@@ -1,0 +1,18 @@
+{
+  "name": "luma-live",
+  "version": "3.4.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "echo 'Build not needed for static applet'"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "express": "^4.21.2"
+  },
+  "overrides": {
+    "archiver": "^7.0.1"
+  }
+}

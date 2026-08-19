@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>LUMA Live</title>
+  <!-- 引入极简轻奢与花体字体 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Playfair+Display:ital,wght@1,600;1,800&family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="style.css">
+  <!-- 独立启动页模块 (Plan A) -->
+  <script src="LIVE/splash.js"></script>
+</head>
+<body class="h-screen w-screen flex flex-col relative select-none">
+
+  <!-- 隐藏的文件导入选择器 -->
+  <input type="file" id="fileInputData" class="hidden" accept=".json" onchange="handleFileImportData(event)">
+  <input type="file" id="fileInputPresets" class="hidden" accept=".json" onchange="handleFileImportPresets(event)">
+
+  <!-- ======================== 原生顶部导航 Header ======================== -->
+  <header class="header-safe-pt px-5 pb-2 flex items-center justify-between z-20 relative">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 flex items-center justify-center shadow-lg border border-slate-700/50 relative overflow-hidden">
+        <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-black text-base tracking-tight text-slate-900 leading-none">LUMA LIVE</h1>
+          <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_8px_#ff2a6d]"></span>
+        </div>
+        <span class="text-[9px] text-slate-400 font-bold tracking-widest uppercase mt-0.5 block">Cyber Live Ecosystem</span>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-1.5 bg-white/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white shadow-sm">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+      <span class="text-[10px] font-bold text-slate-700">实时推流中</span>
+    </div>
+  </header>
+
+  <!-- ======================== 主视图容器 (4大 Tab) ======================== -->
+  <main class="flex-1 overflow-hidden relative z-10">
+    
+    <!-- Tab 1: 直播 -->
+    <div id="tab-live" class="tab-page h-full overflow-y-auto no-scrollbar px-4 pb-28 space-y-3.5">
+      <div onclick="handleGenerateWildNPC()" class="holo-wild-card p-3.5 flex items-center justify-between cursor-pointer active:scale-98 transition shadow-sm">
+        <div class="flex items-center gap-3 relative z-10">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-500 via-purple-600 to-cyan-400 p-0.5 shadow-md">
+            <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-white text-base font-bold">
+              <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <h3 class="text-xs font-black text-slate-900">偶遇野生主播 · AI 生图</h3>
+              <span class="text-[8px] bg-purple-100 text-purple-700 font-extrabold px-1.5 py-0.2 rounded-full">NEW</span>
+            </div>
+            <p class="text-[10px] text-slate-500 mt-0.5">召唤专属虚拟主播（自动套用生图参数）</p>
+          </div>
+        </div>
+        <div id="btnSummonWildBadge" class="relative z-10 flex items-center gap-1 bg-white/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-white text-rose-600 text-[10px] font-black shadow-sm">
+          <span>召唤</span><span>›</span>
+        </div>
+      </div>
+
+      <div class="space-y-1.5 pt-0.5">
+        <div class="flex justify-between items-center px-1">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">PRIMARY CHANNELS · 核心频道</span>
+        </div>
+        <div id="channelCircleContainer" class="flex gap-3.5 overflow-x-auto no-scrollbar py-1 px-1">
+          <div onclick="selectMainCategory('all')" id="ch-all" class="channel-circle-box active">
+            <div class="channel-circle"><div class="channel-circle-inner"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg></div></div>
+            <span class="text-[10px] text-slate-500 font-bold">全部</span>
+          </div>
+          <div onclick="selectMainCategory('电竞竞技')" id="ch-电竞竞技" class="channel-circle-box">
+            <div class="channel-circle"><div class="channel-circle-inner"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 3 18 3 18 8 6 8 6 3"></polygon><line x1="12" y1="8" x2="12" y2="21"></line></svg></div></div>
+            <span class="text-[10px] text-slate-500 font-bold">电竞竞技</span>
+          </div>
+          <div onclick="selectMainCategory('声动音律')" id="ch-声动音律" class="channel-circle-box">
+            <div class="channel-circle"><div class="channel-circle-inner"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div></div>
+            <span class="text-[10px] text-slate-500 font-bold">声动音律</span>
+          </div>
+          <div onclick="selectMainCategory('次元才艺')" id="ch-次元才艺" class="channel-circle-box">
+            <div class="channel-circle"><div class="channel-circle-inner"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div></div>
+            <span class="text-[10px] text-slate-500 font-bold">次元才艺</span>
+          </div>
+          <div onclick="selectMainCategory('随性杂谈')" id="ch-随性杂谈" class="channel-circle-box">
+            <div class="channel-circle"><div class="channel-circle-inner"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></div></div>
+            <span class="text-[10px] text-slate-500 font-bold">随性杂谈</span>
+          </div>
+          <div onclick="selectMainCategory('探索开箱')" id="ch-探索开箱" class="channel-circle-box">
+            <div class="channel-circle"><div class="channel-circle-inner"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg></div></div>
+            <span class="text-[10px] text-slate-500 font-bold">探索开箱</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-1">
+        <div id="subCategoryFilterBar" class="flex gap-2 overflow-x-auto no-scrollbar py-1"></div>
+      </div>
+
+      <div id="liveGrid" class="grid grid-cols-2 gap-3.5 pt-1"></div>
+    </div>
+
+    <!-- Tab 2: 今日热搜 -->
+    <div id="tab-trends" class="tab-page hidden h-full overflow-y-auto no-scrollbar px-4 pb-28 space-y-4">
+      <div class="luxe-card p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-full p-0.5 bg-gradient-to-tr from-rose-500 via-purple-500 to-amber-400 shadow-md flex-shrink-0">
+              <div class="w-full h-full bg-slate-950 rounded-full flex items-center justify-center text-white">
+                <svg class="w-5 h-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              </div>
+            </div>
+            <div>
+              <div class="flex items-center gap-1.5">
+                <h3 class="text-sm font-black text-slate-900 leading-none">今日热搜</h3>
+                <span class="text-[8px] bg-rose-50 text-rose-600 font-extrabold px-1.5 py-0.5 rounded border border-rose-200">TOP 10</span>
+              </div>
+              <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-1 block">TOP TRENDS · 全网实时沸点</span>
+            </div>
+          </div>
+          <button id="btnRefreshTrends" onclick="handleGenerateNewTrend()" class="btn-brand text-xs !py-1.5 !px-3.5 shadow-sm">
+            <span>刷新帖子</span>
+          </button>
+        </div>
+
+        <div class="flex gap-2 overflow-x-auto no-scrollbar py-0.5" id="hotTrendPills">
+          <span class="text-[10px] bg-rose-50 text-rose-600 font-bold px-2.5 py-1 rounded-full border border-rose-200 flex-shrink-0">1. #主播连麦当场破防# 爆</span>
+          <span class="text-[10px] bg-amber-50 text-amber-700 font-bold px-2.5 py-1 rounded-full border border-amber-200 flex-shrink-0">2. #神秘神豪空降直播间# 热</span>
+          <span class="text-[10px] bg-slate-100 text-slate-700 font-bold px-2.5 py-1 rounded-full flex-shrink-0">3. #野生主播惊艳立绘出道#</span>
+        </div>
+      </div>
+
+      <div id="weiboPostFeedContainer" class="space-y-4"></div>
+    </div>
+
+    <!-- Tab 3: 我的个人主页 -->
+    <div id="tab-profile" class="tab-page hidden h-full overflow-y-auto no-scrollbar px-4 pb-28 space-y-4">
+      <div class="luxe-card p-5 space-y-3.5">
+        <div class="flex items-start justify-between">
+          <div class="flex gap-3.5">
+            <div class="relative">
+              <div id="userAvatarContainer" class="w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 via-rose-500 to-purple-600 shadow-md">
+                <img id="userAvatarBox" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200" class="w-full h-full rounded-full object-cover border-2 border-white">
+              </div>
+              <span class="absolute -bottom-1 -right-1 bg-slate-900 text-amber-300 text-[8px] font-black px-1.5 py-0.2 rounded-full border border-amber-400/40">VIP 9</span>
+            </div>
+            <div>
+              <div class="flex items-center gap-1.5">
+                <h3 id="userName" class="font-black text-base text-slate-900">玩家</h3>
+                <span id="userVBadge" class="w-4 h-4 rounded-full bg-gradient-to-tr from-amber-400 to-amber-500 text-slate-950 font-black text-[9px] flex items-center justify-center shadow-sm border border-white">V</span>
+              </div>
+              <p class="text-[10px] text-slate-400 mt-0.5">UID: <span id="displayUserUID">88291048</span> · IP属地: <span id="displayUserIP">LUMA</span></p>
+              <div class="flex gap-1.5 mt-1.5" id="userTagsBox">
+                <span class="text-[9px] bg-rose-50 text-rose-600 font-bold px-1.5 py-0.5 rounded border border-rose-200" id="displayUserTag">新人主播</span>
+              </div>
+            </div>
+          </div>
+          <button onclick="openEditProfileModal()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          </button>
+        </div>
+
+        <p id="userBioText" class="text-xs text-slate-600 leading-relaxed bg-white/60 p-2.5 rounded-xl border border-white/60">
+          “白天是理智社畜，深夜是某主播的头号榜一大哥。理性看播，感性砸车。”
+        </p>
+
+        <div class="grid grid-cols-4 text-center pt-1 border-t border-slate-100">
+          <div onclick="openFollowListPageView()" class="cursor-pointer active:opacity-70">
+            <p class="text-xs font-black text-rose-600" id="statFollowCount">1</p>
+            <p class="text-[10px] text-slate-500 font-bold mt-0.5">关注 ›</p>
+          </div>
+          <div><p class="text-xs font-black text-slate-900" id="statFanCount">0</p><p class="text-[10px] text-slate-400 mt-0.5">粉丝</p></div>
+          <div><p class="text-xs font-black text-slate-900" id="statLikeCount">0</p><p class="text-[10px] text-slate-400 mt-0.5">获赞</p></div>
+          <div><p class="text-xs font-black text-slate-900" id="statMedalCount">0</p><p class="text-[10px] text-slate-400 mt-0.5">守护勋章</p></div>
+        </div>
+      </div>
+
+      <!-- 黑金卡收益中心 -->
+      <div onclick="openWalletPageView()" class="black-card p-5 cursor-pointer active:scale-98 transition space-y-3">
+        <div class="flex justify-between items-center relative z-10">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs text-amber-400">✦</span>
+            <span class="text-xs font-black tracking-wider text-amber-200 uppercase">LUMA Vault · 收益金库</span>
+          </div>
+          <span class="text-[10px] bg-amber-400/20 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-400/30">钱包与流水 ›</span>
+        </div>
+        <div class="relative z-10">
+          <p class="text-[11px] text-slate-400">待提现收益 (LUMA 币)</p>
+          <div class="mt-1 flex items-baseline gap-2">
+            <span class="text-3xl font-black tracking-tight text-white" id="liveRevenueAmount">0</span>
+            <span class="text-xs text-amber-400 font-bold">≈ 点击管理</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 双列守护排行榜 -->
+      <div class="luxe-card p-4 space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <div class="flex gap-4">
+            <button onclick="switchRankTab('fans')" id="btnRankFans" class="text-xs font-black text-rose-600 border-b-2 border-rose-600 pb-1">粉丝守护榜</button>
+            <button onclick="switchRankTab('my')" id="btnRankMy" class="text-xs font-bold text-slate-400 pb-1">我的守护榜</button>
+          </div>
+        </div>
+        <div id="dualRankListContainer" class="space-y-2"></div>
+      </div>
+
+      <button onclick="openPlayerLiveView()" class="btn-brand w-full !py-3.5 justify-center text-xs font-black shadow-lg shadow-rose-500/20">
+        <span>我要开播</span>
+      </button>
+    </div>
+
+    <!-- Tab 4: 设置中心 -->
+    <div id="tab-settings" class="tab-page hidden h-full overflow-y-auto no-scrollbar px-4 pb-28 space-y-3.5">
+      <div class="pt-1 px-1">
+        <h2 class="text-base font-black text-slate-900">系统设定</h2>
+        <p class="text-[11px] text-slate-400 mt-0.5">低耗驱动与自定义接口统管</p>
+      </div>
+
+      <div class="space-y-2.5">
+        <!-- 抽屉 1: 参数设置 (已将滑块上限限制为 0% - 80%) -->
+        <div class="accordion-item" id="accItem1">
+          <div class="accordion-header" onclick="toggleAccordion('accItem1')">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line></svg>
+              </div>
+              <h4 class="text-xs font-black text-slate-900">参数设置</h4>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded" id="tagCharRate">45% 概率开播</span>
+              <svg class="accordion-chevron w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+          </div>
+          <div class="accordion-body space-y-3">
+            <div class="h-[1px] bg-slate-100 mb-2"></div>
+
+            <!-- 1. char开播概率（范围 0% - 80%） -->
+            <div>
+              <div class="flex justify-between text-[11px] font-bold text-slate-700 mb-1">
+                <span>char后台自发开播概率 (0%-80%)</span>
+                <span id="valCharSpawnRate" class="text-rose-600 font-bold">45%</span>
+              </div>
+              <p class="text-[9px] text-slate-400 mb-1.5">0% 为纯自主/代播彩蛋模式（后台不乱抓人），上限80%保留自由意志</p>
+              <input type="range" id="paramCharSpawnRate" min="0" max="80" value="45" oninput="updateParam('charSpawnRate', this.value)" class="jelly-slider">
+            </div>
+
+            <!-- 2. char单次直播时长上限 -->
+            <div>
+              <div class="flex justify-between text-[11px] font-bold text-slate-700 mb-1.5">
+                <span>char单次直播时长上限</span>
+                <span id="valMaxLiveDuration" class="text-rose-600 font-bold">120分钟</span>
+              </div>
+              <input type="range" id="paramMaxLiveDuration" min="10" max="300" step="10" value="120" oninput="updateParam('maxLiveDuration', this.value)" class="jelly-slider">
+            </div>
+
+            <!-- 3. char单次下播休息时长上限 -->
+            <div>
+              <div class="flex justify-between text-[11px] font-bold text-slate-700 mb-1.5">
+                <span>char单次下播休息时长上限</span>
+                <span id="valMaxRestDuration" class="text-rose-600 font-bold">360分钟</span>
+              </div>
+              <input type="range" id="paramMaxRestDuration" min="10" max="720" step="10" value="360" oninput="updateParam('maxRestDuration', this.value)" class="jelly-slider">
+            </div>
+
+            <!-- 4. char回复随机弹幕的概率 -->
+            <div>
+              <div class="flex justify-between text-[11px] font-bold text-slate-700 mb-1">
+                <span>char回复随机弹幕的概率</span>
+                <span id="valReplyRandomDanmakuRate" class="text-rose-600 font-bold">25%</span>
+              </div>
+              <p class="text-[9px] text-slate-400 mb-1.5">0不回复任何弹幕，50%回复概率高但不会条条回复</p>
+              <input type="range" id="paramReplyRandomDanmakuRate" min="0" max="50" value="25" oninput="updateParam('replyRandomDanmakuRate', this.value)" class="jelly-slider">
+            </div>
+
+            <!-- 5. char主动提及你的概率 -->
+            <div>
+              <div class="flex justify-between text-[11px] font-bold text-slate-700 mb-1">
+                <span>char主动提及你的概率</span>
+                <span id="valMentionUserRate" class="text-rose-600 font-bold">30%</span>
+              </div>
+              <p class="text-[9px] text-slate-400 mb-1.5">打包弹幕时主动在公屏或台词艾特玩家的判定概率</p>
+              <input type="range" id="paramMentionUserRate" min="0" max="100" value="30" oninput="updateParam('mentionUserRate', this.value)" class="jelly-slider">
+            </div>
+
+            <!-- 6. char进入其他直播间的概率 -->
+            <div>
+              <div class="flex justify-between text-[11px] font-bold text-slate-700 mb-1">
+                <span>char进入其他直播间的概率</span>
+                <span id="valEnterOtherLiveRate" class="text-rose-600 font-bold">35%</span>
+              </div>
+              <p class="text-[9px] text-slate-400 mb-1.5">char之间互相逛直播间查房的概率</p>
+              <input type="range" id="paramEnterOtherLiveRate" min="0" max="70" value="35" oninput="updateParam('enterOtherLiveRate', this.value)" class="jelly-slider">
+            </div>
+
+            <!-- 7. 弹幕频率 -->
+            <div>
+              <div class="flex justify-between text-[11px] font-bold text-slate-700 mb-1">
+                <span>弹幕频率</span>
+                <span id="valDanmakuSpeed" class="text-rose-600 font-bold">50 (约2.9秒/条)</span>
+              </div>
+              <p class="text-[9px] text-slate-400 mb-1.5">屏幕滚动速度与公屏批处理节奏：20≈5秒/条，80≈1秒/条</p>
+              <input type="range" id="paramDanmakuSpeed" min="20" max="80" value="50" oninput="updateParam('danmakuSpeed', this.value)" class="jelly-slider">
+            </div>
+
+            <!-- 8. 礼物频率 -->
+            <div>
+              <div class="flex justify-between text-[11px] font-bold text-slate-700 mb-1">
+                <span>礼物频率</span>
+                <span id="valGiftFrequency" class="text-rose-600 font-bold">30</span>
+              </div>
+              <p class="text-[9px] text-slate-400 mb-1.5">直播间路人刷礼物的频率节奏</p>
+              <input type="range" id="paramGiftFrequency" min="10" max="80" value="30" oninput="updateParam('giftFrequency', this.value)" class="jelly-slider">
+            </div>
+
+            <!-- 9. char进入你直播间的概率 -->
+            <div>
+              <div class="flex justify-between text-[11px] font-bold text-slate-700 mb-1.5">
+                <span>char进入你直播间的概率</span>
+                <span id="valEnterPlayerLiveRate" class="text-rose-600 font-bold">60%</span>
+              </div>
+              <input type="range" id="paramEnterPlayerLiveRate" min="0" max="100" value="60" oninput="updateParam('enterPlayerLiveRate', this.value)" class="jelly-slider">
+            </div>
+
+            <div class="h-[1px] bg-slate-100 my-2"></div>
+            <div>
+              <div class="flex justify-between text-[11px] font-bold text-slate-700 mb-1.5">
+                <span>主播留言墙翻牌率</span>
+                <span id="valGuestbookRate" class="text-rose-600 font-bold">75%</span>
+              </div>
+              <input type="range" id="paramGuestbookRate" min="10" max="100" value="75" oninput="updateParam('guestbookRate', this.value)" class="jelly-slider">
+            </div>
+
+            <div class="h-[1px] bg-slate-100 my-2"></div>
+            <div class="flex items-center justify-between py-1">
+              <span class="text-[11px] font-bold text-slate-700">礼物全屏特效</span>
+              <label class="switch-toggle">
+                <input type="checkbox" id="paramGiftFullScreenEffect" checked onchange="updateParam('giftFullScreenEffect', this.checked)">
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+
+            <div class="pt-2">
+              <button onclick="saveAllParamsExplicitly()" class="btn-brand w-full py-2 justify-center text-xs font-bold shadow-sm">
+                <span>保存参数设置</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 抽屉 2: 预设提示词 -->
+        <div class="accordion-item" id="accItem2">
+          <div class="accordion-header" onclick="toggleAccordion('accItem2')">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+              </div>
+              <h4 class="text-xs font-black text-slate-900">预设提示词</h4>
+            </div>
+            <svg class="accordion-chevron w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </div>
+          <div class="accordion-body space-y-2">
+            <div class="h-[1px] bg-slate-100 mb-2"></div>
+            <div class="grid grid-cols-1 gap-2" id="presetCategoryList"></div>
+          </div>
+        </div>
+
+        <!-- 抽屉 3: 数据储存 -->
+        <div class="accordion-item" id="accItem3">
+          <div class="accordion-header" onclick="toggleAccordion('accItem3')">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline></svg>
+              </div>
+              <h4 class="text-xs font-black text-slate-900">数据储存</h4>
+            </div>
+            <svg class="accordion-chevron w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </div>
+          <div class="accordion-body space-y-2">
+            <div class="h-[1px] bg-slate-100 mb-2"></div>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="exportAppDataFile()" class="btn-action justify-center text-[11px]">导出运行数据</button>
+              <button onclick="triggerImportAppDataFile()" class="btn-action justify-center text-[11px]">导入运行数据</button>
+              <button onclick="exportPresetsDataFile()" class="btn-action justify-center text-[11px]">导出提示词预设</button>
+              <button onclick="triggerImportPresetsDataFile()" class="btn-action justify-center text-[11px]">导入提示词预设</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 抽屉 4: 自定义API (已对齐文案与注释说明) -->
+        <div class="accordion-item" id="accItem4">
+          <div class="accordion-header" onclick="toggleAccordion('accItem4')">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+              </div>
+              <h4 class="text-xs font-black text-slate-900">自定义API</h4>
+            </div>
+            <svg class="accordion-chevron w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </div>
+          <div class="accordion-body space-y-2.5">
+            <div class="h-[1px] bg-slate-100 mb-2"></div>
+            <div onclick="openCustomApiModal()" class="luxe-card p-3 flex items-center justify-between cursor-pointer active:scale-98 transition bg-white">
+              <div>
+                <h5 class="text-xs font-black text-slate-800">自定义文本API</h5>
+                <p class="text-[9px] text-slate-400" id="statusCustomApi">支持硅基流动 / DeepSeek / 自定义接口</p>
+              </div>
+              <span class="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-bold">配置 ›</span>
+            </div>
+
+            <div onclick="openCustomImageApiModal()" class="luxe-card p-3 flex items-center justify-between cursor-pointer active:scale-98 transition bg-white">
+              <div>
+                <h5 class="text-xs font-black text-slate-800">自定义生图API</h5>
+                <p class="text-[9px] text-slate-400" id="statusCustomImageApi">SD / DALL-E 格式支持</p>
+              </div>
+              <span class="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-bold">配置 ›</span>
+            </div>
+
+            <!-- 自定义文本模型开关 -->
+            <div class="luxe-card p-3 flex items-center justify-between bg-white">
+              <div>
+                <h5 class="text-xs font-black text-slate-800">启用全局文本API</h5>
+                <p class="text-[9px] text-slate-400">开启时使用全局模型，关闭时使用自定义模型</p>
+              </div>
+              <label class="switch-toggle">
+                <input type="checkbox" id="switchGlobalModel" onchange="toggleGlobalModelSwitch(this.checked)">
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+
+            <!-- 自定义生图模型开关 -->
+            <div class="luxe-card p-3 flex items-center justify-between bg-white">
+              <div>
+                <h5 class="text-xs font-black text-slate-800">启用全局生图API</h5>
+                <p class="text-[9px] text-slate-400">开启时使用全局模型，关闭时使用自定义模型</p>
+              </div>
+              <label class="switch-toggle">
+                <input type="checkbox" id="switchGlobalImageModel" onchange="toggleGlobalImageModelSwitch(this.checked)">
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 抽屉 5: 生图参数及提示词 -->
+        <div class="accordion-item" id="accItem5">
+          <div class="accordion-header" onclick="toggleAccordion('accItem5')">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+              </div>
+              <h4 class="text-xs font-black text-slate-900">生图参数及提示词</h4>
+            </div>
+            <svg class="accordion-chevron w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </div>
+          <div class="accordion-body space-y-3">
+            <div class="h-[1px] bg-slate-100 mb-2"></div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-[10px] font-bold text-slate-500 block mb-1">生图尺寸</label>
+                <select id="selectImageSize" onchange="handleImageSizeChange(this.value)" class="input-ins !py-1 text-xs font-bold">
+                  <option value="1:1">正方形 1:1 (1024x1024)</option>
+                  <option value="9:16">竖屏 9:16 (1024x1792)</option>
+                  <option value="16:9">横屏 16:9 (1792x1024)</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-[10px] font-bold text-slate-500 block mb-1">生成质量</label>
+                <select id="selectImageQuality" onchange="handleImageQualityChange(this.value)" class="input-ins !py-1 text-xs font-bold">
+                  <option value="standard">标准 Standard</option>
+                  <option value="hd">高清 HD</option>
+                </select>
+              </div>
+            </div>
+            <div class="space-y-2 pt-1" id="imagePromptEntriesContainer"></div>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button onclick="addNewImagePromptEntry()" class="btn-action justify-center !py-2 text-xs !border-dashed !border-emerald-300 text-emerald-600">
+                <span>+ 新增提示词</span>
+              </button>
+              <button onclick="saveImageSettingsExplicitly()" class="btn-brand justify-center !py-2 text-xs font-bold shadow-sm">
+                <span>保存生图设置</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="openResetConfirmModal()" class="luxe-card w-full py-3.5 text-center text-xs font-black text-rose-600 border-rose-200/60 active:bg-rose-50 transition">
+          清除缓存
+        </button>
+
+        <button id="btnVersionUpdateCard" onclick="handleVersionUpdateClick()" class="luxe-card relative w-full py-3.5 text-center text-xs font-black text-rose-600 border-rose-200/60 active:bg-rose-50 transition">
+          <span id="versionUpdateBtnText">版本更新</span>
+          <span id="versionUpdateBadge" class="absolute right-3 bottom-1.5 text-[9px] font-mono text-rose-400 font-normal">v3.4.0</span>
+        </button>
+
+        <!-- 隐藏的文件导入控件 -->
+        <input type="file" id="fileInputData" accept=".json" onchange="handleFileImportData(event)" class="hidden">
+        <input type="file" id="fileInputPresets" accept=".json" onchange="handleFileImportPresets(event)" class="hidden">
+      </div>
+    </div>
+  </main>
+
+  <!-- ======================== 纯矢量 SVG 悬浮 Dock 栏 ======================== -->
+  <div class="fixed bottom-0 left-0 right-0 z-30 pb-safe">
+    <nav class="dock-glass h-[70px] flex items-center justify-around px-3 pb-2 pt-1">
+      <button onclick="switchTab('live')" id="nav-btn-live" class="dock-btn active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+        <span class="text-[9px] font-black">直播</span>
+      </button>
+      <button onclick="switchTab('trends')" id="nav-btn-trends" class="dock-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        <span class="text-[9px] font-black">社区</span>
+      </button>
+      <button onclick="switchTab('profile')" id="nav-btn-profile" class="dock-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <span class="text-[9px] font-black">主页</span>
+      </button>
+      <button onclick="switchTab('settings')" id="nav-btn-settings" class="dock-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span class="text-[9px] font-black">设定</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ======================== 【核心重构】：全屏双区真磨砂直播间 ======================== -->
+  <div id="liveRoomModal" class="full-page-view hidden">
+    
+    <!-- 【区域一：1:1 纯正方形主播立绘（100% 完整无遮挡）】 -->
+    <div class="stage-avatar-zone" id="stageMain">
+      <img id="stageHostPortrait" src="" class="stage-portrait-main">
+
+      <!-- 顶部左侧：独立大退出键 (带精致磨砂边框) -->
+      <button onclick="closeLiveRoom()" class="stage-back-btn" title="退出直播间">
+        <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+
+      <!-- 顶部右侧：放大版动态拍摄红点 (模拟现场 REC 录制质感) 与 实时直播时长计时 -->
+      <div class="stage-rec-indicator">
+        <span class="stage-rec-dot"></span>
+        <span class="stage-rec-text">REC</span>
+        <span id="stageLiveDuration" class="stage-live-duration">00:00:00</span>
+      </div>
+
+      <!-- 1:1 头像区左下角：主播大号精致信息胶囊 (严格同款个人主页高奢彩框头像、VIP等级、ID、金V章、粉丝数与右侧称号) -->
+      <div class="host-capsule-bottom">
+        <div class="relative flex-shrink-0 cursor-pointer" onclick="openCurrentHostProfile()">
+          <div class="w-11 h-11 rounded-full p-[2px] bg-gradient-to-tr from-amber-400 via-rose-500 to-purple-600 shadow-md flex items-center justify-center">
+            <img id="hostAvatarSmall" src="" class="w-full h-full rounded-full object-cover border-[1.5px] border-white">
+          </div>
+          <span id="hostVipBadge" class="absolute -bottom-0.5 -right-0.5 bg-slate-900 text-amber-300 text-[7px] font-black px-1 py-[0.5px] rounded-full border border-amber-400/50 leading-none shadow">VIP 9</span>
+        </div>
+        
+        <div class="flex flex-col min-w-0 pr-1 justify-center cursor-pointer" onclick="openCurrentHostProfile()">
+          <div class="flex items-center gap-1.5">
+            <span id="hostName" class="text-xs font-black text-white leading-none truncate max-w-[85px]">主播</span>
+            <span id="hostVBadge" class="w-3.5 h-3.5 rounded-full bg-gradient-to-tr from-amber-400 to-amber-500 text-slate-950 font-black text-[8px] flex items-center justify-center shadow-sm border border-white flex-shrink-0 leading-none">V</span>
+          </div>
+          <div class="flex items-center gap-1.5 text-[9px] mt-1 leading-none text-white/90">
+            <span class="font-bold flex items-center gap-0.5">
+              <span id="hostFanCount">0</span> 粉丝
+            </span>
+            <span id="hostTitleTag" class="text-[8px] bg-rose-500/25 text-rose-300 font-bold px-1.5 py-0.5 rounded border border-rose-400/40 truncate max-w-[65px]">新人主播</span>
+          </div>
+        </div>
+
+        <button id="btnFollowHost" onclick="toggleFollowRoomHost()" class="host-follow-btn-lg">+ 关注</button>
+      </div>
+
+      <!-- 1:1 头像区右下角：在看人数 (高度略低于主播信息胶囊，bottom: 8px) -->
+      <div class="viewer-capsule-bottom">
+        <svg class="w-3 h-3 text-white/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        <span id="viewerCount" class="text-[10px] font-bold text-white/95">0 在看</span>
+      </div>
+    </div>
+
+    <!-- 【区域二：公屏区（铺满下半部，底层同图晕染，绝无多余底板）】 -->
+    <div class="stage-chat-zone">
+      <!-- 铺满整个公屏区的同图大模糊晕染底图 -->
+      <img id="stageAmbientBg" src="" class="pure-ambient-bleed-bg">
+
+      <!-- 公屏顶部的 1/5 磨砂台词条 (麦克风在左侧垂直居中、字多安全换行) -->
+      <div class="host-speech-bar-top">
+        <div class="w-full flex items-center gap-2.5 px-1">
+          <!-- 麦克风放大在左侧垂直居中并保持呼吸闪烁 -->
+          <div class="flex flex-col items-center justify-center flex-shrink-0">
+            <svg class="mic-pulse-icon w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+            <span class="text-[7px] font-black text-white/60 uppercase tracking-widest mt-0.5">LIVE</span>
+          </div>
+          <!-- 台词正文 -->
+          <div class="flex-1 min-w-0 flex flex-col justify-center">
+            <div class="flex items-center gap-1 mb-0.5">
+              <span class="text-[7px] font-bold text-amber-300 uppercase tracking-wider">ON AIR</span>
+              <span id="speechActionTag" class="text-[8px] text-white/70 font-medium truncate"></span>
+            </div>
+            <p id="speechContentText" class="text-xs font-medium text-white leading-relaxed max-h-12 overflow-y-auto no-scrollbar break-words">
+              欢迎来到直播间！
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 送礼大型流光横幅 -->
+      <div class="gift-banner-float-top" id="giftBannerTrack"></div>
+
+      <!-- 弹幕列表视口 (铺满公屏区，顶部羽化) -->
+      <div id="danmakuFeed" class="danmaku-stream-viewport"></div>
+
+      <!-- 移至说话框下方的悬浮加号按钮 -->
+      <button id="mainPlusBtn" onclick="togglePlusDrawer()" class="ui-plus-btn-sub" title="更多操作">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      </button>
+
+      <!-- 纯悬浮 UI 控件：长条输入框 + 40px 纯黑白磨砂发送按钮 -->
+      <div class="ui-input-bar-float">
+        <input id="inputDanmaku" type="text" placeholder="发条弹幕互动..." onkeydown="if(event.key==='Enter') sendUserDanmaku()">
+        <button onclick="sendUserDanmaku()" class="zb-send-btn-bw" title="发送">
+          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
+
+      <!-- 从底部滑出的操作抽屉 (底栏弹出方式) -->
+      <div id="plusDrawerSheet" class="plus-drawer-bottom-sheet">
+        <button onclick="handleDrawerAction('share')" class="bottom-drawer-btn" title="分享直播">
+          <div class="bottom-drawer-icon-wrap">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+          </div>
+          <span>分享动态</span>
+        </button>
+        <button onclick="handleDrawerAction('gift')" class="bottom-drawer-btn" title="赠送礼物">
+          <div class="bottom-drawer-icon-wrap">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect x="2" y="7" width="20" height="5"></rect><line x1="12" y1="22" x2="12" y2="7"></line><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg>
+          </div>
+          <span>送出礼物</span>
+        </button>
+        <button onclick="handleDrawerAction('quality')" class="bottom-drawer-btn" title="画质调节">
+          <div class="bottom-drawer-icon-wrap">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+          </div>
+          <span>画质调节</span>
+        </button>
+        <button onclick="handleDrawerAction('call')" class="bottom-drawer-btn" title="连麦互动">
+          <div class="bottom-drawer-icon-wrap">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+          </div>
+          <span>连麦互动</span>
+        </button>
+        <button onclick="handleDrawerAction('clear')" class="bottom-drawer-btn" title="清空弹幕">
+          <div class="bottom-drawer-icon-wrap">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </div>
+          <span>清空公屏</span>
+        </button>
+      </div>
+
+      <!-- 全屏礼物特效图层 (仅 User / Char 触发) -->
+      <div id="liveFullscreenFxLayer" class="fullscreen-gift-fx-layer hidden"></div>
+
+      <!-- 抖音同款右下角连击悬浮圆圈 -->
+      <div id="liveComboCircleBtn" class="live-combo-circle-btn hidden" onclick="handleComboCircleClick()">
+        <svg class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3.5"></circle>
+          <circle id="comboProgressCircle" cx="32" cy="32" r="28" fill="none" stroke="#fbbf24" stroke-width="3.5" stroke-dasharray="175.9" stroke-dashoffset="0" stroke-linecap="round"></circle>
+        </svg>
+        <div class="relative z-10 flex flex-col items-center justify-center leading-none">
+          <span class="text-[9px] font-black text-amber-300 uppercase tracking-wider drop-shadow">COMBO</span>
+          <span id="comboCounterNumber" class="text-sm font-black text-white italic drop-shadow-md">x1</span>
+        </div>
+      </div>
+
+      <!-- 底部礼物滑动抽屉 -->
+      <div id="giftTrayModal" class="gift-sheet-modal">
+        <div class="flex justify-between items-center pb-2.5 border-b border-white/10 mb-2.5 flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div>
+              <h4 class="text-xs font-bold text-white">赠送支持礼物</h4>
+              <p class="text-[10px] text-amber-300 font-bold mt-0.5" id="giftWalletBalance">💎 0 LUMA 币</p>
+            </div>
+            <button onclick="openRechargeModal()" class="px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[10px] font-black shadow-sm active:scale-95 transition flex items-center gap-1">
+              <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>充值</span>
+            </button>
+          </div>
+          <button onclick="toggleGiftTray()" class="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-white/60 text-xs font-black">✕</button>
+        </div>
+
+        <!-- 数量快捷选择框 (1, 10, 52, 99, 1314) -->
+        <div class="grid grid-cols-5 gap-1.5 mb-2.5 flex-shrink-0">
+          <button onclick="selectGiftQuantity(1)" id="gift-qty-1" class="gift-qty-btn active">1</button>
+          <button onclick="selectGiftQuantity(10)" id="gift-qty-10" class="gift-qty-btn">10</button>
+          <button onclick="selectGiftQuantity(52)" id="gift-qty-52" class="gift-qty-btn">52</button>
+          <button onclick="selectGiftQuantity(99)" id="gift-qty-99" class="gift-qty-btn">99</button>
+          <button onclick="selectGiftQuantity(1314)" id="gift-qty-1314" class="gift-qty-btn">1314</button>
+        </div>
+
+        <!-- 15款礼物网格 (5行3列) -->
+        <div class="gift-scroll-grid">
+          <!-- 1. 小心心 1 币 -->
+          <div onclick="sendGift('小心心', 1)" class="gift-card-item">
+            <div class="w-7 h-7 rounded-xl bg-rose-500/20 flex items-center justify-center text-rose-400">
+              <svg class="w-4 h-4 fill-rose-500/30 stroke-rose-400 stroke-[2]" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+            </div>
+            <span class="text-[10px] font-bold text-white/95">小心心</span>
+            <span class="text-[9px] text-amber-300 font-black">1 币</span>
+          </div>
+
+          <!-- 2. 荧光棒 2 币 -->
+          <div onclick="sendGift('荧光棒', 2)" class="gift-card-item">
+            <div class="w-7 h-7 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-400">
+              <svg class="w-4 h-4 stroke-cyan-400 stroke-[2] fill-none" viewBox="0 0 24 24"><line x1="4" y1="20" x2="20" y2="4"></line><line x1="14" y1="4" x2="20" y2="10"></line><line x1="4" y1="14" x2="10" y2="20"></line></svg>
+            </div>
+            <span class="text-[10px] font-bold text-white/95">荧光棒</span>
+            <span class="text-[9px] text-amber-300 font-black">2 币</span>
+          </div>
+
+          <!-- 3. 甜甜圈 10 币 -->
+          <div onclick="sendGift('甜甜圈', 10)" class="gift-card-item">
+            <div class="w-7 h-7 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400">
+              <svg class="w-4 h-4 stroke-amber-400 stroke-[2] fill-none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+            </div>
+            <span class="text-[10px] font-bold text-white/95">甜甜圈</span>
+            <span class="text-[9px] text-amber-300 font-black">10 币</span>
+          </div>
+
+          <!-- 4. 告白气球 52 币 -->
+          <div onclick="sendGift('告白气球', 52)" class="gift-card-item">
+            <div class="w-7 h-7 rounded-xl bg-pink-500/25 flex items-center justify-center text-pink-400">
+              <svg class="w-4 h-4 stroke-pink-400 stroke-[2] fill-pink-500/20" viewBox="0 0 24 24"><circle cx="12" cy="9" r="7"></circle><path d="M12 16v6"></path><path d="M10 22h4"></path></svg>
+            </div>
+            <span class="text-[10px] font-bold text-white/95">告白气球</span>
+            <span class="text-[9px] text-amber-300 font-black">52 币</span>
+          </div>
+
+          <!-- 5. 告白花束 99 币 -->
+          <div onclick="sendGift('告白花束', 99)" class="gift-card-item">
+            <div class="w-7 h-7 rounded-xl bg-rose-500/25 flex items-center justify-center text-rose-400">
+              <svg class="w-4 h-4 stroke-rose-400 stroke-[2] fill-rose-500/20" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"></circle><path d="M12 13v9"></path><path d="M8 17l4-4 4 4"></path></svg>
+            </div>
+            <span class="text-[10px] font-bold text-white/95">告白花束</span>
+            <span class="text-[9px] text-amber-300 font-black">99 币</span>
+          </div>
+
+          <!-- 6. 璀璨花火 188 币 -->
+          <div onclick="sendGift('璀璨花火', 188)" class="gift-card-item">
+            <div class="w-7 h-7 rounded-xl bg-yellow-500/25 flex items-center justify-center text-yellow-400">
+              <svg class="w-4 h-4 stroke-yellow-400 stroke-[2] fill-none" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            </div>
+            <span class="text-[10px] font-bold text-white/95">璀璨花火</span>
+            <span class="text-[9px] text-amber-300 font-black">188 币</span>
+          </div>
+
+          <!-- 7. 绚丽皇冠 299 币 -->
+          <div onclick="sendGift('绚丽皇冠', 299)" class="gift-card-item">
+            <div class="w-7 h-7 rounded-xl bg-amber-500/25 flex items-center justify-center text-amber-300">
+              <svg class="w-4 h-4 stroke-amber-300 stroke-[2] fill-amber-500/20" viewBox="0 0 24 24"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5z"></path></svg>
+            </div>
+            <span class="text-[10px] font-bold text-white/95">绚丽皇冠</span>
+            <span class="text-[9px] text-amber-300 font-black">299 币</span>
+          </div>
+
+          <!-- 8. 守护之翼 520 币 -->
+          <div onclick="sendGift('守护之翼', 520)" class="gift-card-item">
+            <div class="w-7 h-7 rounded-xl bg-purple-500/25 flex items-center justify-center text-purple-300">
+              <svg class="w-4 h-4 stroke-purple-300 stroke-[2] fill-none" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+            </div>
+            <span class="text-[10px] font-bold text-white/95">守护之翼</span>
+            <span class="text-[9px] text-amber-300 font-black">520 币</span>
+          </div>
+
+          <!-- 9. 极速超跑 666 币 -->
+          <div onclick="sendGift('极速超跑', 666)" class="gift-card-item">
+            <div class="w-7 h-7 rounded-xl bg-rose-600/30 flex items-center justify-center text-rose-300 border border-rose-500/40 shadow-sm">
+              <svg class="w-4 h-4 stroke-rose-300 stroke-[2] fill-none" viewBox="0 0 24 24"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.5 2.8C2 10.9 2 11.2 2 11.6V16c0 .6.4 1 1 1h2"></path><circle cx="7" cy="17" r="2"></circle><path d="M9 17h6"></path><circle cx="17" cy="17" r="2"></circle></svg>
+            </div>
+            <span class="text-[10px] font-bold text-white/95">极速超跑</span>
+            <span class="text-[9px] text-amber-300 font-black">666 币</span>
+          </div>
+
+          <!-- 10. 梦幻嘉年华 5200 币 (豪华特效 1) -->
+          <div onclick="sendGift('梦幻嘉年华', 5200)" class="gift-card-item gift-card-luxury">
+            <div class="w-7 h-7 rounded-xl bg-gradient-to-tr from-amber-400 to-rose-500 flex items-center justify-center text-slate-950 shadow-md">
+              <svg class="w-4 h-4 stroke-slate-950 stroke-[2.2] fill-none" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            </div>
+            <span class="text-[10px] font-black text-amber-300">梦幻嘉年华</span>
+            <span class="text-[9px] text-amber-200 font-black">5.2k 币</span>
+          </div>
+
+          <!-- 11. 水晶城堡 2888 币 (豪华特效 3) -->
+          <div onclick="sendGift('水晶城堡', 2888)" class="gift-card-item gift-card-luxury">
+            <div class="w-7 h-7 rounded-xl bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-white shadow-md">
+              <svg class="w-4 h-4 stroke-white stroke-[2] fill-none" viewBox="0 0 24 24"><path d="M4 22h16V11l-3-3-3 3-2-2-2 2-3-3-3 3v11z"></path><rect x="9" y="15" width="6" height="7"></rect></svg>
+            </div>
+            <span class="text-[10px] font-black text-purple-200">水晶城堡</span>
+            <span class="text-[9px] text-purple-300 font-black">2888 币</span>
+          </div>
+
+          <!-- 12. 星际飞船 10000 币 (豪华特效 2) -->
+          <div onclick="sendGift('星际飞船', 10000)" class="gift-card-item gift-card-luxury">
+            <div class="w-7 h-7 rounded-xl bg-gradient-to-tr from-cyan-400 to-indigo-500 flex items-center justify-center text-white shadow-md">
+              <svg class="w-4 h-4 stroke-white stroke-[2.2] fill-none" viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path></svg>
+            </div>
+            <span class="text-[10px] font-black text-cyan-200">星际飞船</span>
+            <span class="text-[9px] text-cyan-300 font-black">10k 币</span>
+          </div>
+
+          <!-- 13. 深海星辰 1314 币 (豪华特效 4) -->
+          <div onclick="sendGift('深海星辰', 1314)" class="gift-card-item gift-card-luxury">
+            <div class="w-7 h-7 rounded-xl bg-gradient-to-tr from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-md">
+              <svg class="w-4 h-4 stroke-white stroke-[2] fill-none" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </div>
+            <span class="text-[10px] font-black text-sky-200">深海星辰</span>
+            <span class="text-[9px] text-sky-300 font-black">1314 币</span>
+          </div>
+
+          <!-- 14. 宇宙之心 33440 币 (豪华特效 5) -->
+          <div onclick="sendGift('宇宙之心', 33440)" class="gift-card-item gift-card-luxury">
+            <div class="w-7 h-7 rounded-xl bg-gradient-to-tr from-rose-500 via-purple-600 to-amber-400 flex items-center justify-center text-white shadow-lg animate-pulse">
+              <svg class="w-4 h-4 stroke-white stroke-[2.2] fill-white/20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path></svg>
+            </div>
+            <span class="text-[10px] font-black text-amber-300">宇宙之心</span>
+            <span class="text-[9px] text-amber-200 font-black">33.4k 币</span>
+          </div>
+
+          <!-- 15. 天使之翼 999 币 (豪华特效 6) -->
+          <div onclick="sendGift('天使之翼', 999)" class="gift-card-item gift-card-luxury">
+            <div class="w-7 h-7 rounded-xl bg-gradient-to-tr from-amber-300 via-yellow-400 to-rose-400 flex items-center justify-center text-slate-950 shadow-md">
+              <svg class="w-4 h-4 stroke-slate-950 stroke-[2] fill-none" viewBox="0 0 24 24"><path d="M12 3c-4 4-8 5-10 9 3 1 6 0 8-2 0 3 2 6 5 8 1-2 2-5 1-8 2 2 5 3 8 2-2-4-6-5-10-9z"></path></svg>
+            </div>
+            <span class="text-[10px] font-black text-amber-300">天使之翼</span>
+            <span class="text-[9px] text-amber-200 font-black">999 币</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 关注列表全屏 Page -->
+  <div id="followListPageView" class="full-page-view hidden bg-[#f1f4f9]">
+    <div class="page-nav-bar bg-white/90 backdrop-blur-xl border-b border-slate-200/80">
+      <div class="flex items-center gap-3">
+        <button onclick="closeFollowListPageView()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 active:scale-90 transition">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <div>
+          <h3 class="text-xs font-black text-slate-900">我的关注列表</h3>
+          <p class="text-[8px] text-slate-400 uppercase tracking-wider">FOLLOWED STREAMERS</p>
+        </div>
+      </div>
+    </div>
+    <div class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar" id="followListContentContainer"></div>
+  </div>
+
+  <!-- 钱包全屏 Page -->
+  <div id="walletPageView" class="full-page-view hidden bg-[#f1f4f9]">
+    <div class="page-nav-bar bg-white/90 backdrop-blur-xl border-b border-slate-200/80">
+      <div class="flex items-center gap-3">
+        <button onclick="closeWalletPageView()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 active:scale-90 transition">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <div>
+          <h3 class="text-xs font-black text-slate-900">我的星瞳钱包</h3>
+          <p class="text-[8px] text-slate-400 uppercase tracking-wider">LUMA VAULT & LEDGER</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="openRechargeModal()" class="px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 text-white text-xs font-black shadow-sm active:scale-95 transition flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>充值</span>
+        </button>
+        <button onclick="handleCashOutAll()" class="btn-brand text-xs !py-1 !px-3 shadow-sm">全额提现</button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+      <div class="black-card p-5 space-y-2">
+        <p class="text-[11px] text-amber-200 font-bold">💎 待提现直播收益</p>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-black text-white" id="pageRevenueBalance">0</span>
+          <span class="text-xs text-amber-400">LUMA 币</span>
+        </div>
+        <p class="text-[9px] text-slate-400 pt-1 border-t border-white/10">提现后将实时同步至小手机主钱包</p>
+      </div>
+
+      <div class="space-y-2.5">
+        <h4 class="text-xs font-black text-slate-900 px-1">📋 交易与打赏明细流水</h4>
+        <div id="transactionLedgerContainer" class="space-y-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 我要开播全屏 Page -->
+  <div id="playerLiveRoomView" class="full-page-view hidden bg-[#080c14] text-white">
+    <div class="page-nav-bar bg-black/60 backdrop-blur-xl border-b border-white/10">
+      <div class="flex items-center gap-3">
+        <button onclick="closePlayerLiveView()" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white active:scale-90 transition">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <div>
+          <h3 class="text-xs font-black text-white">我要开播</h3>
+          <p class="text-[8px] text-rose-400 uppercase tracking-wider">CREATOR STUDIO</p>
+        </div>
+      </div>
+      <span class="text-[9px] bg-rose-600 text-white font-bold px-2 py-0.5 rounded-full animate-pulse">ON AIR 准备中</span>
+    </div>
+
+    <div class="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4">
+      <div class="w-24 h-24 rounded-full border-2 border-dashed border-rose-500 flex items-center justify-center text-3xl">🎙️</div>
+      <div>
+        <h3 class="text-sm font-black">创作者直播间模块</h3>
+        <p class="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">你的专属直播间推流骨架已就绪，角色查房与互动逻辑待填充！</p>
+      </div>
+      <button onclick="closePlayerLiveView()" class="btn-brand text-xs !py-2 !px-6">返回主页</button>
+    </div>
+  </div>
+
+  <!-- 动态详情全屏 Page -->
+  <div id="trendDetailModal" class="full-page-view hidden bg-[#f1f4f9]">
+    <div class="page-nav-bar bg-white/90 backdrop-blur-xl border-b border-slate-200/80">
+      <div class="flex items-center gap-3">
+        <button onclick="closeTrendDetail()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 active:scale-90 transition">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <div>
+          <h3 class="text-xs font-black text-slate-900">动态详情</h3>
+          <p class="text-[8px] text-slate-400 uppercase tracking-wider">POST DETAIL</p>
+        </div>
+      </div>
+      <button onclick="openSharePickerModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 active:scale-90 transition">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+      </button>
+    </div>
+    <div id="trendDetailContent" class="flex-1 overflow-y-auto p-4 space-y-3.5 no-scrollbar pb-6"></div>
+    <div class="bg-white/95 backdrop-blur-xl border-t border-slate-200/80 p-3 pb-safe flex items-center gap-2 z-20 flex-shrink-0">
+      <input id="inputTrendComment" placeholder="爱评论的人运气都不会差..." class="input-ins !py-2 text-xs flex-1">
+      <button onclick="submitTrendComment()" class="btn-brand text-xs !py-2 !px-4">发送</button>
+    </div>
+  </div>
+
+  <!-- ======================== 居中毛玻璃弹窗集合 ======================== -->
+
+  <!-- 修改资料弹窗 -->
+  <div id="editProfileModal" class="hidden center-modal-backdrop">
+    <div class="center-modal-card p-5 space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+        <div>
+          <h3 class="text-xs font-black text-slate-900">✏️ 编辑个人资料</h3>
+          <p class="text-[9px] text-slate-400">修改后立即保存至本地数据库</p>
+        </div>
+        <button onclick="closeEditProfileModal()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs text-slate-500 font-bold">✕</button>
+      </div>
+      <div class="space-y-2.5">
+        <div>
+          <label class="text-[10px] font-bold text-slate-500 block mb-1">星瞳 UID</label>
+          <input id="editInputUID" value="88291048" class="input-ins text-xs">
+        </div>
+        <div>
+          <label class="text-[10px] font-bold text-slate-500 block mb-1">IP 属地</label>
+          <input id="editInputIP" value="LUMA" class="input-ins text-xs">
+        </div>
+        <div>
+          <label class="text-[10px] font-bold text-slate-500 block mb-1">称号头衔</label>
+          <input id="editInputTag" value="新人主播" class="input-ins text-xs font-bold text-rose-600">
+        </div>
+        <div>
+          <label class="text-[10px] font-bold text-slate-500 block mb-1">个性签名</label>
+          <textarea id="editInputBio" rows="3" class="input-ins text-xs leading-relaxed">白天是理智社畜，深夜是某主播的头号榜一大哥。理性看播，感性砸车。</textarea>
+        </div>
+        <button onclick="saveUserProfileEdits()" class="btn-brand w-full py-2.5 justify-center text-xs font-bold shadow">
+          保存资料
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="customApiModal" class="hidden center-modal-backdrop">
+    <div class="center-modal-card p-5 space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+        <div>
+          <h3 class="text-xs font-black text-slate-900">自定义文本API</h3>
+          <p class="text-[9px] text-slate-400">支持硅基流动 / DeepSeek / 自定义接口</p>
+        </div>
+        <button onclick="closeCustomApiModal()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs text-slate-500 font-bold">✕</button>
+      </div>
+      <div class="space-y-2.5">
+        <div>
+          <label class="text-[10px] font-bold text-slate-500 block mb-1">选择API类型</label>
+          <select id="selectApiType" onchange="handleApiTypeChange(this.value)" class="input-ins text-xs font-bold">
+            <option value="siliconflow">硅基流动</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="custom">自定义接口</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[10px] font-bold text-slate-500 block mb-1">API Base URL</label>
+          <input id="inputApiUrl" placeholder="不填则默认 (https://api.siliconflow.cn/v1)" class="input-ins text-xs">
+        </div>
+        <div>
+          <label class="text-[10px] font-bold text-slate-500 block mb-1">API Key</label>
+          <input id="inputApiKey" type="password" placeholder="sk-..." class="input-ins text-xs">
+        </div>
+        <div>
+          <label class="text-[10px] font-bold text-slate-500 block mb-1">选择模型</label>
+          <select id="selectApiModel" class="input-ins text-xs font-bold">
+            <option value="">默认宿主模型</option>
+          </select>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="fetchOpenAIModels()" class="btn-action flex-1 justify-center !py-2 text-xs font-bold">拉取模型</button>
+          <button onclick="testCustomApiConnection()" class="btn-action flex-1 justify-center !py-2 text-xs font-bold">🔗 测试连接</button>
+        </div>
+        <button onclick="saveCustomApiSettingsModal()" class="btn-brand w-full py-2.5 justify-center text-xs font-bold shadow">保存设置</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="customImageApiModal" class="hidden center-modal-backdrop">
+    <div class="center-modal-card p-5 space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+        <div>
+          <h3 class="text-xs font-black text-slate-900">自定义生图API</h3>
+          <p class="text-[9px] text-slate-400">用于召唤野生主播</p>
+        </div>
+        <button onclick="closeCustomImageApiModal()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs text-slate-500 font-bold">✕</button>
+      </div>
+      <div class="space-y-2.5">
+        <div>
+          <label class="text-[10px] font-bold text-slate-500 block mb-1">生图 API URL</label>
+          <input id="inputImageApiUrl" placeholder="https://api.example.com/v1" class="input-ins text-xs">
+        </div>
+        <div>
+          <label class="text-[10px] font-bold text-slate-500 block mb-1">API Key</label>
+          <input id="inputImageApiKey" type="password" placeholder="sk-..." class="input-ins text-xs">
+        </div>
+        <div>
+          <label class="text-[10px] font-bold text-slate-500 block mb-1">选择模型</label>
+          <select id="selectImageApiModel" class="input-ins text-xs font-bold">
+            <option value="dall-e-3">dall-e-3</option>
+          </select>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="fetchImageApiModels()" class="btn-action flex-1 justify-center !py-2 text-xs font-bold">拉取模型</button>
+          <button onclick="testCustomImageApiConnection()" class="btn-action flex-1 justify-center !py-2 text-xs font-bold">🔗 测试连接</button>
+        </div>
+        <button onclick="saveCustomImageApiSettingsModal()" class="btn-brand w-full py-2.5 justify-center text-xs font-bold shadow">保存设置</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="sharePickerModal" class="hidden center-modal-backdrop">
+    <div class="center-modal-card p-5 space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+        <div>
+          <h3 class="text-xs font-black text-slate-900">分享给好友 / 群聊</h3>
+          <p class="text-[9px] text-slate-400">点击头像即可直接将小卡片发给 TA</p>
+        </div>
+        <button onclick="closeSharePickerModal()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs text-slate-500 font-bold">✕</button>
+      </div>
+      <div id="shareTargetListContainer" class="max-h-60 overflow-y-auto space-y-2 no-scrollbar pr-1"></div>
+    </div>
+  </div>
+
+  <!-- 微博风格：角色/主播个人主页大页面 -->
+  <div id="streamerProfilePageView">
+    <!-- 顶部封面与浮动导航 -->
+    <div class="profile-cover-banner">
+      <img id="spCoverImg" src="" class="profile-cover-img" alt="Cover">
+      <div class="profile-cover-mask"></div>
+      <div class="profile-top-nav">
+        <button onclick="closeStreamerProfilePage()" class="profile-nav-btn" title="返回">
+          <svg class="w-5 h-5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <div class="flex items-center gap-2">
+          <button onclick="shareCurrentStreamerProfile()" class="profile-nav-btn" title="分享">
+            <svg class="w-4 h-4 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 滚动内容容器 -->
+    <div class="profile-content-scroll">
+      <!-- 头部档案资料区 -->
+      <div class="px-4 pb-3 bg-white">
+        <div class="flex items-end justify-between mb-3">
+          <!-- 头像与金V认证 -->
+          <div class="profile-avatar-wrapper">
+            <img id="spAvatar" src="" class="profile-avatar-img" alt="Avatar">
+            <div class="v-badge-gold" title="官方认证金V">
+              <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            </div>
+          </div>
+
+          <!-- 操作按钮行 -->
+          <div class="flex items-center gap-2">
+            <!-- 直播中快捷入口 (动态展示) -->
+            <button id="spBtnGoLiveRoom" onclick="spEnterLiveRoom()" class="hidden px-3 py-1.5 rounded-full bg-gradient-to-r from-rose-500 to-pink-500 text-white text-xs font-black shadow-md flex items-center gap-1.5 active:scale-95 transition">
+              <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+              <span>直播中</span>
+            </button>
+
+            <!-- 关注按钮 -->
+            <button id="spBtnFollow" onclick="spToggleFollow()" class="px-4 py-1.5 rounded-full bg-rose-500 text-white text-xs font-bold shadow-sm active:scale-95 transition flex items-center gap-1">
+              <svg class="w-3.5 h-3.5 stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span id="spFollowBtnText">关注</span>
+            </button>
+
+            <!-- 发私信/互动 -->
+            <button onclick="spOpenPrivateChat()" class="p-2 rounded-full bg-slate-100 text-slate-700 active:scale-95 transition" title="发私信">
+              <svg class="w-4 h-4 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- 名字与头衔 -->
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 id="spName" class="text-base font-black text-slate-900">主播名字</h2>
+            <span id="spVipTag" class="text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-900 text-amber-300 border border-amber-400/40">VIP 9</span>
+            <span id="spCategoryBadge" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-100">签约主播</span>
+          </div>
+
+          <!-- 认证说明 -->
+          <div class="flex items-center gap-1.5 text-[11px] text-amber-600 font-bold mt-1">
+            <svg class="w-3.5 h-3.5 text-amber-500 fill-amber-500 flex-shrink-0" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            <span id="spVerifyTitle" class="truncate">LUMA 平台年度认证大V主播</span>
+          </div>
+
+          <!-- 4 宫格核心数据矩阵 (微博经典：粉丝数与直播场数强绑定) -->
+          <div class="grid grid-cols-4 gap-2 my-3 py-2.5 px-3 rounded-2xl bg-slate-50 border border-slate-100 text-center">
+            <div class="cursor-pointer">
+              <span id="spFansCount" class="block text-sm font-black text-slate-900">0</span>
+              <span class="text-[9px] text-slate-400 font-medium">粉丝</span>
+            </div>
+            <div class="cursor-pointer border-l border-slate-200">
+              <span id="spLiveShowsCount" class="block text-sm font-black text-rose-600">0</span>
+              <span class="text-[9px] text-slate-400 font-medium">直播场次</span>
+            </div>
+            <div class="cursor-pointer border-l border-slate-200">
+              <span id="spFollowCount" class="block text-sm font-black text-slate-900">0</span>
+              <span class="text-[9px] text-slate-400 font-medium">关注</span>
+            </div>
+            <div class="cursor-pointer border-l border-slate-200">
+              <span id="spLikesCount" class="block text-sm font-black text-slate-900">0</span>
+              <span class="text-[9px] text-slate-400 font-medium">转赞评</span>
+            </div>
+          </div>
+
+          <!-- 详细基本信息：个签、IP、标签、粉丝团 -->
+          <p id="spBioText" class="text-xs text-slate-700 leading-relaxed font-medium">心怀旷野，在直播间弹琴唱歌给你听~</p>
+
+          <div class="flex flex-wrap items-center gap-2 mt-2 text-[10px] text-slate-500">
+            <span class="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-md font-medium">
+              <svg class="w-3 h-3 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
+              <span id="spIpLocation">IP属地: 广东</span>
+            </span>
+            <span class="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-md font-medium">
+              <svg class="w-3 h-3 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              <span id="spJoinDays">入驻 320 天</span>
+            </span>
+            <span class="flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded-md font-bold">
+              <svg class="w-3 h-3 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+              <span id="spFanClubName">粉丝团: 星辰守护团</span>
+            </span>
+          </div>
+
+          <!-- 标签 Tags -->
+          <div id="spTagsContainer" class="flex flex-wrap gap-1.5 mt-2.5"></div>
+        </div>
+      </div>
+
+      <!-- 微博 4 大专属 Tab 导航条 (粘性定位) -->
+      <div class="sticky top-0 z-20 bg-white/95 backdrop-blur border-y border-slate-100 flex items-center justify-around px-2 shadow-xs">
+        <div onclick="switchSpTab('posts')" id="spTabPosts" class="weibo-tab-item active">动态</div>
+        <div onclick="switchSpTab('shows')" id="spTabShows" class="weibo-tab-item">直播场次</div>
+        <div onclick="switchSpTab('gallery')" id="spTabGallery" class="weibo-tab-item">相册</div>
+        <div onclick="switchSpTab('guestbook')" id="spTabGuestbook" class="weibo-tab-item">留言墙</div>
+      </div>
+
+      <!-- Tab 1: 动态微博列表 -->
+      <div id="spPanelPosts" class="p-3 space-y-3"></div>
+
+      <!-- Tab 2: 直播场次与回放记录 -->
+      <div id="spPanelShows" class="hidden p-3 space-y-3"></div>
+
+      <!-- Tab 3: 相册影集 -->
+      <div id="spPanelGallery" class="hidden p-3"></div>
+
+      <!-- Tab 4: 留言墙与守护榜 -->
+      <div id="spPanelGuestbook" class="hidden p-3 space-y-3">
+        <!-- 留言输入框 -->
+        <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs space-y-2">
+          <div class="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+            <svg class="w-4 h-4 text-rose-500 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            <span>主播私密留言墙 (角色会根据人设温暖回复)</span>
+          </div>
+          <div class="flex gap-2">
+            <input id="inputSpaceComment" placeholder="给主播留句话..." class="input-ins flex-1">
+            <button onclick="submitGuestbookComment()" class="btn-brand text-xs">留言</button>
+          </div>
+        </div>
+        <div id="spaceGuestbookList" class="space-y-2.5"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="presetCategoryModal" class="hidden center-modal-backdrop">
+    <div class="center-modal-card p-5 space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <h3 class="text-xs font-black text-slate-900" id="presetModalCategoryTitle">预设条目管理</h3>
+          <p class="text-[9px] text-slate-400">点击左侧箭头展开编辑，修改立即生效</p>
+        </div>
+        <button onclick="closePresetCategoryModal()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs text-slate-500 font-bold">✕</button>
+      </div>
+      <div id="promptEntriesContainer" class="flex-1 overflow-y-auto max-h-[50vh] pr-1 space-y-2 no-scrollbar"></div>
+      <button onclick="addNewPromptEntryToCurrentCategory()" class="btn-action w-full justify-center !py-2 text-xs !border-dashed !border-purple-300 text-purple-600">
+        <span>+ 添加提示词条目</span>
+      </button>
+      <button onclick="saveCurrentCategoryPresets()" class="btn-brand w-full py-2.5 justify-center text-xs font-bold shadow">
+        保存当前分类设置
+      </button>
+    </div>
+  </div>
+
+  <!-- 充值中心弹窗 -->
+  <div id="rechargeModal" class="hidden center-modal-backdrop">
+    <div class="center-modal-card p-5 space-y-4 max-w-sm">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-2xl bg-amber-500/10 border border-amber-400/30 flex items-center justify-center text-amber-500">
+            <svg class="w-5 h-5 fill-amber-400 stroke-amber-500 stroke-[1.5]" viewBox="0 0 24 24"><polygon points="6 3 18 3 22 9 12 22 2 9 6 3"></polygon></svg>
+          </div>
+          <div>
+            <h3 class="text-xs font-black text-slate-900">LUMA 充值中心</h3>
+            <p class="text-[9px] text-slate-400">即充即到 · 安全保障</p>
+          </div>
+        </div>
+        <button onclick="closeRechargeModal()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs text-slate-500 font-bold active:scale-90 transition">✕</button>
+      </div>
+
+      <!-- 当前余额卡片 -->
+      <div class="bg-gradient-to-r from-slate-900 to-slate-800 p-3.5 rounded-2xl text-white flex items-center justify-between border border-slate-700 shadow-sm">
+        <div>
+          <span class="text-[9px] text-amber-300 font-bold">当前账户余额</span>
+          <div class="flex items-baseline gap-1 mt-0.5">
+            <span class="text-lg font-black text-amber-400" id="rechargeModalBalance">0</span>
+            <span class="text-[10px] text-slate-300">LUMA 币</span>
+          </div>
+        </div>
+        <div class="text-right">
+          <span class="text-[8px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-bold border border-amber-400/30">1元 = 10币</span>
+        </div>
+      </div>
+
+      <!-- 充值档位网格 -->
+      <div class="space-y-1.5">
+        <div class="flex justify-between items-center text-[10px] font-bold text-slate-700">
+          <span>选择充值面额</span>
+          <span class="text-[9px] text-rose-500">限时赠送福利</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <!-- 60币 -->
+          <div onclick="selectRechargeTier(60, 6, this)" class="recharge-tier-card active">
+            <span class="text-xs font-black text-slate-900">60 币</span>
+            <span class="text-[10px] text-slate-500 font-bold">¥6.00</span>
+          </div>
+          <!-- 300币 -->
+          <div onclick="selectRechargeTier(300, 30, this)" class="recharge-tier-card">
+            <span class="text-xs font-black text-slate-900">300 币</span>
+            <span class="text-[10px] text-slate-500 font-bold">¥30.00</span>
+          </div>
+          <!-- 680币 -->
+          <div onclick="selectRechargeTier(680, 68, this)" class="recharge-tier-card relative">
+            <span class="absolute -top-1.5 -right-1 bg-rose-500 text-white text-[7px] font-black px-1 rounded-full">+30币</span>
+            <span class="text-xs font-black text-slate-900">680 币</span>
+            <span class="text-[10px] text-slate-500 font-bold">¥68.00</span>
+          </div>
+          <!-- 1280币 -->
+          <div onclick="selectRechargeTier(1280, 128, this)" class="recharge-tier-card relative">
+            <span class="absolute -top-1.5 -right-1 bg-rose-500 text-white text-[7px] font-black px-1 rounded-full">+80币</span>
+            <span class="text-xs font-black text-slate-900">1280 币</span>
+            <span class="text-[10px] text-slate-500 font-bold">¥128.00</span>
+          </div>
+          <!-- 3280币 -->
+          <div onclick="selectRechargeTier(3280, 328, this)" class="recharge-tier-card relative">
+            <span class="absolute -top-1.5 -right-1 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[7px] font-black px-1 rounded-full">+280币</span>
+            <span class="text-xs font-black text-slate-900">3280 币</span>
+            <span class="text-[10px] text-slate-500 font-bold">¥328.00</span>
+          </div>
+          <!-- 6480币 -->
+          <div onclick="selectRechargeTier(6480, 648, this)" class="recharge-tier-card relative">
+            <span class="absolute -top-1.5 -right-1 bg-gradient-to-r from-purple-500 to-rose-500 text-white text-[7px] font-black px-1 rounded-full">+680币</span>
+            <span class="text-xs font-black text-slate-900">6480 币</span>
+            <span class="text-[10px] text-slate-500 font-bold">¥648.00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 自定义金额 -->
+      <div class="space-y-1">
+        <label class="text-[10px] font-bold text-slate-700">自定义充值币数</label>
+        <div class="flex gap-2">
+          <input id="inputCustomRechargeAmount" type="number" min="1" placeholder="输入 LUMA 币数 (如 5000)" class="input-ins flex-1 text-xs" oninput="handleCustomRechargeInput(this.value)">
+          <button onclick="applyCustomRechargeTier()" class="btn-action text-xs !py-1 px-3">确定</button>
+        </div>
+      </div>
+
+      <!-- 支付方式选择 -->
+      <div class="space-y-1.5 pt-1">
+        <span class="text-[10px] font-bold text-slate-700">选择支付方式</span>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="pay-method-radio active flex items-center gap-2 p-2 rounded-xl border border-emerald-500/40 bg-emerald-50/50 cursor-pointer">
+            <input type="radio" name="pay_method" value="wechat" checked class="hidden">
+            <span class="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center text-white text-[9px] font-bold">✓</span>
+            <span class="text-xs font-bold text-slate-800">微信支付</span>
+          </label>
+          <label class="pay-method-radio flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white cursor-pointer">
+            <input type="radio" name="pay_method" value="alipay" class="hidden">
+            <span class="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-[9px] font-bold">支</span>
+            <span class="text-xs font-bold text-slate-800">支付宝</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 立即充值按钮 -->
+      <div class="pt-2">
+        <button onclick="submitExecuteRecharge()" class="btn-brand w-full py-2.5 justify-center text-xs font-black shadow-lg shadow-rose-200 flex items-center gap-1.5" id="btnSubmitRecharge">
+          <span>确认充值 60 币 (¥6.00)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 清除本地缓存确认弹窗 -->
+  <div id="resetConfirmModal" class="hidden center-modal-backdrop">
+    <div class="center-modal-card p-5 space-y-4 max-w-xs">
+      <div class="flex items-center gap-3 text-rose-600">
+        <div class="w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center border border-rose-100 flex-shrink-0">
+          <svg class="w-5 h-5 text-rose-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        </div>
+        <div>
+          <h3 class="text-xs font-black text-slate-900">清除缓存确认</h3>
+          <p class="text-[9px] text-slate-400">操作提示·初始化应用</p>
+        </div>
+      </div>
+      <div class="bg-rose-50/70 p-3 rounded-2xl border border-rose-100/80 text-xs text-rose-900 leading-relaxed">
+        <p class="font-bold mb-1">是否清除所有本地缓存？建议先导出备份！</p>
+        <p class="text-[10px] text-rose-700/80">此操作将清空所有直播间、私有预设、沙盒参数设置、生图配置与钱包数据，并将应用初始化为初始状态。</p>
+      </div>
+      <div class="grid grid-cols-2 gap-2 pt-1">
+        <button onclick="closeResetConfirmModal()" class="btn-action justify-center !py-2 text-xs font-bold text-slate-600">取消</button>
+        <button onclick="executeConfirmResetAppData()" class="btn-brand justify-center !py-2 text-xs font-bold !bg-rose-600 shadow-rose-200">确认清除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模块化脚本引用 -->
+  <script src="LIVE/core.js"></script>
+  <script src="LIVE/主页/profile.js"></script>
+  <script src="LIVE/社区/trends.js"></script>
+  <script src="LIVE/直播/live.js"></script>
+  <script src="LIVE/设定/main.js"></script>
+</body>
+</html>
