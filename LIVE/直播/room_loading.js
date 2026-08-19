@@ -1,10 +1,10 @@
 // =========================================================================
 // 【直播间状态与全息连接过渡模块】LIVE/直播/room_loading.js
-// 包含：进房全息连接与弹幕打包加载、API状态检测、双金边退出按键、下播驻留离场过渡
+// 包含：网易云全屏晕染背景、唱片级立绘、抖音风左上角主播栏、双细线暗金边退出按键
 // =========================================================================
 
 (function initRoomLoadingModule() {
-  // 1. 注入全息过渡与高奢双金边专属样式
+  // 1. 注入网易云全屏晕染背景与 #CD853F 双细线专属样式
   const styleEl = document.createElement('style');
   styleEl.id = 'luma-room-transition-style';
   styleEl.textContent = `
@@ -13,17 +13,16 @@
       inset: 0;
       width: 100vw;
       height: 100vh;
-      background: radial-gradient(circle at 50% 40%, #0d1527 0%, #070a14 55%, #020408 100%);
       z-index: 150;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: center;
       align-items: center;
-      padding: calc(env(safe-area-inset-top, 24px) + 16px) 20px calc(env(safe-area-inset-bottom, 24px) + 24px);
       user-select: none;
       -webkit-user-select: none;
       overflow: hidden;
-      transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+      transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s ease-out;
+      background-color: #05070c;
     }
 
     .room-transition-overlay.hidden {
@@ -36,152 +35,263 @@
       pointer-events: none;
     }
 
-    /* 屏幕中心头像周围的晕染与多层呼吸光晕 */
-    .room-ambient-diffusion {
+    /* 网易云全屏背景晕染层 */
+    .room-full-diffusion-bg {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 220px;
-      height: 220px;
-      background: radial-gradient(circle, rgba(244, 63, 94, 0.32) 0%, rgba(168, 85, 247, 0.25) 40%, rgba(6, 182, 212, 0.12) 70%, transparent 85%);
-      filter: blur(32px);
-      border-radius: 9999px;
-      pointer-events: none;
-      animation: roomDiffusionPulse 3.5s ease-in-out infinite alternate;
+      inset: -30px;
+      background-size: cover;
+      background-position: center;
+      filter: blur(55px) brightness(0.32) saturate(1.35);
+      transform: scale(1.2);
       z-index: 1;
+      pointer-events: none;
+      transition: background-image 0.5s ease;
     }
 
-    @keyframes roomDiffusionPulse {
-      0% {
-        transform: translate(-50%, -50%) scale(0.85);
-        opacity: 0.55;
-      }
-      50% {
-        transform: translate(-50%, -50%) scale(1.18);
-        opacity: 0.95;
-        filter: blur(38px);
-      }
-      100% {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 0.7;
-      }
+    /* 全屏径向压暗与暗角遮罩 */
+    .room-vignette-mask {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 48%, rgba(8, 10, 15, 0.35) 0%, rgba(4, 5, 8, 0.8) 65%, #020306 100%);
+      z-index: 2;
+      pointer-events: none;
     }
 
-    .room-char-avatar-box {
-      position: relative;
-      z-index: 10;
-      width: 96px;
-      height: 96px;
-      border-radius: 9999px;
-      padding: 3px;
-      background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(244, 63, 94, 0.8) 50%, rgba(168, 85, 247, 0.8) 100%);
-      box-shadow: 0 0 28px rgba(244, 63, 94, 0.45), 0 0 50px rgba(168, 85, 247, 0.3);
+    /* 抖音风格左上角主播信息栏 */
+    .douyin-host-capsule {
+      position: absolute;
+      top: 32px;
+      left: 16px;
+      z-index: 30;
       display: flex;
       align-items: center;
-      justify-content: center;
-      animation: roomAvatarFloat 4s ease-in-out infinite alternate;
+      gap: 7px;
+      background: rgba(0, 0, 0, 0.48);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 0.8px solid rgba(255, 255, 255, 0.18);
+      border-radius: 9999px;
+      padding: 3px 6px 3px 3px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+      max-width: calc(100vw - 32px);
     }
 
-    @keyframes roomAvatarFloat {
-      0% { transform: translateY(0); }
-      100% { transform: translateY(-6px); }
+    .douyin-avatar-wrap {
+      position: relative;
+      width: 34px;
+      height: 34px;
+      border-radius: 9999px;
+      flex-shrink: 0;
     }
 
-    .room-char-avatar-img {
+    .douyin-avatar-img {
       width: 100%;
       height: 100%;
       border-radius: 9999px;
       object-fit: cover;
-      border: 2px solid rgba(255, 255, 255, 0.85);
+      border: 1.5px solid rgba(255, 255, 255, 0.85);
     }
 
-    /* 三个点的呼吸加载样式 */
-    .loading-dots span {
-      display: inline-block;
-      animation: loadingDotPulse 1.4s infinite ease-in-out both;
-      font-size: 16px;
-      line-height: 1;
-    }
-    .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
-    .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
-    .loading-dots span:nth-child(3) { animation-delay: 0s; }
-
-    @keyframes loadingDotPulse {
-      0%, 80%, 100% {
-        opacity: 0.2;
-        transform: scale(0.8);
-      }
-      40% {
-        opacity: 1;
-        transform: scale(1.3);
-        color: #f43f5e;
-      }
-    }
-
-    /* 高奢金色双边框退出按钮 (双层金边，黑底白字) */
-    .btn-gold-double-border {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 3px;
-      background: linear-gradient(135deg, #fef08a 0%, #eab308 30%, #ca8a04 70%, #fef08a 100%);
+    .douyin-badge-v {
+      position: absolute;
+      bottom: -1px;
+      right: -1px;
+      width: 13px;
+      height: 13px;
       border-radius: 9999px;
-      box-shadow: 0 0 16px rgba(234, 179, 8, 0.35), 0 4px 14px rgba(0, 0, 0, 0.6);
-      cursor: pointer;
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      border: none;
-      outline: none;
-    }
-
-    .btn-gold-double-border:active {
-      transform: scale(0.96);
-      box-shadow: 0 0 10px rgba(234, 179, 8, 0.25);
-    }
-
-    .btn-gold-double-border-inner {
+      background: #f59e0b;
+      color: #000;
+      font-size: 8px;
+      font-weight: 900;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      padding: 10px 28px;
-      background: #06080e;
-      border: 1.5px solid rgba(253, 224, 71, 0.85);
-      border-radius: 9999px;
-      color: #ffffff;
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: 2px;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-      box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8);
+      border: 1px solid #fff;
     }
 
-    /* 次级重试按钮 */
-    .btn-retry-hologram {
+    .douyin-host-meta {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      padding-right: 2px;
+    }
+
+    .douyin-host-name {
+      font-size: 12px;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 90px;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    }
+
+    .douyin-host-sub {
+      font-size: 9px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.72);
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 90px;
+    }
+
+    .douyin-btn-follow {
+      background: #fe2c55;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(254, 44, 85, 0.45);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .douyin-btn-follow:active {
+      transform: scale(0.94);
+    }
+
+    .douyin-btn-follow.followed {
+      background: rgba(255, 255, 255, 0.18);
+      color: rgba(255, 255, 255, 0.85);
+      box-shadow: none;
+    }
+
+    /* 网易云唱片级中心大头像 */
+    .vinyl-stage-box {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .vinyl-disc-frame {
+      width: clamp(190px, 54vw, 224px);
+      height: clamp(190px, 54vw, 224px);
+      border-radius: 9999px;
+      padding: 10px;
+      background: radial-gradient(circle, #242730 0%, #13161f 55%, #080a0f 85%, #040508 100%);
+      box-shadow: 0 16px 45px rgba(0, 0, 0, 0.8), 0 0 45px rgba(205, 133, 63, 0.22);
+      border: 1.5px solid rgba(205, 133, 63, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      animation: vinylFloatBreath 4s ease-in-out infinite alternate;
+    }
+
+    @keyframes vinylFloatBreath {
+      0% {
+        transform: translateY(0) scale(1);
+        box-shadow: 0 16px 45px rgba(0, 0, 0, 0.8), 0 0 35px rgba(205, 133, 63, 0.18);
+      }
+      100% {
+        transform: translateY(-6px) scale(1.015);
+        box-shadow: 0 22px 55px rgba(0, 0, 0, 0.9), 0 0 55px rgba(205, 133, 63, 0.32);
+      }
+    }
+
+    .vinyl-inner-avatar {
+      width: 100%;
+      height: 100%;
+      border-radius: 9999px;
+      object-fit: cover;
+      border: 2px solid rgba(255, 255, 255, 0.88);
+    }
+
+    /* 状态提示文案区 (紧贴唱片下方) */
+    .room-status-content-flow {
+      position: relative;
+      z-index: 10;
+      margin-top: 26px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0 24px;
+    }
+
+    .status-main-headline {
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      line-height: 1.5;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+    }
+
+    /* 三个点跳动加载效果 */
+    .loading-dots-clean span {
+      display: inline-block;
+      animation: cleanDotJump 1.4s infinite ease-in-out both;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .loading-dots-clean span:nth-child(1) { animation-delay: -0.32s; }
+    .loading-dots-clean span:nth-child(2) { animation-delay: -0.16s; }
+    .loading-dots-clean span:nth-child(3) { animation-delay: 0s; }
+
+    @keyframes cleanDotJump {
+      0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); }
+      40% { opacity: 1; transform: scale(1.2); color: #CD853F; }
+    }
+
+    /* #CD853F 双细线金色边框按键 (外1px细线 + 2px暗隙 + 内1px细线，纯黑底白字，无图标) */
+    .btn-bronze-double-border {
+      position: relative;
+      margin-top: 18px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      padding: 10px 22px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 2px;
+      background: transparent;
+      border: 1px solid #CD853F;
       border-radius: 9999px;
-      color: rgba(255, 255, 255, 0.9);
-      font-size: 12px;
-      font-weight: 700;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      border-style: solid;
+      outline: none;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 12px rgba(205, 133, 63, 0.25);
     }
-    .btn-retry-hologram:active {
-      background: rgba(255, 255, 255, 0.16);
+
+    .btn-bronze-double-border:active {
       transform: scale(0.96);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+    }
+
+    .btn-bronze-double-border-inner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 30px;
+      background: #06080d;
+      border: 1px solid #CD853F;
+      border-radius: 9999px;
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      white-space: nowrap;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
     }
   `;
   document.head.appendChild(styleEl);
 
-  // 2. 创建或获取全局全息过渡浮层 DOM
+  // 2. 获取或创建过渡 DOM 结构
   function getTransitionOverlay() {
     let overlay = document.getElementById('liveRoomTransitionOverlay');
     if (!overlay) {
@@ -189,55 +299,35 @@
       overlay.id = 'liveRoomTransitionOverlay';
       overlay.className = 'room-transition-overlay hidden';
       overlay.innerHTML = `
-        <!-- 顶部栏：左侧小头像与关注胶囊，右侧退出叉号 -->
-        <div class="w-full flex items-center justify-between z-20">
-          <div class="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md p-1.5 pr-3 rounded-full border border-white/15 shadow-lg">
-            <div class="w-8 h-8 rounded-full p-[1.5px] bg-gradient-to-tr from-amber-400 via-rose-500 to-purple-600 flex-shrink-0">
-              <img id="transTopAvatar" src="" class="w-full h-full rounded-full object-cover border border-white/80">
-            </div>
-            <div class="flex flex-col min-w-0 pr-1">
-              <div class="flex items-center gap-1">
-                <span id="transTopName" class="text-xs font-black text-white truncate max-w-[80px]">主播</span>
-                <span class="w-3 h-3 rounded-full bg-amber-400 text-slate-950 font-black text-[7px] flex items-center justify-center">V</span>
-              </div>
-              <span id="transTopTag" class="text-[8px] text-slate-400 font-bold truncate max-w-[70px]">直播中</span>
-            </div>
-            <button id="transBtnFollow" onclick="handleTransitionFollowClick()" class="bg-rose-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm active:scale-95 transition">
-              + 关注
-            </button>
-          </div>
+        <!-- 网易云全屏背景晕染层与遮罩 -->
+        <div id="transFullDiffusionBg" class="room-full-diffusion-bg"></div>
+        <div class="room-vignette-mask"></div>
 
-          <button onclick="handleTransitionExitClick()" class="w-8 h-8 rounded-full bg-slate-900/70 border border-white/15 text-white/80 flex items-center justify-center active:scale-95 transition backdrop-blur-md" title="关闭">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <!-- 抖音风格左上角主播信息栏 (往下移，不避让状态栏) -->
+        <div class="douyin-host-capsule">
+          <div class="douyin-avatar-wrap">
+            <img id="transTopAvatar" src="" class="douyin-avatar-img">
+            <span class="douyin-badge-v">V</span>
+          </div>
+          <div class="douyin-host-meta">
+            <span id="transTopName" class="douyin-host-name">主播</span>
+            <span id="transTopSub" class="douyin-host-sub">1.2w 在看</span>
+          </div>
+          <button id="transBtnFollow" onclick="handleTransitionFollowClick()" class="douyin-btn-follow">
+            + 关注
           </button>
         </div>
 
-        <!-- 屏幕中心：头像与晕染光环 + 状态信息区 -->
-        <div class="flex flex-col items-center justify-center relative my-auto z-10 space-y-5">
-          <!-- 晕染光晕背景 -->
-          <div class="room-ambient-diffusion"></div>
-
-          <!-- 中心 Char 头像 -->
-          <div class="room-char-avatar-box">
-            <img id="transCenterAvatar" src="" class="room-char-avatar-img">
-          </div>
-
-          <!-- 状态文字与加载器 -->
-          <div id="transStatusBox" class="text-center px-4 space-y-1.5 relative z-10 max-w-xs">
-            <!-- 动态状态标题与副标题 -->
-            <div id="transTitleEl" class="text-white text-sm font-black tracking-wide flex items-center justify-center gap-1">
-              <span>正在进入直播间</span>
-              <span class="loading-dots"><span class="dot-1">.</span><span class="dot-2">.</span><span class="dot-3">.</span></span>
-            </div>
-            <p id="transSubtitleEl" class="text-[11px] text-slate-400 font-medium tracking-wider">
-              正在同步弹幕包与检测全息神经连接
-            </p>
+        <!-- 网易云唱片级中心大头像舞台 -->
+        <div class="vinyl-stage-box">
+          <div class="vinyl-disc-frame">
+            <img id="transCenterAvatar" src="" class="vinyl-inner-avatar">
           </div>
         </div>
 
-        <!-- 底部操作区 (动态根据状态呈现：加载中、连接失败、主播已离线) -->
-        <div id="transActionsBox" class="w-full flex flex-col items-center justify-center gap-3 z-20 pb-4">
-          <!-- 动态注入按钮 -->
+        <!-- 状态提示与退出按键区域 (紧贴在文字下方) -->
+        <div id="transStatusFlowBox" class="room-status-content-flow">
+          <!-- 动态注入状态与退出按键 -->
         </div>
       `;
       document.body.appendChild(overlay);
@@ -245,7 +335,7 @@
     return overlay;
   }
 
-  // 3. 当前过渡态控制器
+  // 3. 全局控制器与状态维护
   let currentTransitionSession = null;
   let connectingTimeoutId = null;
 
@@ -261,43 +351,53 @@
     const overlay = getTransitionOverlay();
     overlay.classList.remove('hidden', 'fade-out');
 
-    // 填充左上角与中心头像
-    const avatarUrl = session.avatar || (session.cover || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400');
+    // 填充头像与背景
+    const avatarUrl = session.avatar || (session.cover || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500');
     const nameStr = session.name || '主播';
-    const tagStr = session.subTag || session.category || '新人主播';
+    const viewersCount = (typeof window.getLiveSessionViewers === 'function') ? window.getLiveSessionViewers(session) : 1200;
+    const viewersStr = viewersCount > 10000 ? (viewersCount / 10000).toFixed(1) + 'w 在看' : `${viewersCount} 在看`;
 
+    const fullBg = document.getElementById('transFullDiffusionBg');
     const topAvatar = document.getElementById('transTopAvatar');
-    const topName = document.getElementById('transTopName');
-    const topTag = document.getElementById('transTopTag');
     const centerAvatar = document.getElementById('transCenterAvatar');
+    const topName = document.getElementById('transTopName');
+    const topSub = document.getElementById('transTopSub');
     const followBtn = document.getElementById('transBtnFollow');
 
+    if (fullBg) fullBg.style.backgroundImage = `url('${avatarUrl}')`;
     if (topAvatar) topAvatar.src = avatarUrl;
     if (centerAvatar) centerAvatar.src = avatarUrl;
     if (topName) topName.textContent = nameStr;
-    if (topTag) topTag.textContent = tagStr;
+    if (topSub) topSub.textContent = viewersStr;
 
     // 关注状态同步
     const isFollowed = (window.followedHosts || []).includes(session.characterId);
     if (followBtn) {
       followBtn.textContent = isFollowed ? '已关注' : '+ 关注';
       if (isFollowed) {
-        followBtn.className = 'bg-slate-700 text-slate-300 text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm';
+        followBtn.classList.add('followed');
       } else {
-        followBtn.className = 'bg-rose-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm active:scale-95 transition';
+        followBtn.classList.remove('followed');
       }
     }
 
-    // 设置状态 1: 正在进入直播间...
+    // 状态：正在进入直播间…
     renderTransitionState('connecting');
 
     if (connectingTimeoutId) clearTimeout(connectingTimeoutId);
 
-    // 开始执行全息弹幕打包与 API 连接检测
+    // 检查 API 配置状态以精准判定网络失败类型
+    const customCfg = window.customApiConfig || {};
+    const hasConfiguredApi = !!(customCfg.apiKey || customCfg.endpoint);
+
     try {
-      // 预估打包时长 (800ms ~ 1600ms)
+      // 离线/未联网检测
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        throw new Error("NO_NETWORK_DISCONNECTED");
+      }
+
+      // 执行打包与连通性检测
       const fetchPromise = (async () => {
-        // 调用底层 AI / 网关检测
         if (typeof window.aiGenerate === 'function') {
           return await window.aiGenerate({
             characterId: session.characterId,
@@ -310,12 +410,12 @@
 
       const timeoutPromise = new Promise((_, reject) => {
         connectingTimeoutId = setTimeout(() => {
-          reject(new Error("CONNECT_TIMEOUT"));
-        }, 12000);
+          reject(new Error("TIMEOUT_ERROR"));
+        }, 10000);
       });
 
-      // 竞态检测 (至少停留 900ms 展现精致全息进入动画)
-      const minDelayPromise = new Promise(r => setTimeout(r, 950));
+      // 保持最少 900ms 丝滑黑胶进房体验
+      const minDelayPromise = new Promise(r => setTimeout(r, 900));
       const [res] = await Promise.all([
         Promise.race([fetchPromise, timeoutPromise]),
         minDelayPromise
@@ -323,7 +423,7 @@
 
       if (connectingTimeoutId) clearTimeout(connectingTimeoutId);
 
-      // 解析返回数据包，如果成功拿到则填充到弹幕池
+      // 解析弹幕包注入弹幕池
       if (res && res.text) {
         const parsed = (typeof window.extractJsonFromText === 'function') ? window.extractJsonFromText(res.text) : null;
         if (parsed) {
@@ -336,7 +436,7 @@
         }
       }
 
-      // 连接成功！平滑淡出全息层，进入真实直播间
+      // 成功进入：平滑淡出全息层
       overlay.classList.add('fade-out');
       setTimeout(() => {
         overlay.classList.add('hidden');
@@ -348,77 +448,63 @@
 
     } catch (err) {
       if (connectingTimeoutId) clearTimeout(connectingTimeoutId);
-      console.warn("直播间连接与打包检测失败:", err);
-      // 切换至状态 2: 网络连接失败
-      renderTransitionState('failed', session, onSuccessCallback);
+      console.warn("进房连接检测:", err);
+
+      const errMsg = String(err?.message || '');
+      // 第一种情况：连接了API，但返回失败/请求超时 (网络连接超时，请重试)
+      // 第二种情况：没有配置API或完全断网 (网络连接失败，请检查你的网络环境。)
+      if (hasConfiguredApi || errMsg.includes('TIMEOUT')) {
+        renderTransitionState('timeout');
+      } else {
+        renderTransitionState('network_error');
+      }
     }
   }
 
   /**
-   * 渲染不同过渡态视图与按键
+   * 渲染状态文案与 #CD853F 双细线退出按键
    */
-  function renderTransitionState(state, session, callback) {
-    const statusBox = document.getElementById('transStatusBox');
-    const actionsBox = document.getElementById('transActionsBox');
-    if (!statusBox || !actionsBox) return;
+  function renderTransitionState(state) {
+    const flowBox = document.getElementById('transStatusFlowBox');
+    if (!flowBox) return;
 
     if (state === 'connecting') {
-      statusBox.innerHTML = `
-        <div class="text-white text-sm font-black tracking-wide flex items-center justify-center gap-1">
+      flowBox.innerHTML = `
+        <div class="status-main-headline">
           <span>正在进入直播间</span>
-          <span class="loading-dots"><span>.</span><span>.</span><span>.</span></span>
+          <span class="loading-dots-clean"><span>.</span><span>.</span><span>.</span></span>
         </div>
-        <p class="text-[11px] text-slate-400 font-medium tracking-wider mt-1">
-          正在打包同步弹幕流与检测全息神经连接
-        </p>
       `;
-      actionsBox.innerHTML = `
-        <span class="text-[10px] font-bold text-slate-500 tracking-widest uppercase animate-pulse">Connecting Cyber Stream...</span>
-      `;
-    } else if (state === 'failed') {
-      statusBox.innerHTML = `
-        <div class="text-rose-400 text-sm font-black tracking-wide flex items-center justify-center gap-1.5">
-          <svg class="w-4 h-4 text-rose-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-          <span>网络连接失败，请重试…</span>
+    } else if (state === 'timeout') {
+      flowBox.innerHTML = `
+        <div class="status-main-headline text-rose-300">
+          <span>网络连接超时，请重试</span>
         </div>
-        <p class="text-[11px] text-slate-400 font-medium tracking-wider mt-1">
-          全息神经连接超时，请检查您的网络或自定义API设置
-        </p>
+        <button onclick="handleTransitionExitClick()" class="btn-bronze-double-border">
+          <div class="btn-bronze-double-border-inner">
+            <span>退出直播间</span>
+          </div>
+        </button>
       `;
-
-      actionsBox.innerHTML = `
-        <div class="flex items-center gap-3">
-          <button onclick="handleTransitionRetryClick()" class="btn-retry-hologram">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
-            <span>重试连接</span>
-          </button>
-
-          <!-- 金色双边框黑底白字退出按键 -->
-          <button onclick="handleTransitionExitClick()" class="btn-gold-double-border">
-            <div class="btn-gold-double-border-inner">
-              <svg class="w-3.5 h-3.5 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-              <span>退出房间</span>
-            </div>
-          </button>
+    } else if (state === 'network_error') {
+      flowBox.innerHTML = `
+        <div class="status-main-headline text-rose-300">
+          <span>网络连接失败，请检查你的网络环境。</span>
         </div>
+        <button onclick="handleTransitionExitClick()" class="btn-bronze-double-border">
+          <div class="btn-bronze-double-border-inner">
+            <span>退出直播间</span>
+          </div>
+        </button>
       `;
     } else if (state === 'host_left') {
-      statusBox.innerHTML = `
-        <div class="text-amber-300 text-sm font-black tracking-wide flex items-center justify-center gap-1.5">
-          <svg class="w-4 h-4 text-amber-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+      flowBox.innerHTML = `
+        <div class="status-main-headline text-amber-200">
           <span>主播已离开房间…</span>
         </div>
-        <p class="text-[11px] text-slate-400 font-medium tracking-wider mt-1">
-          本次全息直播已圆满下播，期待与主播下次相遇~
-        </p>
-      `;
-
-      actionsBox.innerHTML = `
-        <!-- 金色双边框黑底白字退出按键 -->
-        <button onclick="handleTransitionExitClick()" class="btn-gold-double-border">
-          <div class="btn-gold-double-border-inner">
-            <svg class="w-3.5 h-3.5 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-            <span>退出房间</span>
+        <button onclick="handleTransitionExitClick()" class="btn-bronze-double-border">
+          <div class="btn-bronze-double-border-inner">
+            <span>退出直播间</span>
           </div>
         </button>
       `;
@@ -426,7 +512,7 @@
   }
 
   /**
-   * 当主播在直播间中途下播时的驻留画面
+   * 主播下播时的停留画面
    */
   function showHostLeftRoomStage(session) {
     const s = session || window.currentRoom;
@@ -436,18 +522,20 @@
     const overlay = getTransitionOverlay();
     overlay.classList.remove('hidden', 'fade-out');
 
-    const avatarUrl = s.avatar || (s.cover || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400');
+    const avatarUrl = s.avatar || (s.cover || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500');
+    const fullBg = document.getElementById('transFullDiffusionBg');
     const topAvatar = document.getElementById('transTopAvatar');
     const centerAvatar = document.getElementById('transCenterAvatar');
     const topName = document.getElementById('transTopName');
-    const topTag = document.getElementById('transTopTag');
+    const topSub = document.getElementById('transTopSub');
 
+    if (fullBg) fullBg.style.backgroundImage = `url('${avatarUrl}')`;
     if (topAvatar) topAvatar.src = avatarUrl;
     if (centerAvatar) centerAvatar.src = avatarUrl;
     if (topName) topName.textContent = s.name || '主播';
-    if (topTag) topTag.textContent = '已下播';
+    if (topSub) topSub.textContent = '已下播';
 
-    renderTransitionState('host_left', s);
+    renderTransitionState('host_left');
   }
 
   // 4. 用户交互处理函数
@@ -456,16 +544,6 @@
     if (overlay) overlay.classList.add('hidden');
     if (typeof window.closeLiveRoom === 'function') {
       window.closeLiveRoom();
-    }
-  }
-
-  function handleTransitionRetryClick() {
-    if (currentTransitionSession) {
-      launchRoomConnectingStage(currentTransitionSession, () => {
-        if (typeof window.enterLiveRoomDirectly === 'function') {
-          window.enterLiveRoomDirectly(currentTransitionSession.id);
-        }
-      });
     }
   }
 
@@ -480,9 +558,9 @@
       if (followBtn) {
         followBtn.textContent = isFollowed ? '已关注' : '+ 关注';
         if (isFollowed) {
-          followBtn.className = 'bg-slate-700 text-slate-300 text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm';
+          followBtn.classList.add('followed');
         } else {
-          followBtn.className = 'bg-rose-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm active:scale-95 transition';
+          followBtn.classList.remove('followed');
         }
       }
     }
@@ -491,6 +569,5 @@
   window.launchRoomConnectingStage = launchRoomConnectingStage;
   window.showHostLeftRoomStage = showHostLeftRoomStage;
   window.handleTransitionExitClick = handleTransitionExitClick;
-  window.handleTransitionRetryClick = handleTransitionRetryClick;
   window.handleTransitionFollowClick = handleTransitionFollowClick;
 })();
