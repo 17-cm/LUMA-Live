@@ -221,15 +221,7 @@
           </div>
         </div>
       `;
-      if (document.body) {
-        document.body.prepend(container);
-      } else {
-        window.addEventListener('DOMContentLoaded', () => {
-          if (document.body && !document.getElementById('appSplashScreen')) {
-            document.body.prepend(container);
-          }
-        });
-      }
+      document.body.prepend(container);
     }
     return container;
   }
