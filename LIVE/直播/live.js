@@ -324,8 +324,13 @@ function enterLiveRoomDirectly(sessionId) {
   
   const feed = document.getElementById('danmakuFeed');
   if (feed) feed.innerHTML = '';
-  danmakuPool = [];
-  hostSpeechPool = [];
+  // 如果过渡阶段已经打包填充了 danmakuPool/hostSpeechPool，保留它们，不要暴力清空导致重复等待
+  if (!window.danmakuPool || window.danmakuPool.length === 0) {
+    danmakuPool = [];
+  }
+  if (!window.hostSpeechPool || window.hostSpeechPool.length === 0) {
+    hostSpeechPool = [];
+  }
   
   closePlusDrawer();
   const roomModal = document.getElementById('liveRoomModal');
@@ -335,7 +340,13 @@ function enterLiveRoomDirectly(sessionId) {
   updateLiveRoomDuration();
   liveDurationInterval = setInterval(updateLiveRoomDuration, 1000);
 
-  fetchBatchLivePackage();
+  // 如果已经有打包好的内容，立即推首条台词并启动流，不用再阻塞请求
+  if (hostSpeechPool.length > 0) {
+    const first = hostSpeechPool.shift();
+    renderHostSpeech(first.speech, first.action);
+  } else {
+    fetchBatchLivePackage();
+  }
   startDanmakuDripFeed();
   startHostSpeechDripFeed();
 

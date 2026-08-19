@@ -1,11 +1,11 @@
 // =========================================================================
 // 【直播间状态与全息连接过渡模块】LIVE/直播/room_loading.js
 // 包含：方案1【纯正高斯模糊毛玻璃背景扩散】、唱片级头像、三层浅红细圈步进扩散、
-// 抖音风左上角主播栏、暗红状态文案、#CD853F 双细线暗金边退出按键
+// 抖音高仿豪华主播栏（粉丝团/榜单/小心心/关注）、#A0B0BD 字体、#CD853F 双细线暗金边退出按键
 // =========================================================================
 
 (function initRoomLoadingModule() {
-  // 1. 注入方案 1【高斯模糊毛玻璃扩散】专属样式
+  // 1. 注入样式
   const styleEl = document.createElement('style');
   styleEl.id = 'luma-room-transition-style';
   styleEl.textContent = `
@@ -36,7 +36,7 @@
       pointer-events: none;
     }
 
-    /* 方案 1：全屏高斯模糊毛玻璃背景 (将主播照片本身重度高斯模糊) */
+    /* 方案 1：全屏高斯模糊毛玻璃背景 */
     .room-gaussian-blur-bg {
       position: absolute;
       inset: -40px;
@@ -59,29 +59,37 @@
       pointer-events: none;
     }
 
-    /* 抖音风格左上角主播信息栏 (向下移至舒适位置) */
-    .douyin-host-capsule {
+    /* 抖音风格左上角丰富的主播互动胶囊群 (进一步高仿豪华版) */
+    .douyin-top-bar-cluster {
       position: absolute;
       top: 56px;
-      left: 16px;
+      left: 14px;
+      right: 14px;
       z-index: 30;
       display: flex;
       align-items: center;
-      gap: 7px;
-      background: rgba(0, 0, 0, 0.52);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 0.8px solid rgba(255, 255, 255, 0.18);
+      justify-content: space-between;
+      pointer-events: auto;
+    }
+
+    .douyin-host-capsule {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.54);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 0.8px solid rgba(255, 255, 255, 0.16);
       border-radius: 9999px;
-      padding: 3px 6px 3px 3px;
+      padding: 3px 5px 3px 3px;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-      max-width: calc(100vw - 32px);
+      max-width: calc(100vw - 110px);
     }
 
     .douyin-avatar-wrap {
       position: relative;
-      width: 34px;
-      height: 34px;
+      width: 35px;
+      height: 35px;
       border-radius: 9999px;
       flex-shrink: 0;
     }
@@ -91,15 +99,29 @@
       height: 100%;
       border-radius: 9999px;
       object-fit: cover;
-      border: 1.5px solid rgba(255, 255, 255, 0.85);
+      border: 1.5px solid rgba(255, 255, 255, 0.9);
+    }
+
+    .douyin-live-ring {
+      position: absolute;
+      inset: -2px;
+      border-radius: 9999px;
+      border: 1.5px solid #fe2c55;
+      animation: douyinLiveRingPulse 1.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes douyinLiveRingPulse {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.1); opacity: 0.4; }
     }
 
     .douyin-badge-v {
       position: absolute;
       bottom: -1px;
       right: -1px;
-      width: 13px;
-      height: 13px;
+      width: 12px;
+      height: 12px;
       border-radius: 9999px;
       background: #f59e0b;
       color: #000;
@@ -118,42 +140,80 @@
       padding-right: 2px;
     }
 
+    .douyin-name-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
     .douyin-host-name {
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 800;
       color: #ffffff;
       line-height: 1.2;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 90px;
+      max-width: 78px;
       text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    }
+
+    .douyin-level-tag {
+      font-size: 8px;
+      font-weight: 900;
+      color: #ffd700;
+      background: linear-gradient(135deg, #4338ca, #6366f1);
+      padding: 0.5px 3.5px;
+      border-radius: 3px;
+      line-height: 1.1;
+      border: 0.5px solid rgba(255, 215, 0, 0.5);
+    }
+
+    .douyin-sub-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 1px;
     }
 
     .douyin-host-sub {
       font-size: 9px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.72);
-      line-height: 1.2;
+      color: rgba(255, 255, 255, 0.75);
+      line-height: 1.1;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 90px;
+    }
+
+    .douyin-fans-club-tag {
+      font-size: 8px;
+      font-weight: 800;
+      color: #ffedd5;
+      background: linear-gradient(90deg, #f97316, #ea580c);
+      padding: 0.5px 4px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 1.5px;
+      line-height: 1.1;
+      box-shadow: 0 1px 4px rgba(234, 88, 12, 0.4);
     }
 
     .douyin-btn-follow {
-      background: #fe2c55;
+      background: linear-gradient(135deg, #fe2c55, #ff0050);
       color: #ffffff;
       font-size: 10px;
       font-weight: 800;
-      padding: 4px 10px;
+      padding: 4.5px 9px;
       border-radius: 9999px;
       border: none;
       outline: none;
       cursor: pointer;
       flex-shrink: 0;
-      box-shadow: 0 2px 8px rgba(254, 44, 85, 0.45);
+      box-shadow: 0 2px 8px rgba(254, 44, 85, 0.5);
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      gap: 2px;
     }
 
     .douyin-btn-follow:active {
@@ -161,9 +221,51 @@
     }
 
     .douyin-btn-follow.followed {
-      background: rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.2);
       color: rgba(255, 255, 255, 0.85);
       box-shadow: none;
+    }
+
+    /* 抖音右侧榜单小头像组与热度胶囊 */
+    .douyin-top-right-ranks {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .douyin-rank-avatars {
+      display: flex;
+      align-items: center;
+    }
+
+    .douyin-rank-user {
+      width: 22px;
+      height: 22px;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      margin-left: -5px;
+      object-fit: cover;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+
+    .douyin-rank-user:first-child {
+      margin-left: 0;
+      border-color: #ffd700;
+    }
+
+    .douyin-heat-pill {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: rgba(0, 0, 0, 0.48);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 0.8px solid rgba(255, 255, 255, 0.14);
+      border-radius: 9999px;
+      padding: 3px 6px;
+      color: #fbbf24;
+      font-size: 9px;
+      font-weight: 800;
     }
 
     /* 核心舞台：包含高斯模糊毛玻璃空隙散开 + 三层浅红细圈向外步进扩散 */
@@ -284,35 +386,35 @@
       padding: 0 24px;
     }
 
-    /* 中间一行字体：暗红色 */
-    .status-dark-red-headline {
-      color: #991b1b;
+    /* 中间一行字体：#A0B0BD 雅致淡蓝灰 */
+    .status-custom-headline {
+      color: #A0B0BD;
       font-size: 14px;
-      font-weight: 800;
+      font-weight: 700;
       letter-spacing: 1px;
       line-height: 1.5;
-      text-shadow: 0 0 10px rgba(153, 27, 27, 0.55), 0 1px 3px rgba(0, 0, 0, 0.9);
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 12px rgba(160, 176, 189, 0.35);
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 2px;
     }
 
-    /* 暗红色跳动三点加载效果 */
-    .loading-dots-darkred span {
+    /* #A0B0BD 跳动三点加载效果 */
+    .loading-dots-custom span {
       display: inline-block;
-      animation: darkRedDotJump 1.4s infinite ease-in-out both;
+      animation: customDotJump 1.4s infinite ease-in-out both;
       font-size: 15px;
-      font-weight: 900;
-      color: #991b1b;
+      font-weight: 800;
+      color: #A0B0BD;
     }
-    .loading-dots-darkred span:nth-child(1) { animation-delay: -0.32s; }
-    .loading-dots-darkred span:nth-child(2) { animation-delay: -0.16s; }
-    .loading-dots-darkred span:nth-child(3) { animation-delay: 0s; }
+    .loading-dots-custom span:nth-child(1) { animation-delay: -0.32s; }
+    .loading-dots-custom span:nth-child(2) { animation-delay: -0.16s; }
+    .loading-dots-custom span:nth-child(3) { animation-delay: 0s; }
 
-    @keyframes darkRedDotJump {
-      0%, 80%, 100% { opacity: 0.35; transform: scale(0.85); color: #7f1d1d; }
-      40% { opacity: 1; transform: scale(1.25); color: #b91c1c; }
+    @keyframes customDotJump {
+      0%, 80%, 100% { opacity: 0.35; transform: scale(0.85); color: #718096; }
+      40% { opacity: 1; transform: scale(1.25); color: #E2E8F0; }
     }
 
     /* #CD853F 双细线金色边框按键 (外1px细线 + 2px暗隙 + 内1px细线，纯黑底白字，无图标) */
@@ -368,19 +470,39 @@
         <div id="transGaussianBg" class="room-gaussian-blur-bg"></div>
         <div class="room-vignette-mask"></div>
 
-        <!-- 抖音风格左上角主播信息栏 (舒适下移) -->
-        <div class="douyin-host-capsule">
-          <div class="douyin-avatar-wrap">
-            <img id="transTopAvatar" src="" class="douyin-avatar-img">
-            <span class="douyin-badge-v">V</span>
+        <!-- 抖音高仿豪华主播栏群 (包含主播胶囊、等级、粉丝团标、榜单头像、小心心) -->
+        <div class="douyin-top-bar-cluster">
+          <div class="douyin-host-capsule">
+            <div class="douyin-avatar-wrap">
+              <div class="douyin-live-ring"></div>
+              <img id="transTopAvatar" src="" class="douyin-avatar-img">
+              <span class="douyin-badge-v">V</span>
+            </div>
+            <div class="douyin-host-meta">
+              <div class="douyin-name-row">
+                <span id="transTopName" class="douyin-host-name">主播</span>
+                <span id="transTopLevel" class="douyin-level-tag">Lv.16</span>
+              </div>
+              <div class="douyin-sub-row">
+                <span id="transTopSub" class="douyin-host-sub">1.2w 本场点赞</span>
+                <span class="douyin-fans-club-tag">💖 粉丝团</span>
+              </div>
+            </div>
+            <button id="transBtnFollow" onclick="handleTransitionFollowClick()" class="douyin-btn-follow">
+              <span>+</span> 关注
+            </button>
           </div>
-          <div class="douyin-host-meta">
-            <span id="transTopName" class="douyin-host-name">主播</span>
-            <span id="transTopSub" class="douyin-host-sub">1.2w 在看</span>
+
+          <div class="douyin-top-right-ranks">
+            <div class="douyin-rank-avatars">
+              <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80" class="douyin-rank-user">
+              <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80" class="douyin-rank-user">
+              <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=80" class="douyin-rank-user">
+            </div>
+            <div class="douyin-heat-pill">
+              <span>🔥 8.6w</span>
+            </div>
           </div>
-          <button id="transBtnFollow" onclick="handleTransitionFollowClick()" class="douyin-btn-follow">
-            + 关注
-          </button>
         </div>
 
         <!-- 核心舞台：包含高斯模糊毛玻璃空隙散开 + 3层浅红细圈步进向外扩散 -->
@@ -397,7 +519,7 @@
           </div>
         </div>
 
-        <!-- 状态提示与退出按键区域 (紧贴在文字下方，暗红色) -->
+        <!-- 状态提示与退出按键区域 (紧贴在文字下方，#A0B0BD 字体) -->
         <div id="transStatusFlowBox" class="room-status-content-flow">
           <!-- 动态注入状态与退出按键 -->
         </div>
@@ -435,6 +557,7 @@
     const centerAvatar = document.getElementById('transCenterAvatar');
     const topName = document.getElementById('transTopName');
     const topSub = document.getElementById('transTopSub');
+    const topLevel = document.getElementById('transTopLevel');
     const followBtn = document.getElementById('transBtnFollow');
 
     if (gaussianBg) gaussianBg.style.backgroundImage = `url('${avatarUrl}')`;
@@ -443,11 +566,12 @@
     if (centerAvatar) centerAvatar.src = avatarUrl;
     if (topName) topName.textContent = nameStr;
     if (topSub) topSub.textContent = viewersStr;
+    if (topLevel) topLevel.textContent = `Lv.${(nameStr.length * 3 + 7) % 30 + 1}`;
 
     // 关注状态同步
     const isFollowed = (window.followedHosts || []).includes(session.characterId);
     if (followBtn) {
-      followBtn.textContent = isFollowed ? '已关注' : '+ 关注';
+      followBtn.innerHTML = isFollowed ? '已关注' : '<span>+</span> 关注';
       if (isFollowed) {
         followBtn.classList.add('followed');
       } else {
@@ -455,7 +579,7 @@
       }
     }
 
-    // 状态：正在进入直播间… (暗红色)
+    // 状态：正在进入直播间… (#A0B0BD)
     renderTransitionState('connecting');
 
     if (connectingTimeoutId) clearTimeout(connectingTimeoutId);
@@ -470,13 +594,13 @@
         throw new Error("NO_NETWORK_DISCONNECTED");
       }
 
-      // 执行打包与连通性检测
+      // 执行打包与连通性检测（在过渡期间预加载弹幕包）
       const fetchPromise = (async () => {
         if (typeof window.aiGenerate === 'function') {
           return await window.aiGenerate({
             characterId: session.characterId,
-            appTags: ['live', 'package', 'ping'],
-            instruction: `当前频道：${session.category}，检测并准备直播弹幕包`
+            appTags: ['live', 'package'],
+            instruction: `当前频道：${session.category || '综合'}（${session.subTag || '生活'}），标题：${session.topic || '直播间'}。请生成开场台词与弹幕`
           });
         }
         return { text: '{"danmakus":[],"hostSpeeches":[]}' };
@@ -488,8 +612,8 @@
         }, 10000);
       });
 
-      // 保持最少 900ms 丝滑进房体验
-      const minDelayPromise = new Promise(r => setTimeout(r, 900));
+      // 保持至少 650ms 丝滑进房体验
+      const minDelayPromise = new Promise(r => setTimeout(r, 650));
       const [res] = await Promise.all([
         Promise.race([fetchPromise, timeoutPromise]),
         minDelayPromise
@@ -497,14 +621,16 @@
 
       if (connectingTimeoutId) clearTimeout(connectingTimeoutId);
 
-      // 解析弹幕包注入弹幕池
+      // 解析弹幕包注入全局弹幕池与主播台词池
       if (res && res.text) {
         const parsed = (typeof window.extractJsonFromText === 'function') ? window.extractJsonFromText(res.text) : null;
         if (parsed) {
-          if (parsed.danmakus && Array.isArray(parsed.danmakus) && window.danmakuPool) {
+          if (parsed.danmakus && Array.isArray(parsed.danmakus)) {
+            window.danmakuPool = window.danmakuPool || [];
             window.danmakuPool.push(...parsed.danmakus);
           }
-          if (parsed.hostSpeeches && Array.isArray(parsed.hostSpeeches) && window.hostSpeechPool) {
+          if (parsed.hostSpeeches && Array.isArray(parsed.hostSpeeches)) {
+            window.hostSpeechPool = window.hostSpeechPool || [];
             window.hostSpeechPool.push(...parsed.hostSpeeches);
           }
         }
@@ -536,7 +662,7 @@
   }
 
   /**
-   * 渲染暗红色状态文案与 #CD853F 双细线退出按键
+   * 渲染 #A0B0BD 状态文案与 #CD853F 双细线退出按键
    */
   function renderTransitionState(state) {
     const flowBox = document.getElementById('transStatusFlowBox');
@@ -544,14 +670,14 @@
 
     if (state === 'connecting') {
       flowBox.innerHTML = `
-        <div class="status-dark-red-headline">
+        <div class="status-custom-headline">
           <span>正在进入直播间</span>
-          <span class="loading-dots-darkred"><span>.</span><span>.</span><span>.</span></span>
+          <span class="loading-dots-custom"><span>.</span><span>.</span><span>.</span></span>
         </div>
       `;
     } else if (state === 'timeout') {
       flowBox.innerHTML = `
-        <div class="status-dark-red-headline">
+        <div class="status-custom-headline">
           <span>网络连接超时，请重试</span>
         </div>
         <button onclick="handleTransitionExitClick()" class="btn-bronze-double-border">
@@ -562,7 +688,7 @@
       `;
     } else if (state === 'network_error') {
       flowBox.innerHTML = `
-        <div class="status-dark-red-headline">
+        <div class="status-custom-headline">
           <span>网络连接失败，请检查你的网络环境。</span>
         </div>
         <button onclick="handleTransitionExitClick()" class="btn-bronze-double-border">
@@ -573,7 +699,7 @@
       `;
     } else if (state === 'host_left') {
       flowBox.innerHTML = `
-        <div class="status-dark-red-headline">
+        <div class="status-custom-headline">
           <span>主播已离开房间…</span>
         </div>
         <button onclick="handleTransitionExitClick()" class="btn-bronze-double-border">
@@ -632,7 +758,7 @@
       await window.toggleFollowRoomHost();
       const isFollowed = (window.followedHosts || []).includes(charId);
       if (followBtn) {
-        followBtn.textContent = isFollowed ? '已关注' : '+ 关注';
+        followBtn.innerHTML = isFollowed ? '已关注' : '<span>+</span> 关注';
         if (isFollowed) {
           followBtn.classList.add('followed');
         } else {
