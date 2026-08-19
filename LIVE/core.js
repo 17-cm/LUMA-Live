@@ -682,7 +682,11 @@ const lumaOpsGateway = {
     );
 
     if (window.currentRoom && (window.currentRoom.characterId === characterId || window.currentRoom.id === session?.id)) {
-      if (typeof closeLiveRoom === 'function') closeLiveRoom();
+      if (typeof window.showHostLeftRoomStage === 'function') {
+        window.showHostLeftRoomStage(window.currentRoom);
+      } else if (typeof closeLiveRoom === 'function') {
+        closeLiveRoom();
+      }
       api.ui.toast(`主播【${charName}】已下播休息`);
     }
 

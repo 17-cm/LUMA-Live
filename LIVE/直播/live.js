@@ -293,7 +293,7 @@ function updateLiveRoomDuration() {
   durationEl.textContent = formatLiveDuration(start);
 }
 
-function enterLiveRoom(sessionId) {
+function enterLiveRoomDirectly(sessionId) {
   const lives = window.liveList || liveList || [];
   currentRoom = lives.find(s => s.id === sessionId || String(s.roomId) === String(sessionId));
   if (!currentRoom) return;
@@ -353,6 +353,21 @@ function enterLiveRoom(sessionId) {
     currentRoom.viewers = baseViewer;
     updateViewerEl(baseViewer);
   }, 4000);
+}
+window.enterLiveRoomDirectly = enterLiveRoomDirectly;
+
+function enterLiveRoom(sessionId) {
+  const lives = window.liveList || liveList || [];
+  const targetSession = lives.find(s => s.id === sessionId || String(s.roomId) === String(sessionId));
+  if (!targetSession) return;
+
+  if (typeof window.launchRoomConnectingStage === 'function') {
+    window.launchRoomConnectingStage(targetSession, () => {
+      enterLiveRoomDirectly(sessionId);
+    });
+  } else {
+    enterLiveRoomDirectly(sessionId);
+  }
 }
 window.enterLiveRoom = enterLiveRoom;
 window.openLiveRoom = enterLiveRoom;
