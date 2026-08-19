@@ -1142,7 +1142,12 @@ window.closePlayerLiveView = closePlayerLiveView;
 // =========================================================================
 // 11. 全局启动加载生命周期
 // =========================================================================
-window.addEventListener('DOMContentLoaded', async () => {
+let isAppInitialized = false;
+
+async function initAppGlobalLifecycle() {
+  if (isAppInitialized) return;
+  isAppInitialized = true;
+
   if (typeof registerAiPhoneToolHandlers === 'function') {
     registerAiPhoneToolHandlers();
   }
@@ -1234,4 +1239,10 @@ window.addEventListener('DOMContentLoaded', async () => {
       syncLiveSessions({ allowSpawn: true });
     }
   }, 30000);
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAppGlobalLifecycle);
+} else {
+  initAppGlobalLifecycle();
+}
