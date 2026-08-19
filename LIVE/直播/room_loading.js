@@ -1,10 +1,11 @@
 // =========================================================================
 // 【直播间状态与全息连接过渡模块】LIVE/直播/room_loading.js
-// 包含：照片毛玻璃空隙晕染扩散、三层浅红细圈步进扩散、抖音风左上角主播栏、#CD853F 双细线暗金边退出按键
+// 包含：方案1【纯正高斯模糊毛玻璃背景扩散】、唱片级头像、三层浅红细圈步进扩散、
+// 抖音风左上角主播栏、暗红状态文案、#CD853F 双细线暗金边退出按键
 // =========================================================================
 
 (function initRoomLoadingModule() {
-  // 1. 注入专属样式
+  // 1. 注入方案 1【高斯模糊毛玻璃扩散】专属样式
   const styleEl = document.createElement('style');
   styleEl.id = 'luma-room-transition-style';
   styleEl.textContent = `
@@ -22,7 +23,7 @@
       -webkit-user-select: none;
       overflow: hidden;
       transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s ease-out;
-      background-color: #04060a;
+      background-color: #030508;
     }
 
     .room-transition-overlay.hidden {
@@ -35,16 +36,30 @@
       pointer-events: none;
     }
 
-    /* 全屏深层暗角背景遮罩 */
+    /* 方案 1：全屏高斯模糊毛玻璃背景 (将主播照片本身重度高斯模糊) */
+    .room-gaussian-blur-bg {
+      position: absolute;
+      inset: -40px;
+      background-size: cover;
+      background-position: center;
+      filter: blur(48px) brightness(0.4) saturate(1.4);
+      -webkit-filter: blur(48px) brightness(0.4) saturate(1.4);
+      transform: scale(1.25);
+      z-index: 1;
+      pointer-events: none;
+      transition: background-image 0.4s ease;
+    }
+
+    /* 柔和暗角压暗遮罩 */
     .room-vignette-mask {
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at 50% 48%, rgba(8, 10, 15, 0.4) 0%, rgba(4, 5, 8, 0.85) 65%, #020306 100%);
+      background: radial-gradient(circle at 50% 50%, rgba(3, 5, 8, 0.25) 0%, rgba(2, 3, 5, 0.75) 70%, #010204 100%);
       z-index: 2;
       pointer-events: none;
     }
 
-    /* 抖音风格左上角主播信息栏 (进一步下移) */
+    /* 抖音风格左上角主播信息栏 (向下移至舒适位置) */
     .douyin-host-capsule {
       position: absolute;
       top: 56px;
@@ -151,8 +166,8 @@
       box-shadow: none;
     }
 
-    /* 核心舞台：包含照片毛玻璃空隙晕染 + 三层浅红细圈步进扩散动效 */
-    .avatar-halo-stage {
+    /* 核心舞台：包含高斯模糊毛玻璃空隙散开 + 三层浅红细圈向外步进扩散 */
+    .avatar-stage-container {
       position: relative;
       z-index: 10;
       width: clamp(230px, 64vw, 270px);
@@ -163,7 +178,7 @@
     }
 
     /* 三个很细的浅红扩散光圈 (步进式向外蔓延) */
-    .ripple-ring {
+    .ripple-step-ring {
       position: absolute;
       top: 50%;
       left: 50%;
@@ -191,10 +206,10 @@
         height: 170px;
         opacity: 0.85;
         border-color: rgba(248, 113, 113, 0.65);
-        box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.35);
       }
       50% {
-        opacity: 0.5;
+        opacity: 0.45;
         border-color: rgba(248, 113, 113, 0.35);
       }
       100% {
@@ -202,12 +217,12 @@
         height: 290px;
         opacity: 0;
         border-color: rgba(248, 113, 113, 0);
-        box-shadow: 0 0 18px rgba(239, 68, 68, 0);
+        box-shadow: 0 0 16px rgba(239, 68, 68, 0);
       }
     }
 
-    /* 空隙毛玻璃晕染外框 (照片向外模糊扩散发散) */
-    .avatar-gap-diffusion-frame {
+    /* 中心头像框（大唱片尺寸） */
+    .avatar-crisp-frame {
       position: relative;
       width: clamp(180px, 50vw, 210px);
       height: clamp(180px, 50vw, 210px);
@@ -215,37 +230,37 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      overflow: visible;
       z-index: 5;
     }
 
-    /* 照片自身放大并重度模糊，形成四周空隙发散晕染 */
-    .avatar-diffuse-backdrop {
+    /* 方案 1：中间头像背后直接垫一层一模一样的头像，放大并施加高斯模糊（向外毛玻璃虚化晕散） */
+    .avatar-gaussian-underlay {
       position: absolute;
-      inset: -22px;
+      inset: -18px;
       border-radius: 9999px;
       background-size: cover;
       background-position: center;
-      filter: blur(24px) saturate(1.8) brightness(0.9);
-      opacity: 0.92;
+      filter: blur(22px) brightness(1.05) saturate(1.6);
+      -webkit-filter: blur(22px) brightness(1.05) saturate(1.6);
+      opacity: 0.9;
       z-index: 1;
-      animation: backdropGlowPulse 3.5s ease-in-out infinite alternate;
+      animation: underlayPulse 3.8s ease-in-out infinite alternate;
     }
 
-    @keyframes backdropGlowPulse {
+    @keyframes underlayPulse {
       0% {
-        transform: scale(0.95);
-        opacity: 0.8;
+        transform: scale(0.96);
+        opacity: 0.75;
       }
       100% {
-        transform: scale(1.08);
-        opacity: 1;
-        filter: blur(28px) saturate(2.1) brightness(1.05);
+        transform: scale(1.06);
+        opacity: 0.98;
+        filter: blur(26px) brightness(1.15) saturate(1.8);
       }
     }
 
-    /* 中间清晰纯净的 Char 头像 */
-    .avatar-crisp-center {
+    /* 中间清晰的 Char 头像 */
+    .avatar-crisp-img {
       position: relative;
       z-index: 10;
       width: 100%;
@@ -253,10 +268,10 @@
       border-radius: 9999px;
       object-fit: cover;
       border: 2px solid rgba(255, 255, 255, 0.9);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.75), 0 0 20px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.8);
     }
 
-    /* 状态提示文案区 (紧贴头像下方，使用暗红色) */
+    /* 状态提示文案区 (紧贴头像下方) */
     .room-status-content-flow {
       position: relative;
       z-index: 10;
@@ -349,9 +364,11 @@
       overlay.id = 'liveRoomTransitionOverlay';
       overlay.className = 'room-transition-overlay hidden';
       overlay.innerHTML = `
+        <!-- 方案 1：全屏高斯模糊背景与暗角遮罩 -->
+        <div id="transGaussianBg" class="room-gaussian-blur-bg"></div>
         <div class="room-vignette-mask"></div>
 
-        <!-- 抖音风格左上角主播信息栏 (下移至 top: 56px) -->
+        <!-- 抖音风格左上角主播信息栏 (舒适下移) -->
         <div class="douyin-host-capsule">
           <div class="douyin-avatar-wrap">
             <img id="transTopAvatar" src="" class="douyin-avatar-img">
@@ -366,17 +383,17 @@
           </button>
         </div>
 
-        <!-- 核心舞台：包含照片毛玻璃空隙晕染 + 3层浅红细圈步进向外扩散 -->
-        <div class="avatar-halo-stage">
+        <!-- 核心舞台：包含高斯模糊毛玻璃空隙散开 + 3层浅红细圈步进向外扩散 -->
+        <div class="avatar-stage-container">
           <!-- 3 个浅红扩散细圈 -->
-          <div class="ripple-ring ripple-ring-1"></div>
-          <div class="ripple-ring ripple-ring-2"></div>
-          <div class="ripple-ring ripple-ring-3"></div>
+          <div class="ripple-step-ring ripple-ring-1"></div>
+          <div class="ripple-step-ring ripple-ring-2"></div>
+          <div class="ripple-step-ring ripple-ring-3"></div>
 
-          <!-- 照片空隙晕染层与中心头像 -->
-          <div class="avatar-gap-diffusion-frame">
-            <div id="transBackdropDiffusion" class="avatar-diffuse-backdrop"></div>
-            <img id="transCenterAvatar" src="" class="avatar-crisp-center">
+          <!-- 方案 1：头像背后高斯模糊垫层 + 中心清晰头像 -->
+          <div class="avatar-crisp-frame">
+            <div id="transGaussianUnderlay" class="avatar-gaussian-underlay"></div>
+            <img id="transCenterAvatar" src="" class="avatar-crisp-img">
           </div>
         </div>
 
@@ -412,14 +429,16 @@
     const viewersCount = (typeof window.getLiveSessionViewers === 'function') ? window.getLiveSessionViewers(session) : 1200;
     const viewersStr = viewersCount > 10000 ? (viewersCount / 10000).toFixed(1) + 'w 在看' : `${viewersCount} 在看`;
 
-    const diffuseBackdrop = document.getElementById('transBackdropDiffusion');
+    const gaussianBg = document.getElementById('transGaussianBg');
+    const gaussianUnderlay = document.getElementById('transGaussianUnderlay');
     const topAvatar = document.getElementById('transTopAvatar');
     const centerAvatar = document.getElementById('transCenterAvatar');
     const topName = document.getElementById('transTopName');
     const topSub = document.getElementById('transTopSub');
     const followBtn = document.getElementById('transBtnFollow');
 
-    if (diffuseBackdrop) diffuseBackdrop.style.backgroundImage = `url('${avatarUrl}')`;
+    if (gaussianBg) gaussianBg.style.backgroundImage = `url('${avatarUrl}')`;
+    if (gaussianUnderlay) gaussianUnderlay.style.backgroundImage = `url('${avatarUrl}')`;
     if (topAvatar) topAvatar.src = avatarUrl;
     if (centerAvatar) centerAvatar.src = avatarUrl;
     if (topName) topName.textContent = nameStr;
@@ -578,13 +597,15 @@
     overlay.classList.remove('hidden', 'fade-out');
 
     const avatarUrl = s.avatar || (s.cover || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500');
-    const diffuseBackdrop = document.getElementById('transBackdropDiffusion');
+    const gaussianBg = document.getElementById('transGaussianBg');
+    const gaussianUnderlay = document.getElementById('transGaussianUnderlay');
     const topAvatar = document.getElementById('transTopAvatar');
     const centerAvatar = document.getElementById('transCenterAvatar');
     const topName = document.getElementById('transTopName');
     const topSub = document.getElementById('transTopSub');
 
-    if (diffuseBackdrop) diffuseBackdrop.style.backgroundImage = `url('${avatarUrl}')`;
+    if (gaussianBg) gaussianBg.style.backgroundImage = `url('${avatarUrl}')`;
+    if (gaussianUnderlay) gaussianUnderlay.style.backgroundImage = `url('${avatarUrl}')`;
     if (topAvatar) topAvatar.src = avatarUrl;
     if (centerAvatar) centerAvatar.src = avatarUrl;
     if (topName) topName.textContent = s.name || '主播';
