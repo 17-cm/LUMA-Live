@@ -781,14 +781,14 @@ window.executeConfirmResetAppData = executeConfirmResetAppData;
 // =========================================================================
 // 10. 【版本更新与 Git 仓库直连系统】
 // =========================================================================
-const APP_CURRENT_VERSION = 'v3.4.0';
-const DEFAULT_GIT_REPO = '17-cm/hy2';
+const APP_CURRENT_VERSION = 'v3.4.1';
+const DEFAULT_GIT_REPO = '17-cm/LUMA-Live';
 const DEFAULT_GIT_BRANCH = 'main';
 
 let gitUpdateState = {
   currentVersion: APP_CURRENT_VERSION,
   latestVersion: APP_CURRENT_VERSION,
-  localCommit: 'v3.4.0-main',
+  localCommit: 'v3.4.1-main',
   remoteCommit: '',
   hasUpdate: false,
   updateLog: '',
