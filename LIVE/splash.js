@@ -51,48 +51,16 @@
       100% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.95; }
     }
 
-    .splash-top-bar {
-      width: 100%;
-      display: flex;
-      justify-content: flex-start;
-      align-items: center;
-      z-index: 20;
-    }
-
-    .splash-skip-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(15, 23, 42, 0.65);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 9999px;
-      padding: 6px 14px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      color: rgba(241, 245, 249, 0.85);
-      cursor: pointer;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .splash-skip-btn:active {
-      transform: scale(0.94);
-      background: rgba(30, 41, 59, 0.85);
-      border-color: rgba(244, 63, 94, 0.4);
-    }
-
-    .splash-skip-count {
-      color: #f43f5e;
-      font-variant-numeric: tabular-nums;
-      font-weight: 800;
-    }
-
     .splash-brand-stage {
       position: relative;
       display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      margin-top: auto;
+      margin-bottom: auto;
+    }
       flex-direction: column;
       align-items: center;
       justify-content: center;
@@ -238,12 +206,6 @@
       container.id = 'appSplashScreen';
       container.innerHTML = `
         <div class="splash-ambient-glow"></div>
-        <div class="splash-top-bar">
-          <button class="splash-skip-btn" id="splashSkipBtn">
-            <span>跳过</span>
-            <span class="splash-skip-count" id="splashSkipCounter">3s</span>
-          </button>
-        </div>
         <div class="splash-brand-stage">
           <div class="splash-logo-letters" id="splashLogoLetters">
             <span class="splash-char" id="spChar-0">L</span>
@@ -280,8 +242,6 @@
     const logo = document.getElementById('splashLogoLetters');
     const slogan = document.getElementById('splashSloganBox');
     const progress = document.getElementById('splashProgressFill');
-    const counter = document.getElementById('splashSkipCounter');
-    const skipBtn = document.getElementById('splashSkipBtn');
 
     container.classList.remove('splash-exit');
     container.style.display = 'flex';
@@ -291,7 +251,6 @@
       progress.style.transition = 'none';
       progress.style.width = '0%';
     }
-    if (counter) counter.textContent = '3s';
 
     const chars = [
       document.getElementById('spChar-0'),
@@ -301,49 +260,38 @@
     ];
     chars.forEach(c => c && c.classList.remove('lit'));
 
-    // 绑定跳过事件
-    if (skipBtn) {
-      skipBtn.onclick = exitSplashScreen;
-    }
+    // 点击背景也可快速进入
+    container.onclick = exitSplashScreen;
 
-    // 启动 3.0 秒进度条
+    // 启动 2.6 秒优雅进度条
     setTimeout(() => {
       if (progress) {
-        progress.style.transition = 'width 3000ms cubic-bezier(0.2, 0.8, 0.2, 1)';
+        progress.style.transition = 'width 2600ms cubic-bezier(0.2, 0.8, 0.2, 1)';
         progress.style.width = '100%';
       }
     }, 50);
 
-    // 1. 优雅逐字点亮 (200ms -> 550ms -> 900ms -> 1250ms)
-    setTimeout(() => chars[0] && chars[0].classList.add('lit'), 200);
-    setTimeout(() => chars[1] && chars[1].classList.add('lit'), 550);
-    setTimeout(() => chars[2] && chars[2].classList.add('lit'), 900);
-    setTimeout(() => chars[3] && chars[3].classList.add('lit'), 1250);
+    // 1. 优雅逐字点亮 (180ms -> 480ms -> 780ms -> 1080ms)
+    setTimeout(() => chars[0] && chars[0].classList.add('lit'), 180);
+    setTimeout(() => chars[1] && chars[1].classList.add('lit'), 480);
+    setTimeout(() => chars[2] && chars[2].classList.add('lit'), 780);
+    setTimeout(() => chars[3] && chars[3].classList.add('lit'), 1080);
 
-    // 2. 全字合成爆闪高光 (1550ms)
+    // 2. 全字合成爆闪高光 (1350ms)
     setTimeout(() => {
       if (logo) logo.classList.add('bloom');
-    }, 1550);
+    }, 1350);
 
-    // 3. 副标题淡入滑出 (1700ms)
+    // 3. 副标题淡入滑出 (1500ms)
     setTimeout(() => {
       if (slogan) slogan.classList.add('show');
-    }, 1700);
+    }, 1500);
 
-    // 4. 倒计时数字递减
-    setTimeout(() => {
-      if (!isSplashExited && counter) counter.textContent = '2s';
-    }, 1000);
-
-    setTimeout(() => {
-      if (!isSplashExited && counter) counter.textContent = '1s';
-    }, 2000);
-
-    // 5. 3 秒结束自动转场
+    // 4. 2.6 秒结束自动转场
     if (splashTimerId) clearTimeout(splashTimerId);
     splashTimerId = setTimeout(() => {
       exitSplashScreen();
-    }, 3050);
+    }, 2650);
   }
 
   function exitSplashScreen() {
