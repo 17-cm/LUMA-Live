@@ -10,47 +10,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Playfair+Display:ital,wght@1,600;1,800&family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="style.css">
-  
-  <!-- 动态热更新引导加载器 (Hot-Patch Bootloader) -->
-  <script id="luma-hotpatch-bootloader">
-    (function() {
-      try {
-        var raw = localStorage.getItem('luma_hotpatch_files');
-        if (raw) {
-          var files = JSON.parse(raw);
-          if (files && typeof files === 'object') {
-            window.__LUMA_HOTPATCH_ACTIVE__ = true;
-            window.__LUMA_HOTPATCH_FILES__ = files;
-            if (files['style.css']) {
-              var s = document.createElement('style');
-              s.id = 'luma-hotpatch-css';
-              s.textContent = files['style.css'];
-              document.head.appendChild(s);
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Bootloader read warning:', e);
-      }
-    })();
-  </script>
-
-  <!-- 独立启动页模块 (支持热更新覆盖) -->
-  <script>
-    (function() {
-      var hotpatch = window.__LUMA_HOTPATCH_FILES__;
-      if (hotpatch && hotpatch['LIVE/splash.js']) {
-        var s = document.createElement('script');
-        s.setAttribute('data-hotpatch-src', 'LIVE/splash.js');
-        s.textContent = hotpatch['LIVE/splash.js'];
-        document.head.appendChild(s);
-      } else {
-        var s = document.createElement('script');
-        s.src = 'LIVE/splash.js';
-        document.head.appendChild(s);
-      }
-    })();
-  </script>
+  <!-- 独立启动页模块 -->
+  <script src="LIVE/splash.js"></script>
 </head>
 <body class="h-screen w-screen flex flex-col relative select-none">
 
@@ -1396,40 +1357,11 @@
     </div>
   </div>
 
-  <!-- 模块化脚本引用 (支持动态热更新无缝替换) -->
-  <script>
-    (function() {
-      var scriptList = [
-        'LIVE/core.js',
-        'LIVE/主页/profile.js',
-        'LIVE/社区/trends.js',
-        'LIVE/直播/live.js',
-        'LIVE/设定/main.js'
-      ];
-
-      var hotpatch = window.__LUMA_HOTPATCH_FILES__;
-      if (hotpatch && typeof hotpatch === 'object') {
-        scriptList.forEach(function(src) {
-          var code = hotpatch[src];
-          if (code) {
-            var s = document.createElement('script');
-            s.setAttribute('data-hotpatch-src', src);
-            s.textContent = code;
-            document.body.appendChild(s);
-          } else {
-            var s = document.createElement('script');
-            s.src = src;
-            document.body.appendChild(s);
-          }
-        });
-      } else {
-        scriptList.forEach(function(src) {
-          var s = document.createElement('script');
-          s.src = src;
-          document.body.appendChild(s);
-        });
-      }
-    })();
-  </script>
+  <!-- 模块化脚本引用 -->
+  <script src="LIVE/core.js"></script>
+  <script src="LIVE/主页/profile.js"></script>
+  <script src="LIVE/社区/trends.js"></script>
+  <script src="LIVE/直播/live.js"></script>
+  <script src="LIVE/设定/main.js"></script>
 </body>
 </html>
