@@ -61,12 +61,6 @@
       margin-top: auto;
       margin-bottom: auto;
     }
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 10;
-      margin-top: -30px;
-    }
 
     .splash-logo-letters {
       display: flex;
