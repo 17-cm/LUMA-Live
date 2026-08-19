@@ -1,10 +1,10 @@
 // =========================================================================
 // 【直播间状态与全息连接过渡模块】LIVE/直播/room_loading.js
-// 包含：网易云全屏晕染背景、唱片级立绘、抖音风左上角主播栏、双细线暗金边退出按键
+// 包含：照片毛玻璃空隙晕染扩散、三层浅红细圈步进扩散、抖音风左上角主播栏、#CD853F 双细线暗金边退出按键
 // =========================================================================
 
 (function initRoomLoadingModule() {
-  // 1. 注入网易云全屏晕染背景与 #CD853F 双细线专属样式
+  // 1. 注入专属样式
   const styleEl = document.createElement('style');
   styleEl.id = 'luma-room-transition-style';
   styleEl.textContent = `
@@ -22,7 +22,7 @@
       -webkit-user-select: none;
       overflow: hidden;
       transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s ease-out;
-      background-color: #05070c;
+      background-color: #04060a;
     }
 
     .room-transition-overlay.hidden {
@@ -35,44 +35,31 @@
       pointer-events: none;
     }
 
-    /* 网易云全屏背景晕染层 */
-    .room-full-diffusion-bg {
-      position: absolute;
-      inset: -30px;
-      background-size: cover;
-      background-position: center;
-      filter: blur(55px) brightness(0.32) saturate(1.35);
-      transform: scale(1.2);
-      z-index: 1;
-      pointer-events: none;
-      transition: background-image 0.5s ease;
-    }
-
-    /* 全屏径向压暗与暗角遮罩 */
+    /* 全屏深层暗角背景遮罩 */
     .room-vignette-mask {
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at 50% 48%, rgba(8, 10, 15, 0.35) 0%, rgba(4, 5, 8, 0.8) 65%, #020306 100%);
+      background: radial-gradient(circle at 50% 48%, rgba(8, 10, 15, 0.4) 0%, rgba(4, 5, 8, 0.85) 65%, #020306 100%);
       z-index: 2;
       pointer-events: none;
     }
 
-    /* 抖音风格左上角主播信息栏 */
+    /* 抖音风格左上角主播信息栏 (进一步下移) */
     .douyin-host-capsule {
       position: absolute;
-      top: 32px;
+      top: 56px;
       left: 16px;
       z-index: 30;
       display: flex;
       align-items: center;
       gap: 7px;
-      background: rgba(0, 0, 0, 0.48);
+      background: rgba(0, 0, 0, 0.52);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 0.8px solid rgba(255, 255, 255, 0.18);
       border-radius: 9999px;
       padding: 3px 6px 3px 3px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
       max-width: calc(100vw - 32px);
     }
 
@@ -164,55 +151,116 @@
       box-shadow: none;
     }
 
-    /* 网易云唱片级中心大头像 */
-    .vinyl-stage-box {
+    /* 核心舞台：包含照片毛玻璃空隙晕染 + 三层浅红细圈步进扩散动效 */
+    .avatar-halo-stage {
       position: relative;
       z-index: 10;
+      width: clamp(230px, 64vw, 270px);
+      height: clamp(230px, 64vw, 270px);
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
     }
 
-    .vinyl-disc-frame {
-      width: clamp(190px, 54vw, 224px);
-      height: clamp(190px, 54vw, 224px);
+    /* 三个很细的浅红扩散光圈 (步进式向外蔓延) */
+    .ripple-ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       border-radius: 9999px;
-      padding: 10px;
-      background: radial-gradient(circle, #242730 0%, #13161f 55%, #080a0f 85%, #040508 100%);
-      box-shadow: 0 16px 45px rgba(0, 0, 0, 0.8), 0 0 45px rgba(205, 133, 63, 0.22);
-      border: 1.5px solid rgba(205, 133, 63, 0.35);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      animation: vinylFloatBreath 4s ease-in-out infinite alternate;
+      border: 1px solid rgba(248, 113, 113, 0.55);
+      pointer-events: none;
+      z-index: 3;
+      animation: rippleStepSpread 3.6s cubic-bezier(0.1, 0.45, 0.3, 1) infinite;
     }
 
-    @keyframes vinylFloatBreath {
+    .ripple-ring-1 {
+      animation-delay: 0s;
+    }
+    .ripple-ring-2 {
+      animation-delay: 1.2s;
+    }
+    .ripple-ring-3 {
+      animation-delay: 2.4s;
+    }
+
+    @keyframes rippleStepSpread {
       0% {
-        transform: translateY(0) scale(1);
-        box-shadow: 0 16px 45px rgba(0, 0, 0, 0.8), 0 0 35px rgba(205, 133, 63, 0.18);
+        width: 170px;
+        height: 170px;
+        opacity: 0.85;
+        border-color: rgba(248, 113, 113, 0.65);
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+      }
+      50% {
+        opacity: 0.5;
+        border-color: rgba(248, 113, 113, 0.35);
       }
       100% {
-        transform: translateY(-6px) scale(1.015);
-        box-shadow: 0 22px 55px rgba(0, 0, 0, 0.9), 0 0 55px rgba(205, 133, 63, 0.32);
+        width: 290px;
+        height: 290px;
+        opacity: 0;
+        border-color: rgba(248, 113, 113, 0);
+        box-shadow: 0 0 18px rgba(239, 68, 68, 0);
       }
     }
 
-    .vinyl-inner-avatar {
+    /* 空隙毛玻璃晕染外框 (照片向外模糊扩散发散) */
+    .avatar-gap-diffusion-frame {
+      position: relative;
+      width: clamp(180px, 50vw, 210px);
+      height: clamp(180px, 50vw, 210px);
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: visible;
+      z-index: 5;
+    }
+
+    /* 照片自身放大并重度模糊，形成四周空隙发散晕染 */
+    .avatar-diffuse-backdrop {
+      position: absolute;
+      inset: -22px;
+      border-radius: 9999px;
+      background-size: cover;
+      background-position: center;
+      filter: blur(24px) saturate(1.8) brightness(0.9);
+      opacity: 0.92;
+      z-index: 1;
+      animation: backdropGlowPulse 3.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes backdropGlowPulse {
+      0% {
+        transform: scale(0.95);
+        opacity: 0.8;
+      }
+      100% {
+        transform: scale(1.08);
+        opacity: 1;
+        filter: blur(28px) saturate(2.1) brightness(1.05);
+      }
+    }
+
+    /* 中间清晰纯净的 Char 头像 */
+    .avatar-crisp-center {
+      position: relative;
+      z-index: 10;
       width: 100%;
       height: 100%;
       border-radius: 9999px;
       object-fit: cover;
-      border: 2px solid rgba(255, 255, 255, 0.88);
+      border: 2px solid rgba(255, 255, 255, 0.9);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.75), 0 0 20px rgba(0, 0, 0, 0.5);
     }
 
-    /* 状态提示文案区 (紧贴唱片下方) */
+    /* 状态提示文案区 (紧贴头像下方，使用暗红色) */
     .room-status-content-flow {
       position: relative;
       z-index: 10;
-      margin-top: 26px;
+      margin-top: 30px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -221,39 +269,41 @@
       padding: 0 24px;
     }
 
-    .status-main-headline {
-      color: #ffffff;
+    /* 中间一行字体：暗红色 */
+    .status-dark-red-headline {
+      color: #991b1b;
       font-size: 14px;
-      font-weight: 700;
+      font-weight: 800;
       letter-spacing: 1px;
       line-height: 1.5;
-      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+      text-shadow: 0 0 10px rgba(153, 27, 27, 0.55), 0 1px 3px rgba(0, 0, 0, 0.9);
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 2px;
     }
 
-    /* 三个点跳动加载效果 */
-    .loading-dots-clean span {
+    /* 暗红色跳动三点加载效果 */
+    .loading-dots-darkred span {
       display: inline-block;
-      animation: cleanDotJump 1.4s infinite ease-in-out both;
-      font-size: 14px;
-      font-weight: 700;
+      animation: darkRedDotJump 1.4s infinite ease-in-out both;
+      font-size: 15px;
+      font-weight: 900;
+      color: #991b1b;
     }
-    .loading-dots-clean span:nth-child(1) { animation-delay: -0.32s; }
-    .loading-dots-clean span:nth-child(2) { animation-delay: -0.16s; }
-    .loading-dots-clean span:nth-child(3) { animation-delay: 0s; }
+    .loading-dots-darkred span:nth-child(1) { animation-delay: -0.32s; }
+    .loading-dots-darkred span:nth-child(2) { animation-delay: -0.16s; }
+    .loading-dots-darkred span:nth-child(3) { animation-delay: 0s; }
 
-    @keyframes cleanDotJump {
-      0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); }
-      40% { opacity: 1; transform: scale(1.2); color: #CD853F; }
+    @keyframes darkRedDotJump {
+      0%, 80%, 100% { opacity: 0.35; transform: scale(0.85); color: #7f1d1d; }
+      40% { opacity: 1; transform: scale(1.25); color: #b91c1c; }
     }
 
     /* #CD853F 双细线金色边框按键 (外1px细线 + 2px暗隙 + 内1px细线，纯黑底白字，无图标) */
     .btn-bronze-double-border {
       position: relative;
-      margin-top: 18px;
+      margin-top: 20px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -265,7 +315,7 @@
       transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
       border-style: solid;
       outline: none;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 12px rgba(205, 133, 63, 0.25);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 12px rgba(205, 133, 63, 0.22);
     }
 
     .btn-bronze-double-border:active {
@@ -277,7 +327,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 8px 30px;
+      padding: 8px 32px;
       background: #06080d;
       border: 1px solid #CD853F;
       border-radius: 9999px;
@@ -299,11 +349,9 @@
       overlay.id = 'liveRoomTransitionOverlay';
       overlay.className = 'room-transition-overlay hidden';
       overlay.innerHTML = `
-        <!-- 网易云全屏背景晕染层与遮罩 -->
-        <div id="transFullDiffusionBg" class="room-full-diffusion-bg"></div>
         <div class="room-vignette-mask"></div>
 
-        <!-- 抖音风格左上角主播信息栏 (往下移，不避让状态栏) -->
+        <!-- 抖音风格左上角主播信息栏 (下移至 top: 56px) -->
         <div class="douyin-host-capsule">
           <div class="douyin-avatar-wrap">
             <img id="transTopAvatar" src="" class="douyin-avatar-img">
@@ -318,14 +366,21 @@
           </button>
         </div>
 
-        <!-- 网易云唱片级中心大头像舞台 -->
-        <div class="vinyl-stage-box">
-          <div class="vinyl-disc-frame">
-            <img id="transCenterAvatar" src="" class="vinyl-inner-avatar">
+        <!-- 核心舞台：包含照片毛玻璃空隙晕染 + 3层浅红细圈步进向外扩散 -->
+        <div class="avatar-halo-stage">
+          <!-- 3 个浅红扩散细圈 -->
+          <div class="ripple-ring ripple-ring-1"></div>
+          <div class="ripple-ring ripple-ring-2"></div>
+          <div class="ripple-ring ripple-ring-3"></div>
+
+          <!-- 照片空隙晕染层与中心头像 -->
+          <div class="avatar-gap-diffusion-frame">
+            <div id="transBackdropDiffusion" class="avatar-diffuse-backdrop"></div>
+            <img id="transCenterAvatar" src="" class="avatar-crisp-center">
           </div>
         </div>
 
-        <!-- 状态提示与退出按键区域 (紧贴在文字下方) -->
+        <!-- 状态提示与退出按键区域 (紧贴在文字下方，暗红色) -->
         <div id="transStatusFlowBox" class="room-status-content-flow">
           <!-- 动态注入状态与退出按键 -->
         </div>
@@ -357,14 +412,14 @@
     const viewersCount = (typeof window.getLiveSessionViewers === 'function') ? window.getLiveSessionViewers(session) : 1200;
     const viewersStr = viewersCount > 10000 ? (viewersCount / 10000).toFixed(1) + 'w 在看' : `${viewersCount} 在看`;
 
-    const fullBg = document.getElementById('transFullDiffusionBg');
+    const diffuseBackdrop = document.getElementById('transBackdropDiffusion');
     const topAvatar = document.getElementById('transTopAvatar');
     const centerAvatar = document.getElementById('transCenterAvatar');
     const topName = document.getElementById('transTopName');
     const topSub = document.getElementById('transTopSub');
     const followBtn = document.getElementById('transBtnFollow');
 
-    if (fullBg) fullBg.style.backgroundImage = `url('${avatarUrl}')`;
+    if (diffuseBackdrop) diffuseBackdrop.style.backgroundImage = `url('${avatarUrl}')`;
     if (topAvatar) topAvatar.src = avatarUrl;
     if (centerAvatar) centerAvatar.src = avatarUrl;
     if (topName) topName.textContent = nameStr;
@@ -381,7 +436,7 @@
       }
     }
 
-    // 状态：正在进入直播间…
+    // 状态：正在进入直播间… (暗红色)
     renderTransitionState('connecting');
 
     if (connectingTimeoutId) clearTimeout(connectingTimeoutId);
@@ -414,7 +469,7 @@
         }, 10000);
       });
 
-      // 保持最少 900ms 丝滑黑胶进房体验
+      // 保持最少 900ms 丝滑进房体验
       const minDelayPromise = new Promise(r => setTimeout(r, 900));
       const [res] = await Promise.all([
         Promise.race([fetchPromise, timeoutPromise]),
@@ -462,7 +517,7 @@
   }
 
   /**
-   * 渲染状态文案与 #CD853F 双细线退出按键
+   * 渲染暗红色状态文案与 #CD853F 双细线退出按键
    */
   function renderTransitionState(state) {
     const flowBox = document.getElementById('transStatusFlowBox');
@@ -470,14 +525,14 @@
 
     if (state === 'connecting') {
       flowBox.innerHTML = `
-        <div class="status-main-headline">
+        <div class="status-dark-red-headline">
           <span>正在进入直播间</span>
-          <span class="loading-dots-clean"><span>.</span><span>.</span><span>.</span></span>
+          <span class="loading-dots-darkred"><span>.</span><span>.</span><span>.</span></span>
         </div>
       `;
     } else if (state === 'timeout') {
       flowBox.innerHTML = `
-        <div class="status-main-headline text-rose-300">
+        <div class="status-dark-red-headline">
           <span>网络连接超时，请重试</span>
         </div>
         <button onclick="handleTransitionExitClick()" class="btn-bronze-double-border">
@@ -488,7 +543,7 @@
       `;
     } else if (state === 'network_error') {
       flowBox.innerHTML = `
-        <div class="status-main-headline text-rose-300">
+        <div class="status-dark-red-headline">
           <span>网络连接失败，请检查你的网络环境。</span>
         </div>
         <button onclick="handleTransitionExitClick()" class="btn-bronze-double-border">
@@ -499,7 +554,7 @@
       `;
     } else if (state === 'host_left') {
       flowBox.innerHTML = `
-        <div class="status-main-headline text-amber-200">
+        <div class="status-dark-red-headline">
           <span>主播已离开房间…</span>
         </div>
         <button onclick="handleTransitionExitClick()" class="btn-bronze-double-border">
@@ -523,13 +578,13 @@
     overlay.classList.remove('hidden', 'fade-out');
 
     const avatarUrl = s.avatar || (s.cover || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500');
-    const fullBg = document.getElementById('transFullDiffusionBg');
+    const diffuseBackdrop = document.getElementById('transBackdropDiffusion');
     const topAvatar = document.getElementById('transTopAvatar');
     const centerAvatar = document.getElementById('transCenterAvatar');
     const topName = document.getElementById('transTopName');
     const topSub = document.getElementById('transTopSub');
 
-    if (fullBg) fullBg.style.backgroundImage = `url('${avatarUrl}')`;
+    if (diffuseBackdrop) diffuseBackdrop.style.backgroundImage = `url('${avatarUrl}')`;
     if (topAvatar) topAvatar.src = avatarUrl;
     if (centerAvatar) centerAvatar.src = avatarUrl;
     if (topName) topName.textContent = s.name || '主播';
