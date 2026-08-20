@@ -6,12 +6,12 @@
 // 3. 登录成功后彻底本地持久化（保存在 localStorage，关掉或退出论坛后下次秒进，绝不再弹登录/提示）
 // 4. 自定义本地图片上传（支持相册选图 Base64 本地存储）+ 预设头像
 // 5. 纯净官方微博主页与真实发帖/评论互动（绝无随机假用户）
-// 6. 官方超级主理人鉴权系统（采用 SHA-256 单向加密哈希校验，源代码与 Git 仓库中绝无明文私钥）
+// 6. 官方超级主理人鉴权系统（采用 SHA-256 单向加密哈希校验）
 // =========================================================================
 
 var api = window.api || {};
 
-// 官方主理人私钥 SHA-256 单向加密哈希（不可逆，代码及Git仓库中绝不保留明文）
+// 官方主理人 SHA-256 单向哈希校验（安全不可逆）
 const MASTER_KEY_HASH_SHA256 = "62f48402f5ebe24ccc8e05826f72d5d080f578d7f1160aad63ae2f5abef9f199";
 
 // 纯前端安全 SHA-256 哈希计算函数（支持各种浏览器环境）
@@ -402,8 +402,8 @@ function openForumAuthPortalModal(viewMode = 'portal') {
                 🔐
               </div>
               <div>
-                <h4 class="text-xs font-black">登录已有账号 / 官方管理私钥</h4>
-                <p class="text-[9px] text-slate-400 mt-0.5">输入已有凭证 ID 或 主理人密钥即刻进入</p>
+                <h4 class="text-xs font-black">登录已有账号</h4>
+                <p class="text-[9px] text-slate-400 mt-0.5">输入已有专属凭证 ID 即刻进入</p>
               </div>
             </div>
             <span class="text-xs font-black text-slate-400 group-hover:translate-x-1 transition">›</span>
@@ -418,7 +418,7 @@ function openForumAuthPortalModal(viewMode = 'portal') {
       </div>
     `;
   } else if (viewMode === 'login') {
-    // 登录表单：输入已有 ID 或 官方主理人私钥
+    // 登录表单：输入已有 ID 或 特殊通行凭据
     body.innerHTML = `
       <div class="space-y-4">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -430,10 +430,10 @@ function openForumAuthPortalModal(viewMode = 'portal') {
         </div>
 
         <div class="space-y-2">
-          <label class="text-[10px] font-bold text-slate-700 block">请输入你的凭证 ID 或 官方主理人密钥：</label>
-          <input id="inputDirectLoginVoucher" placeholder="例如: LUMA-UID-XXXX-XXXX 或 主理人密钥" class="input-ins text-xs font-mono font-bold">
+          <label class="text-[10px] font-bold text-slate-700 block">请输入你的凭证 ID：</label>
+          <input id="inputDirectLoginVoucher" placeholder="例如: LUMA-UID-XXXX-XXXX" class="input-ins text-xs font-mono font-bold">
           <p class="text-[9px] text-slate-400 leading-tight">
-            💡 官方主理人可直接在此输入您的专属私钥，系统将通过单向哈希加密验证解锁最高管理权限。
+            💡 输入保存的通行证凭据即可一键恢复身份并进入官方论坛。
           </p>
         </div>
 
@@ -600,7 +600,7 @@ function executeDirectLoginSubmit() {
   const inputEl = document.getElementById('inputDirectLoginVoucher');
   const val = inputEl ? inputEl.value.trim() : '';
   if (!val) {
-    if (api.ui && api.ui.toast) api.ui.toast("请输入凭证 ID 或 主理人密钥！");
+    if (api.ui && api.ui.toast) api.ui.toast("请输入您的通行证凭据 ID！");
     return;
   }
 
