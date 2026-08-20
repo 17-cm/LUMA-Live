@@ -347,6 +347,22 @@ function enterLiveRoomDirectly(sessionId) {
   } else {
     fetchBatchLivePackage();
   }
+  
+  // 进房第 0 秒立即弹出 2 条欢迎/互动弹幕，让直播间瞬间活起来
+  if (danmakuPool.length > 0) {
+    const firstDanmaku = danmakuPool.shift();
+    const sInfo1 = getSenderLiveInfo(firstDanmaku.sender, firstDanmaku.type);
+    pushDanmakuToScreen(sInfo1, firstDanmaku.text, firstDanmaku.type);
+    if (danmakuPool.length > 0) {
+      setTimeout(() => {
+        if (!currentRoom) return;
+        const secondDanmaku = danmakuPool.shift();
+        const sInfo2 = getSenderLiveInfo(secondDanmaku.sender, secondDanmaku.type);
+        pushDanmakuToScreen(sInfo2, secondDanmaku.text, secondDanmaku.type);
+      }, 200);
+    }
+  }
+
   startDanmakuDripFeed();
   startHostSpeechDripFeed();
 

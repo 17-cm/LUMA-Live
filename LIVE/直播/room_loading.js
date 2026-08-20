@@ -62,9 +62,9 @@
     /* 抖音风格左上角丰富的主播互动胶囊群 (进一步高仿豪华版) */
     .douyin-top-bar-cluster {
       position: absolute;
-      top: 56px;
-      left: 14px;
-      right: 14px;
+      top: 52px;
+      left: 12px;
+      right: 12px;
       z-index: 30;
       display: flex;
       align-items: center;
@@ -75,21 +75,21 @@
     .douyin-host-capsule {
       display: flex;
       align-items: center;
-      gap: 6px;
-      background: rgba(0, 0, 0, 0.54);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      border: 0.8px solid rgba(255, 255, 255, 0.16);
+      gap: 7px;
+      background: rgba(15, 23, 42, 0.68);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 9999px;
-      padding: 3px 5px 3px 3px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-      max-width: calc(100vw - 110px);
+      padding: 3px 6px 3px 3px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.55);
+      max-width: calc(100vw - 120px);
     }
 
     .douyin-avatar-wrap {
       position: relative;
-      width: 35px;
-      height: 35px;
+      width: 38px;
+      height: 38px;
       border-radius: 9999px;
       flex-shrink: 0;
     }
@@ -99,12 +99,13 @@
       height: 100%;
       border-radius: 9999px;
       object-fit: cover;
-      border: 1.5px solid rgba(255, 255, 255, 0.9);
+      border: 1.5px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     }
 
     .douyin-live-ring {
       position: absolute;
-      inset: -2px;
+      inset: -2.5px;
       border-radius: 9999px;
       border: 1.5px solid #fe2c55;
       animation: douyinLiveRingPulse 1.8s ease-in-out infinite;
@@ -120,17 +121,18 @@
       position: absolute;
       bottom: -1px;
       right: -1px;
-      width: 12px;
-      height: 12px;
+      width: 13px;
+      height: 13px;
       border-radius: 9999px;
-      background: #f59e0b;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
       color: #000;
-      font-size: 8px;
+      font-size: 8.5px;
       font-weight: 900;
       display: flex;
       align-items: center;
       justify-content: center;
       border: 1px solid #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.5);
     }
 
     .douyin-host-meta {
@@ -147,14 +149,14 @@
     }
 
     .douyin-host-name {
-      font-size: 11.5px;
+      font-size: 12px;
       font-weight: 800;
       color: #ffffff;
       line-height: 1.2;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 78px;
+      max-width: 82px;
       text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
     }
 
@@ -163,23 +165,23 @@
       font-weight: 900;
       color: #ffd700;
       background: linear-gradient(135deg, #4338ca, #6366f1);
-      padding: 0.5px 3.5px;
+      padding: 0.5px 4px;
       border-radius: 3px;
       line-height: 1.1;
-      border: 0.5px solid rgba(255, 215, 0, 0.5);
+      border: 0.5px solid rgba(255, 215, 0, 0.6);
     }
 
     .douyin-sub-row {
       display: flex;
       align-items: center;
-      gap: 5px;
-      margin-top: 1px;
+      gap: 4px;
+      margin-top: 1.5px;
     }
 
     .douyin-host-sub {
       font-size: 9px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.75);
+      color: #A0B0BD;
       line-height: 1.1;
       white-space: nowrap;
     }
@@ -189,7 +191,7 @@
       font-weight: 800;
       color: #ffedd5;
       background: linear-gradient(90deg, #f97316, #ea580c);
-      padding: 0.5px 4px;
+      padding: 0.5px 4.5px;
       border-radius: 9999px;
       display: inline-flex;
       align-items: center;
@@ -198,12 +200,22 @@
       box-shadow: 0 1px 4px rgba(234, 88, 12, 0.4);
     }
 
+    .douyin-city-tag {
+      font-size: 8px;
+      font-weight: 700;
+      color: #A0B0BD;
+      background: rgba(255, 255, 255, 0.12);
+      padding: 0.5px 3.5px;
+      border-radius: 3px;
+      line-height: 1.1;
+    }
+
     .douyin-btn-follow {
       background: linear-gradient(135deg, #fe2c55, #ff0050);
       color: #ffffff;
-      font-size: 10px;
+      font-size: 10.5px;
       font-weight: 800;
-      padding: 4.5px 9px;
+      padding: 4.5px 10px;
       border-radius: 9999px;
       border: none;
       outline: none;
@@ -221,7 +233,7 @@
     }
 
     .douyin-btn-follow.followed {
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.22);
       color: rgba(255, 255, 255, 0.85);
       box-shadow: none;
     }
@@ -239,11 +251,11 @@
     }
 
     .douyin-rank-user {
-      width: 22px;
-      height: 22px;
+      width: 24px;
+      height: 24px;
       border-radius: 9999px;
-      border: 1px solid rgba(255, 255, 255, 0.8);
-      margin-left: -5px;
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      margin-left: -6px;
       object-fit: cover;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
     }
@@ -257,14 +269,14 @@
       display: flex;
       align-items: center;
       gap: 2px;
-      background: rgba(0, 0, 0, 0.48);
+      background: rgba(0, 0, 0, 0.52);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      border: 0.8px solid rgba(255, 255, 255, 0.14);
+      border: 0.8px solid rgba(255, 255, 255, 0.16);
       border-radius: 9999px;
-      padding: 3px 6px;
+      padding: 3px 7px;
       color: #fbbf24;
-      font-size: 9px;
+      font-size: 9.5px;
       font-weight: 800;
     }
 
@@ -594,7 +606,7 @@
         throw new Error("NO_NETWORK_DISCONNECTED");
       }
 
-      // 执行打包与连通性检测（在过渡期间预加载弹幕包）
+      // 执行打包与连通性检测（在过渡期间预加载首包弹幕并检测网络响应）
       const fetchPromise = (async () => {
         if (typeof window.aiGenerate === 'function') {
           return await window.aiGenerate({
@@ -612,16 +624,12 @@
         }, 10000);
       });
 
-      // 保持至少 650ms 丝滑进房体验
-      const minDelayPromise = new Promise(r => setTimeout(r, 650));
-      const [res] = await Promise.all([
-        Promise.race([fetchPromise, timeoutPromise]),
-        minDelayPromise
-      ]);
+      // 0 秒无感直通：拿到响应或完成首包打包后立即进房，不人为堆叠任何多余延迟
+      const res = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (connectingTimeoutId) clearTimeout(connectingTimeoutId);
 
-      // 解析弹幕包注入全局弹幕池与主播台词池
+      // 解析弹幕包注入全局弹幕池与主播台词池，确保一进房弹幕就立刻满载滚动
       if (res && res.text) {
         const parsed = (typeof window.extractJsonFromText === 'function') ? window.extractJsonFromText(res.text) : null;
         if (parsed) {
@@ -636,15 +644,11 @@
         }
       }
 
-      // 成功进入：平滑淡出全息层
-      overlay.classList.add('fade-out');
-      setTimeout(() => {
-        overlay.classList.add('hidden');
-        overlay.classList.remove('fade-out');
-        if (typeof onSuccessCallback === 'function') {
-          onSuccessCallback();
-        }
-      }, 350);
+      // 成功进入：全息层立刻隐去进入直播间
+      overlay.classList.add('hidden');
+      if (typeof onSuccessCallback === 'function') {
+        onSuccessCallback();
+      }
 
     } catch (err) {
       if (connectingTimeoutId) clearTimeout(connectingTimeoutId);

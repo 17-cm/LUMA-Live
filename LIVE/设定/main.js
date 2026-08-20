@@ -59,7 +59,12 @@ function updateParam(key, val) {
   if (!window.appParams) window.appParams = {};
   window.appParams[key] = num;
 
-  if (key === 'maxLiveDuration') {
+  if (key === 'charSpawnRate') {
+    const el = document.getElementById('valCharSpawnRate');
+    const tagEl = document.getElementById('tagCharRate');
+    if (el) el.textContent = `${num}%`;
+    if (tagEl) tagEl.textContent = `${num}% 概率开播`;
+  } else if (key === 'maxLiveDuration') {
     const el = document.getElementById('valMaxLiveDuration');
     if (el) el.textContent = `${num}分钟`;
   } else if (key === 'maxRestDuration') {
@@ -101,6 +106,11 @@ function syncParamDisplays() {
     if (input && val !== undefined) input.value = val;
     if (text && val !== undefined) text.textContent = `${val}${suffix}`;
   };
+
+  const spawnVal = p.charSpawnRate !== undefined ? p.charSpawnRate : 45;
+  setVal('paramCharSpawnRate', spawnVal, 'valCharSpawnRate', '%');
+  const tagEl = document.getElementById('tagCharRate');
+  if (tagEl) tagEl.textContent = `${spawnVal}% 概率开播`;
 
   setVal('paramMaxLiveDuration', p.maxLiveDuration || 120, 'valMaxLiveDuration', '分钟');
   setVal('paramMaxRestDuration', p.maxRestDuration || 360, 'valMaxRestDuration', '分钟');
@@ -341,7 +351,10 @@ async function fetchOpenAIModels() {
 
   api.ui.toast("正在拉取可用模型列表...");
   try {
-    const endpoint = url.replace(/\/+$/, '') + '/models';
+    const endpoint = (typeof formatOpenAIEndpoint === 'function') 
+      ? formatOpenAIEndpoint(url, 'models') 
+      : (url.replace(/\/+$/, '') + (url.endsWith('/v1') ? '/models' : '/v1/models'));
+
     const res = await window.robustNetworkRequest({
       url: endpoint,
       headers: { 'Authorization': key ? `Bearer ${key}` : '' }
@@ -350,14 +363,14 @@ async function fetchOpenAIModels() {
     const list = data?.data || [];
     if (list.length > 0 && selectModel) {
       selectModel.innerHTML = list.map(m => `<option value="${m.id}">${m.id}</option>`).join('');
-      api.ui.toast(`成功拉取 ${list.length} 个模型！`);
+      api.ui.toast(`🎉 成功拉取 ${list.length} 个模型！`);
     } else {
-      if (selectModel) selectModel.innerHTML = `<option value="gpt-3.5-turbo">gpt-3.5-turbo (默认)</option><option value="gpt-4o">gpt-4o</option><option value="deepseek-chat">deepseek-chat</option>`;
-      api.ui.toast("已加载推荐模型列表");
+      if (selectModel) selectModel.innerHTML = `<option value="gpt-3.5-turbo">gpt-3.5-turbo (默认)</option><option value="gpt-4o">gpt-4o</option><option value="deepseek-chat">deepseek-chat</option><option value="deepseek-ai/DeepSeek-V3">deepseek-ai/DeepSeek-V3</option>`;
+      api.ui.toast("已载入推荐常用模型列表");
     }
   } catch (err) {
-    if (selectModel) selectModel.innerHTML = `<option value="gpt-3.5-turbo">gpt-3.5-turbo (默认)</option><option value="gpt-4o">gpt-4o</option><option value="deepseek-chat">deepseek-chat</option>`;
-    api.ui.toast("接口响应超时，已载入标准预设模型");
+    if (selectModel) selectModel.innerHTML = `<option value="gpt-3.5-turbo">gpt-3.5-turbo (默认)</option><option value="gpt-4o">gpt-4o</option><option value="deepseek-chat">deepseek-chat</option><option value="deepseek-ai/DeepSeek-V3">deepseek-ai/DeepSeek-V3</option>`;
+    api.ui.toast(`拉取模型受限 (${err.message || '网络连接异常'})，已载入常用预设`);
   }
 }
 window.fetchOpenAIModels = fetchOpenAIModels;
@@ -384,7 +397,10 @@ async function testCustomApiConnection() {
 
   api.ui.toast("正在测试连接外部大模型...");
   try {
-    const endpoint = url.replace(/\/+$/, '') + '/chat/completions';
+    const endpoint = (typeof formatOpenAIEndpoint === 'function') 
+      ? formatOpenAIEndpoint(url, 'chat') 
+      : (url.replace(/\/+$/, '') + (url.endsWith('/v1') ? '/chat/completions' : '/v1/chat/completions'));
+
     const res = await window.robustNetworkRequest({
       url: endpoint,
       method: 'POST',
@@ -398,7 +414,8 @@ async function testCustomApiConnection() {
     if (res.ok) {
       api.ui.toast("🎉 大模型 API 连接测试成功！");
     } else {
-      api.ui.toast(`❌ 连接失败：HTTP 状态码 ${res.status}`);
+      const errMsg = res.json?.error?.message || `HTTP 状态码 ${res.status}`;
+      api.ui.toast(`❌ 连接失败：${errMsg}`);
     }
   } catch (err) {
     api.ui.toast(`❌ 连接异常: ${err.message || '网络不通'}`);

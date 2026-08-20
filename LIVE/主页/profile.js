@@ -99,8 +99,32 @@ window.saveUserProfileEdits = saveUserProfileEdits;
 function openFollowListPageView() {
   const container = document.getElementById('followListContentContainer');
   if (!container) return;
-  const list = window.allCharacters || [];
-  const follows = list.filter(c => (window.followedHosts || []).includes(c.id));
+  
+  const followedIds = window.followedHosts || [];
+  const chars = window.allCharacters || [];
+  const lives = window.liveList || [];
+  
+  // 查找已关注的所有主播信息（包含当前在线和下播的主播）
+  const follows = followedIds.map(id => {
+    // 优先从角色库找
+    const fromChars = chars.find(c => c.id === id || c.characterId === id);
+    if (fromChars) return fromChars;
+    // 其次从直播列表中找
+    const fromLives = lives.find(l => l.characterId === id || l.id === id);
+    if (fromLives) return {
+      id: fromLives.characterId || fromLives.id,
+      name: fromLives.name,
+      avatar: fromLives.avatar || fromLives.cover,
+      tags: [fromLives.category, fromLives.subTag].filter(Boolean)
+    };
+    // 兜底虚拟信息
+    return {
+      id: id,
+      name: `主播_${String(id).slice(-4)}`,
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      tags: ['签约主播']
+    };
+  });
 
   let html = `
     <div class="luxe-card p-3.5 flex items-center justify-between bg-white">
@@ -126,15 +150,19 @@ function openFollowListPageView() {
     `;
   } else {
     html += follows.map(c => {
+      const isOnline = (window.liveList || []).some(l => (l.characterId === c.id || l.id === c.id) && l.isLive !== false);
       const fansCount = window.getHostBaseFans ? window.getHostBaseFans(c.id, c) : 1280;
       const formattedFans = fansCount >= 10000 ? (fansCount / 10000).toFixed(1) + '万' : fansCount.toLocaleString();
       return `
         <div class="luxe-card p-3.5 flex items-center justify-between bg-white">
           <div class="flex items-center gap-3 cursor-pointer" onclick="openStreamerSpace('${c.id}')">
-            <img src="${c.avatar}" class="w-11 h-11 rounded-full object-cover border-2 border-rose-500 flex-shrink-0">
+            <div class="relative flex-shrink-0">
+              <img src="${c.avatar}" class="w-11 h-11 rounded-full object-cover border-2 ${isOnline ? 'border-rose-500' : 'border-slate-200'}">
+              ${isOnline ? '<span class="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[8px] bg-rose-500 text-white font-black px-1.5 py-0.2 rounded-full leading-tight">直播中</span>' : ''}
+            </div>
             <div>
               <h4 class="text-xs font-black text-slate-900">${c.name}</h4>
-              <p class="text-[9px] text-rose-600 font-bold mt-0.5">${formattedFans} 粉丝 · 签约主播</p>
+              <p class="text-[9px] ${isOnline ? 'text-rose-600 font-bold' : 'text-slate-400'} mt-0.5">${formattedFans} 粉丝 · ${isOnline ? '正在直播' : '已下播休息'}</p>
             </div>
           </div>
           <button onclick="toggleFollowRoomHostById('${c.id}')" class="btn-action text-[10px] !py-1 !px-2.5 text-slate-500">取消关注</button>
