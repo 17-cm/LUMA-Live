@@ -1656,3 +1656,22 @@ input:checked + .switch-slider:before {
   box-shadow: 0 4px 12px rgba(255, 42, 109, 0.12);
 }
 
+/* 论坛发帖标签胶囊 */
+.forum-tag-pill {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  transition: all 0.15s ease-out;
+  cursor: pointer;
+}
+.forum-tag-pill.active {
+  background: #f5f3ff;
+  color: #7c3aed;
+  border-color: #ddd6fe;
+  box-shadow: 0 1px 3px rgba(124, 58, 237, 0.12);
+}
+

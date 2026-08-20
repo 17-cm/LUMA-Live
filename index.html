@@ -1518,6 +1518,21 @@
     </div>
   </div>
 
+  <!-- 官方云端论坛准入与凭证 3 步认证弹窗 -->
+  <div id="forumAuthModal" class="hidden center-modal-backdrop">
+    <div class="center-modal-card p-5 space-y-4 max-w-sm" id="forumAuthModalBody"></div>
+  </div>
+
+  <!-- 凭据管理弹窗 -->
+  <div id="voucherManageModal" class="hidden center-modal-backdrop">
+    <div class="center-modal-card p-5 space-y-4 max-w-sm" id="voucherManageModalBody"></div>
+  </div>
+
+  <!-- 管理员任免中心弹窗 -->
+  <div id="adminManageModal" class="hidden center-modal-backdrop">
+    <div class="center-modal-card p-5 space-y-4 max-w-sm" id="adminManageModalBody"></div>
+  </div>
+
   <!-- =========================================================================
        【社区全新 6 大专区全屏子视图体系】
   ========================================================================= -->
@@ -1691,33 +1706,23 @@
     </div>
   </div>
 
-  <!-- 子页面 5: 官方论坛 全屏子页 -->
-  <div id="communityForumView" class="full-page-view hidden">
+  <!-- 子页面 5: 官方论坛 全屏子页 (仿微博官方账号主页 & 玩家广场) -->
+  <div id="communityForumView" class="full-page-view hidden bg-[#f1f4f9]">
     <div class="page-nav-bar">
       <button onclick="closeCommunitySubPage()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </button>
       <div class="text-center">
         <h3 class="text-xs font-black text-slate-900 leading-none">官方论坛 · LUMA STATION</h3>
-        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">NEWS & FEEDBACK</span>
+        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">OFFICIAL WEIBO & COMMUNITY</span>
       </div>
-      <div class="w-8"></div>
-    </div>
-
-    <!-- 论坛双 Tab -->
-    <div class="px-4 pb-2">
-      <div class="bg-white/80 backdrop-blur-md p-1 rounded-2xl border border-white shadow-xs flex items-center justify-between">
-        <button onclick="switchForumTab('news')" id="btnForumTabNews" class="flex-1 py-1.5 text-center text-xs font-bold rounded-xl transition">
-          📢 官方公告 & 更新日志
-        </button>
-        <button onclick="switchForumTab('feedback')" id="btnForumTabFeedback" class="flex-1 py-1.5 text-center text-xs font-bold rounded-xl transition">
-          💡 玩家反馈 & Bug信箱
-        </button>
-      </div>
+      <button onclick="openVoucherManageModal()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition" title="通行证凭据">
+        <span class="text-xs">🔑</span>
+      </button>
     </div>
 
     <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-4" id="communityForumContent">
-      <!-- 动态渲染官方公告与反馈信箱 -->
+      <!-- 动态渲染仿微博官方账号主页、置顶公告、玩家广场与发帖流 -->
     </div>
   </div>
 
