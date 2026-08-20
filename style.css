@@ -137,7 +137,7 @@ input:checked + .switch-slider:before {
   transform: translateX(20px);
 }
 
-/* 全屏 Page 统一规范体系 (100dvh + z-[100]) */
+/* 全屏 Page 统一规范体系 (100dvh + z-[100] + 纯净实体高质感底色防止背景穿模) */
 .full-page-view {
   position: fixed !important;
   inset: 0 !important;
@@ -148,8 +148,25 @@ input:checked + .switch-slider:before {
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
+  background-color: #f1f4f9 !important;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(255, 42, 109, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(121, 40, 202, 0.08) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(0, 242, 254, 0.06) 0px, transparent 50%) !important;
+  animation: pageSlideIn 0.24s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .full-page-view.hidden { display: none !important; }
+
+@keyframes pageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
 
 /* 页面顶部导航栏 (给右上角胶囊预留 56px 避让空间) */
 .page-nav-bar {
