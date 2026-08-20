@@ -102,7 +102,7 @@ window.HOT_SEARCH_ITEMS = [
   { rank: 3, title: '野生新人主播首播惊艳立绘出道', heat: '145.2万', badge: 'xin', badgeText: '新' },
   { rank: 4, title: '全服超话打榜争霸赛进入决赛周', heat: '120.6万', badge: 'fei', badgeText: '沸' },
   { rank: 5, title: '苏小喵专属粉丝后援会突破十万人', heat: '98.5万', badge: 're', badgeText: '热' },
-  { rank: 6, title: '直播间1:1毛玻璃沉浸式舞台新体验', heat: '82.3万', badge: 'jian', badgeText: '荐' },
+  { rank: 6, title: '全景沉浸互动直播新体验上线', heat: '82.3万', badge: 'jian', badgeText: '荐' },
   { rank: 7, title: '谁在凌晨两点给主播疯狂点赞', heat: '65.1万', badge: '', badgeText: '' },
   { rank: 8, title: '年度十佳才艺主播大赏提名公布', heat: '54.7万', badge: '', badgeText: '' },
   { rank: 9, title: '连麦偷塔战术真的有科学依据吗', heat: '43.9万', badge: '', badgeText: '' },
