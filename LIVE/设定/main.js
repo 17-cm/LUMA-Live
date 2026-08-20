@@ -31,6 +31,7 @@ function switchTab(tabId) {
   } else if (tabId === 'profile') {
     if (typeof renderDualRankList === 'function') renderDualRankList();
     if (typeof syncWalletDisplays === 'function') syncWalletDisplays();
+    if (typeof syncFollowCountDisplay === 'function') syncFollowCountDisplay();
   } else if (tabId === 'settings') {
     syncParamDisplays();
     renderPresetCategories();
@@ -436,16 +437,22 @@ async function saveCustomApiSettingsModal() {
   window.customApiConfig.text.url = inputUrl?.value.trim() || '';
   window.customApiConfig.text.key = inputKey?.value.trim() || '';
   window.customApiConfig.text.model = selectModel?.value || 'gpt-3.5-turbo';
+  // 保存自定义接口时，自动切换为自定义模式以确保即时生效
+  window.customApiConfig.enableGlobalModel = false;
 
-  try {
-    await api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {
-      api.db.update("app_settings", "custom_api_config", window.customApiConfig).catch(() => {});
-    });
-  } catch (e) {}
+  if (typeof saveDbSetting === 'function') {
+    await saveDbSetting("custom_api_config", window.customApiConfig);
+  } else {
+    try {
+      await api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {
+        api.db.update("app_settings", "custom_api_config", window.customApiConfig).catch(() => {});
+      });
+    } catch (e) {}
+  }
 
   closeCustomApiModal();
   syncCustomApiModalFields();
-  api.ui.toast("自定义文本 API 配置已保存！");
+  api.ui.toast("自定义文本 API 配置已保存并实时生效！");
 }
 window.saveCustomApiSettingsModal = saveCustomApiSettingsModal;
 
@@ -532,32 +539,52 @@ async function saveCustomImageApiSettingsModal() {
   window.customApiConfig.image.url = inputUrl?.value.trim() || '';
   window.customApiConfig.image.key = inputKey?.value.trim() || '';
   window.customApiConfig.image.model = selectModel?.value || 'dall-e-3';
+  // 保存自定义生图接口时，自动切换为自定义生图模式
+  window.customApiConfig.enableGlobalImageModel = false;
 
-  try {
-    await api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {
-      api.db.update("app_settings", "custom_api_config", window.customApiConfig).catch(() => {});
-    });
-  } catch (e) {}
+  if (typeof saveDbSetting === 'function') {
+    await saveDbSetting("custom_api_config", window.customApiConfig);
+  } else {
+    try {
+      await api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {
+        api.db.update("app_settings", "custom_api_config", window.customApiConfig).catch(() => {});
+      });
+    } catch (e) {}
+  }
 
   closeCustomImageApiModal();
   syncCustomApiModalFields();
-  api.ui.toast("自定义生图 API 配置已保存！");
+  api.ui.toast("自定义生图 API 配置已保存并实时生效！");
 }
 window.saveCustomImageApiSettingsModal = saveCustomImageApiSettingsModal;
 
-function toggleGlobalModelSwitch(checked) {
+async function toggleGlobalModelSwitch(checked) {
   if (!window.customApiConfig) window.customApiConfig = {};
   window.customApiConfig.enableGlobalModel = !!checked;
-  api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {});
-  api.ui.toast(checked ? "已启用全局文本模型" : "已切换为自定义文本模型");
+  if (typeof saveDbSetting === 'function') {
+    await saveDbSetting("custom_api_config", window.customApiConfig);
+  } else {
+    api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {
+      api.db.update("app_settings", "custom_api_config", window.customApiConfig).catch(() => {});
+    });
+  }
+  syncCustomApiModalFields();
+  api.ui.toast(checked ? "已实时启用全局文本大模型" : "已实时切换为自定义文本API");
 }
 window.toggleGlobalModelSwitch = toggleGlobalModelSwitch;
 
-function toggleGlobalImageModelSwitch(checked) {
+async function toggleGlobalImageModelSwitch(checked) {
   if (!window.customApiConfig) window.customApiConfig = {};
   window.customApiConfig.enableGlobalImageModel = !!checked;
-  api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {});
-  api.ui.toast(checked ? "已启用全局生图模型" : "已切换为自定义生图模型");
+  if (typeof saveDbSetting === 'function') {
+    await saveDbSetting("custom_api_config", window.customApiConfig);
+  } else {
+    api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {
+      api.db.update("app_settings", "custom_api_config", window.customApiConfig).catch(() => {});
+    });
+  }
+  syncCustomApiModalFields();
+  api.ui.toast(checked ? "已实时启用全局生图大模型" : "已实时切换为自定义生图API");
 }
 window.toggleGlobalImageModelSwitch = toggleGlobalImageModelSwitch;
 
@@ -565,16 +592,29 @@ function syncCustomApiModalFields() {
   const cfg = window.customApiConfig || {};
   const statusText = document.getElementById('statusCustomApi');
   const statusImg = document.getElementById('statusCustomImageApi');
+  const switchGlobal = document.getElementById('switchGlobalModel');
+  const switchGlobalImg = document.getElementById('switchGlobalImageModel');
+
+  if (switchGlobal) switchGlobal.checked = !!cfg.enableGlobalModel;
+  if (switchGlobalImg) switchGlobalImg.checked = !!cfg.enableGlobalImageModel;
 
   if (statusText) {
-    if (cfg.enableGlobalModel) statusText.textContent = '当前模式: 全局宿主模型';
-    else if (cfg.text?.model) statusText.textContent = `当前模型: ${cfg.text.model}`;
-    else statusText.textContent = '支持硅基流动 / DeepSeek / 自定义接口';
+    if (cfg.enableGlobalModel) {
+      statusText.textContent = '当前模式: 宿主全局大模型 (实时生效)';
+    } else if (cfg.text?.model) {
+      statusText.textContent = `当前模型: ${cfg.text.model} (${cfg.apiType || '自定义'})`;
+    } else {
+      statusText.textContent = '支持硅基流动 / DeepSeek / 自定义接口 (点击配置)';
+    }
   }
   if (statusImg) {
-    if (cfg.enableGlobalImageModel) statusImg.textContent = '当前模式: 全局生图模型';
-    else if (cfg.image?.model) statusImg.textContent = `当前生图模型: ${cfg.image.model}`;
-    else statusImg.textContent = 'SD / DALL-E / FLUX 格式支持';
+    if (cfg.enableGlobalImageModel) {
+      statusImg.textContent = '当前模式: 宿主全局生图模型 (实时生效)';
+    } else if (cfg.image?.model) {
+      statusImg.textContent = `当前生图模型: ${cfg.image.model}`;
+    } else {
+      statusImg.textContent = 'SD / DALL-E / FLUX 格式支持 (点击配置)';
+    }
   }
 }
 
@@ -1256,6 +1296,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     const followsRec = await api.db.list("follows") || [];
     window.followedHosts = followsRec.map(f => f.id);
+    if (typeof syncFollowCountDisplay === 'function') syncFollowCountDisplay();
 
     const walletRec = await api.db.get("app_wallet", "vault_data");
     if (walletRec) window.currentWalletBalance = walletRec.balance || 0;

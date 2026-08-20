@@ -29,7 +29,16 @@ let currentRankTab = 'fans';
 let selectedRechargeAmount = 600;
 let selectedRechargePrice = 6;
 
-// 1. 同步个人资料
+// 1. 同步个人资料与关注统计
+function syncFollowCountDisplay() {
+  const followed = Array.isArray(window.followedHosts) ? window.followedHosts : [];
+  // LUMA 官方运营组固定占 1 个关注项，其余均来自真实关注记录
+  const count = followed.length + 1;
+  const statEl = document.getElementById('statFollowCount');
+  if (statEl) statEl.textContent = String(count);
+}
+window.syncFollowCountDisplay = syncFollowCountDisplay;
+
 async function syncUserProfile() {
   try {
     const u = await api.user.getProfile();
@@ -42,6 +51,8 @@ async function syncUserProfile() {
       if (avatarBox && currentUser.avatar) avatarBox.src = currentUser.avatar;
     }
   } catch (e) {}
+
+  syncFollowCountDisplay();
 }
 window.syncUserProfile = syncUserProfile;
 

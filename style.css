@@ -284,11 +284,19 @@ input:checked + .switch-slider:before {
   overflow: hidden; transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   max-height: 56px;
 }
-.accordion-item.open { max-height: 850px; background: rgba(255, 255, 255, 0.95); box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04); }
+.accordion-item.open { 
+  max-height: 2500px !important; 
+  background: rgba(255, 255, 255, 0.95); 
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04); 
+}
 .accordion-header { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; cursor: pointer; }
 .accordion-chevron { transition: transform 0.3s; }
 .accordion-item.open .accordion-chevron { transform: rotate(180deg); }
-.accordion-body { padding: 0 16px 16px 16px; }
+.accordion-body { padding: 0 16px 24px 16px; }
+
+#tab-settings {
+  padding-bottom: 200px !important;
+}
 
 /* 居中毛玻璃弹窗体系 */
 .center-modal-backdrop {
