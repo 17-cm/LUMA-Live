@@ -1157,6 +1157,12 @@ async function sendGift(name, cost) {
       renderDualRankList();
     }
 
+    // 同步到全局超话与全网贡献榜
+    if (currentRoom && typeof window.addCharContributionScore === 'function') {
+      const charKey = currentRoom.characterId || currentRoom.id || currentRoom.name;
+      window.addCharContributionScore(charKey, totalCost);
+    }
+
     const uInfo = getCurrentUserLiveInfo();
     const streamerName = currentRoom ? currentRoom.name : '主播';
 
