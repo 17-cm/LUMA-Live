@@ -24,15 +24,45 @@ function switchTab(tabId) {
     }
   });
 
+  // 动态同步原生顶部 Header 标识与状态
+  const headerTitle = document.getElementById('mainAppHeaderTitle');
+  const headerSubtitle = document.getElementById('mainAppHeaderSubtitle');
+  const headerStatus = document.getElementById('mainAppHeaderStatusText');
+  const headerIcon = document.getElementById('mainAppHeaderIconSvg');
+
   if (tabId === 'live') {
+    if (headerTitle) headerTitle.textContent = 'LUMA LIVE';
+    if (headerSubtitle) headerSubtitle.textContent = 'Cyber Live Ecosystem';
+    if (headerStatus) headerStatus.textContent = '实时推流中';
+    if (headerIcon) {
+      headerIcon.innerHTML = `<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>`;
+    }
     if (typeof renderLiveGrid === 'function') renderLiveGrid();
   } else if (tabId === 'trends') {
+    if (headerTitle) headerTitle.textContent = '社区';
+    if (headerSubtitle) headerSubtitle.textContent = 'Community · 探索与动态';
+    if (headerStatus) headerStatus.textContent = '社区动态';
+    if (headerIcon) {
+      headerIcon.innerHTML = `<circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path>`;
+    }
     if (typeof renderTrends === 'function') renderTrends();
   } else if (tabId === 'profile') {
+    if (headerTitle) headerTitle.textContent = '个人中心';
+    if (headerSubtitle) headerSubtitle.textContent = 'My Profile & Vault';
+    if (headerStatus) headerStatus.textContent = '在线';
+    if (headerIcon) {
+      headerIcon.innerHTML = `<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>`;
+    }
     if (typeof renderDualRankList === 'function') renderDualRankList();
     if (typeof syncWalletDisplays === 'function') syncWalletDisplays();
     if (typeof syncFollowCountDisplay === 'function') syncFollowCountDisplay();
   } else if (tabId === 'settings') {
+    if (headerTitle) headerTitle.textContent = '系统设定';
+    if (headerSubtitle) headerSubtitle.textContent = 'Sandbox Configuration';
+    if (headerStatus) headerStatus.textContent = '核心就绪';
+    if (headerIcon) {
+      headerIcon.innerHTML = `<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>`;
+    }
     syncParamDisplays();
     renderPresetCategories();
     renderImagePromptEntries();
