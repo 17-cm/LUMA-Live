@@ -1,11 +1,12 @@
 // =========================================================================
 // 【模块二·社区子文档5·官方云端论坛系统】LIVE/社区/module_forum.js
 // 包含：
-// 1. 严格单次准入流程：本地持久化存储用户凭证，登录一次后永不再弹！
-// 2. 自定义本地头像上传（FileReader Base64 编码与持久存储）+ 预设高质头像
-// 3. 仿微博官方账号主页：官方公告置顶、纯净真实玩家广场（绝无随机假用户）
-// 4. 专属官方主理人最高特权（密钥 17826719645Zy 全站置顶/删帖/任免管理员）
-// 5. 跨端/跨部署数据与凭据恢复机制
+// 1. 须知弹窗（勾选【永久不再显示此界面】后永不弹出）
+// 2. 纯粹直接的【注册账号】与【登录账号】双向通道
+// 3. 登录成功后彻底本地持久化（保存在 localStorage，关掉或退出论坛后下次秒进，绝不再弹登录/提示）
+// 4. 自定义本地图片上传（支持相册选图 Base64 本地存储）+ 预设头像
+// 5. 纯净官方微博主页与真实发帖/评论互动（绝无随机假用户）
+// 6. 官方超级主理人密钥（17826719645Zy 全站置顶/删帖/任免管理员）
 // =========================================================================
 
 var api = window.api || {};
@@ -67,19 +68,19 @@ const INITIAL_FORUM_POSTS = [
 
 // 当前论坛状态
 let currentForumActiveTab = 'official'; // 'official' (官方公告) | 'square' (玩家广场) | 'mine' (我的发帖)
-let temporaryRegState = {
-  step: 1,
+
+// 注册流程的临时内存状态
+let forumRegisterDraft = {
   generatedUid: '',
-  inputVoucher: '',
   nickname: '',
-  avatar: FORUM_PRESET_AVATARS[0],
-  isMasterKey: false
+  avatar: FORUM_PRESET_AVATARS[0]
 };
 
 // =========================================================================
-// 【一、认证状态与持久化本地存储】
+// 【一、持久化本地存储：用户信息、免提示标记、管理员列表】
 // =========================================================================
 
+// 获取当前登录用户
 function getForumCurrentUser() {
   try {
     const raw = localStorage.getItem('luma_forum_current_user');
@@ -92,12 +93,30 @@ function getForumCurrentUser() {
 }
 window.getForumCurrentUser = getForumCurrentUser;
 
+// 存储当前登录用户
 function saveForumCurrentUser(userObj) {
   try {
     localStorage.setItem('luma_forum_current_user', JSON.stringify(userObj));
   } catch (e) {}
 }
 
+// 检查是否勾选了“永久不再显示此提示说明”
+function isForumNoticeMuted() {
+  try {
+    return localStorage.getItem('luma_forum_notice_muted') === 'true';
+  } catch (e) {
+    return false;
+  }
+}
+
+// 设置“永久不再显示此提示说明”
+function setForumNoticeMuted(muted) {
+  try {
+    localStorage.setItem('luma_forum_notice_muted', muted ? 'true' : 'false');
+  } catch (e) {}
+}
+
+// 管理员 UID 列表
 function getForumAdminUids() {
   try {
     return JSON.parse(localStorage.getItem('luma_forum_admin_uids') || '[]');
@@ -124,21 +143,29 @@ function generateRandomVoucherID() {
 }
 
 // =========================================================================
-// 【二、论坛入口检查与 3 步式准入弹窗（只在未注册时触发一次）】
+// 【二、论坛核心入口调度函数 checkAndOpenForum】
 // =========================================================================
 
 function checkAndOpenForum() {
+  // 1. 如果已经登录，直接进论坛，绝不弹任何窗！
   const currentUser = getForumCurrentUser();
-  if (!currentUser || !currentUser.uid) {
-    // 尚未注册/登录，弹出 3 步入场弹窗
-    openForumAuthModal();
-  } else {
-    // 已登录过，直接进入官方论坛，绝不再弹窗！
+  if (currentUser && currentUser.uid) {
     openCommunitySubPageDirectForum();
+    return;
   }
+
+  // 2. 如果未登录，但勾选了“永久不再显示提示说明”，直接显示【注册 / 登录】窗口
+  if (isForumNoticeMuted()) {
+    openForumAuthPortalModal('portal');
+    return;
+  }
+
+  // 3. 未登录且未勾选免提示，显示【说明须知弹窗】
+  openForumNoticeModal();
 }
 window.checkAndOpenForum = checkAndOpenForum;
 
+// 直接打开论坛主视图并渲染
 function openCommunitySubPageDirectForum() {
   const allSubViews = [
     'communityTrendsView',
@@ -161,21 +188,90 @@ function openCommunitySubPageDirectForum() {
 }
 window.openCommunitySubPageDirectForum = openCommunitySubPageDirectForum;
 
-// 打开认证弹窗
-function openForumAuthModal() {
-  temporaryRegState = {
-    step: 1,
-    generatedUid: generateRandomVoucherID(),
-    inputVoucher: '',
-    nickname: '',
-    avatar: FORUM_PRESET_AVATARS[0],
-    isMasterKey: false
-  };
-  renderForumAuthModalContent();
+// =========================================================================
+// 【三、弹窗系统：提示说明弹窗、注册/登录入口、登录表单、注册表单】
+// =========================================================================
+
+// 1. 提示说明弹窗（带“永久不再显示此界面”打勾）
+function openForumNoticeModal() {
   const modal = document.getElementById('forumAuthModal');
-  if (modal) modal.classList.remove('hidden');
+  const body = document.getElementById('forumAuthModalBody');
+  if (!modal || !body) return;
+
+  body.innerHTML = `
+    <div class="space-y-4">
+      <div class="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white text-lg shadow-md flex-shrink-0">
+          🌐
+        </div>
+        <div>
+          <h3 class="text-sm font-black text-slate-900">LUMA 官方云端论坛</h3>
+          <p class="text-[10px] text-purple-600 font-bold">全网跨端互通 · 云端安全与隐私须知</p>
+        </div>
+      </div>
+
+      <div class="space-y-2.5 text-xs text-slate-700 leading-relaxed">
+        <div class="p-3 bg-purple-50/70 border border-purple-100 rounded-2xl space-y-1.5">
+          <h4 class="font-black text-purple-900 flex items-center gap-1.5">
+            <span>✦ 功能说明</span>
+          </h4>
+          <p class="text-[11px] text-purple-800">这是连接所有 LUMA 创作者与玩家的官方实时交流阵地。您发布的动态、建议与官方公告将通过云端网络实时全网同步。</p>
+        </div>
+
+        <div class="p-3 bg-slate-50 border border-slate-100 rounded-2xl space-y-1.5">
+          <h4 class="font-black text-slate-900 flex items-center gap-1.5">
+            <span>🔒 隐私与安全性承诺</span>
+          </h4>
+          <ul class="text-[11px] text-slate-600 space-y-1 list-disc pl-4">
+            <li><b>小手机沙盒绝对隔离</b>：您在本地沙盒内的所有私密对话、API Key、本地模型配置等<b>绝对留在本地浏览器，绝不上云</b>！</li>
+            <li><b>仅同步公开名片</b>：云端仅存储您在此处填写的公开昵称、头像以及您在论坛公开发布的帖子与评论。</li>
+            <li><b>匿名凭据通行证</b>：无需绑定手机号或邮箱，系统自动分配专属凭据 ID，换设备凭 ID 即可找回。</li>
+          </ul>
+        </div>
+
+        <!-- 标红警示框 -->
+        <div class="p-3 bg-rose-50 border-2 border-rose-200 rounded-2xl text-rose-700 space-y-1 shadow-xs">
+          <div class="flex items-center gap-1.5 font-black text-xs text-rose-600">
+            <svg class="w-4 h-4 text-rose-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            <span>【重要提醒与警示】</span>
+          </div>
+          <p class="text-[11px] font-bold text-rose-600 leading-normal">
+            如果您介意云端数据同步或不愿公开昵称与发言，请点击下方【退出】，切勿进入本模块！
+          </p>
+        </div>
+      </div>
+
+      <!-- 永久不再显示勾选框 -->
+      <div class="pt-1">
+        <label class="flex items-center gap-2 cursor-pointer bg-slate-50 hover:bg-slate-100 p-2.5 rounded-xl border border-slate-200 transition">
+          <input type="checkbox" id="chkNeverShowForumNotice" class="w-4 h-4 rounded text-purple-600 accent-purple-600">
+          <span class="text-xs font-black text-slate-800 select-none">永久不再显示此界面 (下次直接进入)</span>
+        </label>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-100">
+        <button onclick="closeForumAuthModal()" class="btn-action justify-center !py-2.5 text-xs font-bold text-slate-600">
+          退出返回
+        </button>
+        <button onclick="handleConfirmNoticeAndProceed()" class="btn-brand justify-center !py-2.5 text-xs font-black shadow-md">
+          <span>进入注册 / 登录 ›</span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  modal.classList.remove('hidden');
 }
-window.openForumAuthModal = openForumAuthModal;
+window.openForumNoticeModal = openForumNoticeModal;
+
+function handleConfirmNoticeAndProceed() {
+  const chk = document.getElementById('chkNeverShowForumNotice');
+  if (chk && chk.checked) {
+    setForumNoticeMuted(true);
+  }
+  openForumAuthPortalModal('portal');
+}
+window.handleConfirmNoticeAndProceed = handleConfirmNoticeAndProceed;
 
 function closeForumAuthModal() {
   const modal = document.getElementById('forumAuthModal');
@@ -183,159 +279,134 @@ function closeForumAuthModal() {
 }
 window.closeForumAuthModal = closeForumAuthModal;
 
-// 渲染 3 步弹窗内容
-function renderForumAuthModalContent() {
-  const container = document.getElementById('forumAuthModalBody');
-  if (!container) return;
+// 2. 注册 / 登录主入口与表单弹窗
+function openForumAuthPortalModal(viewMode = 'portal') {
+  const modal = document.getElementById('forumAuthModal');
+  const body = document.getElementById('forumAuthModalBody');
+  if (!modal || !body) return;
 
-  const step = temporaryRegState.step;
-
-  if (step === 1) {
-    // 步骤 1：功能告知与隐私须知（带标红严正警示）
-    container.innerHTML = `
-      <div class="space-y-4">
-        <div class="flex items-center gap-2.5 border-b border-slate-100 pb-3">
-          <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white text-lg shadow-md flex-shrink-0">
-            🌐
-          </div>
-          <div>
-            <h3 class="text-sm font-black text-slate-900">LUMA 官方云端论坛</h3>
-            <p class="text-[10px] text-purple-600 font-bold">全网跨端互通 · 云端安全与隐私须知</p>
-          </div>
-        </div>
-
-        <div class="space-y-2.5 text-xs text-slate-700 leading-relaxed">
-          <div class="p-3 bg-purple-50/70 border border-purple-100 rounded-2xl space-y-1.5">
-            <h4 class="font-black text-purple-900 flex items-center gap-1.5">
-              <span>✦ 功能说明</span>
-            </h4>
-            <p class="text-[11px] text-purple-800">这是连接所有 LUMA 创作者与玩家的官方实时交流阵地。您发布的动态、建议与官方公告将通过云端网络实时全网同步。</p>
-          </div>
-
-          <div class="p-3 bg-slate-50 border border-slate-100 rounded-2xl space-y-1.5">
-            <h4 class="font-black text-slate-900 flex items-center gap-1.5">
-              <span>🔒 隐私与安全性承诺</span>
-            </h4>
-            <ul class="text-[11px] text-slate-600 space-y-1 list-disc pl-4">
-              <li><b>小手机沙盒绝对隔离</b>：您在本地沙盒内的所有私密对话、API Key、本地模型配置等<b>绝对留在本地浏览器，绝不上云</b>！</li>
-              <li><b>仅同步公开名片</b>：云端仅存储您在此处填写的公开昵称、头像以及您在论坛公开发布的帖子与评论。</li>
-              <li><b>匿名凭据通行证</b>：无需绑定手机号或邮箱，系统自动分配专属凭据 ID，换设备凭 ID 即可找回。</li>
-            </ul>
-          </div>
-
-          <!-- 标红警示框 -->
-          <div class="p-3.5 bg-rose-50 border-2 border-rose-200 rounded-2xl text-rose-700 space-y-1 shadow-xs">
-            <div class="flex items-center gap-1.5 font-black text-xs text-rose-600">
-              <svg class="w-4 h-4 text-rose-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-              <span>【重要提醒与警示】</span>
-            </div>
-            <p class="text-[11px] font-bold text-rose-600 leading-normal">
-              如果您介意云端数据同步或不愿公开昵称与发言，请点击下方【退出】，切勿注册账号进入本模块！
-            </p>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-2.5 pt-1 border-t border-slate-100">
-          <button onclick="closeForumAuthModal()" class="btn-action justify-center !py-2.5 text-xs font-bold text-slate-600">
-            退出返回
-          </button>
-          <button onclick="goToAuthStep(2)" class="btn-brand justify-center !py-2.5 text-xs font-black shadow-md">
-            <span>了解并注册/登录 ›</span>
-          </button>
-        </div>
-      </div>
-    `;
-  } else if (step === 2) {
-    // 步骤 2：凭据发放与激活
-    container.innerHTML = `
+  if (viewMode === 'portal') {
+    // 主入口：清晰明了的【注册账号】与【登录账号】两个按钮
+    body.innerHTML = `
       <div class="space-y-4">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div class="flex items-center gap-2.5">
-            <div class="w-9 h-9 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 text-base">
+            <div class="w-9 h-9 rounded-2xl bg-purple-600 text-white flex items-center justify-center text-base shadow-sm">
               🔑
             </div>
             <div>
-              <h3 class="text-xs font-black text-slate-900">凭证发放与激活</h3>
-              <p class="text-[9px] text-slate-400">专属通行证 ID · 换设备换部署凭此找回</p>
+              <h3 class="text-xs font-black text-slate-900">LUMA 官方论坛身份中心</h3>
+              <p class="text-[9px] text-slate-400">选择注册新账号或凭 ID 登录</p>
             </div>
           </div>
-          <span class="text-[9px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">步骤 2/3</span>
+          <button onclick="closeForumAuthModal()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs text-slate-500 font-bold">✕</button>
         </div>
 
-        <!-- 自动生成的随机凭证 -->
-        <div class="p-3.5 bg-slate-900 text-white rounded-2xl space-y-2 border border-slate-800 shadow-md">
-          <div class="flex items-center justify-between">
-            <span class="text-[9px] text-amber-300 font-bold uppercase tracking-wider">NEW VOUCHER ID · 为你生成的新凭证</span>
-            <span class="text-[8px] bg-white/10 px-1.5 py-0.2 rounded text-slate-300">请牢记保存</span>
-          </div>
-          <div class="flex items-center justify-between gap-2 bg-black/40 p-2.5 rounded-xl border border-white/10">
-            <span class="font-mono text-xs font-black text-amber-400 select-all tracking-wider">${temporaryRegState.generatedUid}</span>
-            <button onclick="copyGeneratedVoucher('${temporaryRegState.generatedUid}')" class="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[10px] rounded-lg shadow active:scale-95 transition flex items-center gap-1">
-              <span>复制</span>
-            </button>
-          </div>
-          <p class="text-[9px] text-slate-400 leading-tight">
-            💡 提示：保存此 ID，换设备或换部署时输入即可一键恢复身份与历史发帖。
-          </p>
+        <div class="p-3 bg-purple-50/70 rounded-2xl border border-purple-100 text-xs text-purple-900 leading-relaxed">
+          💡 <b>提示</b>：登录成功后系统将自动保存您的登录态到本地，下次进入将<b>免登录秒进</b>，无需重复操作！
         </div>
 
-        <!-- 激活已有凭证 / 官方私钥 -->
-        <div class="space-y-1.5 pt-1">
-          <label class="text-[10px] font-bold text-slate-700 flex items-center justify-between">
-            <span>已有凭证 ID 或 主理人管理密钥？在下方输入激活：</span>
-          </label>
-          <div class="relative">
-            <input id="inputVoucherAuth" placeholder="输入已有 ID（留空则使用上方新生成 ID）" value="${temporaryRegState.inputVoucher}" oninput="handleVoucherInput(this.value)" class="input-ins text-xs font-mono font-bold pr-16">
-            <span id="voucherTagBadge" class="absolute right-2 top-2 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded hidden">已验证</span>
-          </div>
-          <p id="masterKeyPromptText" class="text-[9px] text-slate-400"></p>
-        </div>
-
-        <div class="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-100">
-          <button onclick="goToAuthStep(1)" class="btn-action justify-center !py-2.5 text-xs font-bold text-slate-600">
-            ‹ 上一步
+        <div class="space-y-2.5 pt-1">
+          <!-- 注册账号按钮 -->
+          <button onclick="openForumAuthPortalModal('register')" class="w-full p-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white flex items-center justify-between shadow-md active:scale-98 transition group">
+            <div class="flex items-center gap-3 text-left">
+              <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-lg">
+                ✨
+              </div>
+              <div>
+                <h4 class="text-xs font-black">注册新账号</h4>
+                <p class="text-[9px] text-purple-200 mt-0.5">自动生成专属凭证 ID · 自定义上传头像与昵称</p>
+              </div>
+            </div>
+            <span class="text-xs font-black group-hover:translate-x-1 transition">›</span>
           </button>
-          <button onclick="submitVoucherStep()" class="btn-brand justify-center !py-2.5 text-xs font-black shadow-md">
-            <span>下一步：设置名片 ›</span>
+
+          <!-- 登录账号按钮 -->
+          <button onclick="openForumAuthPortalModal('login')" class="w-full p-3.5 rounded-2xl bg-white hover:bg-slate-50 border-2 border-slate-200 text-slate-900 flex items-center justify-between shadow-xs active:scale-98 transition group">
+            <div class="flex items-center gap-3 text-left">
+              <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg text-slate-700">
+                🔐
+              </div>
+              <div>
+                <h4 class="text-xs font-black">登录已有账号 / 官方管理私钥</h4>
+                <p class="text-[9px] text-slate-400 mt-0.5">输入已有凭证 ID 或 主理人密钥即刻进入</p>
+              </div>
+            </div>
+            <span class="text-xs font-black text-slate-400 group-hover:translate-x-1 transition">›</span>
+          </button>
+        </div>
+
+        <div class="pt-2 border-t border-slate-100 flex justify-center">
+          <button onclick="closeForumAuthModal()" class="text-xs font-bold text-slate-400 hover:text-slate-600">
+            暂不进入，返回
           </button>
         </div>
       </div>
     `;
-  } else if (step === 3) {
-    // 步骤 3：个人信息与名片设置（支持玩家本地上传自定义头像）
-    const isMaster = temporaryRegState.isMasterKey;
-    container.innerHTML = `
+  } else if (viewMode === 'login') {
+    // 登录表单：输入已有 ID 或 官方主理人私钥
+    body.innerHTML = `
       <div class="space-y-4">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div class="flex items-center gap-2.5">
-            <div class="w-9 h-9 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-500 text-base">
-              👤
-            </div>
-            <div>
-              <h3 class="text-xs font-black text-slate-900">${isMaster ? '👑 官方主理人身份激活' : '设置公开名片'}</h3>
-              <p class="text-[9px] text-slate-400">仅在论坛展示 · 随时可修改</p>
-            </div>
+          <div class="flex items-center gap-2">
+            <span class="text-base">🔐</span>
+            <h3 class="text-xs font-black text-slate-900">登录账号 / 凭证验证</h3>
           </div>
-          <span class="text-[9px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">步骤 3/3</span>
+          <button onclick="openForumAuthPortalModal('portal')" class="text-xs font-bold text-purple-600">‹ 返回</button>
         </div>
 
-        ${isMaster ? `
-          <div class="p-3 bg-gradient-to-r from-amber-500/20 via-rose-500/20 to-purple-500/20 rounded-2xl border border-amber-400/40 space-y-1">
-            <div class="flex items-center gap-1 text-xs font-black text-amber-700">
-              <span>👑 官方超级主理人权限已解锁！</span>
-            </div>
-            <p class="text-[10px] text-slate-700">您将拥有官方置顶、全站删帖、任命管理员及发布官方认证动态的最高特权。</p>
-          </div>
-        ` : ''}
+        <div class="space-y-2">
+          <label class="text-[10px] font-bold text-slate-700 block">请输入你的凭证 ID 或 官方主理人密钥：</label>
+          <input id="inputDirectLoginVoucher" placeholder="例如: LUMA-UID-XXXX-XXXX 或 主理人密钥" class="input-ins text-xs font-mono font-bold">
+          <p class="text-[9px] text-slate-400 leading-tight">
+            💡 输入主理人私钥 (17826719645Zy) 可直接解锁官方超级主理人最高管理权限。
+          </p>
+        </div>
 
-        <div class="p-2.5 bg-blue-50/80 rounded-xl text-[10px] text-blue-800 leading-relaxed border border-blue-100">
-          ℹ️ 再次告知：云端只会储存您在此处设置的公开昵称、头像以及论坛帖子，小手机沙盒内其余私密数据绝不储存！
+        <div class="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-100">
+          <button onclick="openForumAuthPortalModal('portal')" class="btn-action justify-center !py-2.5 text-xs font-bold text-slate-600">
+            取消
+          </button>
+          <button onclick="executeDirectLoginSubmit()" class="btn-brand justify-center !py-2.5 text-xs font-black shadow-md">
+            <span>立即登录进入 ›</span>
+          </button>
+        </div>
+      </div>
+    `;
+  } else if (viewMode === 'register') {
+    // 注册表单：自动分配新 ID，玩家自定义上传本地头像或选预设，填写昵称
+    forumRegisterDraft.generatedUid = generateRandomVoucherID();
+    forumRegisterDraft.avatar = forumRegisterDraft.avatar || FORUM_PRESET_AVATARS[0];
+    forumRegisterDraft.nickname = '';
+
+    body.innerHTML = `
+      <div class="space-y-3.5">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="text-base">✨</span>
+            <h3 class="text-xs font-black text-slate-900">注册新账号 · 设置名片</h3>
+          </div>
+          <button onclick="openForumAuthPortalModal('portal')" class="text-xs font-bold text-purple-600">‹ 返回</button>
+        </div>
+
+        <!-- 分配的新凭证 ID 展示卡片 -->
+        <div class="p-3 bg-slate-900 text-white rounded-2xl space-y-1.5 border border-slate-800 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-[9px] text-amber-300 font-bold uppercase">YOUR VOUCHER ID · 为你生成的新凭证</span>
+            <span class="text-[8px] bg-white/10 px-1.5 py-0.2 rounded text-slate-300">请牢记保存</span>
+          </div>
+          <div class="flex items-center justify-between gap-2 bg-black/40 p-2 rounded-xl border border-white/10">
+            <span class="font-mono text-xs font-black text-amber-400 select-all tracking-wider">${forumRegisterDraft.generatedUid}</span>
+            <button onclick="copyGeneratedVoucher('${forumRegisterDraft.generatedUid}')" class="px-2 py-0.8 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[9px] rounded-lg shadow active:scale-95 transition">
+              复制
+            </button>
+          </div>
         </div>
 
         <div class="space-y-3">
           <div>
             <label class="text-[10px] font-bold text-slate-700 block mb-1">公开昵称</label>
-            <input id="inputForumNickname" placeholder="输入你在论坛展示的昵称" value="${isMaster ? 'LUMA 官方运营组' : temporaryRegState.nickname}" class="input-ins text-xs font-bold">
+            <input id="inputRegNickname" placeholder="输入你在论坛展示的昵称" value="${forumRegisterDraft.nickname}" class="input-ins text-xs font-bold">
           </div>
 
           <div>
@@ -343,15 +414,15 @@ function renderForumAuthModalContent() {
               <label class="text-[10px] font-bold text-slate-700">自定义上传头像 或 选用预设</label>
               <label class="cursor-pointer text-[9px] text-purple-600 font-bold bg-purple-50 hover:bg-purple-100 px-2 py-0.8 rounded-lg border border-purple-200 transition">
                 📁 本地上传图片
-                <input type="file" accept="image/*" class="hidden" onchange="handleCustomAvatarUpload(event)">
+                <input type="file" accept="image/*" class="hidden" onchange="handleRegAvatarUpload(event)">
               </label>
             </div>
 
             <!-- 当前选中头像预览 -->
             <div class="flex items-center gap-3 p-2 bg-slate-50 rounded-2xl border border-slate-100 mb-2">
-              <img id="currentForumAvatarPreview" src="${temporaryRegState.avatar}" class="w-12 h-12 rounded-full object-cover border-2 border-rose-500 shadow-sm flex-shrink-0">
+              <img id="currentRegAvatarPreview" src="${forumRegisterDraft.avatar}" class="w-11 h-11 rounded-full object-cover border-2 border-purple-500 shadow-sm flex-shrink-0">
               <div class="text-[10px] text-slate-500">
-                <span class="font-bold text-slate-800 block">当前使用头像</span>
+                <span class="font-bold text-slate-800 block">当前头像预览</span>
                 <span>支持从相册选择任意图片，将保存于本地名片中</span>
               </div>
             </div>
@@ -359,9 +430,9 @@ function renderForumAuthModalContent() {
             <!-- 预设头像横向滚轮 -->
             <div class="flex gap-2 overflow-x-auto no-scrollbar py-1">
               ${FORUM_PRESET_AVATARS.map((url, i) => `
-                <div onclick="selectPresetAvatar('${url}')" class="relative flex-shrink-0 cursor-pointer">
-                  <img src="${url}" class="w-9 h-9 rounded-full object-cover border-2 ${temporaryRegState.avatar === url ? 'border-rose-500 scale-105 shadow-md' : 'border-slate-200 opacity-80'}">
-                  ${temporaryRegState.avatar === url ? '<span class="absolute -bottom-1 -right-1 bg-rose-500 text-white text-[7px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-black">✓</span>' : ''}
+                <div onclick="selectRegPresetAvatar('${url}')" class="relative flex-shrink-0 cursor-pointer">
+                  <img src="${url}" class="w-8 h-8 rounded-full object-cover border-2 ${forumRegisterDraft.avatar === url ? 'border-purple-600 scale-105 shadow-md' : 'border-slate-200 opacity-80'}">
+                  ${forumRegisterDraft.avatar === url ? '<span class="absolute -bottom-1 -right-1 bg-purple-600 text-white text-[7px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-black">✓</span>' : ''}
                 </div>
               `).join('')}
             </div>
@@ -369,23 +440,22 @@ function renderForumAuthModalContent() {
         </div>
 
         <div class="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-100">
-          <button onclick="goToAuthStep(2)" class="btn-action justify-center !py-2.5 text-xs font-bold text-slate-600">
-            ‹ 上一步
+          <button onclick="openForumAuthPortalModal('portal')" class="btn-action justify-center !py-2.5 text-xs font-bold text-slate-600">
+            ‹ 取消
           </button>
-          <button onclick="completeForumRegistration()" class="btn-brand justify-center !py-2.5 text-xs font-black shadow-md">
-            <span>确认并进入官方主页 ›</span>
+          <button onclick="executeRegisterSubmit()" class="btn-brand justify-center !py-2.5 text-xs font-black shadow-md">
+            <span>完成注册并进入 ›</span>
           </button>
         </div>
       </div>
     `;
   }
-}
 
-function goToAuthStep(s) {
-  temporaryRegState.step = s;
-  renderForumAuthModalContent();
+  modal.classList.remove('hidden');
 }
+window.openForumAuthPortalModal = openForumAuthPortalModal;
 
+// 复制生成的 UID
 function copyGeneratedVoucher(uid) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(uid).then(() => {
@@ -397,120 +467,120 @@ function copyGeneratedVoucher(uid) {
 }
 window.copyGeneratedVoucher = copyGeneratedVoucher;
 
-function handleVoucherInput(val) {
-  temporaryRegState.inputVoucher = val.trim();
-  const badge = document.getElementById('voucherTagBadge');
-  const prompt = document.getElementById('masterKeyPromptText');
-
-  if (val.trim() === MASTER_KEY_RAW) {
-    temporaryRegState.isMasterKey = true;
-    if (badge) {
-      badge.textContent = "👑 官方私钥匹配";
-      badge.className = "absolute right-2 top-2 text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded";
-      badge.classList.remove('hidden');
-    }
-    if (prompt) {
-      prompt.textContent = "✨ 识别到官方超级主理人私钥，下一步将直接激活最高管理特权！";
-      prompt.className = "text-[9px] text-amber-600 font-bold";
-    }
-  } else if (val.trim().length > 0) {
-    temporaryRegState.isMasterKey = false;
-    if (badge) {
-      badge.textContent = "已有ID";
-      badge.className = "absolute right-2 top-2 text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded";
-      badge.classList.remove('hidden');
-    }
-    if (prompt) {
-      prompt.textContent = "将尝试连接并恢复该凭证下的历史发帖与资料。";
-      prompt.className = "text-[9px] text-slate-400";
-    }
-  } else {
-    temporaryRegState.isMasterKey = false;
-    if (badge) badge.classList.add('hidden');
-    if (prompt) prompt.textContent = "";
-  }
-}
-window.handleVoucherInput = handleVoucherInput;
-
-// 用户自定义上传本地图片头像
-function handleCustomAvatarUpload(e) {
+// 上传本地自定义头像
+function handleRegAvatarUpload(e) {
   const file = e.target.files && e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = function(evt) {
     const base64Url = evt.target.result;
-    temporaryRegState.avatar = base64Url;
-    const previewEl = document.getElementById('currentForumAvatarPreview');
+    forumRegisterDraft.avatar = base64Url;
+    const previewEl = document.getElementById('currentRegAvatarPreview');
     if (previewEl) previewEl.src = base64Url;
-    renderForumAuthModalContent();
-    if (api.ui && api.ui.toast) api.ui.toast("🎉 自定义头像加载成功！");
+    if (api.ui && api.ui.toast) api.ui.toast("🎉 本地图片已成功载入为头像！");
   };
   reader.readAsDataURL(file);
 }
-window.handleCustomAvatarUpload = handleCustomAvatarUpload;
+window.handleRegAvatarUpload = handleRegAvatarUpload;
 
-function selectPresetAvatar(url) {
-  temporaryRegState.avatar = url;
-  renderForumAuthModalContent();
+// 选择预设头像
+function selectRegPresetAvatar(url) {
+  forumRegisterDraft.avatar = url;
+  const previewEl = document.getElementById('currentRegAvatarPreview');
+  if (previewEl) previewEl.src = url;
+  openForumAuthPortalModal('register');
 }
-window.selectPresetAvatar = selectPresetAvatar;
+window.selectRegPresetAvatar = selectRegPresetAvatar;
 
-function submitVoucherStep() {
-  const inputEl = document.getElementById('inputVoucherAuth');
-  if (inputEl && inputEl.value.trim()) {
-    temporaryRegState.inputVoucher = inputEl.value.trim();
-    if (temporaryRegState.inputVoucher === MASTER_KEY_RAW) {
-      temporaryRegState.isMasterKey = true;
-    }
-  }
-  goToAuthStep(3);
-}
-window.submitVoucherStep = submitVoucherStep;
-
-function completeForumRegistration() {
-  const nickInput = document.getElementById('inputForumNickname');
+// 执行注册并持久化保存
+function executeRegisterSubmit() {
+  const nickInput = document.getElementById('inputRegNickname');
   let nickname = nickInput ? nickInput.value.trim() : '';
   if (!nickname) {
-    nickname = temporaryRegState.isMasterKey ? 'LUMA 官方运营组' : '创作者';
+    nickname = 'LUMA玩家_' + Math.floor(1000 + Math.random() * 9000);
   }
 
-  const finalUid = temporaryRegState.isMasterKey ? 'LUMA_OFFICIAL_OWNER' : (temporaryRegState.inputVoucher || temporaryRegState.generatedUid);
-  const isOwner = temporaryRegState.isMasterKey;
-
   const userObj = {
-    uid: finalUid,
+    uid: forumRegisterDraft.generatedUid,
     name: nickname,
-    avatar: temporaryRegState.avatar,
-    role: isOwner ? 'owner' : 'user',
-    roleTitle: isOwner ? '👑 官方主理人' : '👤 玩家',
-    isOwner: isOwner,
-    isAdmin: isOwner,
+    avatar: forumRegisterDraft.avatar || FORUM_PRESET_AVATARS[0],
+    role: 'user',
+    roleTitle: '👤 玩家',
+    isOwner: false,
+    isAdmin: false,
     registeredAt: new Date().toISOString()
   };
 
-  // 持久化存储至本地，永不丢失！
+  // 永久本地持久化！
   saveForumCurrentUser(userObj);
+  setForumNoticeMuted(true); // 注册成功后自动静音须知，下次绝不再弹！
+  closeForumAuthModal();
+
+  if (api.ui && api.ui.toast) api.ui.toast("🎉 注册成功！欢迎来到官方论坛！");
+  openCommunitySubPageDirectForum();
+}
+window.executeRegisterSubmit = executeRegisterSubmit;
+
+// 执行登录并持久化保存
+function executeDirectLoginSubmit() {
+  const inputEl = document.getElementById('inputDirectLoginVoucher');
+  const val = inputEl ? inputEl.value.trim() : '';
+  if (!val) {
+    if (api.ui && api.ui.toast) api.ui.toast("请输入凭证 ID 或 主理人密钥！");
+    return;
+  }
+
+  const isMasterKey = (val === MASTER_KEY_RAW);
+  let userObj = null;
+
+  if (isMasterKey) {
+    userObj = {
+      uid: 'LUMA_OFFICIAL_OWNER',
+      name: 'LUMA 官方运营组',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      role: 'owner',
+      roleTitle: '👑 官方主理人',
+      isOwner: true,
+      isAdmin: true,
+      registeredAt: new Date().toISOString()
+    };
+  } else {
+    // 普通玩家憑證登錄
+    userObj = {
+      uid: val,
+      name: '玩家_' + val.slice(-4),
+      avatar: FORUM_PRESET_AVATARS[0],
+      role: 'user',
+      roleTitle: '👤 玩家',
+      isOwner: false,
+      isAdmin: false,
+      registeredAt: new Date().toISOString()
+    };
+  }
+
+  // 永久本地持久化！
+  saveForumCurrentUser(userObj);
+  setForumNoticeMuted(true); // 登录成功后自动静音须知，下次绝不再弹！
   closeForumAuthModal();
 
   if (api.ui && api.ui.toast) {
-    api.ui.toast(isOwner ? "👑 欢迎回来，官方超级主理人！" : "🎉 论坛名片已永久绑定！");
+    api.ui.toast(isMasterKey ? "👑 欢迎回来，官方超级主理人！" : "🎉 登录成功！已载入身份！");
   }
-
   openCommunitySubPageDirectForum();
 }
-window.completeForumRegistration = completeForumRegistration;
+window.executeDirectLoginSubmit = executeDirectLoginSubmit;
 
-// 切换账号或退出论坛登录
+// 退出登录
 function handleForumLogout() {
   localStorage.removeItem('luma_forum_current_user');
-  if (api.ui && api.ui.toast) api.ui.toast("已退出论坛账号，可重新输入凭证或注册。");
+  if (api.ui && api.ui.toast) api.ui.toast("已退出当前论坛账号。");
   closeVoucherManageModal();
   closeCommunitySubPage();
 }
 window.handleForumLogout = handleForumLogout;
 
 // =========================================================================
-// 【三、官方论坛微博式主页体系】
+// 【四、官方论坛微博式主页体系】
 // =========================================================================
 
 function getForumPosts() {
@@ -538,9 +608,8 @@ function renderOfficialWeiboForum(activeTab = 'official') {
   if (!container) return;
 
   const currentUser = getForumCurrentUser();
-  if (!currentUser) {
-    // 尚未注册/登录，弹出 3 步入场弹窗
-    openForumAuthModal();
+  if (!currentUser || !currentUser.uid) {
+    checkAndOpenForum();
     return;
   }
 
@@ -837,7 +906,7 @@ function renderSingleForumPostCard(post, currentUser, isOwner, isAdmin) {
 function submitNewForumPost() {
   const currentUser = getForumCurrentUser();
   if (!currentUser || !currentUser.uid) {
-    openForumAuthModal();
+    checkAndOpenForum();
     return;
   }
 
@@ -929,7 +998,7 @@ window.togglePostComments = togglePostComments;
 function submitPostComment(postId) {
   const currentUser = getForumCurrentUser();
   if (!currentUser || !currentUser.uid) {
-    openForumAuthModal();
+    checkAndOpenForum();
     return;
   }
   const input = document.getElementById(`input_comment_${postId}`);
@@ -978,7 +1047,7 @@ function deletePostComment(postId, commId) {
 window.deletePostComment = deletePostComment;
 
 // =========================================================================
-// 【四、管理员任命与名片/凭据管理弹窗】
+// 【五、名片/凭据卡管理与管理员任免弹窗】
 // =========================================================================
 
 function openVoucherManageModal() {
@@ -1007,7 +1076,7 @@ function openVoucherManageModal() {
               <h4 class="text-xs font-black text-slate-900 truncate">${currentUser.name}</h4>
               <span class="text-[8px] ${currentUser.isOwner ? 'bg-amber-400 text-slate-950' : 'bg-purple-100 text-purple-700'} font-bold px-1.5 py-0.2 rounded">${currentUser.roleTitle || '👤 玩家'}</span>
             </div>
-            <p class="text-[9px] text-slate-400 mt-0.5 font-mono">已绑定本地名片</p>
+            <p class="text-[9px] text-slate-400 mt-0.5 font-mono">已永久保存在本地</p>
           </div>
         </div>
 
@@ -1043,8 +1112,7 @@ window.closeVoucherManageModal = closeVoucherManageModal;
 
 function openEditProfileInModal() {
   closeVoucherManageModal();
-  openForumAuthModal();
-  goToAuthStep(3);
+  openForumAuthPortalModal('register');
 }
 window.openEditProfileInModal = openEditProfileInModal;
 
