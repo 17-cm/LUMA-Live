@@ -70,9 +70,8 @@ async function loadTrendsFromDb() {
 }
 
 function renderTrends() {
-  const boxHub = document.getElementById('weiboPostFeedContainer');
   const boxFull = document.getElementById('weiboPostFeedContainerFull');
-  if (!boxHub && !boxFull) return;
+  if (!boxFull) return;
 
   const html = weiboPosts.map(post => `
     <div class="luxe-card p-4 space-y-3 bg-white cursor-pointer" onclick="openTrendDetail('${post.id}')">
@@ -130,8 +129,7 @@ function renderTrends() {
     </div>
   `).join('');
 
-  if (boxHub) boxHub.innerHTML = html;
-  if (boxFull) boxFull.innerHTML = html;
+  boxFull.innerHTML = html;
 }
 window.renderTrends = renderTrends;
 
