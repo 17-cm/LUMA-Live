@@ -366,20 +366,22 @@ function renderSuperTopicCheckinTab(char) {
   const uAvatar = (window.currentUser && window.currentUser.avatar) || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200';
   const checkIn = window.getSuperTopicCheckInInfo(char.id);
 
-  const checkinRankList = [
-    { name: '苏小喵全球后援会', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', days: 128, total: 38400, badge: '开山元老' },
-    { name: '每日必吸猫', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', days: 95, total: 28500, badge: '连续满勤' },
-    { name: '星奈今天直播了吗', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100', days: 64, total: 19200, badge: '超话达人' },
-    { name: '早起看重播', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', days: 42, total: 12600, badge: '活跃打卡' },
-    {
-      name: `${uName} (你)`,
-      avatar: uAvatar,
-      days: checkIn.streakDays,
-      total: checkIn.totalExp,
-      badge: checkIn.isCheckedToday ? '今日已打卡' : '等待打卡',
-      isUser: true
-    }
-  ].sort((a, b) => b.days - a.days);
+  const checkinRankList = (window.LumaCheckinManager && typeof window.LumaCheckinManager.getTopicCheckInRankList === 'function')
+    ? window.LumaCheckinManager.getTopicCheckInRankList(char.id)
+    : [
+        { name: '苏小喵全球后援会', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', days: 128, total: 38400, badge: '开山元老' },
+        { name: '每日必吸猫', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', days: 95, total: 28500, badge: '连续满勤' },
+        { name: '星奈今天直播了吗', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100', days: 64, total: 19200, badge: '超话达人' },
+        { name: '早起看重播', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', days: 42, total: 12600, badge: '活跃打卡' },
+        {
+          name: `${uName} (你)`,
+          avatar: uAvatar,
+          days: checkIn.streakDays,
+          total: checkIn.totalExp,
+          badge: checkIn.isCheckedToday ? '今日已打卡' : '等待打卡',
+          isUser: true
+        }
+      ].sort((a, b) => b.days - a.days);
 
   container.innerHTML = `
     <!-- 签到打卡卡片 -->

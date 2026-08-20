@@ -448,7 +448,9 @@ function updateLiveRoomHostFansDisplay() {
   const fanEl = document.getElementById('hostFanCount');
   if (!fanEl) return;
   const isFollowed = (window.followedHosts || []).includes(currentRoom.characterId);
-  const baseFans = getHostBaseFans(currentRoom.characterId, currentRoom);
+  const baseFans = (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function')
+    ? window.LumaFansManager.getFans(currentRoom.characterId, currentRoom)
+    : getHostBaseFans(currentRoom.characterId, currentRoom);
   const totalFans = baseFans + (isFollowed ? 1 : 0);
   fanEl.textContent = totalFans >= 10000 ? (totalFans / 10000).toFixed(1) + '万' : totalFans.toLocaleString();
 }
@@ -1091,6 +1093,17 @@ async function handleComboCircleClick() {
   }
   if (typeof syncWalletDisplays === 'function') syncWalletDisplays();
 
+  // 记录消费与打榜贡献
+  const streamerAvatar = currentRoom ? (currentRoom.avatar || currentRoom.cover) : '';
+  const streamerTag = currentRoom ? (currentRoom.subTag || currentRoom.category || '签约主播') : '签约主播';
+  if (typeof recordTransaction === 'function') {
+    await recordTransaction(`连送 ${liveComboSession.giftName} x${liveComboSession.unitQty}`, "gift", totalCost, currentRoom.name, streamerAvatar, streamerTag);
+  }
+  if (currentRoom && typeof window.addCharContributionScore === 'function') {
+    const charKey = currentRoom.characterId || currentRoom.id || currentRoom.name;
+    window.addCharContributionScore(charKey, totalCost);
+  }
+
   // 累加连击
   liveComboSession.comboCount++;
   liveComboSession.totalCount += liveComboSession.unitQty;
@@ -1411,7 +1424,9 @@ function getOrGenerateStreamerProfile(characterId, characterObj) {
   
   const totalShows = (characterObj && characterObj.totalShows) ? Number(characterObj.totalShows) : (38 + (hash % 290));
   const avgFansPerShow = 360 + (hash % 420);
-  const baseFans = totalShows * avgFansPerShow + 2400 + (hash % 5000);
+  const baseFans = (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function')
+    ? window.LumaFansManager.getFans(characterId, characterObj)
+    : (totalShows * avgFansPerShow + 2400 + (hash % 5000));
   const followCount = 28 + (hash % 150);
   const likesCount = Math.floor(baseFans * (3.8 + (hash % 5) * 0.8));
   

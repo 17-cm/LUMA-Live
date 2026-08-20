@@ -36,7 +36,21 @@ function renderCommunityRanking(tabType = 'fans') {
 
   let rankedItems = [];
 
-  if (tabType === 'fans') {
+  if (tabType === 'fans' && window.LumaFansManager) {
+    // 粉丝人气榜：严格按照 Char 和 User 的粉丝数量降序排列
+    const list = window.LumaFansManager.getAllEntitiesPopularityList();
+    rankedItems = list.map(item => ({
+      name: item.name,
+      avatar: item.avatar,
+      badge: item.tag || '人气主播',
+      score: item.fans,
+      scoreLabel: '粉丝',
+      isUser: item.isUser
+    }));
+  } else if (tabType === 'guard' && window.LumaGuardManager) {
+    // 全服守护榜：直播间送礼 + 超话打榜应援消费总体排行
+    rankedItems = window.LumaGuardManager.getAllCommunityGuardRankingList();
+  } else if (tabType === 'fans') {
     rankedItems = chars.map(c => ({
       name: c.name,
       avatar: c.avatar,
@@ -48,13 +62,12 @@ function renderCommunityRanking(tabType = 'fans') {
       name: uName + ' (你)',
       avatar: uAvatar,
       badge: uProfile.tag || '新人主播',
-      score: uProfile.fanCount || 520,
+      score: uProfile.fans || 128,
       scoreLabel: '粉丝',
       isUser: true
     });
     rankedItems.sort((a, b) => b.score - a.score);
   } else if (tabType === 'guard') {
-    // 守护榜：基础分数 + 真实打榜贡献累计
     rankedItems = chars.map(c => ({
       name: c.name,
       avatar: c.avatar,
@@ -66,7 +79,7 @@ function renderCommunityRanking(tabType = 'fans') {
       name: uName + ' (你)',
       avatar: uAvatar,
       badge: '至尊榜一',
-      score: (uWallet * 3) + parseInt(localStorage.getItem('luma_total_user_contribution') || '12000', 10),
+      score: 18000,
       scoreLabel: '贡献值',
       isUser: true
     });

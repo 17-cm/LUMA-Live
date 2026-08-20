@@ -52,7 +52,33 @@ async function syncUserProfile() {
     }
   } catch (e) {}
 
+  // 1. 同步个人粉丝数量
+  const myFans = window.LumaFansManager ? window.LumaFansManager.getFans('user') : (userProfileData.fans || 128);
+  userProfileData.fans = myFans;
+  const statFanEl = document.getElementById('statFanCount');
+  if (statFanEl) {
+    statFanEl.textContent = window.LumaDataHub ? window.LumaDataHub.formatNumber(myFans) : myFans;
+  }
+
+  // 2. 同步点赞与勋章数
+  const statLikeEl = document.getElementById('statLikeCount');
+  if (statLikeEl) statLikeEl.textContent = (userProfileData.likes || 1240).toLocaleString();
+
+  const statMedalEl = document.getElementById('statMedalCount');
+  if (statMedalEl) statMedalEl.textContent = userProfileData.medals || 3;
+
+  // 3. 同步佩戴头衔/称号
+  if (window.LumaTitlesManager) {
+    const activeTitle = window.LumaTitlesManager.getActiveTitle('user');
+    if (activeTitle) {
+      userProfileData.tag = activeTitle.name;
+      const tagEl = document.getElementById('displayUserTag');
+      if (tagEl) tagEl.textContent = activeTitle.name;
+    }
+  }
+
   syncFollowCountDisplay();
+  renderDualRankList();
 }
 window.syncUserProfile = syncUserProfile;
 
@@ -231,84 +257,30 @@ function renderDualRankList() {
   const box = document.getElementById('dualRankListContainer');
   if (!box) return;
 
-  const getAvatarForTarget = (name) => {
-    const chars = window.allCharacters || [];
-    const foundChar = chars.find(c => c.name === name || c.id === name);
-    if (foundChar && foundChar.avatar) return foundChar.avatar;
-    const lives = window.liveList || [];
-    const foundLive = lives.find(l => l.name === name);
-    if (foundLive && foundLive.avatar) return foundLive.avatar;
-    return `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200`;
-  };
-
   let aggregatedList = [];
 
-  if (currentRankTab === 'fans') {
-    const fanMap = {
-      "星海漫游·榜一大哥": {
-        targetName: "星海漫游·榜一大哥",
-        avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200",
-        tag: "👑 至尊帝王",
-        totalAmount: 18880,
-        giftCount: 16,
-        lastTime: "10分钟前"
-      },
-      "秋水共长天": {
-        targetName: "秋水共长天",
-        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200",
-        tag: "💎 超级粉丝团",
-        totalAmount: 9990,
-        giftCount: 9,
-        lastTime: "25分钟前"
-      },
-      "真爱喵星人": {
-        targetName: "真爱喵星人",
-        avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200",
-        tag: "💖 铁杆守护",
-        totalAmount: 5200,
-        giftCount: 6,
-        lastTime: "1小时前"
-      }
-    };
-
-    (transactionLedger || []).filter(t => t.type === 'income').forEach(tx => {
-      const name = tx.targetName || '匿名粉丝';
-      if (!fanMap[name]) {
-        fanMap[name] = {
-          targetName: name,
-          avatar: tx.targetAvatar || getAvatarForTarget(name),
-          tag: tx.targetTag || '直播间贵宾',
-          totalAmount: 0,
-          giftCount: 0,
-          lastTime: tx.time || '刚刚'
-        };
-      }
-      fanMap[name].totalAmount += Number(tx.amount) || 0;
-      fanMap[name].giftCount += 1;
-      if (tx.targetAvatar) fanMap[name].avatar = tx.targetAvatar;
-    });
-
-    aggregatedList = Object.values(fanMap).sort((a, b) => b.totalAmount - a.totalAmount);
-  } else {
-    const myGiftsMap = {};
-    (transactionLedger || []).filter(t => t.type === 'gift').forEach(tx => {
-      const name = tx.targetName || '签约主播';
-      if (!myGiftsMap[name]) {
-        myGiftsMap[name] = {
-          targetName: name,
-          avatar: tx.targetAvatar || getAvatarForTarget(name),
-          tag: tx.targetTag || '守护主播',
-          totalAmount: 0,
-          giftCount: 0,
-          lastTime: tx.time || '刚刚'
-        };
-      }
-      myGiftsMap[name].totalAmount += Number(tx.amount) || 0;
-      myGiftsMap[name].giftCount += 1;
-      if (tx.targetAvatar) myGiftsMap[name].avatar = tx.targetAvatar;
-    });
-
-    aggregatedList = Object.values(myGiftsMap).sort((a, b) => b.totalAmount - a.totalAmount);
+  if (window.LumaGuardManager) {
+    if (currentRankTab === 'fans') {
+      // 粉丝榜：只计算 Char 谁为我消费得最多
+      aggregatedList = window.LumaGuardManager.getTopFansSpentOnMe().map(item => ({
+        targetName: item.fromName || '主播',
+        avatar: item.fromAvatar || window.LumaGuardManager.getAvatarById(item.fromId),
+        tag: item.tag || '👑 铁杆打赏',
+        totalAmount: item.totalAmount || 0,
+        giftCount: item.giftCount || 1,
+        lastTime: item.lastTime || '活跃'
+      }));
+    } else {
+      // 我的守护榜：我为谁消费得最多
+      aggregatedList = window.LumaGuardManager.getTopCharsISpentOn().map(item => ({
+        targetName: item.toName || '主播',
+        avatar: item.toAvatar || window.LumaGuardManager.getAvatarById(item.toId),
+        tag: item.tag || '💖 守护主播',
+        totalAmount: item.totalAmount || 0,
+        giftCount: item.giftCount || 1,
+        lastTime: item.lastTime || '活跃'
+      }));
+    }
   }
 
   if (aggregatedList.length === 0) {
@@ -317,8 +289,8 @@ function renderDualRankList() {
         <div class="w-12 h-12 mx-auto mb-2 rounded-full bg-slate-100 flex items-center justify-center text-slate-300">
           <svg class="w-6 h-6 stroke-[1.8]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
         </div>
-        <p class="font-bold">暂无${currentRankTab === 'fans' ? '粉丝守护' : '守护主播'}数据</p>
-        <p class="text-[10px] text-slate-400 mt-1">进入直播间赠送心仪礼物，即可实时累加并登顶榜单！</p>
+        <p class="font-bold">暂无${currentRankTab === 'fans' ? '粉丝打赏' : '守护主播'}数据</p>
+        <p class="text-[10px] text-slate-400 mt-1">进入直播间赠送心仪礼物或在超话打榜，即可实时累加并登顶榜单！</p>
       </div>
     `;
     return;
