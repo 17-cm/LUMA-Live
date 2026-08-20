@@ -1568,3 +1568,91 @@ input:checked + .switch-slider:before {
   border-radius: 16px 16px 0 0;
   height: 55px;
 }
+
+/* 微博热搜榜单角标 */
+.hot-badge-bao {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.hot-badge-re {
+  background: #f97316;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.hot-badge-xin {
+  background: #ec4899;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.hot-badge-fei {
+  background: #8b5cf6;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.hot-badge-jian {
+  background: #0ea5e9;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+/* 微博超话 4 大子 Tab */
+.weibo-sub-tab {
+  flex: 1;
+  text-align: center;
+  padding: 8px 4px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+}
+.weibo-sub-tab.active {
+  color: #0f172a;
+}
+.weibo-sub-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 25%;
+  right: 25%;
+  height: 2.5px;
+  background: #ff2a6d;
+  border-radius: 99px;
+}
+
+/* 打榜商品道具卡片 */
+.support-gift-card {
+  background: #ffffff;
+  border: 1.5px solid #f1f5f9;
+  border-radius: 16px;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.support-gift-card:active {
+  transform: scale(0.96);
+}
+.support-gift-card.selected {
+  border-color: #ff2a6d;
+  background: rgba(255, 42, 109, 0.04);
+  box-shadow: 0 4px 12px rgba(255, 42, 109, 0.12);
+}
+

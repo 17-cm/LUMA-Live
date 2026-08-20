@@ -1522,45 +1522,60 @@
        【社区全新 6 大专区全屏子视图体系】
   ========================================================================= -->
 
-  <!-- 子页面 1: 今日热搜 全屏子页 -->
+  <!-- 子页面 1: 今日热搜 全屏子页 (仿微博热搜榜 & 热点广场) -->
   <div id="communityTrendsView" class="full-page-view hidden">
     <div class="page-nav-bar">
       <button onclick="closeCommunitySubPage()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </button>
       <div class="text-center">
-        <h3 class="text-xs font-black text-slate-900 leading-none">今日热搜</h3>
-        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">HOT TRENDS & FEED</span>
+        <h3 class="text-xs font-black text-slate-900 leading-none">微博热搜 · 实时榜</h3>
+        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">HOT SEARCH & PLAZA</span>
       </div>
       <div class="flex items-center gap-1.5">
         <button onclick="handleGenerateNewTrend()" class="btn-brand text-[10px] !py-1 !px-2.5 shadow-sm">
           <span>刷新</span>
         </button>
-        <button onclick="openCreatePostModal()" class="w-7 h-7 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-bold shadow-sm active:scale-90 transition">
+        <button onclick="openCreatePostModal('#微博热搜#')" class="w-7 h-7 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-bold shadow-sm active:scale-90 transition">
           +
         </button>
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-3">
-      <!-- 热门词条滚动条 -->
-      <div class="flex gap-2 overflow-x-auto no-scrollbar py-1">
-        <span class="text-[10px] bg-rose-50 text-rose-600 font-bold px-2.5 py-1 rounded-full border border-rose-200 flex-shrink-0">1. #主播连麦当场破防# 爆</span>
-        <span class="text-[10px] bg-amber-50 text-amber-700 font-bold px-2.5 py-1 rounded-full border border-amber-200 flex-shrink-0">2. #神秘神豪空降直播间# 热</span>
-        <span class="text-[10px] bg-purple-50 text-purple-700 font-bold px-2.5 py-1 rounded-full border border-purple-200 flex-shrink-0">3. #野生主播惊艳立绘出道#</span>
+    <!-- 热搜双 Tab 切换 (实时热搜榜 / 热点广场流) -->
+    <div class="px-4 pb-2">
+      <div class="bg-white/90 p-1 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+        <button onclick="switchHotTrendTab('ranking')" id="btnHotTabRanking" class="flex-1 py-1.5 text-center text-xs font-bold rounded-xl transition bg-slate-900 text-white shadow-xs">
+          🔥 实时热搜榜 TOP 50
+        </button>
+        <button onclick="switchHotTrendTab('feed')" id="btnHotTabFeed" class="flex-1 py-1.5 text-center text-xs font-bold rounded-xl transition text-slate-600 hover:text-slate-900">
+          📰 热点广场动态
+        </button>
       </div>
-      <div id="weiboPostFeedContainerFull" class="space-y-3.5"></div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-3" id="communityTrendsScrollArea">
+      <!-- 视图 1: 实时热搜榜单 -->
+      <div id="hotSearchRankingContainer" class="space-y-2"></div>
+      <!-- 视图 2: 广场动态流 (默认可按热搜话题过滤) -->
+      <div id="hotSearchFeedContainer" class="hidden space-y-3.5">
+        <div id="hotSearchFilterBanner" class="hidden luxe-card p-2.5 bg-rose-50/80 border border-rose-200 flex items-center justify-between text-xs text-rose-700">
+          <span id="hotSearchFilterText" class="font-bold truncate">当前话题: #xxx#</span>
+          <button onclick="clearHotSearchFilter()" class="text-[10px] font-bold text-rose-600 bg-white px-2 py-0.5 rounded-full border border-rose-200">查看全部</button>
+        </div>
+        <div id="weiboPostFeedContainerFull" class="space-y-3.5"></div>
+      </div>
     </div>
   </div>
 
-  <!-- 子页面 2: 超话专区 全屏子页 -->
+  <!-- 子页面 2: 主播超话专区 全屏子页 (深度复刻微博超话 UI) -->
   <div id="communitySuperTopicView" class="full-page-view hidden">
     <div class="page-nav-bar">
       <button onclick="closeCommunitySubPage()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </button>
       <div class="text-center">
-        <h3 class="text-xs font-black text-slate-900 leading-none">主播超话专区</h3>
+        <h3 class="text-xs font-black text-slate-900 leading-none" id="superTopicHeaderTitle">主播超话专区</h3>
         <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">SUPER TOPICS · 粉丝主场</span>
       </div>
       <button onclick="toggleSuperTopicDrawer(true)" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
@@ -1568,8 +1583,8 @@
       </button>
     </div>
 
-    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-4" id="communitySuperTopicContent">
-      <!-- 动态渲染主播超话内容 -->
+    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-3" id="communitySuperTopicContent">
+      <!-- 动态渲染微博超话完整视图 (包含 Header、4大子Tab及对应面板) -->
     </div>
   </div>
 
@@ -1721,6 +1736,75 @@
 
     <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-4" id="communityMyTopicContent">
       <!-- 动态渲染玩家专属超话 -->
+    </div>
+  </div>
+
+  <!-- 全屏帖子详情页 (原生全屏推入二级页面) -->
+  <div id="trendDetailModal" class="full-page-view hidden !z-[110]">
+    <div class="page-nav-bar">
+      <button onclick="closeTrendDetail()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div class="text-center">
+        <h3 class="text-xs font-black text-slate-900 leading-none">动态正文</h3>
+        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">POST DETAIL & COMMENTS</span>
+      </div>
+      <button onclick="handleShareCurrentPost()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
+        <svg class="w-4 h-4 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+      </button>
+    </div>
+
+    <!-- 详情主滚动区 -->
+    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-28 space-y-3.5" id="trendDetailContent">
+      <!-- 动态填充正文与评论树 -->
+    </div>
+
+    <!-- 底部常驻评论回复输入栏 -->
+    <div class="fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur border-t border-slate-200/80 flex items-center gap-2 z-20 shadow-lg">
+      <div class="flex-1 flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">
+        <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        <input id="inputTrendComment" placeholder="发条温暖善意的评论..." class="bg-transparent border-none outline-none text-xs w-full text-slate-800 placeholder-slate-400" onkeydown="if(event.key==='Enter') submitTrendComment()">
+      </div>
+      <button onclick="submitTrendComment()" class="btn-brand text-xs !py-1.5 !px-3.5 shadow-sm">
+        发送
+      </button>
+    </div>
+  </div>
+
+  <!-- 超话打榜应援确认弹窗 -->
+  <div id="superTopicSupportModal" class="hidden center-modal-backdrop !z-[120]">
+    <div class="center-modal-card p-5 space-y-3.5 max-w-sm">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+        <div class="flex items-center gap-2">
+          <span class="text-base">🎁</span>
+          <div>
+            <h3 class="text-xs font-black text-slate-900" id="supportModalTitle">为主播打榜应援</h3>
+            <p class="text-[9px] text-slate-400">消费计入主播专属贡献值与超话热度</p>
+          </div>
+        </div>
+        <button onclick="closeSuperTopicSupportModal()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs text-slate-500 font-bold">✕</button>
+      </div>
+
+      <div class="p-3 bg-gradient-to-r from-rose-50 to-purple-50 rounded-2xl border border-rose-100 flex items-center justify-between">
+        <div>
+          <span class="text-[9px] font-bold text-slate-500">打榜目标</span>
+          <h4 class="text-xs font-black text-slate-900" id="supportModalCharName">主播名字</h4>
+        </div>
+        <div class="text-right">
+          <span class="text-[9px] font-bold text-slate-500">我的余额</span>
+          <div class="text-xs font-black text-amber-600" id="supportModalUserBalance">0 币</div>
+        </div>
+      </div>
+
+      <!-- 打榜道具档位选择 -->
+      <div class="space-y-1.5 text-xs">
+        <span class="text-[10px] font-bold text-slate-700">选择打榜应援物</span>
+        <div class="grid grid-cols-2 gap-2" id="supportItemsGrid"></div>
+      </div>
+
+      <button onclick="executeSupportGift()" class="btn-brand w-full py-2.5 justify-center text-xs font-black shadow-md flex items-center gap-1.5" id="btnExecuteSupport">
+        <span>确认打榜 (消耗 10 LUMA币)</span>
+      </button>
     </div>
   </div>
 
