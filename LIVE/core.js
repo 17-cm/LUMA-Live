@@ -919,17 +919,39 @@ async function aiGenerateImage(params) {
 
   const endpoint = formatOpenAIEndpoint(url, 'images');
   try {
+    // 兼容大多数中转站 (FLUX/SD/DALL-E)
+    const requestBody = { 
+      model: model, 
+      prompt: promptText, 
+      n: 1, 
+      size: imgSettings.size === '9:16' ? '1024x1792' : (imgSettings.size === '16:9' ? '1792x1024' : '1024x1024')
+    };
+    if (model.toLowerCase().includes('dall-e-3')) {
+      requestBody.quality = imgSettings.quality || 'standard';
+    }
+
     const res = await robustNetworkRequest({
       url: endpoint,
       method: 'POST',
       headers: { 'Authorization': key ? `Bearer ${key}` : '', 'Content-Type': 'application/json' },
-      body: { model: model, prompt: promptText, n: 1, size: imgSettings.size === '9:16' ? '1024x1792' : (imgSettings.size === '16:9' ? '1792x1024' : '1024x1024'), quality: imgSettings.quality || 'standard' }
+      body: requestBody
     });
     const data = res.json || (res.text ? JSON.parse(res.text) : null);
+    
+    // 兼容标准 OpenAI 格式: { data: [{ url: "..." }] } 或 { data: [{ b64_json: "..." }] }
     const item = data?.data?.[0];
     if (res.ok && item?.url) return { dataUrl: item.url };
     if (res.ok && item?.b64_json) return { dataUrl: `data:image/png;base64,${item.b64_json}` };
-    throw new Error(`自定义生图API请求失败: ${data?.error?.message || res.status}`);
+    
+    // 兼容部分中转站与开源平台格式: { images: ["url/base64"] } 或 { url: "..." }
+    if (res.ok && Array.isArray(data?.images) && data.images[0]) {
+      const firstImg = data.images[0];
+      if (firstImg.startsWith('http') || firstImg.startsWith('data:')) return { dataUrl: firstImg };
+      return { dataUrl: `data:image/png;base64,${firstImg}` };
+    }
+    if (res.ok && data?.url) return { dataUrl: data.url };
+
+    throw new Error(`自定义生图API请求失败: ${data?.error?.message || data?.message || res.status}`);
   } catch (e) {
     throw e;
   }

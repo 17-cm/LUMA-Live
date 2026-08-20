@@ -456,7 +456,37 @@ async function saveCustomApiSettingsModal() {
 }
 window.saveCustomApiSettingsModal = saveCustomApiSettingsModal;
 
-// 6. 自定义生图 API 弹窗与设置
+// 6. 自定义生图 API 弹窗与设置 (兼容 New API / OpenAI / One API 标准)
+let isManualImageModelMode = false;
+
+function toggleManualImageModelInput(forceShow) {
+  const manualInput = document.getElementById('inputManualImageModel');
+  const selectBox = document.getElementById('selectImageApiModel');
+  if (!manualInput || !selectBox) return;
+
+  if (typeof forceShow === 'boolean') {
+    isManualImageModelMode = forceShow;
+  } else {
+    isManualImageModelMode = !isManualImageModelMode;
+  }
+
+  if (isManualImageModelMode) {
+    manualInput.classList.remove('hidden');
+    manualInput.focus();
+  } else {
+    manualInput.classList.add('hidden');
+  }
+}
+window.toggleManualImageModelInput = toggleManualImageModelInput;
+
+function handleImageModelSelect(val) {
+  const manualInput = document.getElementById('inputManualImageModel');
+  if (manualInput) {
+    manualInput.value = val;
+  }
+}
+window.handleImageModelSelect = handleImageModelSelect;
+
 function openCustomImageApiModal() {
   const modal = document.getElementById('customImageApiModal');
   if (!modal) return;
@@ -464,12 +494,16 @@ function openCustomImageApiModal() {
   const inputUrl = document.getElementById('inputImageApiUrl');
   const inputKey = document.getElementById('inputImageApiKey');
   const selectModel = document.getElementById('selectImageApiModel');
+  const manualInput = document.getElementById('inputManualImageModel');
 
   if (inputUrl) inputUrl.value = cfg.url || '';
   if (inputKey) inputKey.value = cfg.key || '';
   if (selectModel && cfg.model) {
     selectModel.innerHTML = `<option value="${cfg.model}">${cfg.model}</option>`;
     selectModel.value = cfg.model;
+  }
+  if (manualInput && cfg.model) {
+    manualInput.value = cfg.model;
   }
   modal.classList.remove('hidden');
 }
@@ -482,14 +516,76 @@ function closeCustomImageApiModal() {
 window.closeCustomImageApiModal = closeCustomImageApiModal;
 
 async function fetchImageApiModels() {
+  const inputUrl = document.getElementById('inputImageApiUrl');
+  const inputKey = document.getElementById('inputImageApiKey');
   const selectModel = document.getElementById('selectImageApiModel');
-  if (selectModel) {
-    selectModel.innerHTML = `
-      <option value="dall-e-3">dall-e-3 (OpenAI 官方)</option>
-      <option value="stabilityai/stable-diffusion-3-5-large">SD 3.5 Large (硅基流动)</option>
-      <option value="black-forest-labs/FLUX.1-schnell">FLUX.1 Schnell (硅基流动)</option>
-    `;
-    api.ui.toast("已加载常用生图模型预设");
+  const manualInput = document.getElementById('inputManualImageModel');
+
+  let url = inputUrl?.value.trim() || '';
+  const key = inputKey?.value.trim() || '';
+
+  if (!url) {
+    api.ui.toast("请先填写生图 API Base URL");
+    return;
+  }
+
+  api.ui.toast("正在向中转站获取模型列表...");
+  try {
+    const endpoint = (typeof formatOpenAIEndpoint === 'function') 
+      ? formatOpenAIEndpoint(url, 'models') 
+      : (url.replace(/\/+$/, '') + (url.endsWith('/v1') ? '/models' : '/v1/models'));
+
+    const res = await window.robustNetworkRequest({
+      url: endpoint,
+      headers: { 'Authorization': key ? `Bearer ${key}` : '' }
+    });
+    const data = res.json || (res.text ? JSON.parse(res.text) : null);
+    const list = data?.data || [];
+
+    if (list.length > 0 && selectModel) {
+      // 智能排序：优先将包含 dall-e, flux, sd, stable-diffusion, image, mj, midjourney, cogview 等关键字的模型排在前面
+      const imageKeywords = ['dall', 'flux', 'sd', 'stable-diffusion', 'image', 'mj', 'midjourney', 'cogview', 'kolors', 'paint', 'draw'];
+      const sorted = [...list].sort((a, b) => {
+        const idA = String(a.id || '').toLowerCase();
+        const idB = String(b.id || '').toLowerCase();
+        const aIsImg = imageKeywords.some(k => idA.includes(k));
+        const bIsImg = imageKeywords.some(k => idB.includes(k));
+        if (aIsImg && !bIsImg) return -1;
+        if (!aIsImg && bIsImg) return 1;
+        return idA.localeCompare(idB);
+      });
+
+      selectModel.innerHTML = sorted.map(m => {
+        const isLikelyImg = imageKeywords.some(k => String(m.id || '').toLowerCase().includes(k));
+        return `<option value="${m.id}">${m.id}${isLikelyImg ? ' 🎨' : ''}</option>`;
+      }).join('');
+
+      if (sorted.length > 0 && manualInput) {
+        manualInput.value = sorted[0].id;
+      }
+      api.ui.toast(`🎉 成功从中转站拉取 ${list.length} 个可用模型！`);
+    } else {
+      if (selectModel) {
+        selectModel.innerHTML = `
+          <option value="dall-e-3">dall-e-3</option>
+          <option value="dall-e-2">dall-e-2</option>
+          <option value="flux-schnell">flux-schnell</option>
+          <option value="flux-dev">flux-dev</option>
+          <option value="stable-diffusion-3">stable-diffusion-3</option>
+          <option value="midjourney">midjourney</option>
+        `;
+      }
+      api.ui.toast("中转站未返回模型列表，已载入常见生图模型名称");
+    }
+  } catch (err) {
+    if (selectModel) {
+      selectModel.innerHTML = `
+        <option value="dall-e-3">dall-e-3</option>
+        <option value="flux-schnell">flux-schnell</option>
+        <option value="stable-diffusion-3">stable-diffusion-3</option>
+      `;
+    }
+    api.ui.toast(`获取受限 (${err.message || '网络异常'})，支持点击上方【手动输入】直接填写`);
   }
 }
 window.fetchImageApiModels = fetchImageApiModels;
@@ -498,29 +594,36 @@ async function testCustomImageApiConnection() {
   const inputUrl = document.getElementById('inputImageApiUrl');
   const inputKey = document.getElementById('inputImageApiKey');
   const selectModel = document.getElementById('selectImageApiModel');
+  const manualInput = document.getElementById('inputManualImageModel');
 
   const url = inputUrl?.value.trim() || '';
   const key = inputKey?.value.trim() || '';
-  const model = selectModel?.value || 'dall-e-3';
+  const model = (manualInput && !manualInput.classList.contains('hidden') && manualInput.value.trim()) 
+    ? manualInput.value.trim() 
+    : (selectModel?.value || 'dall-e-3');
 
   if (!url) {
-    api.ui.toast("请先填写生图 API URL");
+    api.ui.toast("请先填写生图 API Base URL");
     return;
   }
 
-  api.ui.toast("正在测试连接生图模型接口...");
+  api.ui.toast("正在向中转站测试生图连通性...");
   try {
-    const endpoint = url.replace(/\/+$/, '') + '/images/generations';
+    const endpoint = (typeof formatOpenAIEndpoint === 'function') 
+      ? formatOpenAIEndpoint(url, 'images') 
+      : (url.replace(/\/+$/, '') + (url.endsWith('/v1') ? '/images/generations' : '/v1/images/generations'));
+
     const res = await window.robustNetworkRequest({
       url: endpoint,
       method: 'POST',
       headers: { 'Authorization': key ? `Bearer ${key}` : '', 'Content-Type': 'application/json' },
-      body: { model: model, prompt: 'A cute anime cat avatar', n: 1, size: '1024x1024' }
+      body: { model: model, prompt: 'A cute cat avatar, high quality', n: 1, size: '1024x1024' }
     });
     if (res.ok) {
       api.ui.toast("🎉 生图 API 连接测试成功！");
     } else {
-      api.ui.toast(`❌ 生图连接响应: HTTP ${res.status}`);
+      const errMsg = res.json?.error?.message || `HTTP ${res.status}`;
+      api.ui.toast(`❌ 中转站返回: ${errMsg}`);
     }
   } catch (err) {
     api.ui.toast(`❌ 生图网络异常: ${err.message || '地址不通'}`);
@@ -532,13 +635,18 @@ async function saveCustomImageApiSettingsModal() {
   const inputUrl = document.getElementById('inputImageApiUrl');
   const inputKey = document.getElementById('inputImageApiKey');
   const selectModel = document.getElementById('selectImageApiModel');
+  const manualInput = document.getElementById('inputManualImageModel');
 
   if (!window.customApiConfig) window.customApiConfig = {};
   if (!window.customApiConfig.image) window.customApiConfig.image = {};
 
+  const modelVal = (manualInput && !manualInput.classList.contains('hidden') && manualInput.value.trim())
+    ? manualInput.value.trim()
+    : (selectModel?.value || 'dall-e-3');
+
   window.customApiConfig.image.url = inputUrl?.value.trim() || '';
   window.customApiConfig.image.key = inputKey?.value.trim() || '';
-  window.customApiConfig.image.model = selectModel?.value || 'dall-e-3';
+  window.customApiConfig.image.model = modelVal;
   // 保存自定义生图接口时，自动切换为自定义生图模式
   window.customApiConfig.enableGlobalImageModel = false;
 
@@ -554,7 +662,7 @@ async function saveCustomImageApiSettingsModal() {
 
   closeCustomImageApiModal();
   syncCustomApiModalFields();
-  api.ui.toast("自定义生图 API 配置已保存并实时生效！");
+  api.ui.toast(`生图模型 [${modelVal}] 配置已保存并实时生效！`);
 }
 window.saveCustomImageApiSettingsModal = saveCustomImageApiSettingsModal;
 

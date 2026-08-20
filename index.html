@@ -1035,10 +1035,14 @@
           <input id="inputImageApiKey" type="password" placeholder="sk-..." class="input-ins text-xs">
         </div>
         <div>
-          <label class="text-[10px] font-bold text-slate-500 block mb-1">选择模型</label>
-          <select id="selectImageApiModel" class="input-ins text-xs font-bold">
-            <option value="dall-e-3">dall-e-3</option>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-[10px] font-bold text-slate-500">生图模型 (选择或手动输入)</label>
+            <span class="text-[9px] text-emerald-600 font-bold cursor-pointer" onclick="toggleManualImageModelInput()">手动输入</span>
+          </div>
+          <select id="selectImageApiModel" onchange="handleImageModelSelect(this.value)" class="input-ins text-xs font-bold">
+            <option value="dall-e-3">dall-e-3 (默认)</option>
           </select>
+          <input id="inputManualImageModel" placeholder="例如: flux-schnell / stable-diffusion-3" class="input-ins text-xs font-bold mt-1.5 hidden">
         </div>
         <div class="flex gap-2">
           <button onclick="fetchImageApiModels()" class="btn-action flex-1 justify-center !py-2 text-xs font-bold">拉取模型</button>
