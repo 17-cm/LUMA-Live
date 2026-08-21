@@ -1,8 +1,96 @@
 // LUMA Live hotfixes: follow count, spawn-rate display, settings panel exposure
-// 注意：热补丁代码注入已移至 splash.js（启动时动态加载最新代码）
-// 本文件只保留运行时热修复逻辑
 (function installLumaHotfixes() {
+  // =========================================================================
+  // 【热补丁 JS 执行】所有业务脚本加载完成后，用新版本代码覆盖旧函数
+  // 沙盒 iframe 无法访问 localStorage，必须用 api.db
+  // 关键修复：把代码包裹在 IIFE（立即执行函数）里，让它在独立的函数作用域执行
+  // 这样就不会和原始脚本的全局 const/let 变量冲突，避免 "Identifier already declared" 错误
+  // =========================================================================
+  async function applyHotpatchJs() {
+    if (window.__lumaHotpatchJsApplied) return;
+    // 等待 api 对象可用
+    let api = window.api || window.AiPhone || window.AiPhoneApp;
+    let waitCount = 0;
+    while (!api && waitCount < 50) {
+      await new Promise(r => setTimeout(r, 50));
+      api = window.api || window.AiPhone || window.AiPhoneApp;
+      waitCount++;
+    }
+    if (!api || !api.db) {
+      console.warn('[LUMA Hotpatch] ⚠️ api.db 不可用，跳过 JS 热补丁');
+      return;
+    }
+    try {
+      const hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
+      if (!hotpatchRec || !hotpatchRec.files) {
+        console.log('[LUMA Hotpatch] 无热补丁数据，跳过 JS 注入');
+        return;
+      }
+      const files = hotpatchRec.files;
+      const fileCount = Object.keys(files).length;
+      console.log(`[LUMA Hotpatch] 检测到 ${fileCount} 个热补丁文件，开始应用...`);
+      // 需要排除的文件：splash.js（已执行完，重执行会重播启动动画）
+      // patch.js（正在执行，重执行会递归）
+      // style.css（CSS 文件，已由 splash.js 注入）
+      // manifest.json（配置文件，不需要执行）
+      const excludeFiles = ['LIVE/splash.js', 'LIVE/设定/patch.js', 'style.css', 'manifest.json'];
+      let appliedCount = 0;
+      let failCount = 0;
+      for (const [filePath, fileData] of Object.entries(files)) {
+        if (!filePath.endsWith('.js')) continue;
+        if (excludeFiles.includes(filePath)) continue;
+        // 兼容两种格式：字符串 或 { content: "...", hash: "..." }
+        const fileContent = typeof fileData === 'string' ? fileData : (fileData.content || null);
+        if (!fileContent || typeof fileContent !== 'string' || !fileContent.trim()) {
+          console.warn(`[LUMA Hotpatch] ⚠️ ${filePath} 内容为空，跳过`);
+          failCount++;
+          continue;
+        }
+        // 检查是否下载到了 HTML 错误页面
+        if (fileContent.trim().startsWith('<!DOCTYPE') || fileContent.trim().startsWith('<html')) {
+          console.error(`[LUMA Hotpatch] ❌ ${filePath} 是 HTML 错误页面，跳过`);
+          failCount++;
+          continue;
+        }
+        try {
+          // 用动态创建 script 标签的方式加载
+          // 关键修复：把代码包裹在 IIFE（立即执行函数）里，让它在独立的函数作用域执行
+          // 这样就不会和原始脚本的全局 const/let 变量冲突，避免 "Identifier already declared" 错误
+          // 代码里的 window.xxx = xxx 赋值仍然会生效，外部可以正常访问这些函数
+          const wrappedCode = `(function() {\n${fileContent}\n})();`;
+          const blob = new Blob([wrappedCode], { type: 'application/javascript' });
+          const url = URL.createObjectURL(blob);
+          const script = document.createElement('script');
+          script.src = url;
+          script.setAttribute('data-hotpatch', filePath);
+          script.onload = () => {
+            URL.revokeObjectURL(url);
+          };
+          script.onerror = () => {
+            console.error(`[LUMA Hotpatch] ❌ ${filePath} 脚本加载失败`);
+            URL.revokeObjectURL(url);
+          };
+          document.head.appendChild(script);
+          appliedCount++;
+          console.log(`[LUMA Hotpatch] ✅ ${filePath} 已注入 (${(fileContent.length / 1024).toFixed(1)}KB)`);
+        } catch (evalErr) {
+          console.error(`[LUMA Hotpatch] ❌ ${filePath} 注入失败: ${evalErr.message}`);
+          failCount++;
+        }
+      }
+      if (appliedCount > 0) {
+        window.__lumaHotpatchJsApplied = true;
+        console.log(`[LUMA Hotpatch] 🎉 热补丁应用完成：成功 ${appliedCount} 个，失败 ${failCount} 个`);
+      } else {
+        console.warn('[LUMA Hotpatch] ⚠️ 没有成功应用任何 JS 热补丁');
+      }
+    } catch (e) {
+      console.error('[LUMA Hotpatch] ❌ JS 热补丁应用异常:', e.message);
+    }
+  }
   function install() {
+    // 先应用 JS 热补丁（更新所有函数到最新版本）
+    applyHotpatchJs();
     if (typeof window.syncParamDisplays !== 'function' || typeof window.updateParam !== 'function') {
       setTimeout(install, 25);
       return;

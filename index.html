@@ -9,9 +9,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Playfair+Display:ital,wght@1,600;1,800&family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- 注意：style.css 和所有业务 JS 都由 splash.js 动态加载（支持热补丁） -->
-  <!-- 独立启动页模块 (Plan A) - 启动器，不参与热补丁 -->
+  <link rel="stylesheet" href="style.css">
+  <!-- 独立启动页模块 (Plan A) -->
   <script src="LIVE/splash.js"></script>
+  <script src="LIVE/设定/page_stack.js"></script>
 </head>
 <body class="h-screen w-screen flex flex-col relative select-none">
 
@@ -1847,6 +1848,27 @@
   </div>
 
 
-  <!-- 注意：所有业务 JS 脚本都由 splash.js 动态加载（支持热补丁） -->
+  <!-- 模块化脚本引用 -->
+  <script src="LIVE/core.js"></script>
+  <!-- 统一数据中心体系 -->
+  <script src="LIVE/数据/data_hub.js"></script>
+  <script src="LIVE/数据/fans_manager.js"></script>
+  <script src="LIVE/数据/guard_manager.js"></script>
+  <script src="LIVE/数据/checkin_manager.js"></script>
+  <script src="LIVE/数据/titles_manager.js"></script>
+  <script src="LIVE/主页/profile.js"></script>
+  <!-- 社区 7 模块化架构系统 -->
+  <script src="LIVE/社区/community_store.js"></script>
+  <script src="LIVE/社区/module_trends.js"></script>
+  <script src="LIVE/社区/module_supertopic.js"></script>
+  <script src="LIVE/社区/module_detail.js"></script>
+  <script src="LIVE/社区/module_ranking.js"></script>
+  <script src="LIVE/社区/module_forum.js"></script>
+  <script src="LIVE/社区/module_mytopic.js"></script>
+  <script src="LIVE/社区/trends.js"></script>
+  <script src="LIVE/直播/room_loading.js"></script>
+  <script src="LIVE/直播/live.js"></script>
+  <script src="LIVE/设定/main.js"></script>
+  <script src="LIVE/设定/patch.js"></script>
 </body>
 </html>

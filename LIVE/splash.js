@@ -1,251 +1,67 @@
 /**
  * LUMA Live - 开屏启动画面模块 (Splash Screen Module)
  * 优雅衬线书写动画 · 柔和光圈 · 幻彩呼吸
- * 
- * 【重要】本文件是启动器，不参与热补丁更新，永远用原始版本。
- * 负责：1) 从 api.db 读取热补丁 2) 动态加载所有 CSS/JS 文件 3) 显示开屏动画
  */
 (function initSplashScreenModule() {
   // =========================================================================
-  // 【动态文件加载器】根据热补丁数据，动态加载所有 CSS/JS 文件
-  // 如果有热补丁，用热补丁里的内容；否则用原始地址
+  // 【热补丁启动注入】在所有业务脚本加载前，先应用 api.db 中的热补丁 CSS
+  // 沙盒 iframe 无法访问 localStorage，必须用 api.db
   // =========================================================================
-  
-  // 需要动态加载的文件列表（按顺序，splash.js 本身不在此列表）
-  const APP_ASSET_FILES = [
-    'style.css',
-    'LIVE/设定/page_stack.js',
-    'LIVE/core.js',
-    'LIVE/数据/data_hub.js',
-    'LIVE/数据/fans_manager.js',
-    'LIVE/数据/guard_manager.js',
-    'LIVE/数据/checkin_manager.js',
-    'LIVE/数据/titles_manager.js',
-    'LIVE/主页/profile.js',
-    'LIVE/社区/community_store.js',
-    'LIVE/社区/module_trends.js',
-    'LIVE/社区/module_supertopic.js',
-    'LIVE/社区/module_detail.js',
-    'LIVE/社区/module_ranking.js',
-    'LIVE/社区/module_forum.js',
-    'LIVE/社区/module_mytopic.js',
-    'LIVE/社区/trends.js',
-    'LIVE/直播/room_loading.js',
-    'LIVE/直播/live.js',
-    'LIVE/设定/main.js',
-    'LIVE/设定/patch.js'
-  ];
-  
-  // 热补丁数据（从 api.db 读取）
-  let hotpatchFiles = null;
-  let hotpatchVersion = null;
-  let hotpatchCommit = null;
-  
-  // 等待 api 对象可用（宿主注入可能需要一点时间）
-  async function waitForApi() {
+  (async function applyHotpatchCssEarly() {
+    // 等待 api 对象可用（宿主注入可能需要一点时间）
     let api = window.api || window.AiPhone || window.AiPhoneApp;
     let waitCount = 0;
-    while (!api && waitCount < 100) {
+    while (!api && waitCount < 50) {
       await new Promise(r => setTimeout(r, 50));
       api = window.api || window.AiPhone || window.AiPhoneApp;
       waitCount++;
     }
-    return api;
-  }
-  
-  // 从 api.db 读取热补丁
-  async function loadHotpatchFromDb() {
-    const api = await waitForApi();
     if (!api || !api.db) {
-      console.warn('[LUMA Loader] ⚠️ api.db 不可用，跳过热补丁');
-      return null;
+      console.warn('[LUMA Hotpatch] ⚠️ api.db 不可用，跳过热补丁注入');
+      return;
     }
     try {
-      const rec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
-      if (rec && rec.files) {
-        return rec;
+      const hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
+      if (!hotpatchRec || !hotpatchRec.files) {
+        console.log('[LUMA Hotpatch] 无热补丁数据，跳过 CSS 注入');
+        return;
       }
-      return null;
+      const files = hotpatchRec.files;
+      // 注入热补丁 CSS（覆盖旧样式）
+      let cssContent = null;
+      const styleData = files['style.css'];
+      if (styleData) {
+        // 兼容两种格式：字符串 或 { content: "...", hash: "..." }
+        cssContent = typeof styleData === 'string' ? styleData : (styleData.content || null);
+      }
+      if (cssContent && typeof cssContent === 'string' && cssContent.trim()) {
+        // 检查是否下载到了 HTML 错误页面
+        if (cssContent.trim().startsWith('<!DOCTYPE') || cssContent.trim().startsWith('<html')) {
+          console.error('[LUMA Hotpatch] ❌ style.css 是 HTML 错误页面，跳过');
+        } else {
+          const style = document.createElement('style');
+          style.id = 'luma-hotpatch-style';
+          style.setAttribute('data-hotpatch', 'true');
+          style.textContent = cssContent;
+          document.head.appendChild(style);
+          window.__lumaHotpatchCssApplied = true;
+          console.log(`[LUMA Hotpatch] ✅ style.css 已注入 (${(cssContent.length / 1024).toFixed(1)}KB)`);
+        }
+      } else {
+        console.warn('[LUMA Hotpatch] ⚠️ style.css 不存在或内容为空');
+      }
+      // 记录热补丁版本信息
+      if (hotpatchRec.version) {
+        window.__lumaHotpatchVersion = hotpatchRec.version;
+        window.__lumaHotpatchCommit = hotpatchRec.commit || '';
+        window.__lumaHotpatchActive = true;
+        console.log(`[LUMA Hotpatch] 📌 当前热补丁版本: ${hotpatchRec.version} ${hotpatchRec.commit ? '(' + hotpatchRec.commit + ')' : ''}`);
+      }
     } catch (e) {
-      console.error('[LUMA Loader] ❌ 读取热补丁异常:', e.message);
-      return null;
+      console.error('[LUMA Hotpatch] ❌ CSS 注入异常:', e.message);
     }
-  }
-  
-  // 从热补丁数据中获取文件内容
-  function getHotpatchFileContent(filePath) {
-    if (!hotpatchFiles) return null;
-    const fileData = hotpatchFiles[filePath];
-    if (!fileData) return null;
-    // 兼容两种格式：字符串 或 { content: "...", hash: "..." }
-    if (typeof fileData === 'string') return fileData;
-    if (fileData && typeof fileData.content === 'string') return fileData.content;
-    return null;
-  }
-  
-  // 检查内容是否是 HTML 错误页面
-  function isHtmlErrorPage(content) {
-    if (!content || typeof content !== 'string') return false;
-    const trimmed = content.trim();
-    return trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html');
-  }
-  
-  // 加载单个 CSS 文件
-  function loadCssFile(filePath) {
-    return new Promise((resolve) => {
-      const content = getHotpatchFileContent(filePath);
-      
-      if (content && !isHtmlErrorPage(content)) {
-        // 用热补丁内容创建 style 标签
-        const style = document.createElement('style');
-        style.setAttribute('data-hotpatch', 'true');
-        style.setAttribute('data-source', filePath);
-        style.textContent = content;
-        document.head.appendChild(style);
-        console.log(`[LUMA Loader] ✅ ${filePath} (热补丁, ${(content.length / 1024).toFixed(1)}KB)`);
-        resolve();
-      } else {
-        // 用原始地址加载
-        if (content && isHtmlErrorPage(content)) {
-          console.warn(`[LUMA Loader] ⚠️ ${filePath} 热补丁是 HTML 错误页面，回退到原始地址`);
-        }
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = filePath;
-        link.onload = () => {
-          console.log(`[LUMA Loader] ✅ ${filePath} (原始)`);
-          resolve();
-        };
-        link.onerror = () => {
-          console.error(`[LUMA Loader] ❌ ${filePath} 加载失败`);
-          resolve(); // 失败也继续，不阻塞其他文件
-        };
-        document.head.appendChild(link);
-      }
-    });
-  }
-  
-  // 加载单个 JS 文件
-  function loadJsFile(filePath) {
-    return new Promise((resolve) => {
-      const content = getHotpatchFileContent(filePath);
-      
-      if (content && !isHtmlErrorPage(content)) {
-        // 用热补丁内容直接执行（textContent 方式，最可靠）
-        try {
-          const script = document.createElement('script');
-          script.textContent = content;
-          script.setAttribute('data-hotpatch', 'true');
-          script.setAttribute('data-source', filePath);
-          document.head.appendChild(script);
-          console.log(`[LUMA Loader] ✅ ${filePath} (热补丁, ${(content.length / 1024).toFixed(1)}KB)`);
-          resolve();
-        } catch (e) {
-          console.error(`[LUMA Loader] ❌ ${filePath} 热补丁执行失败:`, e.message);
-          // 回退到原始地址
-          loadJsFileFromOriginal(filePath).then(resolve);
-        }
-      } else {
-        if (content && isHtmlErrorPage(content)) {
-          console.warn(`[LUMA Loader] ⚠️ ${filePath} 热补丁是 HTML 错误页面，回退到原始地址`);
-        }
-        loadJsFileFromOriginal(filePath).then(resolve);
-      }
-    });
-  }
-  
-  // 从原始地址加载 JS 文件
-  function loadJsFileFromOriginal(filePath) {
-    return new Promise((resolve) => {
-      // 方式1：用 textContent + fetch（如果可用）
-      // 方式2：直接用 script src 加载
-      const script = document.createElement('script');
-      script.src = filePath;
-      script.async = false;
-      script.onload = () => {
-        console.log(`[LUMA Loader] ✅ ${filePath} (原始)`);
-        resolve();
-      };
-      script.onerror = () => {
-        console.error(`[LUMA Loader] ❌ ${filePath} 原始地址加载失败，尝试 textContent 方式`);
-        // 回退：用 fetch 拉取内容然后 textContent 执行
-        fetch(filePath)
-          .then(r => r.text())
-          .then(text => {
-            if (text && !isHtmlErrorPage(text)) {
-              try {
-                const s = document.createElement('script');
-                s.textContent = text;
-                document.head.appendChild(s);
-                console.log(`[LUMA Loader] ✅ ${filePath} (原始-fetch)`);
-              } catch (e) {
-                console.error(`[LUMA Loader] ❌ ${filePath} textContent 执行失败:`, e.message);
-              }
-            }
-          })
-          .catch(e => {
-            console.error(`[LUMA Loader] ❌ ${filePath} fetch 也失败:`, e.message);
-          })
-          .finally(() => resolve());
-      };
-      document.head.appendChild(script);
-    });
-  }
-  
-  // 按顺序加载所有文件
-  async function loadAllAppFiles() {
-    console.log(`[LUMA Loader] 🚀 开始加载 ${APP_ASSET_FILES.length} 个文件...`);
-    const startTime = Date.now();
-    
-    for (const filePath of APP_ASSET_FILES) {
-      if (filePath.endsWith('.css')) {
-        await loadCssFile(filePath);
-      } else if (filePath.endsWith('.js')) {
-        await loadJsFile(filePath);
-      }
-    }
-    
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.log(`[LUMA Loader] 🎉 所有文件加载完成，耗时 ${elapsed}s`);
-    
-    // 所有文件加载完成后，检查是否需要手动触发 DOMContentLoaded
-    // 因为我们是异步加载脚本，DOMContentLoaded 可能已经触发了
-    if (document.readyState === 'interactive' || document.readyState === 'complete') {
-      console.log('[LUMA Loader] 📢 document 已就绪，手动触发 DOMContentLoaded 事件');
-      // 延迟一点，确保最后一个脚本执行完成
-      setTimeout(() => {
-        document.dispatchEvent(new Event('DOMContentLoaded'));
-      }, 50);
-    }
-  }
-  
-  // 主启动流程
-  async function bootstrap() {
-    // 1. 从 api.db 读取热补丁
-    const hotpatch = await loadHotpatchFromDb();
-    if (hotpatch && hotpatch.files) {
-      hotpatchFiles = hotpatch.files;
-      hotpatchVersion = hotpatch.version;
-      hotpatchCommit = hotpatch.commit;
-      window.__lumaHotpatchVersion = hotpatch.version;
-      window.__lumaHotpatchCommit = hotpatch.commit || '';
-      window.__lumaHotpatchActive = true;
-      console.log(`[LUMA Loader] 📌 检测到热补丁版本: ${hotpatch.version} ${hotpatch.commit ? '(' + hotpatch.commit + ')' : ''}`);
-    } else {
-      console.log('[LUMA Loader] 无热补丁数据，加载原始文件');
-    }
-    
-    // 2. 加载所有 APP 文件
-    await loadAllAppFiles();
-  }
-  
-  // 启动（不阻塞开屏动画）
-  bootstrap();
-  
-  // =========================================================================
-  // 以下是原有的开屏动画代码
-  // =========================================================================
-  
+  })();
+
   // 加载字体
   const fontLink = document.createElement('link');
   fontLink.rel = 'stylesheet';
