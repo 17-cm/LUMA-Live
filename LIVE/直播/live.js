@@ -428,20 +428,10 @@ function enterLiveRoomByRoomId(targetRoomId) {
 window.enterLiveRoomByRoomId = enterLiveRoomByRoomId;
 window.openLiveByRoomId = enterLiveRoomByRoomId;
 
-function checkDeepLinkParams() {
-  try {
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomId = urlParams.get('roomId') || urlParams.get('room');
-    const sessionId = urlParams.get('sessionId');
-    if (roomId || sessionId) {
-      setTimeout(() => {
-        enterLiveRoomByRoomId(roomId || sessionId);
-      }, 500);
-    }
-  } catch (e) {}
-}
-window.checkDeepLinkParams = checkDeepLinkParams;
-window.addEventListener('load', checkDeepLinkParams);
+// checkDeepLinkParams 增强版本定义在文件末尾，这里只保留 load 事件监听
+window.addEventListener('load', () => {
+  if (typeof checkDeepLinkParams === 'function') checkDeepLinkParams();
+});
 
 function updateLiveRoomHostFansDisplay() {
   if (!currentRoom) return;
@@ -474,18 +464,18 @@ window.checkFollowState = checkFollowState;
 async function toggleFollowRoomHost() {
   if (!currentRoom) return;
   const charId = currentRoom.characterId;
-  const isFollowed = (window.followedHosts || []).includes(charId);
+  // 确保 followedHosts 是数组
+  if (!Array.isArray(window.followedHosts)) window.followedHosts = [];
+  const isFollowed = window.followedHosts.includes(charId);
 
   if (isFollowed) {
-    followedHosts = (window.followedHosts || []).filter(id => id !== charId);
-    window.followedHosts = followedHosts;
+    window.followedHosts = window.followedHosts.filter(id => id !== charId);
     await api.db.delete("follows", charId).catch(() => {});
     api.ui.toast("已取消关注");
   } else {
     if (!window.followedHosts.includes(charId)) {
       window.followedHosts.push(charId);
     }
-    followedHosts = window.followedHosts;
     await api.db.create("follows", { id: charId, timestamp: Date.now() }).catch(() => {});
     api.ui.toast("关注成功！");
   }
@@ -1560,16 +1550,28 @@ function openStreamerProfilePage(id) {
   currentViewingProfile = profile;
   renderStreamerProfileToUI(profile);
 
-  const page = document.getElementById('streamerProfilePageView');
-  if (page) page.classList.add('open');
+  // 使用统一页面栈管理器打开个人主页
+  if (window.PageStack) {
+    window.PageStack.open('streamerProfilePageView');
+  } else {
+    // 降级：直接操作 DOM
+    const page = document.getElementById('streamerProfilePageView');
+    if (page) page.classList.add('open');
+  }
 }
 window.openStreamerProfilePage = openStreamerProfilePage;
 window.openStreamerSpace = openStreamerProfilePage;
 
 function closeStreamerProfilePage() {
-  const page = document.getElementById('streamerProfilePageView');
-  if (page) page.classList.remove('open');
-  currentViewingProfile = null;
+  // 使用统一页面栈管理器返回
+  if (window.PageStack) {
+    window.PageStack.back();
+  } else {
+    // 降级：直接操作 DOM
+    const page = document.getElementById('streamerProfilePageView');
+    if (page) page.classList.remove('open');
+    currentViewingProfile = null;
+  }
 }
 window.closeStreamerProfilePage = closeStreamerProfilePage;
 window.closeStreamerSpace = closeStreamerProfilePage;
@@ -2078,3 +2080,19 @@ function checkDeepLinkParams() {
 window.checkDeepLinkParams = checkDeepLinkParams;
 window.addEventListener('hashchange', checkDeepLinkParams);
 
+
+
+// =========================================================================
+// 【统一页面栈注册】个人主页
+// =========================================================================
+if (window.PageStack) {
+  window.PageStack.register('streamerProfilePageView', {
+    element: document.getElementById('streamerProfilePageView'),
+    openClass: 'open',
+    hiddenClass: null,  // 个人主页用 transform 定位，不用 hidden 类
+    onClose: () => {
+      currentViewingProfile = null;
+    },
+  });
+  console.log('[PageStack] 个人主页已注册');
+}
