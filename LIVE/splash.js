@@ -131,29 +131,18 @@
       const content = getHotpatchFileContent(filePath);
       
       if (content && !isHtmlErrorPage(content)) {
-        // 用热补丁内容创建 blob URL 加载
+        // 用热补丁内容直接执行（textContent 方式，最可靠）
         try {
-          const blob = new Blob([content], { type: 'application/javascript' });
-          const url = URL.createObjectURL(blob);
           const script = document.createElement('script');
-          script.src = url;
-          script.async = false; // 确保按顺序执行
+          script.textContent = content;
           script.setAttribute('data-hotpatch', 'true');
           script.setAttribute('data-source', filePath);
-          script.onload = () => {
-            URL.revokeObjectURL(url);
-            console.log(`[LUMA Loader] ✅ ${filePath} (热补丁, ${(content.length / 1024).toFixed(1)}KB)`);
-            resolve();
-          };
-          script.onerror = () => {
-            URL.revokeObjectURL(url);
-            console.error(`[LUMA Loader] ❌ ${filePath} 热补丁脚本加载失败，回退到原始地址`);
-            // 回退到原始地址
-            loadJsFileFromOriginal(filePath).then(resolve);
-          };
           document.head.appendChild(script);
+          console.log(`[LUMA Loader] ✅ ${filePath} (热补丁, ${(content.length / 1024).toFixed(1)}KB)`);
+          resolve();
         } catch (e) {
-          console.error(`[LUMA Loader] ❌ ${filePath} 创建 blob 失败:`, e.message);
+          console.error(`[LUMA Loader] ❌ ${filePath} 热补丁执行失败:`, e.message);
+          // 回退到原始地址
           loadJsFileFromOriginal(filePath).then(resolve);
         }
       } else {
@@ -168,6 +157,8 @@
   // 从原始地址加载 JS 文件
   function loadJsFileFromOriginal(filePath) {
     return new Promise((resolve) => {
+      // 方式1：用 textContent + fetch（如果可用）
+      // 方式2：直接用 script src 加载
       const script = document.createElement('script');
       script.src = filePath;
       script.async = false;
@@ -176,8 +167,26 @@
         resolve();
       };
       script.onerror = () => {
-        console.error(`[LUMA Loader] ❌ ${filePath} 原始地址加载失败`);
-        resolve(); // 失败也继续
+        console.error(`[LUMA Loader] ❌ ${filePath} 原始地址加载失败，尝试 textContent 方式`);
+        // 回退：用 fetch 拉取内容然后 textContent 执行
+        fetch(filePath)
+          .then(r => r.text())
+          .then(text => {
+            if (text && !isHtmlErrorPage(text)) {
+              try {
+                const s = document.createElement('script');
+                s.textContent = text;
+                document.head.appendChild(s);
+                console.log(`[LUMA Loader] ✅ ${filePath} (原始-fetch)`);
+              } catch (e) {
+                console.error(`[LUMA Loader] ❌ ${filePath} textContent 执行失败:`, e.message);
+              }
+            }
+          })
+          .catch(e => {
+            console.error(`[LUMA Loader] ❌ ${filePath} fetch 也失败:`, e.message);
+          })
+          .finally(() => resolve());
       };
       document.head.appendChild(script);
     });
