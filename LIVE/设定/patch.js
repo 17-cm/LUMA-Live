@@ -49,7 +49,12 @@
         }
         try {
           // 用动态创建 script 标签的方式加载，比 eval 更接近正常脚本加载
-          const blob = new Blob([fileContent], { type: 'application/javascript' });
+          // 关键修复：把顶层 const/let 替换成 var，避免 "Identifier already declared" 错误
+          // 因为原始脚本已经在全局作用域声明过这些变量，const/let 不能重复声明
+          let runnableCode = fileContent
+            .replace(/^(\s*)const\s+/gm, '$1var ')
+            .replace(/^(\s*)let\s+/gm, '$1var ');
+          const blob = new Blob([runnableCode], { type: 'application/javascript' });
           const url = URL.createObjectURL(blob);
           const script = document.createElement('script');
           script.src = url;
