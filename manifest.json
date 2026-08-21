@@ -2,9 +2,9 @@
   "sdkVersion": "1.0",
   "id": "live.luma",
   "name": "LUMA Live",
-  "version": "3.4.4",
+  "version": "3.4.3",
   "author": "hy.禾一",
-  "description": "LUMA Live (v3.4.4): 新增直播间右上角 REC 实时直播时长毫秒级秒表计时；全面静默工具权限调用与状态更新通知，杜绝扰民弹窗；统一开播唯一性权限闸门，防止角色多开分身；参数保存即时生效且 0% 概率触发专属彩蛋。",
+  "description": "LUMA Live (v3.4.3): 新增直播间右上角 REC 实时直播时长毫秒级秒表计时；全面静默工具权限调用与状态更新通知，杜绝扰民弹窗；统一开播唯一性权限闸门，防止角色多开分身；参数保存即时生效且 0% 概率触发专属彩蛋。",
   "icon": "icon.png",
   "entry": "index.html",
   "permissions": [
