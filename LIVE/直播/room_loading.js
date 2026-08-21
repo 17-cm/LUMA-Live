@@ -630,7 +630,7 @@
         if (typeof window.aiGenerate === 'function') {
           return await window.aiGenerate({
             characterId: session.characterId,
-            appTags: ['live', 'package'],
+            appTags: ['luma', 'stream', 'content'],
             instruction: `当前频道：${session.category || '综合'}（${session.subTag || '生活'}），标题：${session.topic || '直播间'}。${(typeof window.getLivePackagePrompt === 'function') ? window.getLivePackagePrompt() : '请生成观众弹幕（danmakus数组）和主播互动台词（hostSpeeches数组，每条包含speech和action字段）。返回JSON格式。'}`
           });
         }

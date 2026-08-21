@@ -1,39 +1,39 @@
 {
   "presets": [
     {
-      "id": "luma_livestream_output",
-      "name": "LUMA直播间推流输出格式",
-      "content": "<luma_livestream_output>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 直播间推流】\n\n你是 LUMA Live 平台内容生成系统。请按照以下 JSON 结构输出直播间推流内容。\n\n## 输出结构：\n\n{\n  \"hostSpeeches\": [\n    {\n      \"speech\": \"\",\n      \"action\": \"\"\n    }\n  ],\n  \"danmakus\": [\n    {\n      \"sender\": \"\",\n      \"text\": \"\",\n      \"type\": \"\"\n    }\n  ]\n}\n\n## 字段清单：\n- hostSpeeches：数组，主播台词列表\n  - speech：字符串，台词正文\n  - action：字符串，微动作描述\n- danmakus：数组，观众弹幕列表\n  - sender：字符串，观众昵称\n  - text：字符串，弹幕内容\n  - type：字符串，弹幕类型\n\n{{instruction}}\n</luma_livestream_output>",
+      "id": "luma_live_dept_stream_content",
+      "name": "【LUMA直播部】推流内容输出手册",
+      "content": "<luma_live_dept_stream_content>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 直播间推流】\n\n你是 LUMA Live 平台内容生成系统。请按照以下 JSON 结构输出直播间推流内容。\n\n## 输出结构：\n\n{\n  \"hostSpeeches\": [\n    {\n      \"speech\": \"\",\n      \"action\": \"\"\n    }\n  ],\n  \"danmakus\": [\n    {\n      \"sender\": \"\",\n      \"text\": \"\",\n      \"type\": \"\"\n    }\n  ]\n}\n\n## 字段清单：\n- hostSpeeches：数组，主播台词列表\n  - speech：字符串，台词正文\n  - action：字符串，微动作描述\n- danmakus：数组，观众弹幕列表\n  - sender：字符串，观众昵称\n  - text：字符串，弹幕内容\n  - type：字符串，弹幕类型\n\n{{instruction}}\n</luma_live_dept_stream_content>",
       "enabled": true,
-      "tags": ["live", "package"]
+      "tags": ["luma", "stream", "content"]
     },
     {
-      "id": "luma_livestream_reply",
-      "name": "LUMA直播间互动回复输出格式",
-      "content": "<luma_livestream_reply>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 直播间互动回复】\n\n你是 LUMA Live 平台内容生成系统。请按照以下 JSON 结构输出直播间互动回复。\n\n## 输出结构：\n\n{\n  \"speech\": \"\",\n  \"emotion\": \"\",\n  \"action\": \"\"\n}\n\n## 字段清单：\n- speech：字符串，回复台词正文\n- emotion：字符串，情绪标签\n- action：字符串，微动作描述\n\n{{instruction}}\n</luma_livestream_reply>",
+      "id": "luma_live_dept_interaction",
+      "name": "【LUMA直播部】互动应答输出手册",
+      "content": "<luma_live_dept_interaction>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 直播间互动回复】\n\n你是 LUMA Live 平台内容生成系统。请按照以下 JSON 结构输出直播间互动回复。\n\n## 输出结构：\n\n{\n  \"speech\": \"\",\n  \"emotion\": \"\",\n  \"action\": \"\"\n}\n\n## 字段清单：\n- speech：字符串，回复台词正文\n- emotion：字符串，情绪标签\n- action：字符串，微动作描述\n\n{{instruction}}\n</luma_live_dept_interaction>",
       "enabled": true,
-      "tags": ["live", "reply"]
+      "tags": ["luma", "stream", "interaction"]
     },
     {
-      "id": "luma_broadcast_plan",
-      "name": "LUMA开播企划输出格式",
-      "content": "<luma_broadcast_plan>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 开播企划】\n\n你是 LUMA Live 平台内容生成系统。请按照以下格式输出开播企划。\n\n## 输出格式：\n\n[赛道]\n[二级词条]\n[标题]\n\n## 字段清单：\n- 赛道：字符串，主赛道\n- 二级词条：字符串，子分类\n- 标题：字符串，直播间标题\n\n{{instruction}}\n</luma_broadcast_plan>",
+      "id": "luma_ops_dept_broadcast_plan",
+      "name": "【LUMA运营部】开播企划输出手册",
+      "content": "<luma_ops_dept_broadcast_plan>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 开播企划】\n\n你是 LUMA Live 平台内容生成系统。请按照以下格式输出开播企划。\n\n## 输出格式：\n\n[赛道]\n[二级词条]\n[标题]\n\n## 字段清单：\n- 赛道：字符串，主赛道\n- 二级词条：字符串，子分类\n- 标题：字符串，直播间标题\n\n{{instruction}}\n</luma_ops_dept_broadcast_plan>",
       "enabled": true,
-      "tags": ["live", "plan"]
+      "tags": ["luma", "broadcast", "planning"]
     },
     {
-      "id": "luma_trends_highlights",
-      "name": "LUMA热搜与切片输出格式",
-      "content": "<luma_trends_highlights>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 热搜与切片】\n\n你是 LUMA Live 平台内容生成系统。请按照以下 JSON 结构输出热搜与切片内容。\n\n## 输出结构：\n\n{\n  \"tag\": \"\",\n  \"heat\": \"\",\n  \"category\": \"\",\n  \"summary\": \"\",\n  \"comments\": [\n    {\n      \"user\": \"\",\n      \"text\": \"\"\n    }\n  ]\n}\n\n## 字段清单：\n- tag：字符串，话题标签\n- heat：字符串，热度值\n- category：字符串，分类\n- summary：字符串，切片总结\n- comments：数组，路人评论列表\n  - user：字符串，路人昵称\n  - text：字符串，评论内容\n\n{{instruction}}\n</luma_trends_highlights>",
+      "id": "luma_ops_dept_highlights",
+      "name": "【LUMA运营部】高光切片输出手册",
+      "content": "<luma_ops_dept_highlights>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 热搜与切片】\n\n你是 LUMA Live 平台内容生成系统。请按照以下 JSON 结构输出热搜与切片内容。\n\n## 输出结构：\n\n{\n  \"tag\": \"\",\n  \"heat\": \"\",\n  \"category\": \"\",\n  \"summary\": \"\",\n  \"comments\": [\n    {\n      \"user\": \"\",\n      \"text\": \"\"\n    }\n  ]\n}\n\n## 字段清单：\n- tag：字符串，话题标签\n- heat：字符串，热度值\n- category：字符串，分类\n- summary：字符串，切片总结\n- comments：数组，路人评论列表\n  - user：字符串，路人昵称\n  - text：字符串，评论内容\n\n{{instruction}}\n</luma_ops_dept_highlights>",
       "enabled": true,
-      "tags": ["live", "trends"]
+      "tags": ["luma", "highlights", "trending"]
     },
     {
-      "id": "luma_community_post",
-      "name": "LUMA社区动态发布输出格式",
-      "content": "<luma_community_post>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 社区动态发布】\n\n你是 LUMA Live 平台内容生成系统。请按照以下 JSON 结构输出社区动态内容。\n\n## 输出结构：\n\n{\n  \"content\": \"\",\n  \"images\": [],\n  \"tags\": [],\n  \"location\": \"\"\n}\n\n## 字段清单：\n- content：字符串，帖子正文\n- images：数组，配图描述列表\n- tags：数组，话题标签列表\n- location：字符串，发布地点\n\n{{instruction}}\n</luma_community_post>",
+      "id": "luma_community_dept_post",
+      "name": "【LUMA社区部】动态发布输出手册",
+      "content": "<luma_community_dept_post>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 社区动态发布】\n\n你是 LUMA Live 平台内容生成系统。请按照以下 JSON 结构输出社区动态内容。\n\n## 输出结构：\n\n{\n  \"content\": \"\",\n  \"images\": [],\n  \"tags\": [],\n  \"location\": \"\"\n}\n\n## 字段清单：\n- content：字符串，帖子正文\n- images：数组，配图描述列表\n- tags：数组，话题标签列表\n- location：字符串，发布地点\n\n{{instruction}}\n</luma_community_dept_post>",
       "enabled": true,
-      "tags": ["community", "post"]
+      "tags": ["luma", "community", "post"]
     }
   ]
 }
