@@ -467,8 +467,6 @@ async function saveCustomApiSettingsModal() {
   window.customApiConfig.text.url = inputUrl?.value.trim() || '';
   window.customApiConfig.text.key = inputKey?.value.trim() || '';
   window.customApiConfig.text.model = selectModel?.value || 'gpt-3.5-turbo';
-  // 保存自定义接口时，自动切换为自定义模式以确保即时生效
-  window.customApiConfig.enableGlobalModel = false;
 
   if (typeof saveDbSetting === 'function') {
     await saveDbSetting("custom_api_config", window.customApiConfig);
@@ -677,8 +675,6 @@ async function saveCustomImageApiSettingsModal() {
   window.customApiConfig.image.url = inputUrl?.value.trim() || '';
   window.customApiConfig.image.key = inputKey?.value.trim() || '';
   window.customApiConfig.image.model = modelVal;
-  // 保存自定义生图接口时，自动切换为自定义生图模式
-  window.customApiConfig.enableGlobalImageModel = false;
 
   if (typeof saveDbSetting === 'function') {
     await saveDbSetting("custom_api_config", window.customApiConfig);
