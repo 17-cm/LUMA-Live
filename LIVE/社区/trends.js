@@ -77,26 +77,37 @@ function openCommunitySubPage(pageKey, targetCharId = null) {
 
   const targetEl = document.getElementById(targetModalId);
   if (targetEl) {
-    targetEl.classList.remove('hidden');
+    if (window.PageStack) {
+      window.PageStack.open(targetModalId);
+    } else {
+      targetEl.classList.remove('hidden');
+    }
   }
 }
 window.openCommunitySubPage = openCommunitySubPage;
 
 function closeCommunitySubPage() {
-  const allSubViews = [
-    'communityTrendsView',
-    'communitySuperTopicView',
-    'communityRankView',
-    'communityLiveSettingsView',
-    'communityForumView',
-    'communityMyTopicView'
-  ];
-  allSubViews.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.classList.add('hidden');
-  });
-  if (typeof closeSuperTopicDrawer === 'function') {
-    closeSuperTopicDrawer();
+  if (window.PageStack) {
+    if (typeof closeSuperTopicDrawer === 'function') {
+      closeSuperTopicDrawer();
+    }
+    window.PageStack.back();
+  } else {
+    const allSubViews = [
+      'communityTrendsView',
+      'communitySuperTopicView',
+      'communityRankView',
+      'communityLiveSettingsView',
+      'communityForumView',
+      'communityMyTopicView'
+    ];
+    allSubViews.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
+    });
+    if (typeof closeSuperTopicDrawer === 'function') {
+      closeSuperTopicDrawer();
+    }
   }
 }
 window.closeCommunitySubPage = closeCommunitySubPage;
@@ -131,3 +142,24 @@ if (typeof subscribeCommunityData === 'function') {
 
 // 5. 初始化载入
 loadTrendsFromDb();
+
+
+// =========================================================================
+// 【统一页面栈注册】社区六大模块
+// =========================================================================
+if (window.PageStack) {
+  const communityPages = [
+    'communityTrendsView',
+    'communitySuperTopicView',
+    'communityRankView',
+    'communityLiveSettingsView',
+    'communityForumView',
+    'communityMyTopicView',
+  ];
+  communityPages.forEach(id => {
+    window.PageStack.register(id, {
+      animationType: 'slide-right',
+    });
+  });
+  console.log('[PageStack] 社区六大模块已注册');
+}

@@ -48,13 +48,12 @@
           continue;
         }
         try {
-          // 用动态创建 script 标签的方式加载，比 eval 更接近正常脚本加载
-          // 关键修复：把顶层 const/let 替换成 var，避免 "Identifier already declared" 错误
-          // 因为原始脚本已经在全局作用域声明过这些变量，const/let 不能重复声明
-          let runnableCode = fileContent
-            .replace(/^(\s*)const\s+/gm, '$1var ')
-            .replace(/^(\s*)let\s+/gm, '$1var ');
-          const blob = new Blob([runnableCode], { type: 'application/javascript' });
+          // 用动态创建 script 标签的方式加载
+          // 关键修复：把代码包裹在 IIFE（立即执行函数）里，让它在独立的函数作用域执行
+          // 这样就不会和原始脚本的全局 const/let 变量冲突，避免 "Identifier already declared" 错误
+          // 代码里的 window.xxx = xxx 赋值仍然会生效，外部可以正常访问这些函数
+          const wrappedCode = `(function() {\n${fileContent}\n})();`;
+          const blob = new Blob([wrappedCode], { type: 'application/javascript' });
           const url = URL.createObjectURL(blob);
           const script = document.createElement('script');
           script.src = url;

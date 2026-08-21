@@ -333,8 +333,12 @@ function enterLiveRoomDirectly(sessionId) {
   }
   
   closePlusDrawer();
-  const roomModal = document.getElementById('liveRoomModal');
-  if (roomModal) roomModal.classList.remove('hidden');
+  if (window.PageStack) {
+    window.PageStack.open('liveRoomModal');
+  } else {
+    const roomModal = document.getElementById('liveRoomModal');
+    if (roomModal) roomModal.classList.remove('hidden');
+  }
 
   clearInterval(liveDurationInterval);
   updateLiveRoomDuration();
@@ -406,10 +410,14 @@ function closeLiveRoom() {
   clearInterval(viewerCountInterval);
   if (api.voice?.stopPlayback) api.voice.stopPlayback({ channel: "voice" });
 
-  const roomModal = document.getElementById('liveRoomModal');
-  if (roomModal) roomModal.classList.add('hidden');
   document.getElementById('giftTrayModal')?.classList.remove('open');
   closePlusDrawer();
+  if (window.PageStack) {
+    window.PageStack.back();
+  } else {
+    const roomModal = document.getElementById('liveRoomModal');
+    if (roomModal) roomModal.classList.add('hidden');
+  }
   currentRoom = null;
   window.currentRoom = null;
   renderLiveGrid();
@@ -2094,5 +2102,10 @@ if (window.PageStack) {
       currentViewingProfile = null;
     },
   });
-  console.log('[PageStack] 个人主页已注册');
+  // 直播间：底部滑入动画（沉浸式全屏体验）
+  window.PageStack.register('liveRoomModal', {
+    animationType: 'slide-bottom',
+    zIndex: 150,  // 直播间层级高一些
+  });
+  console.log('[PageStack] 个人主页 + 直播间已注册');
 }

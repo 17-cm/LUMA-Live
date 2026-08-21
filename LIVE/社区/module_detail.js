@@ -18,17 +18,23 @@ function openTrendDetail(postId) {
 
   const modal = document.getElementById('trendDetailModal');
   if (modal) {
-    modal.classList.remove('hidden');
     renderPostDetailView(post);
+    if (window.PageStack) {
+      window.PageStack.open('trendDetailModal');
+    } else {
+      modal.classList.remove('hidden');
+    }
   }
 }
 window.openTrendDetail = openTrendDetail;
 
 // 关闭帖子详情
 function closeTrendDetail() {
-  const modal = document.getElementById('trendDetailModal');
-  if (modal) {
-    modal.classList.add('hidden');
+  if (window.PageStack) {
+    window.PageStack.back();
+  } else {
+    const modal = document.getElementById('trendDetailModal');
+    if (modal) modal.classList.add('hidden');
   }
   activePostId = null;
   currentReplyTarget = null;
@@ -287,3 +293,14 @@ function handleShareCurrentPost() {
   if (typeof openSharePickerModal === 'function') openSharePickerModal();
 }
 window.handleShareCurrentPost = handleShareCurrentPost;
+
+
+// =========================================================================
+// 【统一页面栈注册】动态详情
+// =========================================================================
+if (window.PageStack) {
+  window.PageStack.register('trendDetailModal', {
+    animationType: 'slide-right',
+  });
+  console.log('[PageStack] 动态详情已注册');
+}

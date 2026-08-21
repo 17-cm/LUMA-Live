@@ -2,9 +2,25 @@
 // 【统一页面栈管理器】LIVE/设定/page_stack.js
 // 功能：管理所有全屏页面的跳转、返回、动画、状态保留
 // 原理：像一摞牌，打开新页面压入栈顶，返回弹出栈顶，下面的页面状态保留
+// 支持动画：slide-right（右侧滑入）、slide-bottom（底部滑入）、fade（淡入淡出）
 // =========================================================================
 (function () {
   'use strict';
+
+  const ANIMATION_TYPES = {
+    'slide-right': {
+      baseClass: 'page-stack-slide-right',
+      openClass: 'page-stack-open',
+    },
+    'slide-bottom': {
+      baseClass: 'page-stack-slide-bottom',
+      openClass: 'page-stack-open',
+    },
+    'fade': {
+      baseClass: 'page-stack-fade',
+      openClass: 'page-stack-open',
+    },
+  };
 
   const PageStack = {
     // 页面栈，初始只有首页（home 是虚拟的，代表主界面 Tab）
@@ -21,7 +37,8 @@
      * @param {string} pageId - 页面唯一标识
      * @param {object} config - 页面配置
      *   - element: DOM 元素（默认按 pageId 找）
-     *   - openClass: 打开时添加的类名（默认 'page-stack-open'）
+     *   - animationType: 动画类型 'slide-right' | 'slide-bottom' | 'fade'（默认 'slide-right'）
+     *   - openClass: 打开时添加的类名（默认根据 animationType 自动设置）
      *   - hiddenClass: 隐藏时的类名（默认 'hidden'）
      *   - onOpen: 打开时的回调函数
      *   - onClose: 关闭时的回调函数
@@ -34,26 +51,34 @@
         return;
       }
 
+      // 确定动画类型
+      const animationType = config.animationType || 'slide-right';
+      const animConfig = ANIMATION_TYPES[animationType] || ANIMATION_TYPES['slide-right'];
+
+      // 给元素添加基础动画类
+      element.classList.add('page-stack-page', animConfig.baseClass);
+
       this.pages[pageId] = {
         id: pageId,
         element: element,
-        openClass: config.openClass || 'page-stack-open',
-        hiddenClass: config.hiddenClass || 'hidden',
+        animationType: animationType,
+        openClass: config.openClass || animConfig.openClass,
+        hiddenClass: config.hiddenClass !== undefined ? config.hiddenClass : 'hidden',
         onOpen: config.onOpen || null,
         onClose: config.onClose || null,
         baseZIndex: config.zIndex || 100,
       };
 
       // 初始状态：确保页面是隐藏的（除非在栈里）
-      if (!this.stack.includes(pageId) && page.hiddenClass) {
-        element.classList.add(page.hiddenClass);
+      if (!this.stack.includes(pageId) && this.pages[pageId].hiddenClass) {
+        element.classList.add(this.pages[pageId].hiddenClass);
       }
 
-      console.log('[PageStack] 页面已注册:', pageId);
+      console.log('[PageStack] 页面已注册:', pageId, '动画:', animationType);
     },
 
     /**
-     * 打开新页面（压入栈顶，从右侧滑入）
+     * 打开新页面（压入栈顶）
      * @param {string} pageId - 要打开的页面 ID
      * @param {object} options - 传递给页面的参数
      */
@@ -77,7 +102,7 @@
         return;
       }
 
-      console.log('[PageStack] 打开页面:', pageId, '当前栈:', [...this.stack]);
+      console.log('[PageStack] 打开页面:', pageId, '动画:', page.animationType, '当前栈:', [...this.stack]);
 
       this.isAnimating = true;
 
@@ -94,7 +119,7 @@
       // 触发重排，确保动画生效
       void el.offsetWidth;
 
-      // 添加打开类（触发从右侧滑入动画）
+      // 添加打开类（触发动画）
       el.classList.add(page.openClass);
 
       // 执行 onOpen 回调
@@ -114,7 +139,7 @@
     },
 
     /**
-     * 返回上一页（弹出栈顶，滑出）
+     * 返回上一页（弹出栈顶）
      * @returns {boolean} 是否成功返回
      */
     back() {
@@ -141,7 +166,7 @@
       // 关闭当前页面
       if (currentPage) {
         const el = currentPage.element;
-        // 移除打开类（触发滑出动画）
+        // 移除打开类（触发滑出/淡出动画）
         el.classList.remove(currentPage.openClass);
 
         // 动画结束后隐藏

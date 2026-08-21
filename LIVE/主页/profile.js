@@ -209,14 +209,22 @@ function openFollowListPageView() {
   }
 
   container.innerHTML = html;
-  const page = document.getElementById('followListPageView');
-  if (page) page.classList.remove('hidden');
+  if (window.PageStack) {
+    window.PageStack.open('followListPageView');
+  } else {
+    const page = document.getElementById('followListPageView');
+    if (page) page.classList.remove('hidden');
+  }
 }
 window.openFollowListPageView = openFollowListPageView;
 
 function closeFollowListPageView() {
-  const page = document.getElementById('followListPageView');
-  if (page) page.classList.add('hidden');
+  if (window.PageStack) {
+    window.PageStack.back();
+  } else {
+    const page = document.getElementById('followListPageView');
+    if (page) page.classList.add('hidden');
+  }
 }
 window.closeFollowListPageView = closeFollowListPageView;
 
@@ -349,14 +357,22 @@ function openWalletPageView() {
   const pageRev = document.getElementById('pageRevenueBalance');
   if (pageRev) pageRev.textContent = revenueBalance.toLocaleString();
   renderTransactionLedger();
-  const page = document.getElementById('walletPageView');
-  if (page) page.classList.remove('hidden');
+  if (window.PageStack) {
+    window.PageStack.open('walletPageView');
+  } else {
+    const page = document.getElementById('walletPageView');
+    if (page) page.classList.remove('hidden');
+  }
 }
 window.openWalletPageView = openWalletPageView;
 
 function closeWalletPageView() {
-  const page = document.getElementById('walletPageView');
-  if (page) page.classList.add('hidden');
+  if (window.PageStack) {
+    window.PageStack.back();
+  } else {
+    const page = document.getElementById('walletPageView');
+    if (page) page.classList.add('hidden');
+  }
 }
 window.closeWalletPageView = closeWalletPageView;
 
@@ -525,3 +541,17 @@ function syncWalletDisplays() {
   if (modalBal) modalBal.textContent = bal.toLocaleString();
 }
 window.syncWalletDisplays = syncWalletDisplays;
+
+
+// =========================================================================
+// 【统一页面栈注册】关注列表 + 钱包
+// =========================================================================
+if (window.PageStack) {
+  window.PageStack.register('followListPageView', {
+    animationType: 'slide-right',
+  });
+  window.PageStack.register('walletPageView', {
+    animationType: 'slide-right',
+  });
+  console.log('[PageStack] 关注列表 + 钱包已注册');
+}
