@@ -79,7 +79,7 @@ function renderCommunityRanking(tabType = 'fans') {
       name: uName + ' (你)',
       avatar: uAvatar,
       badge: '至尊榜一',
-      score: 18000,
+      score: parseInt(localStorage.getItem('luma_total_user_contribution') || '12000', 10),
       scoreLabel: '贡献值',
       isUser: true
     });

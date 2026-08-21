@@ -421,6 +421,7 @@ if (typeof document !== 'undefined') {
 
 // 全局权威共享状态挂载
 window.followedHosts = window.followedHosts || [];
+window.followedSuperTopics = window.followedSuperTopics || [];
 window.allCharacters = window.allCharacters || [];
 window.liveList = window.liveList || [];
 window.charSchedulesMap = window.charSchedulesMap || {};

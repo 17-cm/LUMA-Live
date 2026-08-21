@@ -170,6 +170,8 @@ window.getAvailableCharsList = function() {
 
 // =========================================================================
 // 【全局同步中心 1】：统一签到数据源 (所有主播与个人主场共享同一中心，杜绝重复签到与不同步)
+// 所有签到读写统一委托 LumaCheckinManager (LIVE/数据/checkin_manager.js)，
+// 使签到按钮状态、签到卡片、签到排行榜与我的超话打卡使用同一份持久化数据 (luma_data_checkin_map)
 // =========================================================================
 window.getTodayDateStr = function() {
   const d = new Date();
@@ -180,6 +182,11 @@ window.getTodayDateStr = function() {
 };
 
 window.getSuperTopicCheckInInfo = function(targetKey) {
+  if (window.LumaCheckinManager && typeof window.LumaCheckinManager.getCheckinInfo === 'function') {
+    try {
+      return window.LumaCheckinManager.getCheckinInfo('user', targetKey);
+    } catch (e) {}
+  }
   try {
     const raw = localStorage.getItem(`luma_checkin_${targetKey}`);
     if (!raw) return { isCheckedToday: false, streakDays: 0, totalExp: 0, level: 1 };
@@ -200,6 +207,22 @@ window.getSuperTopicCheckInInfo = function(targetKey) {
 };
 
 window.handleSuperTopicCheckIn = function(targetKey, targetName = '该超话') {
+  if (window.LumaCheckinManager && typeof window.LumaCheckinManager.performCheckIn === 'function') {
+    const res = window.LumaCheckinManager.performCheckIn('user', targetKey);
+    if (!res.success) {
+      if (window.api && window.api.ui) {
+        window.api.ui.toast(`今日已在【${targetName}】打卡完成，明天再来哦！`);
+      }
+      return;
+    }
+    if (window.api && window.api.ui) {
+      window.api.ui.toast(`🎉 签到成功！+100 经验，连续打卡第 ${res.data.streakDays} 天！`);
+    }
+    // 广播触发全局所有相关榜单与界面联动更新
+    window.notifyCommunityDataChanged('checkin', { targetKey, storeData: res.data });
+    return;
+  }
+
   const info = window.getSuperTopicCheckInInfo(targetKey);
   if (info.isCheckedToday) {
     if (window.api && window.api.ui) {
@@ -254,6 +277,23 @@ window.addCharContributionScore = function(charId, addAmount) {
   // 同步全网总贡献
   const totalUserContrib = parseInt(localStorage.getItem('luma_total_user_contribution') || '12000', 10) + addAmount;
   localStorage.setItem('luma_total_user_contribution', totalUserContrib.toString());
+
+  // 同步写入守护消费矩阵，保证「社区全服守护/贡献总榜」与「个人主页消费排行」实时联动
+  if (window.LumaGuardManager && typeof window.LumaGuardManager.recordSpending === 'function') {
+    try {
+      const chars = (typeof window.getAvailableCharsList === 'function') ? window.getAvailableCharsList() : [];
+      const char = chars.find(c => String(c.id) === String(charId));
+      window.LumaGuardManager.recordSpending({
+        fromId: 'user',
+        toId: charId,
+        toName: char ? char.name : '主播',
+        toAvatar: char ? char.avatar : '',
+        amount: addAmount,
+        type: 'support_gift',
+        itemName: '超话打榜'
+      });
+    } catch (e) {}
+  }
 
   // 广播触发打榜与贡献更新
   window.notifyCommunityDataChanged('support', { charId, addAmount, next });
@@ -319,6 +359,9 @@ class CommunityVirtualScroller {
 
   render() {
     if (!this.container || !this.target) return;
+    // 防御：target 若已脱离 DOM（如所在视图整体 innerHTML 重绘），
+    // 直接跳过渲染，等待上层重建新的 scroller 实例，避免写入孤儿节点导致页面空白
+    if (typeof this.target.isConnected === 'boolean' && !this.target.isConnected) return;
     const totalCount = this.items.length;
     if (totalCount === 0) {
       this.target.innerHTML = '';

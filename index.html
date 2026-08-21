@@ -1574,9 +1574,10 @@
       <div id="hotSearchRankingContainer" class="space-y-2"></div>
       <!-- 视图 2: 广场动态流 (默认可按热搜话题过滤) -->
       <div id="hotSearchFeedContainer" class="hidden space-y-3.5">
-        <div id="hotSearchFilterBanner" class="hidden luxe-card p-2.5 bg-rose-50/80 border border-rose-200 flex items-center justify-between text-xs text-rose-700">
-          <span id="hotSearchFilterText" class="font-bold truncate">当前话题: #xxx#</span>
-          <button onclick="clearHotSearchFilter()" class="text-[10px] font-bold text-rose-600 bg-white px-2 py-0.5 rounded-full border border-rose-200">查看全部</button>
+        <div id="activeTopicBanner" class="hidden luxe-card p-2.5 bg-rose-50/80 border border-rose-200 flex items-center justify-between text-xs text-rose-700">
+          <span id="activeTopicTagText" class="font-bold truncate">当前话题: #xxx#</span>
+          <span id="activeTopicTipText" class="text-[9px] text-rose-500 truncate px-1"></span>
+          <button onclick="clearHotSearchFilter()" class="text-[10px] font-bold text-rose-600 bg-white px-2 py-0.5 rounded-full border border-rose-200 flex-shrink-0">查看全部</button>
         </div>
         <div id="weiboPostFeedContainerFull" class="space-y-3.5"></div>
       </div>

@@ -1436,6 +1436,18 @@ window.addEventListener('DOMContentLoaded', async () => {
     window.followedHosts = followsRec.map(f => f.id);
     if (typeof syncFollowCountDisplay === 'function') syncFollowCountDisplay();
 
+    // 加载超话关注列表
+    try {
+      const stRec = await api.db.get("luma_supertopic_follows", "user");
+      if (stRec && Array.isArray(stRec.topics)) {
+        window.followedSuperTopics = stRec.topics;
+      } else {
+        const localST = localStorage.getItem('luma_followed_supertopics');
+        if (localST) window.followedSuperTopics = JSON.parse(localST);
+      }
+    } catch (e) {}
+    if (!window.followedSuperTopics) window.followedSuperTopics = [];
+
     const walletRec = await api.db.get("app_wallet", "vault_data");
     if (walletRec) window.currentWalletBalance = walletRec.balance || 0;
 
