@@ -213,113 +213,7 @@ function downloadAppZipFile() {
 }
 window.downloadAppZipFile = downloadAppZipFile;
 
-function exportAppDataFile() {
-  const exportData = {
-    exportTime: new Date().toISOString(),
-    appParams: window.appParams,
-    customApiConfig: window.customApiConfig,
-    imageSettings: window.imageSettings,
-    userProfileData: window.userProfileData,
-    currentWalletBalance: window.currentWalletBalance,
-    followedHosts: window.followedHosts,
-    transactionLedger: window.transactionLedger,
-    guestbookData: window.guestbookData
-  };
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `luma_live_data_${Date.now()}.json`;
-  a.click();
-  api.ui.toast("运行数据已导出为 JSON 文件");
-}
-window.exportAppDataFile = exportAppDataFile;
 
-function triggerImportAppDataFile() {
-  const input = document.getElementById('fileInputData');
-  if (input) input.click();
-}
-window.triggerImportAppDataFile = triggerImportAppDataFile;
-
-async function handleFileImportData(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  try {
-    const text = await file.text();
-    const data = JSON.parse(text);
-    if (data.appParams) Object.assign(window.appParams, data.appParams);
-    if (data.customApiConfig) Object.assign(window.customApiConfig, data.customApiConfig);
-    if (data.imageSettings) Object.assign(window.imageSettings, data.imageSettings);
-    if (data.userProfileData) Object.assign(window.userProfileData, data.userProfileData);
-    if (data.currentWalletBalance !== undefined) window.currentWalletBalance = data.currentWalletBalance;
-    if (data.followedHosts) window.followedHosts = data.followedHosts;
-    if (data.transactionLedger) window.transactionLedger = data.transactionLedger;
-    if (data.guestbookData) window.guestbookData = data.guestbookData;
-
-    try {
-      await api.db.create("app_settings", { id: "global_params", ...window.appParams }).catch(() => {});
-      await api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {});
-      await api.db.create("app_settings", { id: "image_settings", ...window.imageSettings }).catch(() => {});
-      await api.db.create("app_wallet", { id: "vault_data", balance: window.currentWalletBalance }).catch(() => {});
-      await api.db.create("app_profile", { id: "user_profile", ...window.userProfileData }).catch(() => {});
-    } catch (dbErr) {}
-
-    syncParamDisplays();
-    if (typeof syncWalletDisplays === 'function') syncWalletDisplays();
-    if (typeof renderDualRankList === 'function') renderDualRankList();
-    api.ui.toast("🎉 运行数据导入并恢复成功！");
-  } catch (err) {
-    api.ui.toast(`导入失败: ${err.message || '格式错误'}`);
-  } finally {
-    event.target.value = '';
-  }
-}
-window.handleFileImportData = handleFileImportData;
-
-function exportPresetsDataFile() {
-  const exportData = {
-    exportTime: new Date().toISOString(),
-    presetCategories: window.presetCategories,
-    imageSettings: window.imageSettings
-  };
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `luma_live_presets_${Date.now()}.json`;
-  a.click();
-  api.ui.toast("提示词预设已导出");
-}
-window.exportPresetsDataFile = exportPresetsDataFile;
-
-function triggerImportPresetsDataFile() {
-  const input = document.getElementById('fileInputPresets');
-  if (input) input.click();
-}
-window.triggerImportPresetsDataFile = triggerImportPresetsDataFile;
-
-async function handleFileImportPresets(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  try {
-    const text = await file.text();
-    const data = JSON.parse(text);
-    if (data.presetCategories) window.presetCategories = data.presetCategories;
-    if (data.imageSettings) window.imageSettings = data.imageSettings;
-
-    try {
-      await api.db.create("app_settings", { id: "preset_categories", data: window.presetCategories }).catch(() => {});
-      await api.db.create("app_settings", { id: "image_settings", ...window.imageSettings }).catch(() => {});
-    } catch (e) {}
-
-    renderPresetCategories();
-    renderImagePromptEntries();
-    api.ui.toast("🎉 提示词预设导入成功！");
-  } catch (err) {
-    api.ui.toast(`导入失败: ${err.message || '格式错误'}`);
-  } finally {
-    event.target.value = '';
-  }
-}
-window.handleFileImportPresets = handleFileImportPresets;
 
 // 5. 自定义大模型 API 弹窗与设置
 function openCustomApiModal() {
@@ -1231,6 +1125,7 @@ async function handleVersionUpdateClick() {
       'LIVE/直播/room_loading.js',
       'LIVE/直播/live.js',
       'LIVE/设定/main.js',
+      'LIVE/设定/page_stack.js',
       'LIVE/设定/patch.js'
     ];
 
@@ -1431,11 +1326,6 @@ async function handleFileImportPresets(e) {
   e.target.value = '';
 }
 window.handleFileImportPresets = handleFileImportPresets;
-
-function downloadAppZipFile() {
-  exportAppDataFile();
-}
-window.downloadAppZipFile = downloadAppZipFile;
 
 // 12. 创作者直播间占位全屏
 function openPlayerLiveView() {

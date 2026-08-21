@@ -1681,14 +1681,36 @@ input:checked + .switch-slider:before {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transform: translateX(100%);
-  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
-  will-change: transform;
+  will-change: transform, opacity;
   background: #f8fafc;
-}
-.page-stack-page.page-stack-open {
-  transform: translateX(0);
 }
 .page-stack-page.hidden {
   display: none !important;
+}
+
+/* 动画类型1：右侧滑入（默认，标准导航切换） */
+.page-stack-slide-right {
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.page-stack-slide-right.page-stack-open {
+  transform: translateX(0);
+}
+
+/* 动画类型2：底部滑入（模态展示，适合直播间、全屏播放器） */
+.page-stack-slide-bottom {
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.page-stack-slide-bottom.page-stack-open {
+  transform: translateY(0);
+}
+
+/* 动画类型3：淡入淡出（适合加载页、过渡页、启动页） */
+.page-stack-fade {
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.page-stack-fade.page-stack-open {
+  opacity: 1;
 }
