@@ -265,7 +265,7 @@ function downloadAppZipFile() {
       version: "2.0.0",
       bundle: "luma_live_app",
       params: window.appParams,
-      presets: window.presetCategories,
+      presets: window.appPresets,
       imageSettings: window.imageSettings,
       customApiConfig: window.customApiConfig
     }, null, 2)], { type: 'application/json' });
@@ -800,7 +800,7 @@ let currentActivePresetCatKey = null;
 function renderPresetCategories() {
   const box = document.getElementById('presetCategoryList');
   if (!box) return;
-  const cats = window.presetCategories || {};
+  const cats = window.appPresets || {};
 
   box.innerHTML = Object.entries(cats).map(([key, cat]) => `
     <div onclick="openPresetCategoryModal('${key}')" class="luxe-card p-3 flex items-center justify-between cursor-pointer active:scale-98 transition bg-white">
@@ -821,7 +821,7 @@ function openPresetCategoryModal(catKey) {
   currentActivePresetCatKey = catKey;
   const modal = document.getElementById('presetCategoryModal');
   const title = document.getElementById('presetModalCategoryTitle');
-  const cat = window.presetCategories?.[catKey];
+  const cat = window.appPresets?.[catKey];
   if (!modal || !cat) return;
 
   if (title) title.textContent = `${cat.name} · 条目管理`;
@@ -840,7 +840,7 @@ window.closePresetCategoryModal = closePresetCategoryModal;
 function renderCurrentCategoryPromptEntries() {
   const box = document.getElementById('promptEntriesContainer');
   if (!box || !currentActivePresetCatKey) return;
-  const cat = window.presetCategories[currentActivePresetCatKey];
+  const cat = window.appPresets[currentActivePresetCatKey];
   const entries = cat?.entries || [];
 
   box.innerHTML = entries.map((entry, idx) => `
@@ -855,25 +855,25 @@ function renderCurrentCategoryPromptEntries() {
 }
 
 function updateCurrentCategoryEntryTitle(idx, val) {
-  if (currentActivePresetCatKey && window.presetCategories[currentActivePresetCatKey]?.entries?.[idx]) {
-    window.presetCategories[currentActivePresetCatKey].entries[idx].title = val;
+  if (currentActivePresetCatKey && window.appPresets[currentActivePresetCatKey]?.entries?.[idx]) {
+    window.appPresets[currentActivePresetCatKey].entries[idx].title = val;
   }
 }
 window.updateCurrentCategoryEntryTitle = updateCurrentCategoryEntryTitle;
 
 function updateCurrentCategoryEntryContent(idx, val) {
-  if (currentActivePresetCatKey && window.presetCategories[currentActivePresetCatKey]?.entries?.[idx]) {
-    window.presetCategories[currentActivePresetCatKey].entries[idx].content = val;
+  if (currentActivePresetCatKey && window.appPresets[currentActivePresetCatKey]?.entries?.[idx]) {
+    window.appPresets[currentActivePresetCatKey].entries[idx].content = val;
   }
 }
 window.updateCurrentCategoryEntryContent = updateCurrentCategoryEntryContent;
 
 function addNewPromptEntryToCurrentCategory() {
-  if (!currentActivePresetCatKey || !window.presetCategories[currentActivePresetCatKey]) return;
-  if (!window.presetCategories[currentActivePresetCatKey].entries) {
-    window.presetCategories[currentActivePresetCatKey].entries = [];
+  if (!currentActivePresetCatKey || !window.appPresets[currentActivePresetCatKey]) return;
+  if (!window.appPresets[currentActivePresetCatKey].entries) {
+    window.appPresets[currentActivePresetCatKey].entries = [];
   }
-  window.presetCategories[currentActivePresetCatKey].entries.push({
+  window.appPresets[currentActivePresetCatKey].entries.push({
     id: `entry_${Date.now()}`,
     title: '新增提示词条目',
     content: '请根据设定执行输出。\\n输出格式 JSON：{\\n  "text": "内容"\\n}'
@@ -883,8 +883,8 @@ function addNewPromptEntryToCurrentCategory() {
 window.addNewPromptEntryToCurrentCategory = addNewPromptEntryToCurrentCategory;
 
 function removeCurrentCategoryEntry(idx) {
-  if (currentActivePresetCatKey && window.presetCategories[currentActivePresetCatKey]?.entries) {
-    window.presetCategories[currentActivePresetCatKey].entries.splice(idx, 1);
+  if (currentActivePresetCatKey && window.appPresets[currentActivePresetCatKey]?.entries) {
+    window.appPresets[currentActivePresetCatKey].entries.splice(idx, 1);
     renderCurrentCategoryPromptEntries();
   }
 }
@@ -892,8 +892,8 @@ window.removeCurrentCategoryEntry = removeCurrentCategoryEntry;
 
 async function saveCurrentCategoryPresets() {
   try {
-    await api.db.create("app_settings", { id: "preset_categories", data: window.presetCategories }).catch(() => {
-      api.db.update("app_settings", "preset_categories", { data: window.presetCategories }).catch(() => {});
+    await api.db.create("app_settings", { id: "app_presets", data: window.appPresets }).catch(() => {
+      api.db.update("app_settings", "app_presets", { data: window.appPresets }).catch(() => {});
     });
     api.ui.toast("当前分类提示词已保存！");
   } catch (e) {
@@ -1380,7 +1380,7 @@ function exportAppDataFile() {
       appParams: window.appParams || {},
       customApiConfig: window.customApiConfig || {},
       imageSettings: window.imageSettings || {},
-      presetCategories: window.presetCategories || {},
+      appPresets: window.appPresets || {},
       userProfile: window.userProfileData || {},
       walletBalance: window.currentWalletBalance || 0,
       charSchedules: window.charSchedulesMap || {},
@@ -1416,9 +1416,9 @@ async function handleFileImportData(e) {
       window.appParams = data.appParams;
       await api.db.create("app_settings", { id: "global_params", ...data.appParams }).catch(() => {});
     }
-    if (data.presetCategories) {
-      window.presetCategories = data.presetCategories;
-      await api.db.create("app_settings", { id: "preset_categories", data: data.presetCategories }).catch(() => {});
+    if (data.appPresets) {
+      window.appPresets = data.appPresets;
+      await api.db.create("app_settings", { id: "app_presets", data: data.appPresets }).catch(() => {});
     }
     if (data.customApiConfig) {
       window.customApiConfig = data.customApiConfig;
@@ -1439,7 +1439,7 @@ window.handleFileImportData = handleFileImportData;
 
 function exportPresetsDataFile() {
   try {
-    const blob = new Blob([JSON.stringify(window.presetCategories || {}, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(window.appPresets || {}, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1463,8 +1463,8 @@ async function handleFileImportPresets(e) {
   try {
     const text = await file.text();
     const data = JSON.parse(text);
-    window.presetCategories = data;
-    await api.db.create("app_settings", { id: "preset_categories", data: data }).catch(() => {});
+    window.appPresets = data;
+    await api.db.create("app_settings", { id: "app_presets", data: data }).catch(() => {});
     renderPresetCategories();
     if (api.ui?.toast) api.ui.toast("提示词预设导入成功！");
   } catch (err) {
@@ -1506,8 +1506,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     const imgCfg = await api.db.get("app_settings", "image_settings");
     if (imgCfg) Object.assign(window.imageSettings, imgCfg);
 
-    const catsRec = await api.db.get("app_settings", "preset_categories");
-    if (catsRec?.data) window.presetCategories = catsRec.data;
+    const catsRec = await api.db.get("app_settings", "app_presets");
+    if (catsRec?.data) window.appPresets = catsRec.data;
 
     const followsRec = await api.db.list("follows") || [];
     window.followedHosts = followsRec.map(f => f.id);

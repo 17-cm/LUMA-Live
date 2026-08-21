@@ -42,5 +42,4 @@ window.appPresets = window.appPresets || {
   }
 };
 
-// 兼容旧代码：如果有代码引用 window.presetCategories，自动指向 appPresets
-window.presetCategories = window.appPresets;
+

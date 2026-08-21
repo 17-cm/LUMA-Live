@@ -460,7 +460,7 @@ window.imageSettings = window.imageSettings || {
 
 // 预设配置
 // APP 内部预设已移到 LIVE/设定/app_presets.js
-// window.presetCategories 由 app_presets.js 定义并自动赋值
+// window.appPresets 由 app_presets.js 定义并自动赋值
 
 
 async function saveDbSetting(settingKey, data) {
@@ -780,7 +780,7 @@ function renderPresetTemplate(tpl, vars) {
 }
 
 function getEffectivePresetTemplate(tagKey) {
-  const p = window.presetCategories || {};
+  const p = window.appPresets || {};
   if (p[tagKey]?.entries?.length > 0) {
     return p[tagKey].entries.map(e => e.content).join('\n\n');
   }
