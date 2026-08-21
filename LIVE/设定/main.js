@@ -979,7 +979,7 @@ const DEFAULT_GIT_BRANCH = 'test';
 let gitUpdateState = {
   currentVersion: APP_CURRENT_VERSION,
   latestVersion: APP_CURRENT_VERSION,
-  localCommit: 'v3.4.1-main',
+  localCommit: 'v3.4.1-test',
   remoteCommit: '',
   hasUpdate: false,
   updateLog: '',
