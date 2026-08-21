@@ -2,9 +2,10 @@
 (function installLumaHotfixes() {
   // =========================================================================
   // 【热补丁 JS 执行】所有业务脚本加载完成后，用新版本代码覆盖旧函数
-  // =========================================================================
-  // 【热补丁 JS 执行】从宿主数据库 api.db 读取热补丁，用新版本代码覆盖旧函数
   // 沙盒 iframe 无法访问 localStorage，必须用 api.db
+  // 关键修复：把代码包裹在 IIFE（立即执行函数）里，让它在独立的函数作用域执行
+  // 这样就不会和原始脚本的全局 const/let 变量冲突，避免 "Identifier already declared" 错误
+  // =========================================================================
   async function applyHotpatchJs() {
     if (window.__lumaHotpatchJsApplied) return;
     // 等待 api 对象可用
@@ -30,13 +31,17 @@
       console.log(`[LUMA Hotpatch] 检测到 ${fileCount} 个热补丁文件，开始应用...`);
       // 需要排除的文件：splash.js（已执行完，重执行会重播启动动画）
       // patch.js（正在执行，重执行会递归）
-      const excludeFiles = ['LIVE/splash.js', 'LIVE/设定/patch.js'];
+      // style.css（CSS 文件，已由 splash.js 注入）
+      // manifest.json（配置文件，不需要执行）
+      const excludeFiles = ['LIVE/splash.js', 'LIVE/设定/patch.js', 'style.css', 'manifest.json'];
       let appliedCount = 0;
       let failCount = 0;
-      for (const [filePath, fileContent] of Object.entries(files)) {
+      for (const [filePath, fileData] of Object.entries(files)) {
         if (!filePath.endsWith('.js')) continue;
         if (excludeFiles.includes(filePath)) continue;
-        if (typeof fileContent !== 'string' || !fileContent.trim()) {
+        // 兼容两种格式：字符串 或 { content: "...", hash: "..." }
+        const fileContent = typeof fileData === 'string' ? fileData : (fileData.content || null);
+        if (!fileContent || typeof fileContent !== 'string' || !fileContent.trim()) {
           console.warn(`[LUMA Hotpatch] ⚠️ ${filePath} 内容为空，跳过`);
           failCount++;
           continue;
@@ -83,7 +88,6 @@
       console.error('[LUMA Hotpatch] ❌ JS 热补丁应用异常:', e.message);
     }
   }
-
   function install() {
     // 先应用 JS 热补丁（更新所有函数到最新版本）
     applyHotpatchJs();

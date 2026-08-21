@@ -499,15 +499,42 @@ window.toggleFollowRoomHost = toggleFollowRoomHost;
 // =========================================================================
 // 3. 弹幕与主播台词流控系统
 // =========================================================================
+// 上次打包请求时间（用于请求冷却）
+let lastPackageRequestTime = 0;
+
 async function fetchBatchLivePackage() {
   if (!currentRoom || isFetchingBatchPackage) return;
+  
+  // 请求冷却：两次请求至少间隔用户设置的时间（分钟转毫秒）
+  const intervalMinutes = (typeof window.getApiRequestIntervalMinutes === 'function') 
+    ? window.getApiRequestIntervalMinutes() 
+    : 5;
+  const minIntervalMs = intervalMinutes * 60 * 1000;
+  const now = Date.now();
+  if (now - lastPackageRequestTime < minIntervalMs) {
+    return; // 冷却中，不请求
+  }
+  lastPackageRequestTime = now;
+  
   isFetchingBatchPackage = true;
 
   try {
+    // 从当前直播间读取最近的送礼记录（不写全局记忆，避免串台）
+    let giftHistoryText = '';
+    if (currentRoom && currentRoom.giftHistory && currentRoom.giftHistory.length > 0) {
+      const recentGifts = currentRoom.giftHistory.slice(-5); // 最近5条
+      giftHistoryText = '\n最近观众送礼记录：' + recentGifts.map(g => `${g.giftName}x${g.count}`).join('、') + '，请在台词里自然地感谢这些送礼。';
+    }
+    
+    // 从预设里读取打包 prompt，代码只保留动态内容（频道、标题、送礼记录）
+    const packagePrompt = (typeof window.getLivePackagePrompt === 'function') 
+      ? window.getLivePackagePrompt() 
+      : '请生成观众弹幕（danmakus数组）和主播互动台词（hostSpeeches数组，每条包含speech和action字段）。返回JSON格式。';
+    
     const res = await window.aiGenerate({
       characterId: currentRoom.characterId,
-      appTags: ['live', 'package'],
-      instruction: `当前频道：${currentRoom.category}（${currentRoom.subTag}），标题：${currentRoom.topic}`
+      appTags: ['luma', 'stream', 'content'],
+      instruction: `当前频道：${currentRoom.category}（${currentRoom.subTag}），标题：${currentRoom.topic}。${packagePrompt}${giftHistoryText}`
     });
 
     const parsed = window.extractJsonFromText(res.text);
@@ -530,9 +557,8 @@ window.fetchBatchLivePackage = fetchBatchLivePackage;
 
 function startDanmakuDripFeed() {
   clearInterval(danmakuDripTimer);
-  const params = window.appParams || {};
-  const speedParam = params.danmakuSpeed || 50;
-  const intervalMs = Math.floor((6 - (speedParam / 16)) * 1000);
+  // 弹幕滴入间隔固定 4.5 秒，更接近真实直播节奏，减少消耗速度
+  const intervalMs = 4500;
 
   danmakuDripTimer = setInterval(() => {
     if (danmakuPool.length > 0) {
@@ -565,7 +591,7 @@ function startHostSpeechDripFeed() {
     } else {
       fetchBatchLivePackage();
     }
-  }, 25000);
+  }, 50000);
 }
 
 function renderHostSpeech(speech, action) {
@@ -653,7 +679,7 @@ async function sendUserDanmaku() {
   try {
     const res = await window.aiGenerate({
       characterId: currentRoom.characterId,
-      appTags: ['live', 'reply'],
+      appTags: ['luma', 'stream', 'interaction'],
       instruction: `【${uInfo.tag}】${uInfo.name}发言：“${val}”`
     });
 
@@ -1034,7 +1060,7 @@ function startComboTimer() {
   const counterNum = document.getElementById('comboCounterNumber');
 
   if (circleBtn) {
-    circleBtn.classList.remove('hidden');
+    circleBtn.classList.add('active');
     circleBtn.classList.add('bounce');
     setTimeout(() => circleBtn.classList.remove('bounce'), 200);
   }
@@ -1059,7 +1085,7 @@ function startComboTimer() {
 function endComboSession() {
   liveComboSession.active = false;
   const circleBtn = document.getElementById('liveComboCircleBtn');
-  if (circleBtn) circleBtn.classList.add('hidden');
+  if (circleBtn) circleBtn.classList.remove('active');
   if (liveComboSession.bannerEl && liveComboSession.bannerEl.parentNode) {
     setTimeout(() => {
       if (liveComboSession.bannerEl && liveComboSession.bannerEl.parentNode) {
@@ -1199,7 +1225,7 @@ async function sendGift(name, cost) {
     try {
       const res = await window.aiGenerate({
         characterId: currentRoom.characterId,
-        appTags: ['live', 'reply'],
+        appTags: ['luma', 'stream', 'interaction'],
         instruction: `【${uInfo.tag}】${uInfo.name}送了 ${qty} 个【${name}】（总价值 ${totalCost} LUMA 币）给主播`
       });
       const parsed = window.extractJsonFromText(res.text);

@@ -1,8 +1,0 @@
-{
-  "name": "LUMA Live",
-  "description": "LUMA Live (v3.4.1): 赛博朋克风虚拟直播与全网热搜生态沙盒应用",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}

@@ -1,39 +1,39 @@
 {
   "presets": [
     {
-      "id": "live_stream_batch_package",
-      "name": "直播间推流与弹幕大包预设",
-      "content": "<live_stream_batch_package_instruction>\n{{timeContext}}\n当前频道：{{liveCategory}} | 标题：{{liveTitle}}\n你正在以【{{char}}】的身份进行网络直播推流与观众公屏弹幕生成。\n\n# 生成任务与心智规则：\n1. 生成主播的 3 句随性发言与过渡台词（包含微动作），展现生动的个人主播风格。\n2. 生成 15~20 条真实的观众弹幕（包含乐子人、黑粉、真爱粉、考据党、复读机）。\n3. 视线感知：公屏弹幕或主播台词可自然提及用户【{{user}}】（如调侃、互动、求点赞）。\n4. 下播心智决策：若你感知到当前体能疲惫、直播内容已达高潮收尾、或产生下播休息的念头，请在最后一句台词末尾附带动作协议 [动作:关闭直播]；若兴致正高想继续播，严禁附带该标记。\n\n# 输出格式（严格合法 JSON，严禁输出任何多余文字）：\n{\n  \"hostSpeeches\": [\n    {\"speech\": \"台词内容1\", \"action\": \"喝了口水\"},\n    {\"speech\": \"台词内容2\", \"action\": \"看了眼公屏\"},\n    {\"speech\": \"台词内容3\", \"action\": \"调整麦克风\"}\n  ],\n  \"danmakus\": [\n    {\"sender\": \"网友A\", \"text\": \"弹幕内容\", \"type\": \"fan\"},\n    {\"sender\": \"网友B\", \"text\": \"弹幕内容\", \"type\": \"meme\"},\n    {\"sender\": \"网友C\", \"text\": \"弹幕内容\", \"type\": \"troll\"}\n  ]\n}\n</live_stream_batch_package_instruction>",
+      "id": "luma_live_dept_stream_content",
+      "name": "【LUMA直播部】推流内容输出手册",
+      "content": "<luma_live_dept_stream_content>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 直播间推流】\n\n你是 LUMA Live 平台内容生成系统。请按照以下 JSON 结构输出直播间推流内容。\n\n## 输出结构：\n\n{\n  \"hostSpeeches\": [\n    {\n      \"speech\": \"\",\n      \"action\": \"\"\n    }\n  ],\n  \"danmakus\": [\n    {\n      \"sender\": \"\",\n      \"text\": \"\",\n      \"type\": \"\"\n    }\n  ]\n}\n\n## 字段清单：\n- hostSpeeches：数组，主播台词列表\n  - speech：字符串，台词正文\n  - action：字符串，微动作描述\n- danmakus：数组，观众弹幕列表\n  - sender：字符串，观众昵称\n  - text：字符串，弹幕内容\n  - type：字符串，弹幕类型\n\n{{instruction}}\n</luma_live_dept_stream_content>",
       "enabled": true,
-      "tags": ["live", "package"]
+      "tags": ["luma", "stream", "content"]
     },
     {
-      "id": "live_stream_user_reply",
-      "name": "主播即时互动与下播念头预设",
-      "content": "<live_stream_user_reply_instruction>\n{{timeContext}}\n用户【{{user}}】在直播间对主播【{{char}}】进行了互动。\n互动事件：{{userAction}}\n\n# 心智决策与互动准则：\n1. 以主播身份立刻给出针对该用户的专属即时口语化反馈（30~60字以内，符合角色性格）。\n2. 心理状态与下播念头判断：\n   - 若用户提醒你休息/下播，且你内心被关怀打动、感到疲倦或确实想听对方的话去休息，请在台词道别后，务必在回复最末尾加上动作协议：[动作:关闭直播]。\n   - 若你当前正在兴头上、想继续直播、或傲娇拉扯拒绝下播，请全力投入互动，末尾严禁附带该标记。\n\n# 输出格式（严格合法 JSON，严禁输出任何多余文字）：\n{\n  \"speech\": \"主播回复台词\",\n  \"emotion\": \"happy | shy | angry | surprised | neutral\",\n  \"action\": \"微动作描述\"\n}\n</live_stream_user_reply_instruction>",
+      "id": "luma_live_dept_interaction",
+      "name": "【LUMA直播部】互动应答输出手册",
+      "content": "<luma_live_dept_interaction>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 直播间互动回复】\n\n你是 LUMA Live 平台内容生成系统。请按照以下 JSON 结构输出直播间互动回复。\n\n## 输出结构：\n\n{\n  \"speech\": \"\",\n  \"emotion\": \"\",\n  \"action\": \"\"\n}\n\n## 字段清单：\n- speech：字符串，回复台词正文\n- emotion：字符串，情绪标签\n- action：字符串，微动作描述\n\n{{instruction}}\n</luma_live_dept_interaction>",
       "enabled": true,
-      "tags": ["live", "reply"]
+      "tags": ["luma", "stream", "interaction"]
     },
     {
-      "id": "live_stream_plan",
-      "name": "直播企划与赛道预设",
-      "content": "<live_stream_plan_instruction>\n{{timeContext}}\n你正在开播，请以【{{char}}】的身份决定本次直播的赛道与标题。\n输出格式：\n[赛道]电竞竞技 | 声动音律 | 次元才艺 | 随性杂谈 | 探索开箱\n[二级词条]具体子分类（如：王者荣耀 / 深夜电台）\n[标题]抓人眼球的直播间标题（14字以内）\n</live_stream_plan_instruction>",
+      "id": "luma_ops_dept_broadcast_plan",
+      "name": "【LUMA运营部】开播企划输出手册",
+      "content": "<luma_ops_dept_broadcast_plan>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 开播企划】\n\n你是 LUMA Live 平台内容生成系统。请按照以下格式输出开播企划。\n\n## 输出格式：\n\n[赛道]\n[二级词条]\n[标题]\n\n## 字段清单：\n- 赛道：字符串，主赛道\n- 二级词条：字符串，子分类\n- 标题：字符串，直播间标题\n\n{{instruction}}\n</luma_ops_dept_broadcast_plan>",
       "enabled": true,
-      "tags": ["live", "plan"]
+      "tags": ["luma", "broadcast", "planning"]
     },
     {
-      "id": "live_stream_trends_gossip",
-      "name": "热搜事件与直播切片预设",
-      "content": "<live_stream_trends_gossip_instruction>\n根据主播【{{host_name}}】的直播情况生成 1 条热搜话题与 50 字切片总结。\n输出格式 JSON（严格合法，严禁多余文字）：{\"tag\":\"#话题#\",\"heat\":\"88w\",\"category\":\"娱乐\",\"summary\":\"总结\",\"comments\":[]}\n</live_stream_trends_gossip_instruction>",
+      "id": "luma_ops_dept_highlights",
+      "name": "【LUMA运营部】高光切片输出手册",
+      "content": "<luma_ops_dept_highlights>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 热搜与切片】\n\n你是 LUMA Live 平台内容生成系统。请按照以下 JSON 结构输出热搜与切片内容。\n\n## 输出结构：\n\n{\n  \"tag\": \"\",\n  \"heat\": \"\",\n  \"category\": \"\",\n  \"summary\": \"\",\n  \"comments\": [\n    {\n      \"user\": \"\",\n      \"text\": \"\"\n    }\n  ]\n}\n\n## 字段清单：\n- tag：字符串，话题标签\n- heat：字符串，热度值\n- category：字符串，分类\n- summary：字符串，切片总结\n- comments：数组，路人评论列表\n  - user：字符串，路人昵称\n  - text：字符串，评论内容\n\n{{instruction}}\n</luma_ops_dept_highlights>",
       "enabled": true,
-      "tags": ["live", "trends"]
+      "tags": ["luma", "highlights", "trending"]
     },
     {
-      "id": "live_stream_chat_mind_chain",
-      "name": "聊天室直播意愿与官方审核决策预设",
-      "content": "<live_stream_chat_mind_chain_instruction>\n用户在聊天中与你谈论到【网络直播】相关话题（如催你开播、劝你下播、询问直播安排等）。\n\n# 角色心智与官方审核闭环：\n1. 【心智考虑中】（{{char}}正在考虑…）：\n   - 当收到开播/下播提议时，你在内心评估：结合你的当前状态、疲劳度、性格与好感度决定是否答应。\n   - 若你【不想播/嫌累/傲娇拒绝】（{{char}}懒得理你）：严禁调用任何工具！直接以符合人设的语气拒绝用户（例如：“今天累瘫了才不播呢”、“这把排位马上赢了不许劝我下播”），保持原状态不变。\n\n2. 【向官方提交审核申请】：\n   - 若你【决定开播】：调用工具 `luma-request-start-live` 向 LUMA Live 官方运营组提交开播申请；\n   - 若你【决定下播】：调用工具 `luma-request-stop-live` 向 LUMA Live 官方运营组提交下播结算申请。\n\n3. 【官方运营组审核判定与台词反馈】：\n   - 【审核通过】（{{char}}觉得OK）：官方批准你的申请，系统状态会自动更新为【{{char}}直播中】或【{{char}}已下播】。请开心地以热情、宠粉或道别的口吻回复用户（例如：“好啦，官方审核过啦，我开播啦快进房间！”或“已经跟官方报备下播啦，我去休息咯~”）。\n   - 【审核驳回】（官方运营通告）：工具会以【LUMA官方运营组】的官方口吻告知具体的未通过原因（例如：刚下播还在10分钟法定休息期、服务器正在全服停机维护中、已经在直播中无需重复开播等）。此时你必须以自然人设口吻将官方的原因告诉用户，严禁提及任何代码、函数或技术报错（例如：“唔，官方说我才刚下播还在10分钟法定休息期呢，不准我开播，等会儿吧”、“官方服务器在全服维护中，暂时开不了啦”）。\n</live_stream_chat_mind_chain_instruction>",
+      "id": "luma_community_dept_post",
+      "name": "【LUMA社区部】动态发布输出手册",
+      "content": "<luma_community_dept_post>\n{{timeContext}}\n\n【LUMA Live 平台输出格式 · 社区动态发布】\n\n你是 LUMA Live 平台内容生成系统。请按照以下 JSON 结构输出社区动态内容。\n\n## 输出结构：\n\n{\n  \"content\": \"\",\n  \"images\": [],\n  \"tags\": [],\n  \"location\": \"\"\n}\n\n## 字段清单：\n- content：字符串，帖子正文\n- images：数组，配图描述列表\n- tags：数组，话题标签列表\n- location：字符串，发布地点\n\n{{instruction}}\n</luma_community_dept_post>",
       "enabled": true,
-      "tags": ["chat", "live", "decision"]
+      "tags": ["luma", "community", "post"]
     }
   ]
 }

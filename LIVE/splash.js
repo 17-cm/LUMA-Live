@@ -4,10 +4,9 @@
  */
 (function initSplashScreenModule() {
   // =========================================================================
-  // 【热补丁启动注入】在所有业务脚本加载前，先应用 localStorage 中的热补丁 CSS
-  // =========================================================================
-  // 【热补丁启动注入】从宿主数据库 api.db 读取热补丁并注入 CSS
+  // 【热补丁启动注入】在所有业务脚本加载前，先应用 api.db 中的热补丁 CSS
   // 沙盒 iframe 无法访问 localStorage，必须用 api.db
+  // =========================================================================
   (async function applyHotpatchCssEarly() {
     // 等待 api 对象可用（宿主注入可能需要一点时间）
     let api = window.api || window.AiPhone || window.AiPhoneApp;
@@ -29,8 +28,13 @@
       }
       const files = hotpatchRec.files;
       // 注入热补丁 CSS（覆盖旧样式）
-      if (files['style.css'] && typeof files['style.css'] === 'string' && files['style.css'].trim()) {
-        const cssContent = files['style.css'];
+      let cssContent = null;
+      const styleData = files['style.css'];
+      if (styleData) {
+        // 兼容两种格式：字符串 或 { content: "...", hash: "..." }
+        cssContent = typeof styleData === 'string' ? styleData : (styleData.content || null);
+      }
+      if (cssContent && typeof cssContent === 'string' && cssContent.trim()) {
         // 检查是否下载到了 HTML 错误页面
         if (cssContent.trim().startsWith('<!DOCTYPE') || cssContent.trim().startsWith('<html')) {
           console.error('[LUMA Hotpatch] ❌ style.css 是 HTML 错误页面，跳过');
@@ -81,8 +85,6 @@
       transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease-out;
     }
     #appSplashScreen.splash-exit { transform: scale(1.04); opacity: 0; pointer-events: none; }
-
-    /* 背景星点 */
     .splash-stars { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
     .splash-star {
       position: absolute; width: 2px; height: 2px;
@@ -90,8 +92,6 @@
       animation: starTwinkle 3s ease-in-out infinite;
     }
     @keyframes starTwinkle { 0%,100%{opacity:0.15;transform:scale(0.7)} 50%{opacity:0.7;transform:scale(1.1)} }
-
-    /* 中心环境光晕 - 柔和 */
     .splash-ambient-glow {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
       width: 380px; height: 380px;
@@ -100,21 +100,15 @@
       animation: splashAmbientPulse 6s ease-in-out infinite alternate; z-index: 1;
     }
     @keyframes splashAmbientPulse { 0%{transform:translate(-50%,-50%) scale(0.85);opacity:0.6} 100%{transform:translate(-50%,-50%) scale(1.15);opacity:0.9} }
-
-    /* 品牌舞台 - 严格居中 */
     .splash-brand-stage {
       position: relative; display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       z-index: 10; width: 100%;
     }
-
-    /* logo + 圆圈的组合容器 */
     .splash-logo-wrap {
       position: relative; display: flex; align-items: center; justify-content: center;
       width: 320px; height: 200px;
     }
-
-    /* 圆圈 SVG */
     .splash-ring-svg {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
       width: 300px; height: 300px; pointer-events: none; z-index: 5;
@@ -143,8 +137,6 @@
       0% { filter: drop-shadow(0 0 4px rgba(200,168,255,0.3)); opacity: 0.7; }
       100% { filter: drop-shadow(0 0 12px rgba(200,168,255,0.6)) drop-shadow(0 0 20px rgba(244,63,94,0.3)); opacity: 1; }
     }
-
-    /* LUMA 文字 - Playfair Display 优雅衬线斜体 */
     .splash-logo-letters {
       font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
       font-size: clamp(64px, 16vw, 96px);
@@ -153,10 +145,8 @@
       position: relative; z-index: 6; cursor: default;
       text-align: center;
       padding: 0.15em 0.3em;
-      /* 初始：细描边 */
       -webkit-text-stroke: 0.6px rgba(255,255,255,0.2);
       color: transparent;
-      /* 书写渐变 */
       background: linear-gradient(90deg,
         rgba(255,255,255,0.95) 0%,
         rgba(235,220,255,0.9) 20%,
@@ -193,8 +183,6 @@
     }
     @keyframes splashLogoShimmer { 0%,100%{background-position:0% 0} 50%{background-position:100% 0} }
     @keyframes splashLogoFloat { 0%{transform:translateY(0)} 100%{transform:translateY(-4px)} }
-
-    /* 笔尖光点 */
     .splash-pen-tip {
       position: absolute; top: 50%; left: 0; width: 24px; height: 24px;
       transform: translate(-50%,-50%) scale(0);
@@ -208,8 +196,6 @@
       88%{opacity:1;transform:translate(-50%,-50%) scale(0.9)}
       100%{left:88%;transform:translate(-50%,-50%) scale(0.4);opacity:0}
     }
-
-    /* 副标题 - 明显斜体 */
     .splash-slogan-box {
       margin-top: 22px; opacity: 0; transform: translateY(12px);
       transition: all 0.7s cubic-bezier(0.16,1,0.3,1); z-index: 10;
@@ -225,8 +211,6 @@
       content:''; display:inline-block; width:28px; height:1px;
       background: linear-gradient(90deg, transparent, rgba(200,180,255,0.5), transparent);
     }
-
-    /* 底部区域 */
     .splash-bottom-section {
       position: absolute; bottom: calc(env(safe-area-inset-bottom, 24px) + 28px);
       left: 0; right: 0;
@@ -306,43 +290,26 @@
     const ring = document.getElementById('splashRingCircle');
     const slogan = document.getElementById('splashSloganBox');
     const progress = document.getElementById('splashProgressFill');
-
     container.classList.remove('splash-exit'); container.style.display = 'flex';
-
-    // 重置
     if (logo) { logo.classList.remove('writing','bloom'); void logo.offsetWidth; }
     if (penTip) penTip.classList.remove('active');
     if (ring) { ring.classList.remove('draw','draw-done'); ring.style.strokeDashoffset = '760'; void ring.offsetWidth; }
     if (slogan) slogan.classList.remove('show');
     if (progress) { progress.style.transition='none'; progress.style.width='0%'; }
-
     container.onclick = exitSplashScreen;
-
-    // 进度条
     setTimeout(() => { if (progress) { progress.style.transition='width 3000ms cubic-bezier(0.2,0.8,0.2,1)'; progress.style.width='100%'; } }, 100);
-
-    // ===== 动画时间线 =====
-    // 1. 开始书写 (350ms)
     setTimeout(() => {
       if (logo) logo.classList.add('writing');
       if (penTip) penTip.classList.add('active');
     }, 350);
-
-    // 2. 书写完成 - 文字绽放 + 开始画圈 (2350ms)
     setTimeout(() => {
       if (logo) { logo.classList.remove('writing'); logo.classList.add('bloom'); }
       if (ring) { ring.classList.add('draw'); }
     }, 2350);
-
-    // 3. 圈画完 - 持续柔和发光 (3500ms)
     setTimeout(() => {
       if (ring) { ring.classList.remove('draw'); ring.classList.add('draw-done'); }
     }, 3500);
-
-    // 4. 副标题淡入 (2700ms)
     setTimeout(() => { if (slogan) slogan.classList.add('show'); }, 2700);
-
-    // 5. 自动退出 (4000ms)
     if (splashTimerId) clearTimeout(splashTimerId);
     splashTimerId = setTimeout(exitSplashScreen, 4000);
   }
@@ -357,6 +324,10 @@
 
   window.playSplashScreen = runSplashScreenAnimation;
   window.exitSplashScreen = exitSplashScreen;
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', runSplashScreenAnimation);
-  else runSplashScreenAnimation();
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', runSplashScreenAnimation, { once: true });
+  } else {
+    runSplashScreenAnimation();
+  }
 })();
