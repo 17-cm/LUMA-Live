@@ -978,7 +978,7 @@ window.executeConfirmResetAppData = executeConfirmResetAppData;
 // =========================================================================
 const APP_CURRENT_VERSION = 'v3.4.1';
 const DEFAULT_GIT_REPO = '17-cm/LUMA-Live';
-const DEFAULT_GIT_BRANCH = 'main';
+const DEFAULT_GIT_BRANCH = 'test';
 
 let gitUpdateState = {
   currentVersion: APP_CURRENT_VERSION,
@@ -1216,10 +1216,24 @@ async function handleVersionUpdateClick() {
       'style.css',
       'LIVE/splash.js',
       'LIVE/core.js',
+      'LIVE/数据/data_hub.js',
+      'LIVE/数据/fans_manager.js',
+      'LIVE/数据/guard_manager.js',
+      'LIVE/数据/checkin_manager.js',
+      'LIVE/数据/titles_manager.js',
       'LIVE/主页/profile.js',
+      'LIVE/社区/community_store.js',
+      'LIVE/社区/module_trends.js',
+      'LIVE/社区/module_supertopic.js',
+      'LIVE/社区/module_detail.js',
+      'LIVE/社区/module_ranking.js',
+      'LIVE/社区/module_forum.js',
+      'LIVE/社区/module_mytopic.js',
       'LIVE/社区/trends.js',
+      'LIVE/直播/room_loading.js',
       'LIVE/直播/live.js',
-      'LIVE/设定/main.js'
+      'LIVE/设定/main.js',
+      'LIVE/设定/patch.js'
     ];
 
     const downloadedFiles = {};
@@ -1237,8 +1251,8 @@ async function handleVersionUpdateClick() {
       }
     }
 
-    if (successCount >= 3) {
-      // 成功下载核心代码，写入热补丁引擎本地持久缓存
+    if (successCount >= 10) {
+      // 成功下载大部分核心代码，写入热补丁引擎本地持久缓存
       try {
         localStorage.setItem('luma_hotpatch_files', JSON.stringify(downloadedFiles));
         localStorage.setItem('luma_hotpatch_version', gitUpdateState.latestVersion || APP_CURRENT_VERSION);

@@ -3,6 +3,39 @@
  * 优雅衬线书写动画 · 柔和光圈 · 幻彩呼吸
  */
 (function initSplashScreenModule() {
+  // =========================================================================
+  // 【热补丁启动注入】在所有业务脚本加载前，先应用 localStorage 中的热补丁 CSS
+  // =========================================================================
+  (function applyHotpatchCssEarly() {
+    try {
+      const raw = localStorage.getItem('luma_hotpatch_files');
+      if (!raw) return;
+      const files = JSON.parse(raw);
+      if (!files || typeof files !== 'object') return;
+
+      // 注入热补丁 CSS（覆盖旧样式）
+      if (files['style.css']) {
+        const style = document.createElement('style');
+        style.id = 'luma-hotpatch-style';
+        style.setAttribute('data-hotpatch', 'true');
+        style.textContent = files['style.css'];
+        document.head.appendChild(style);
+        window.__lumaHotpatchCssApplied = true;
+      }
+
+      // 记录热补丁版本信息，供后续显示
+      const hpVersion = localStorage.getItem('luma_hotpatch_version');
+      const hpCommit = localStorage.getItem('luma_hotpatch_commit');
+      if (hpVersion) {
+        window.__lumaHotpatchVersion = hpVersion;
+        window.__lumaHotpatchCommit = hpCommit || '';
+        window.__lumaHotpatchActive = true;
+      }
+    } catch (e) {
+      console.warn('[LUMA Hotpatch] CSS 注入失败:', e);
+    }
+  })();
+
   // 加载字体
   const fontLink = document.createElement('link');
   fontLink.rel = 'stylesheet';

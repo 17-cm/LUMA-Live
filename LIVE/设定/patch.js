@@ -1,6 +1,49 @@
 // LUMA Live hotfixes: follow count, spawn-rate display, settings panel exposure
 (function installLumaHotfixes() {
+  // =========================================================================
+  // 【热补丁 JS 执行】所有业务脚本加载完成后，用新版本代码覆盖旧函数
+  // =========================================================================
+  function applyHotpatchJs() {
+    if (window.__lumaHotpatchJsApplied) return;
+    try {
+      const raw = localStorage.getItem('luma_hotpatch_files');
+      if (!raw) return;
+      const files = JSON.parse(raw);
+      if (!files || typeof files !== 'object') return;
+
+      // 需要排除的文件：splash.js（已执行完，重执行会重播启动动画）
+      // patch.js（正在执行，重执行会递归）
+      const excludeFiles = ['LIVE/splash.js', 'LIVE/设定/patch.js'];
+
+      let appliedCount = 0;
+      for (const [filePath, fileContent] of Object.entries(files)) {
+        if (!filePath.endsWith('.js')) continue;
+        if (excludeFiles.includes(filePath)) continue;
+        if (typeof fileContent !== 'string' || !fileContent.trim()) continue;
+
+        try {
+          // 在全局作用域执行新代码，覆盖旧函数定义
+          // 使用 window.eval 确保在全局作用域执行
+          window.eval(fileContent);
+          appliedCount++;
+        } catch (evalErr) {
+          console.warn(`[LUMA Hotpatch] 执行 ${filePath} 失败:`, evalErr);
+        }
+      }
+
+      if (appliedCount > 0) {
+        window.__lumaHotpatchJsApplied = true;
+        console.log(`[LUMA Hotpatch] 已应用 ${appliedCount} 个 JS 热补丁文件`);
+      }
+    } catch (e) {
+      console.warn('[LUMA Hotpatch] JS 热补丁应用失败:', e);
+    }
+  }
+
   function install() {
+    // 先应用 JS 热补丁（更新所有函数到最新版本）
+    applyHotpatchJs();
+
     if (typeof window.syncParamDisplays !== 'function' || typeof window.updateParam !== 'function') {
       setTimeout(install, 25);
       return;
