@@ -106,12 +106,19 @@
         level: newLevel
       };
 
-      hub.saveCheckinsMap(map);
+hub.saveCheckinsMap(map);
 
-      // 检查是否解锁签到相关称号
-      if (typeof window.LumaTitlesManager?.checkAndUnlockAllTitles === 'function') {
-        window.LumaTitlesManager.checkAndUnlockAllTitles(eId);
-      }
+      // 同步到 api.db 持久层，保证重新进入 APP 后不丢数据
+      try {
+        const api = window.api || {};
+        if (api.db && typeof api.db.create === 'function') {
+          api.db.create("luma_checkin_records", { id: key, ...map[key] }).catch(() => {
+            if (typeof api.db.update === 'function') {
+              api.db.update("luma_checkin_records", key, map[key]).catch(() => {});
+            }
+          });
+        }
+      } catch (e) {}
 
       // 兼容历史 LocalStorage 格式
       try {

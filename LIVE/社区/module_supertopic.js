@@ -33,7 +33,7 @@ function renderSuperTopicView(charId = null) {
   }
   currentActiveSuperTopicCharId = char.id;
 
-  const isFollowed = (window.followedHosts || []).includes(char.name);
+  const isFollowed = (window.followedSuperTopics || []).includes(String(char.id));
   const checkIn = window.getSuperTopicCheckInInfo(char.id);
   // 粉丝数与个人主页/排行榜使用同一数据源 (LumaFansManager)，保证各处数字一致
   const fansCount = (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function')
@@ -602,15 +602,34 @@ function executeSupportGift() {
 window.executeSupportGift = executeSupportGift;
 
 function handleSuperTopicFollow(hostName) {
-  if (!window.followedHosts) window.followedHosts = [];
-  const idx = window.followedHosts.indexOf(hostName);
+  const chars = window.getAvailableCharsList();
+  const char = chars.find(c => String(c.name) === String(hostName));
+  if (!char) return;
+
+  const topicId = String(char.id);
+  if (!window.followedSuperTopics) window.followedSuperTopics = [];
+
+  const idx = window.followedSuperTopics.indexOf(topicId);
   if (idx > -1) {
-    window.followedHosts.splice(idx, 1);
+    window.followedSuperTopics.splice(idx, 1);
     api.ui.toast(`已取消关注【${hostName}】超话`);
   } else {
-    window.followedHosts.push(hostName);
+    window.followedSuperTopics.push(topicId);
     api.ui.toast(`已成功关注【${hostName}】超话！`);
   }
+
+  // 持久化到 localStorage
+  try {
+    localStorage.setItem('luma_followed_supertopics', JSON.stringify(window.followedSuperTopics));
+  } catch (e) {}
+
+  // 持久化到 api.db
+  try {
+    api.db.create("luma_supertopic_follows", { id: 'user', topics: window.followedSuperTopics }).catch(() => {
+      api.db.update("luma_supertopic_follows", 'user', { topics: window.followedSuperTopics }).catch(() => {});
+    });
+  } catch (e) {}
+
   if (typeof syncFollowCountDisplay === 'function') syncFollowCountDisplay();
   renderSuperTopicView(currentActiveSuperTopicCharId);
 }

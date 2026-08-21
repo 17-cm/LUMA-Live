@@ -29,7 +29,7 @@ let currentRankTab = 'fans';
 let selectedRechargeAmount = 600;
 let selectedRechargePrice = 6;
 
-// 1. 同步个人资料与关注统计
+// 1. 同步个人资料与关注统计 (仅统计已关注的主播/用户，超话频道不计入人物关注列表)
 function syncFollowCountDisplay() {
   const followed = Array.isArray(window.followedHosts) ? window.followedHosts : [];
   // LUMA 官方运营组固定占 1 个关注项，其余均来自真实关注记录
