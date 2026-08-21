@@ -474,18 +474,18 @@ window.checkFollowState = checkFollowState;
 async function toggleFollowRoomHost() {
   if (!currentRoom) return;
   const charId = currentRoom.characterId;
-  const isFollowed = (window.followedHosts || []).includes(charId);
+  // 确保 followedHosts 是数组
+  if (!Array.isArray(window.followedHosts)) window.followedHosts = [];
+  const isFollowed = window.followedHosts.includes(charId);
 
   if (isFollowed) {
-    followedHosts = (window.followedHosts || []).filter(id => id !== charId);
-    window.followedHosts = followedHosts;
+    window.followedHosts = window.followedHosts.filter(id => id !== charId);
     await api.db.delete("follows", charId).catch(() => {});
     api.ui.toast("已取消关注");
   } else {
     if (!window.followedHosts.includes(charId)) {
       window.followedHosts.push(charId);
     }
-    followedHosts = window.followedHosts;
     await api.db.create("follows", { id: charId, timestamp: Date.now() }).catch(() => {});
     api.ui.toast("关注成功！");
   }
@@ -1559,6 +1559,9 @@ function openStreamerProfilePage(id) {
   
   currentViewingProfile = profile;
   renderStreamerProfileToUI(profile);
+
+  // 关闭关注列表等可能遮挡个人主页的全屏页面（关注列表 z-index 100 > 个人主页 90）
+  if (typeof closeFollowListPageView === 'function') closeFollowListPageView();
 
   const page = document.getElementById('streamerProfilePageView');
   if (page) page.classList.add('open');
