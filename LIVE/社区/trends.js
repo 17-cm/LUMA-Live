@@ -57,11 +57,14 @@ function openCommunitySubPage(pageKey, targetCharId = null) {
   } else if (pageKey === 'live_settings') {
     targetModalId = 'communityLiveSettingsView';
   } else if (pageKey === 'forum') {
-    if (typeof checkAndOpenForum === 'function') {
-      checkAndOpenForum();
-      return;
-    }
     targetModalId = 'communityForumView';
+    if (typeof checkAndOpenForum === 'function') {
+      const currentUser = typeof getForumCurrentUser === 'function' ? getForumCurrentUser() : null;
+      if (!currentUser || !currentUser.uid) {
+        checkAndOpenForum();
+        return;
+      }
+    }
     if (typeof renderOfficialWeiboForum === 'function') {
       renderOfficialWeiboForum(typeof currentForumActiveTab !== 'undefined' ? currentForumActiveTab : 'official');
     }

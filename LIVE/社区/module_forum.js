@@ -157,9 +157,9 @@ let forumRegisterDraft = {
 // 获取当前登录用户
 function getForumCurrentUser() {
   try {
-    const raw = localStorage.getItem('luma_forum_current_user');
+    const raw = localStorage.getItem('luma_forum_current_user') || (window.api && window.api.store && window.api.store.get ? window.api.store.get('luma_forum_current_user') : null);
     if (raw) {
-      const parsed = JSON.parse(raw);
+      const parsed = (typeof raw === 'string') ? JSON.parse(raw) : raw;
       if (parsed && parsed.uid) return parsed;
     }
   } catch (e) {}
@@ -170,7 +170,17 @@ window.getForumCurrentUser = getForumCurrentUser;
 // 存储当前登录用户
 function saveForumCurrentUser(userObj) {
   try {
-    localStorage.setItem('luma_forum_current_user', JSON.stringify(userObj));
+    if (userObj) {
+      localStorage.setItem('luma_forum_current_user', JSON.stringify(userObj));
+      if (window.api && window.api.store && window.api.store.set) {
+        window.api.store.set('luma_forum_current_user', userObj);
+      }
+    } else {
+      localStorage.removeItem('luma_forum_current_user');
+      if (window.api && window.api.store && window.api.store.set) {
+        window.api.store.set('luma_forum_current_user', null);
+      }
+    }
   } catch (e) {}
 }
 
@@ -648,7 +658,7 @@ window.executeDirectLoginSubmit = executeDirectLoginSubmit;
 
 // 退出登录
 function handleForumLogout() {
-  localStorage.removeItem('luma_forum_current_user');
+  saveForumCurrentUser(null);
   if (api.ui && api.ui.toast) api.ui.toast("已退出当前论坛账号。");
   closeVoucherManageModal();
   closeCommunitySubPage();
