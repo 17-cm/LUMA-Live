@@ -624,46 +624,21 @@
         throw new Error("NO_NETWORK_DISCONNECTED");
       }
 
-      // 执行打包：在过渡期间预加载首包弹幕与主播台词，生成完成后直接进房
-      // 采用 60 秒兜底超时（防止 API 真挂了用户一直卡着），正常生成不受时间限制
-      const fetchPromise = (async () => {
-        if (typeof window.aiGenerate === 'function') {
-          return await window.aiGenerate({
-            characterId: session.characterId,
-            appTags: ['luma', 'stream', 'content'],
-            instruction: `当前频道：${session.category || '综合'}（${session.subTag || '生活'}），标题：${session.topic || '直播间'}。${(typeof window.getLivePackagePrompt === 'function') ? window.getLivePackagePrompt() : '请生成观众弹幕（danmakus数组）和主播互动台词（hostSpeeches数组，每条包含speech和action字段）。返回JSON格式。'}`
-          });
-        }
-        return { text: '{"danmakus":[],"hostSpeeches":[]}' };
-      })();
+      // 只检测本地 API 配置，不发送 AI 请求
+      // 拉取模型列表时已经检测过 URL 和 key 是否有效，这里只检查有没有保存配置
+      if (!hasConfiguredApi) {
+        throw new Error("NO_API_CONFIG");
+      }
 
-      const timeoutPromise = new Promise((_, reject) => {
-        connectingTimeoutId = setTimeout(() => {
-          reject(new Error("TIMEOUT_ERROR"));
-        }, 60000);
+      // 有配置：等待 3 秒（有代入感，不会等待过长），然后直接进入直播间
+      await new Promise(resolve => {
+        connectingTimeoutId = setTimeout(resolve, 3000);
       });
-
-      // 拿到响应或完成首包打包后立即进房，不人为堆叠任何多余延迟
-      const res = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (connectingTimeoutId) clearTimeout(connectingTimeoutId);
 
-      // 解析弹幕包注入全局弹幕池与主播台词池，确保一进房弹幕就立刻满载滚动
-      if (res && res.text) {
-        const parsed = (typeof window.extractJsonFromText === 'function') ? window.extractJsonFromText(res.text) : null;
-        if (parsed) {
-          if (parsed.danmakus && Array.isArray(parsed.danmakus)) {
-            window.danmakuPool = window.danmakuPool || [];
-            window.danmakuPool.push(...parsed.danmakus);
-          }
-          if (parsed.hostSpeeches && Array.isArray(parsed.hostSpeeches)) {
-            window.hostSpeechPool = window.hostSpeechPool || [];
-            window.hostSpeechPool.push(...parsed.hostSpeeches);
-          }
-        }
-      }
-
       // 成功进入：全息层立刻隐去进入直播间
+      // 首包弹幕和台词由进入直播间后的 fetchBatchLivePackage 负责请求
       overlay.classList.add('hidden');
       if (typeof onSuccessCallback === 'function') {
         onSuccessCallback();
