@@ -107,8 +107,9 @@
 
       // 同步到全网贡献总分与超话
       if (fId === 'user') {
-        const totalUserContrib = parseInt(localStorage.getItem('luma_total_user_contribution') || '12000', 10) + amt;
+        // 沙盒 iframe 无 allow-same-origin 权限，localStorage 不可用，用 try-catch 保护
         try {
+          const totalUserContrib = parseInt(localStorage.getItem('luma_total_user_contribution') || '12000', 10) + amt;
           localStorage.setItem('luma_total_user_contribution', totalUserContrib.toString());
           localStorage.setItem(`luma_char_contribution_${tId}`, item.totalAmount.toString());
         } catch (e) {}
