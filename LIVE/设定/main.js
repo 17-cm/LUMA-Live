@@ -1134,7 +1134,9 @@ async function checkGitRepoUpdate(silent = false) {
       gitUpdateState.updateLog = updateMessage || '检测到更新。';
 
       // 判定是否有新版本 (版本号不同 或 Commit 产生变化)
-      const isNewVer = remoteVer && remoteVer.trim() !== APP_CURRENT_VERSION;
+      // 注意：用 gitUpdateState.currentVersion（实际运行的版本，从数据库读取），
+      // 而不是 APP_CURRENT_VERSION（硬编码的原始版本），否则热补丁更新后会一直显示有更新
+      const isNewVer = remoteVer && remoteVer.trim() !== gitUpdateState.currentVersion;
       const isNewCommit = remoteCommit && gitUpdateState.localCommit && !gitUpdateState.localCommit.includes(remoteCommit);
       
       gitUpdateState.hasUpdate = Boolean(isNewVer || isNewCommit);
