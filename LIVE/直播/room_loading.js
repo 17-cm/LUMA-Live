@@ -62,9 +62,9 @@
     /* 抖音风格左上角丰富的主播互动胶囊群 (进一步高仿豪华版) */
     .douyin-top-bar-cluster {
       position: absolute;
-      top: 52px;
-      left: 12px;
-      right: 12px;
+      top: max(var(--ai-phone-app-safe-top, 56px), 56px);
+      left: 14px;
+      right: 14px;
       z-index: 30;
       display: flex;
       align-items: center;
@@ -75,15 +75,15 @@
     .douyin-host-capsule {
       display: flex;
       align-items: center;
-      gap: 7px;
-      background: rgba(15, 23, 42, 0.68);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      gap: 9px;
+      background: rgba(10, 12, 20, 0.55);
+      backdrop-filter: blur(24px) saturate(1.4);
+      -webkit-backdrop-filter: blur(24px) saturate(1.4);
+      border: 1px solid rgba(255, 255, 255, 0.14);
       border-radius: 9999px;
-      padding: 3px 6px 3px 3px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.55);
-      max-width: calc(100vw - 120px);
+      padding: 4px 14px 4px 4px;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255,255,255,0.08);
+      max-width: calc(100vw - 110px);
     }
 
     .douyin-avatar-wrap {
@@ -213,29 +213,32 @@
     .douyin-btn-follow {
       background: linear-gradient(135deg, #fe2c55, #ff0050);
       color: #ffffff;
-      font-size: 10.5px;
+      font-size: 11px;
       font-weight: 800;
-      padding: 4.5px 10px;
+      padding: 6px 14px;
       border-radius: 9999px;
       border: none;
       outline: none;
       cursor: pointer;
       flex-shrink: 0;
-      box-shadow: 0 2px 8px rgba(254, 44, 85, 0.5);
+      box-shadow: 0 3px 10px rgba(254, 44, 85, 0.45), inset 0 1px 0 rgba(255,255,255,0.2);
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
       display: flex;
       align-items: center;
       gap: 2px;
+      letter-spacing: 0.5px;
     }
 
     .douyin-btn-follow:active {
       transform: scale(0.94);
+      box-shadow: 0 1px 5px rgba(254, 44, 85, 0.3);
     }
 
     .douyin-btn-follow.followed {
-      background: rgba(255, 255, 255, 0.22);
-      color: rgba(255, 255, 255, 0.85);
-      box-shadow: none;
+      background: rgba(255, 255, 255, 0.18);
+      color: rgba(255, 255, 255, 0.9);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
     }
 
     /* 抖音右侧榜单小头像组与热度胶囊 */
@@ -268,16 +271,21 @@
     .douyin-heat-pill {
       display: flex;
       align-items: center;
-      gap: 2px;
-      background: rgba(0, 0, 0, 0.52);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 0.8px solid rgba(255, 255, 255, 0.16);
+      gap: 3px;
+      background: rgba(10, 12, 20, 0.5);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 9999px;
-      padding: 3px 7px;
+      padding: 5px 10px;
       color: #fbbf24;
-      font-size: 9.5px;
+      font-size: 10px;
       font-weight: 800;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      letter-spacing: 0.3px;
+    }
+    .douyin-heat-pill .heat-icon {
+      font-size: 11px;
     }
 
     /* 核心舞台：包含高斯模糊毛玻璃空隙散开 + 三层浅红细圈向外步进扩散 */
@@ -506,13 +514,9 @@
           </div>
 
           <div class="douyin-top-right-ranks">
-            <div class="douyin-rank-avatars">
-              <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80" class="douyin-rank-user">
-              <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80" class="douyin-rank-user">
-              <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=80" class="douyin-rank-user">
-            </div>
             <div class="douyin-heat-pill">
-              <span>🔥 8.6w</span>
+              <span class="heat-icon">🔥</span>
+              <span id="transTopHeat">8.6w</span>
             </div>
           </div>
         </div>
@@ -571,6 +575,7 @@
     const topSub = document.getElementById('transTopSub');
     const topLevel = document.getElementById('transTopLevel');
     const followBtn = document.getElementById('transBtnFollow');
+    const heatEl = document.getElementById('transTopHeat');
 
     if (gaussianBg) gaussianBg.style.backgroundImage = `url('${avatarUrl}')`;
     if (gaussianUnderlay) gaussianUnderlay.style.backgroundImage = `url('${avatarUrl}')`;
@@ -579,6 +584,12 @@
     if (topName) topName.textContent = nameStr;
     if (topSub) topSub.textContent = viewersStr;
     if (topLevel) topLevel.textContent = `Lv.${(nameStr.length * 3 + 7) % 30 + 1}`;
+    // 动态填充热度数据
+    if (heatEl) {
+      const heat = session.heat || viewersCount * 10 || 86000;
+      const heatStr = heat > 10000 ? (heat / 10000).toFixed(1) + 'w' : String(heat);
+      heatEl.textContent = heatStr;
+    }
 
     // 关注状态同步
     const isFollowed = (window.followedHosts || []).includes(session.characterId);
@@ -765,19 +776,41 @@
     if (!currentTransitionSession) return;
     const charId = currentTransitionSession.characterId;
     const followBtn = document.getElementById('transBtnFollow');
-
-    if (typeof window.toggleFollowRoomHost === 'function') {
-      await window.toggleFollowRoomHost();
-      const isFollowed = (window.followedHosts || []).includes(charId);
-      if (followBtn) {
-        followBtn.innerHTML = isFollowed ? '已关注' : '<span>+</span> 关注';
-        if (isFollowed) {
-          followBtn.classList.add('followed');
-        } else {
-          followBtn.classList.remove('followed');
-        }
+    // 确保 followedHosts 是数组
+    if (!Array.isArray(window.followedHosts)) window.followedHosts = [];
+    const isFollowed = window.followedHosts.includes(charId);
+    // 等待 api 对象可用
+    let api = window.api || window.AiPhone || window.AiPhoneApp;
+    let waitCount = 0;
+    while (!api && waitCount < 30) {
+      await new Promise(r => setTimeout(r, 50));
+      api = window.api || window.AiPhone || window.AiPhoneApp;
+      waitCount++;
+    }
+    if (isFollowed) {
+      window.followedHosts = window.followedHosts.filter(id => id !== charId);
+      if (api && api.db) await api.db.delete("follows", charId).catch(() => {});
+      if (api && api.ui && api.ui.toast) api.ui.toast("已取消关注");
+    } else {
+      if (!window.followedHosts.includes(charId)) {
+        window.followedHosts.push(charId);
+      }
+      if (api && api.db) await api.db.create("follows", { id: charId, timestamp: Date.now() }).catch(() => {});
+      if (api && api.ui && api.ui.toast) api.ui.toast("关注成功！");
+    }
+    // 更新按钮状态
+    const newIsFollowed = window.followedHosts.includes(charId);
+    if (followBtn) {
+      followBtn.innerHTML = newIsFollowed ? '已关注' : '<span>+</span> 关注';
+      if (newIsFollowed) {
+        followBtn.classList.add('followed');
+      } else {
+        followBtn.classList.remove('followed');
       }
     }
+    // 更新关注人数显示
+    const statEl = document.getElementById('statFollowCount');
+    if (statEl) statEl.textContent = window.followedHosts.length + 1;
   }
 
   window.launchRoomConnectingStage = launchRoomConnectingStage;
