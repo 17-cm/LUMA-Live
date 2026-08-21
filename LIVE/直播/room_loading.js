@@ -598,7 +598,14 @@
 
     // 检查 API 配置状态以精准判定网络失败类型
     const customCfg = window.customApiConfig || {};
-    const hasConfiguredApi = !!(customCfg.apiKey || customCfg.endpoint);
+    // 修复：正确判断是否已配置 API（支持全局模型 / 自定义 API Key / 自定义地址）
+    const hasConfiguredApi = !!(
+      customCfg.enableGlobalModel ||
+      customCfg.text?.key ||
+      customCfg.text?.url ||
+      customCfg.apiKey ||
+      customCfg.endpoint
+    );
 
     try {
       // 离线/未联网检测
@@ -606,7 +613,8 @@
         throw new Error("NO_NETWORK_DISCONNECTED");
       }
 
-      // 执行打包与连通性检测（在过渡期间预加载首包弹幕并检测网络响应）
+      // 执行打包：在过渡期间预加载首包弹幕与主播台词，生成完成后直接进房
+      // 采用 60 秒兜底超时（防止 API 真挂了用户一直卡着），正常生成不受时间限制
       const fetchPromise = (async () => {
         if (typeof window.aiGenerate === 'function') {
           return await window.aiGenerate({
@@ -621,10 +629,10 @@
       const timeoutPromise = new Promise((_, reject) => {
         connectingTimeoutId = setTimeout(() => {
           reject(new Error("TIMEOUT_ERROR"));
-        }, 10000);
+        }, 60000);
       });
 
-      // 0 秒无感直通：拿到响应或完成首包打包后立即进房，不人为堆叠任何多余延迟
+      // 拿到响应或完成首包打包后立即进房，不人为堆叠任何多余延迟
       const res = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (connectingTimeoutId) clearTimeout(connectingTimeoutId);

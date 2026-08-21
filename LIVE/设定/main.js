@@ -978,7 +978,7 @@ window.executeConfirmResetAppData = executeConfirmResetAppData;
 // =========================================================================
 const APP_CURRENT_VERSION = 'v3.4.1';
 const DEFAULT_GIT_REPO = '17-cm/LUMA-Live';
-const DEFAULT_GIT_BRANCH = 'main';
+const DEFAULT_GIT_BRANCH = 'test';
 
 let gitUpdateState = {
   currentVersion: APP_CURRENT_VERSION,
