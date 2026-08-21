@@ -168,6 +168,21 @@ function getPostCardHtml(post) {
   `;
 }
 
+// 判断帖子是否属于某个热搜话题（tag / 正文 / 艾特 任一命中即可，双向包含提升匹配容错）
+function matchesHotTopicFilter(post, tagFilter) {
+  if (!tagFilter) return true;
+  const core = String(tagFilter).replace(/#/g, '').trim();
+  if (!core) return true;
+
+  const haystack = [post.tag, post.content, post.mention].filter(Boolean).join(' ');
+  if (haystack.includes(core)) return true;
+
+  const postTagCore = String(post.tag || '').replace(/#/g, '').trim();
+  if (postTagCore && (postTagCore.includes(core) || core.includes(postTagCore))) return true;
+
+  return false;
+}
+
 // 核心：使用 CommunityVirtualScroller 对今日热搜动态流进行虚拟化滚动渲染
 function renderTrends() {
   const container = document.getElementById('communityTrendsScrollArea');
@@ -184,25 +199,34 @@ function renderTrends() {
       const tagText = document.getElementById('activeTopicTagText');
       if (tagText) tagText.textContent = currentHotSearchFilter;
     }
-    displayPosts = allPosts.filter(p => (p.tag && p.tag.includes(currentHotSearchFilter)) || (p.content && p.content.includes(currentHotSearchFilter)));
+    displayPosts = allPosts.filter(p => matchesHotTopicFilter(p, currentHotSearchFilter));
   } else {
     if (banner) banner.classList.add('hidden');
   }
 
   if (displayPosts.length === 0) {
-    if (trendsVirtualScrollerInstance) {
-      trendsVirtualScrollerInstance.destroy();
-      trendsVirtualScrollerInstance = null;
+    // 该话题暂无专属动态：回退展示全网热点，保证广场动态不消失
+    if (currentHotSearchFilter) {
+      if (banner) banner.classList.remove('hidden');
+      const tip = document.getElementById('activeTopicTipText');
+      if (tip) tip.textContent = '该话题暂无专属动态，已为你展示全网热点';
+      displayPosts = allPosts;
     }
-    target.innerHTML = `
-      <div class="luxe-card p-8 text-center text-xs text-slate-400 bg-white">
-        <p>暂无该话题的动态，快来发布第一条吧～</p>
-        <button onclick="openCreatePostModal('${currentHotSearchFilter || '#社区热点#'}', '')" class="btn-brand text-xs !py-1.5 !px-3.5 mt-3 shadow-sm">
-          <span>+ 发布话题动态</span>
-        </button>
-      </div>
-    `;
-    return;
+    if (displayPosts.length === 0) {
+      if (trendsVirtualScrollerInstance) {
+        trendsVirtualScrollerInstance.destroy();
+        trendsVirtualScrollerInstance = null;
+      }
+      target.innerHTML = `
+        <div class="luxe-card p-8 text-center text-xs text-slate-400 bg-white">
+          <p>暂无该话题的动态，快来发布第一条吧～</p>
+          <button onclick="openCreatePostModal('${currentHotSearchFilter || '#社区热点#'}', '')" class="btn-brand text-xs !py-1.5 !px-3.5 mt-3 shadow-sm">
+            <span>+ 发布话题动态</span>
+          </button>
+        </div>
+      `;
+      return;
+    }
   }
 
   // 列表虚拟化渲染引擎接入

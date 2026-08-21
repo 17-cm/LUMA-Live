@@ -17,6 +17,13 @@ function renderSuperTopicView(charId = null) {
   const container = document.getElementById('communitySuperTopicContent');
   if (!container) return;
 
+  // 视图整体重绘前必须销毁旧的虚拟滚动实例，否则其 target 引用已脱离 DOM，
+  // 会导致重绘后动态列表写入孤儿节点而显示空白
+  if (superTopicVirtualScrollerInstance) {
+    superTopicVirtualScrollerInstance.destroy();
+    superTopicVirtualScrollerInstance = null;
+  }
+
   const chars = window.getAvailableCharsList();
   if (chars.length === 0) return;
 
@@ -28,6 +35,10 @@ function renderSuperTopicView(charId = null) {
 
   const isFollowed = (window.followedHosts || []).includes(char.name);
   const checkIn = window.getSuperTopicCheckInInfo(char.id);
+  // 粉丝数与个人主页/排行榜使用同一数据源 (LumaFansManager)，保证各处数字一致
+  const fansCount = (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function')
+    ? window.LumaFansManager.getFans(char.id, char)
+    : (char.fans || 0);
 
   // 渲染超话基础骨架与头部
   container.innerHTML = `
@@ -65,7 +76,7 @@ function renderSuperTopicView(charId = null) {
             </div>
             <p class="text-[10px] text-slate-300 mt-1 truncate">分类: ${char.category} · ${char.tag}</p>
             <div class="flex items-center gap-3 mt-1 text-[10px] text-slate-400">
-              <span>粉丝 <strong class="text-white">${char.fans.toLocaleString()}</strong></span>
+              <span>粉丝 <strong class="text-white">${fansCount.toLocaleString()}</strong></span>
               <span>今日讨论 <strong class="text-white">${(window.weiboPosts || []).filter(p => p.tag && p.tag.includes(char.name)).length + 18}</strong></span>
             </div>
           </div>
@@ -451,6 +462,9 @@ function renderSuperTopicSupportTab(char) {
 
   const currentWallet = window.currentWalletBalance || 18800;
   const userContribute = window.getCharContributionScore(char.id);
+  const fansCount = (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function')
+    ? window.LumaFansManager.getFans(char.id, char)
+    : (char.fans || 0);
 
   container.innerHTML = `
     <!-- 打榜头部宣传 -->
@@ -470,7 +484,7 @@ function renderSuperTopicSupportTab(char) {
         </div>
         <div>
           <span class="text-[9px] text-rose-200">超话总热度</span>
-          <p class="font-black text-amber-300 text-sm">${(char.fans * 3 + userContribute).toLocaleString()}</p>
+          <p class="font-black text-amber-300 text-sm">${(fansCount * 3 + userContribute).toLocaleString()}</p>
         </div>
       </div>
     </div>

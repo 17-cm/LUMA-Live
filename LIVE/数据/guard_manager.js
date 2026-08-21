@@ -129,6 +129,19 @@
           sum += Number(item.totalAmount) || 0;
         }
       });
+
+      // 兼容历史数据源 (luma_char_contribution_*)：
+      // 若玩家对该主播的直接贡献大于消费矩阵中已记录的玩家部分，则补充差额，保证不丢失也不重复计算
+      try {
+        const localRaw = parseInt(localStorage.getItem(`luma_char_contribution_${tId}`), 10);
+        if (localRaw && localRaw > 0) {
+          const matrixUserVal = matrix[`user_TO_${tId}`] ? (Number(matrix[`user_TO_${tId}`].totalAmount) || 0) : 0;
+          if (localRaw > matrixUserVal) {
+            sum += (localRaw - matrixUserVal);
+          }
+        }
+      } catch (e) {}
+
       return sum;
     },
 
@@ -142,6 +155,22 @@
           sum += Number(item.totalAmount) || 0;
         }
       });
+
+      // 兼容历史数据源 (luma_total_user_contribution 超出基础 12000 的部分)
+      if (fId === 'user') {
+        try {
+          const localTotal = parseInt(localStorage.getItem('luma_total_user_contribution') || '12000', 10);
+          const localSpent = Math.max(0, localTotal - 12000);
+          let matrixUserTotal = 0;
+          Object.values(matrix).forEach(item => {
+            if (item.fromId === 'user') matrixUserTotal += Number(item.totalAmount) || 0;
+          });
+          if (localSpent > matrixUserTotal) {
+            sum += (localSpent - matrixUserTotal);
+          }
+        } catch (e) {}
+      }
+
       return sum;
     },
 
