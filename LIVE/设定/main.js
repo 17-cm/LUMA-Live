@@ -1448,6 +1448,36 @@ window.addEventListener('DOMContentLoaded', async () => {
     } catch (e) {}
     if (!window.followedSuperTopics) window.followedSuperTopics = [];
 
+    // 从 api.db 与 LocalStorage 恢复签到记录，合并进 LumaDataHub 内存
+    try {
+      let checkinDbRecs = [];
+      // 优先从 api.db 读取
+      try {
+        checkinDbRecs = await api.db.list("luma_checkin_records") || [];
+      } catch (e) {}
+      // 兜底从 localStorage 同步备份读取
+      if (checkinDbRecs.length === 0) {
+        try {
+          const raw = localStorage.getItem('luma_db_luma_checkin_records');
+          if (raw) checkinDbRecs = JSON.parse(raw);
+        } catch (e) {}
+      }
+      if (checkinDbRecs.length > 0 && window.LumaDataHub) {
+        const map = window.LumaDataHub.getCheckinsMap() || {};
+        let changed = false;
+        checkinDbRecs.forEach(rec => {
+          if (rec && rec.id) {
+            const key = rec.id;
+            const record = { ...rec };
+            delete record.id;
+            map[key] = { ...map[key], ...record };
+            changed = true;
+          }
+        });
+        if (changed) window.LumaDataHub.saveCheckinsMap(map);
+      }
+    } catch (e) {}
+
     const walletRec = await api.db.get("app_wallet", "vault_data");
     if (walletRec) window.currentWalletBalance = walletRec.balance || 0;
 
