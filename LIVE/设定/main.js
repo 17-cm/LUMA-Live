@@ -1096,57 +1096,134 @@ async function fetchSingleRepoFile(repo, branch, filePath) {
   return null;
 }
 
+// 需要热补丁更新的文件列表（splash.js 是启动器，不参与热补丁）
+const HOTPATCH_FILES = [
+  'manifest.json',
+  'style.css',
+  'LIVE/设定/page_stack.js',
+  'LIVE/core.js',
+  'LIVE/数据/data_hub.js',
+  'LIVE/数据/fans_manager.js',
+  'LIVE/数据/guard_manager.js',
+  'LIVE/数据/checkin_manager.js',
+  'LIVE/数据/titles_manager.js',
+  'LIVE/主页/profile.js',
+  'LIVE/社区/community_store.js',
+  'LIVE/社区/module_trends.js',
+  'LIVE/社区/module_supertopic.js',
+  'LIVE/社区/module_detail.js',
+  'LIVE/社区/module_ranking.js',
+  'LIVE/社区/module_forum.js',
+  'LIVE/社区/module_mytopic.js',
+  'LIVE/社区/trends.js',
+  'LIVE/直播/room_loading.js',
+  'LIVE/直播/live.js',
+  'LIVE/设定/main.js',
+  'LIVE/设定/patch.js'
+];
+
+// 从 GitHub API 获取文件树（包含每个文件的 git SHA，用于增量更新对比）
+async function fetchRepoFileTree(repo, branch) {
+  try {
+    const apiUrl = `https://api.github.com/repos/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
+    const res = await robustNetworkRequest({
+      url: apiUrl,
+      method: 'GET',
+      headers: { 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (res && res.ok && res.json && res.json.tree) {
+      const fileMap = {};
+      res.json.tree.forEach(item => {
+        if (item.type === 'blob' && item.path) {
+          fileMap[item.path] = item.sha;
+        }
+      });
+      return fileMap;
+    }
+  } catch (e) {
+    console.warn('[LUMA Update] ⚠️ 获取文件树失败，将全量下载:', e.message);
+  }
+  return null;
+}
+
+// 从本地热补丁记录中获取文件的 hash
+function getLocalFileHash(localFiles, filePath) {
+  if (!localFiles) return null;
+  const fileData = localFiles[filePath];
+  if (!fileData) return null;
+  if (typeof fileData === 'string') return null; // 旧格式没有 hash
+  if (fileData && fileData.hash) return fileData.hash;
+  return null;
+}
+
+// 从本地热补丁记录中获取文件内容
+function getLocalFileContent(localFiles, filePath) {
+  if (!localFiles) return null;
+  const fileData = localFiles[filePath];
+  if (!fileData) return null;
+  if (typeof fileData === 'string') return fileData;
+  if (fileData && typeof fileData.content === 'string') return fileData.content;
+  return null;
+}
+
 async function handleVersionUpdateClick() {
   const repo = (gitUpdateState.repoUrl || DEFAULT_GIT_REPO).trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
   const branch = (gitUpdateState.branch || DEFAULT_GIT_BRANCH).trim();
-
   if (gitUpdateState.hasUpdate) {
-    if (api.ui?.toast) api.ui.toast(`🚀 正在从 GitHub (${repo}) 下载最新代码包...`);
+    if (api.ui?.toast) api.ui.toast(`🚀 正在从 GitHub (${repo}) 检查并下载更新...`);
     
-    const filesToDownload = [
-      'manifest.json',
-      'style.css',
-      'LIVE/splash.js',
-      'LIVE/core.js',
-      'LIVE/数据/data_hub.js',
-      'LIVE/数据/fans_manager.js',
-      'LIVE/数据/guard_manager.js',
-      'LIVE/数据/checkin_manager.js',
-      'LIVE/数据/titles_manager.js',
-      'LIVE/主页/profile.js',
-      'LIVE/社区/community_store.js',
-      'LIVE/社区/module_trends.js',
-      'LIVE/社区/module_supertopic.js',
-      'LIVE/社区/module_detail.js',
-      'LIVE/社区/module_ranking.js',
-      'LIVE/社区/module_forum.js',
-      'LIVE/社区/module_mytopic.js',
-      'LIVE/社区/trends.js',
-      'LIVE/直播/room_loading.js',
-      'LIVE/直播/live.js',
-      'LIVE/设定/main.js',
-      'LIVE/设定/page_stack.js',
-      'LIVE/设定/patch.js'
-    ];
-
+    // 1. 获取本地热补丁记录（用于增量更新）
+    let localHotpatch = null;
+    try {
+      localHotpatch = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
+    } catch (e) {}
+    const localFiles = localHotpatch ? localHotpatch.files : null;
+    
+    // 2. 获取远程文件树（包含每个文件的 git SHA）
+    const remoteFileTree = await fetchRepoFileTree(repo, branch);
+    
+    // 3. 对比本地和远程的文件 hash，确定需要下载的文件
+    const filesToDownload = [];
+    const unchangedFiles = {};
+    
+    for (const filePath of HOTPATCH_FILES) {
+      const remoteHash = remoteFileTree ? remoteFileTree[filePath] : null;
+      const localHash = getLocalFileHash(localFiles, filePath);
+      
+      if (remoteHash && localHash && remoteHash === localHash) {
+        // 文件没变化，从本地复制
+        const localContent = getLocalFileContent(localFiles, filePath);
+        if (localContent) {
+          unchangedFiles[filePath] = { content: localContent, hash: localHash };
+          console.log(`[LUMA Update] ⏭️ ${filePath} 未变化，复用本地 (${localHash.slice(0, 7)})`);
+          continue;
+        }
+      }
+      
+      // 文件变化了或本地没有，需要下载
+      filesToDownload.push(filePath);
+    }
+    
+    console.log(`[LUMA Update] 📊 增量更新：共 ${HOTPATCH_FILES.length} 个文件，${filesToDownload.length} 个需要下载，${Object.keys(unchangedFiles).length} 个复用本地`);
+    
+    // 4. 下载变化的文件
     const downloadedFiles = {};
     let successCount = 0;
     let failCount = 0;
-    const totalFiles = filesToDownload.length;
-    console.log(`[LUMA Update] 开始下载 ${totalFiles} 个文件，仓库: ${repo}，分支: ${branch}`);
-
+    
     for (const filePath of filesToDownload) {
       try {
         const fileContent = await fetchSingleRepoFile(repo, branch, filePath);
         if (fileContent && typeof fileContent === 'string' && fileContent.trim()) {
-          // 检查是否下载到了 HTML 错误页面
           if (fileContent.trim().startsWith('<!DOCTYPE') || fileContent.trim().startsWith('<html')) {
-            console.error(`[LUMA Update] ❌ ${filePath} 下载到 HTML 错误页面 (${(fileContent.length / 1024).toFixed(1)}KB)`);
+            console.error(`[LUMA Update] ❌ ${filePath} 下载到 HTML 错误页面`);
             failCount++;
           } else {
-            downloadedFiles[filePath] = fileContent;
+            // 新格式：保存 content 和 hash（用远程 git SHA 作为 hash）
+            const remoteHash = remoteFileTree ? remoteFileTree[filePath] : '';
+            downloadedFiles[filePath] = { content: fileContent, hash: remoteHash };
             successCount++;
-            console.log(`[LUMA Update] ✅ ${filePath} 下载成功 (${(fileContent.length / 1024).toFixed(1)}KB)`);
+            console.log(`[LUMA Update] ✅ ${filePath} 下载成功 (${(fileContent.length / 1024).toFixed(1)}KB)${remoteHash ? ' [' + remoteHash.slice(0, 7) + ']' : ''}`);
           }
         } else {
           console.warn(`[LUMA Update] ⚠️ ${filePath} 内容为空，下载失败`);
@@ -1157,38 +1234,42 @@ async function handleVersionUpdateClick() {
         failCount++;
       }
     }
-
-    console.log(`[LUMA Update] 下载完成：成功 ${successCount}/${totalFiles}，失败 ${failCount}`);
-
-    if (successCount >= 10) {
-      // 成功下载大部分核心代码，写入热补丁引擎本地持久缓存
+    
+    // 5. 合并下载的文件和未变化的文件
+    const allFiles = { ...unchangedFiles, ...downloadedFiles };
+    const totalSuccess = Object.keys(allFiles).length;
+    
+    console.log(`[LUMA Update] 下载完成：新下载 ${successCount} 个，复用 ${Object.keys(unchangedFiles).length} 个，失败 ${failCount} 个，共 ${totalSuccess} 个可用`);
+    
+    if (totalSuccess >= 10) {
+      // 成功获取大部分核心代码，写入热补丁引擎本地持久缓存
       try {
-        // 用宿主数据库 api.db 存储热补丁（沙盒 iframe 无法访问 localStorage）
         const hotpatchData = {
           id: 'current_hotpatch',
-          files: downloadedFiles,
+          files: allFiles,
           version: gitUpdateState.latestVersion || APP_CURRENT_VERSION,
           commit: gitUpdateState.remoteCommit || '',
           time: Date.now()
         };
-        const totalSize = Object.values(downloadedFiles).reduce((sum, c) => sum + (typeof c === 'string' ? c.length : 0), 0);
-        // 先尝试 create，如果已存在则 update
+        const totalSize = Object.values(allFiles).reduce((sum, f) => {
+          const content = typeof f === 'string' ? f : (f.content || '');
+          return sum + content.length;
+        }, 0);
+        
         await api.db.create('app_hotpatch', hotpatchData).catch(() => {
           return api.db.update('app_hotpatch', 'current_hotpatch', hotpatchData);
         });
-        console.log(`[LUMA Update] 💾 热补丁已存入数据库，总大小: ${(totalSize / 1024).toFixed(1)}KB`);
+        console.log(`[LUMA Update] 💾 热补丁已存入数据库，总大小: ${(totalSize / 1024).toFixed(1)}KB，文件数: ${totalSuccess}`);
       } catch (e) {
         console.error('[LUMA Update] ❌ 写入热更新缓存异常:', e.message);
         if (api.ui?.toast) api.ui.toast(`存储失败: ${e.message}`);
         return;
       }
-
       gitUpdateState.currentVersion = gitUpdateState.latestVersion;
       if (gitUpdateState.remoteCommit) {
         gitUpdateState.localCommit = gitUpdateState.remoteCommit;
       }
       gitUpdateState.hasUpdate = false;
-
       await api.db.create("app_settings", {
         id: "git_repo_config",
         repoUrl: gitUpdateState.repoUrl,
@@ -1205,9 +1286,9 @@ async function handleVersionUpdateClick() {
           lastUpdated: Date.now()
         }).catch(() => {});
       });
-
       renderGitUpdateButton();
-      if (api.ui?.toast) api.ui.toast(`🎉 最新版本 (${gitUpdateState.currentVersion}) 下载覆盖成功！即将自动重启应用...`);
+      if (api.ui?.toast) api.ui.toast(`🎉 最新版本 (${gitUpdateState.currentVersion}) 下载成功！即将自动重启应用...`);
+      // 刷新页面，splash.js 会从 api.db 读取热补丁并动态加载最新代码
       setTimeout(() => {
         window.location.reload();
       }, 1000);
@@ -1215,7 +1296,6 @@ async function handleVersionUpdateClick() {
       if (api.ui?.toast) api.ui.toast(`网络连接超时，下载代码失败，请稍后重试`);
     }
   } else {
-    // 没更新，直接提示已是最新并触发重新检测
     if (api.ui?.toast) api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
     checkGitRepoUpdate(true);
   }

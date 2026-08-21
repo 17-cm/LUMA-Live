@@ -1,63 +1,242 @@
 /**
  * LUMA Live - 开屏启动画面模块 (Splash Screen Module)
  * 优雅衬线书写动画 · 柔和光圈 · 幻彩呼吸
+ * 
+ * 【重要】本文件是启动器，不参与热补丁更新，永远用原始版本。
+ * 负责：1) 从 api.db 读取热补丁 2) 动态加载所有 CSS/JS 文件 3) 显示开屏动画
  */
 (function initSplashScreenModule() {
   // =========================================================================
-  // 【热补丁启动注入】在所有业务脚本加载前，先应用 localStorage 中的热补丁 CSS
+  // 【动态文件加载器】根据热补丁数据，动态加载所有 CSS/JS 文件
+  // 如果有热补丁，用热补丁里的内容；否则用原始地址
   // =========================================================================
-  // 【热补丁启动注入】从宿主数据库 api.db 读取热补丁并注入 CSS
-  // 沙盒 iframe 无法访问 localStorage，必须用 api.db
-  (async function applyHotpatchCssEarly() {
-    // 等待 api 对象可用（宿主注入可能需要一点时间）
+  
+  // 需要动态加载的文件列表（按顺序，splash.js 本身不在此列表）
+  const APP_ASSET_FILES = [
+    'style.css',
+    'LIVE/设定/page_stack.js',
+    'LIVE/core.js',
+    'LIVE/数据/data_hub.js',
+    'LIVE/数据/fans_manager.js',
+    'LIVE/数据/guard_manager.js',
+    'LIVE/数据/checkin_manager.js',
+    'LIVE/数据/titles_manager.js',
+    'LIVE/主页/profile.js',
+    'LIVE/社区/community_store.js',
+    'LIVE/社区/module_trends.js',
+    'LIVE/社区/module_supertopic.js',
+    'LIVE/社区/module_detail.js',
+    'LIVE/社区/module_ranking.js',
+    'LIVE/社区/module_forum.js',
+    'LIVE/社区/module_mytopic.js',
+    'LIVE/社区/trends.js',
+    'LIVE/直播/room_loading.js',
+    'LIVE/直播/live.js',
+    'LIVE/设定/main.js',
+    'LIVE/设定/patch.js'
+  ];
+  
+  // 热补丁数据（从 api.db 读取）
+  let hotpatchFiles = null;
+  let hotpatchVersion = null;
+  let hotpatchCommit = null;
+  
+  // 等待 api 对象可用（宿主注入可能需要一点时间）
+  async function waitForApi() {
     let api = window.api || window.AiPhone || window.AiPhoneApp;
     let waitCount = 0;
-    while (!api && waitCount < 50) {
+    while (!api && waitCount < 100) {
       await new Promise(r => setTimeout(r, 50));
       api = window.api || window.AiPhone || window.AiPhoneApp;
       waitCount++;
     }
+    return api;
+  }
+  
+  // 从 api.db 读取热补丁
+  async function loadHotpatchFromDb() {
+    const api = await waitForApi();
     if (!api || !api.db) {
-      console.warn('[LUMA Hotpatch] ⚠️ api.db 不可用，跳过热补丁注入');
-      return;
+      console.warn('[LUMA Loader] ⚠️ api.db 不可用，跳过热补丁');
+      return null;
     }
     try {
-      const hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
-      if (!hotpatchRec || !hotpatchRec.files) {
-        console.log('[LUMA Hotpatch] 无热补丁数据，跳过 CSS 注入');
-        return;
+      const rec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
+      if (rec && rec.files) {
+        return rec;
       }
-      const files = hotpatchRec.files;
-      // 注入热补丁 CSS（覆盖旧样式）
-      if (files['style.css'] && typeof files['style.css'] === 'string' && files['style.css'].trim()) {
-        const cssContent = files['style.css'];
-        // 检查是否下载到了 HTML 错误页面
-        if (cssContent.trim().startsWith('<!DOCTYPE') || cssContent.trim().startsWith('<html')) {
-          console.error('[LUMA Hotpatch] ❌ style.css 是 HTML 错误页面，跳过');
-        } else {
-          const style = document.createElement('style');
-          style.id = 'luma-hotpatch-style';
-          style.setAttribute('data-hotpatch', 'true');
-          style.textContent = cssContent;
-          document.head.appendChild(style);
-          window.__lumaHotpatchCssApplied = true;
-          console.log(`[LUMA Hotpatch] ✅ style.css 已注入 (${(cssContent.length / 1024).toFixed(1)}KB)`);
+      return null;
+    } catch (e) {
+      console.error('[LUMA Loader] ❌ 读取热补丁异常:', e.message);
+      return null;
+    }
+  }
+  
+  // 从热补丁数据中获取文件内容
+  function getHotpatchFileContent(filePath) {
+    if (!hotpatchFiles) return null;
+    const fileData = hotpatchFiles[filePath];
+    if (!fileData) return null;
+    // 兼容两种格式：字符串 或 { content: "...", hash: "..." }
+    if (typeof fileData === 'string') return fileData;
+    if (fileData && typeof fileData.content === 'string') return fileData.content;
+    return null;
+  }
+  
+  // 检查内容是否是 HTML 错误页面
+  function isHtmlErrorPage(content) {
+    if (!content || typeof content !== 'string') return false;
+    const trimmed = content.trim();
+    return trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html');
+  }
+  
+  // 加载单个 CSS 文件
+  function loadCssFile(filePath) {
+    return new Promise((resolve) => {
+      const content = getHotpatchFileContent(filePath);
+      
+      if (content && !isHtmlErrorPage(content)) {
+        // 用热补丁内容创建 style 标签
+        const style = document.createElement('style');
+        style.setAttribute('data-hotpatch', 'true');
+        style.setAttribute('data-source', filePath);
+        style.textContent = content;
+        document.head.appendChild(style);
+        console.log(`[LUMA Loader] ✅ ${filePath} (热补丁, ${(content.length / 1024).toFixed(1)}KB)`);
+        resolve();
+      } else {
+        // 用原始地址加载
+        if (content && isHtmlErrorPage(content)) {
+          console.warn(`[LUMA Loader] ⚠️ ${filePath} 热补丁是 HTML 错误页面，回退到原始地址`);
+        }
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = filePath;
+        link.onload = () => {
+          console.log(`[LUMA Loader] ✅ ${filePath} (原始)`);
+          resolve();
+        };
+        link.onerror = () => {
+          console.error(`[LUMA Loader] ❌ ${filePath} 加载失败`);
+          resolve(); // 失败也继续，不阻塞其他文件
+        };
+        document.head.appendChild(link);
+      }
+    });
+  }
+  
+  // 加载单个 JS 文件
+  function loadJsFile(filePath) {
+    return new Promise((resolve) => {
+      const content = getHotpatchFileContent(filePath);
+      
+      if (content && !isHtmlErrorPage(content)) {
+        // 用热补丁内容创建 blob URL 加载
+        try {
+          const blob = new Blob([content], { type: 'application/javascript' });
+          const url = URL.createObjectURL(blob);
+          const script = document.createElement('script');
+          script.src = url;
+          script.async = false; // 确保按顺序执行
+          script.setAttribute('data-hotpatch', 'true');
+          script.setAttribute('data-source', filePath);
+          script.onload = () => {
+            URL.revokeObjectURL(url);
+            console.log(`[LUMA Loader] ✅ ${filePath} (热补丁, ${(content.length / 1024).toFixed(1)}KB)`);
+            resolve();
+          };
+          script.onerror = () => {
+            URL.revokeObjectURL(url);
+            console.error(`[LUMA Loader] ❌ ${filePath} 热补丁脚本加载失败，回退到原始地址`);
+            // 回退到原始地址
+            loadJsFileFromOriginal(filePath).then(resolve);
+          };
+          document.head.appendChild(script);
+        } catch (e) {
+          console.error(`[LUMA Loader] ❌ ${filePath} 创建 blob 失败:`, e.message);
+          loadJsFileFromOriginal(filePath).then(resolve);
         }
       } else {
-        console.warn('[LUMA Hotpatch] ⚠️ style.css 不存在或内容为空');
+        if (content && isHtmlErrorPage(content)) {
+          console.warn(`[LUMA Loader] ⚠️ ${filePath} 热补丁是 HTML 错误页面，回退到原始地址`);
+        }
+        loadJsFileFromOriginal(filePath).then(resolve);
       }
-      // 记录热补丁版本信息
-      if (hotpatchRec.version) {
-        window.__lumaHotpatchVersion = hotpatchRec.version;
-        window.__lumaHotpatchCommit = hotpatchRec.commit || '';
-        window.__lumaHotpatchActive = true;
-        console.log(`[LUMA Hotpatch] 📌 当前热补丁版本: ${hotpatchRec.version} ${hotpatchRec.commit ? '(' + hotpatchRec.commit + ')' : ''}`);
+    });
+  }
+  
+  // 从原始地址加载 JS 文件
+  function loadJsFileFromOriginal(filePath) {
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = filePath;
+      script.async = false;
+      script.onload = () => {
+        console.log(`[LUMA Loader] ✅ ${filePath} (原始)`);
+        resolve();
+      };
+      script.onerror = () => {
+        console.error(`[LUMA Loader] ❌ ${filePath} 原始地址加载失败`);
+        resolve(); // 失败也继续
+      };
+      document.head.appendChild(script);
+    });
+  }
+  
+  // 按顺序加载所有文件
+  async function loadAllAppFiles() {
+    console.log(`[LUMA Loader] 🚀 开始加载 ${APP_ASSET_FILES.length} 个文件...`);
+    const startTime = Date.now();
+    
+    for (const filePath of APP_ASSET_FILES) {
+      if (filePath.endsWith('.css')) {
+        await loadCssFile(filePath);
+      } else if (filePath.endsWith('.js')) {
+        await loadJsFile(filePath);
       }
-    } catch (e) {
-      console.error('[LUMA Hotpatch] ❌ CSS 注入异常:', e.message);
     }
-  })();
-
+    
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`[LUMA Loader] 🎉 所有文件加载完成，耗时 ${elapsed}s`);
+    
+    // 所有文件加载完成后，检查是否需要手动触发 DOMContentLoaded
+    // 因为我们是异步加载脚本，DOMContentLoaded 可能已经触发了
+    if (document.readyState === 'interactive' || document.readyState === 'complete') {
+      console.log('[LUMA Loader] 📢 document 已就绪，手动触发 DOMContentLoaded 事件');
+      // 延迟一点，确保最后一个脚本执行完成
+      setTimeout(() => {
+        document.dispatchEvent(new Event('DOMContentLoaded'));
+      }, 50);
+    }
+  }
+  
+  // 主启动流程
+  async function bootstrap() {
+    // 1. 从 api.db 读取热补丁
+    const hotpatch = await loadHotpatchFromDb();
+    if (hotpatch && hotpatch.files) {
+      hotpatchFiles = hotpatch.files;
+      hotpatchVersion = hotpatch.version;
+      hotpatchCommit = hotpatch.commit;
+      window.__lumaHotpatchVersion = hotpatch.version;
+      window.__lumaHotpatchCommit = hotpatch.commit || '';
+      window.__lumaHotpatchActive = true;
+      console.log(`[LUMA Loader] 📌 检测到热补丁版本: ${hotpatch.version} ${hotpatch.commit ? '(' + hotpatch.commit + ')' : ''}`);
+    } else {
+      console.log('[LUMA Loader] 无热补丁数据，加载原始文件');
+    }
+    
+    // 2. 加载所有 APP 文件
+    await loadAllAppFiles();
+  }
+  
+  // 启动（不阻塞开屏动画）
+  bootstrap();
+  
+  // =========================================================================
+  // 以下是原有的开屏动画代码
+  // =========================================================================
+  
   // 加载字体
   const fontLink = document.createElement('link');
   fontLink.rel = 'stylesheet';
@@ -81,8 +260,6 @@
       transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease-out;
     }
     #appSplashScreen.splash-exit { transform: scale(1.04); opacity: 0; pointer-events: none; }
-
-    /* 背景星点 */
     .splash-stars { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
     .splash-star {
       position: absolute; width: 2px; height: 2px;
@@ -90,8 +267,6 @@
       animation: starTwinkle 3s ease-in-out infinite;
     }
     @keyframes starTwinkle { 0%,100%{opacity:0.15;transform:scale(0.7)} 50%{opacity:0.7;transform:scale(1.1)} }
-
-    /* 中心环境光晕 - 柔和 */
     .splash-ambient-glow {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
       width: 380px; height: 380px;
@@ -100,21 +275,15 @@
       animation: splashAmbientPulse 6s ease-in-out infinite alternate; z-index: 1;
     }
     @keyframes splashAmbientPulse { 0%{transform:translate(-50%,-50%) scale(0.85);opacity:0.6} 100%{transform:translate(-50%,-50%) scale(1.15);opacity:0.9} }
-
-    /* 品牌舞台 - 严格居中 */
     .splash-brand-stage {
       position: relative; display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       z-index: 10; width: 100%;
     }
-
-    /* logo + 圆圈的组合容器 */
     .splash-logo-wrap {
       position: relative; display: flex; align-items: center; justify-content: center;
       width: 320px; height: 200px;
     }
-
-    /* 圆圈 SVG */
     .splash-ring-svg {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
       width: 300px; height: 300px; pointer-events: none; z-index: 5;
@@ -143,8 +312,6 @@
       0% { filter: drop-shadow(0 0 4px rgba(200,168,255,0.3)); opacity: 0.7; }
       100% { filter: drop-shadow(0 0 12px rgba(200,168,255,0.6)) drop-shadow(0 0 20px rgba(244,63,94,0.3)); opacity: 1; }
     }
-
-    /* LUMA 文字 - Playfair Display 优雅衬线斜体 */
     .splash-logo-letters {
       font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
       font-size: clamp(64px, 16vw, 96px);
@@ -153,10 +320,8 @@
       position: relative; z-index: 6; cursor: default;
       text-align: center;
       padding: 0.15em 0.3em;
-      /* 初始：细描边 */
       -webkit-text-stroke: 0.6px rgba(255,255,255,0.2);
       color: transparent;
-      /* 书写渐变 */
       background: linear-gradient(90deg,
         rgba(255,255,255,0.95) 0%,
         rgba(235,220,255,0.9) 20%,
@@ -193,8 +358,6 @@
     }
     @keyframes splashLogoShimmer { 0%,100%{background-position:0% 0} 50%{background-position:100% 0} }
     @keyframes splashLogoFloat { 0%{transform:translateY(0)} 100%{transform:translateY(-4px)} }
-
-    /* 笔尖光点 */
     .splash-pen-tip {
       position: absolute; top: 50%; left: 0; width: 24px; height: 24px;
       transform: translate(-50%,-50%) scale(0);
@@ -208,8 +371,6 @@
       88%{opacity:1;transform:translate(-50%,-50%) scale(0.9)}
       100%{left:88%;transform:translate(-50%,-50%) scale(0.4);opacity:0}
     }
-
-    /* 副标题 - 明显斜体 */
     .splash-slogan-box {
       margin-top: 22px; opacity: 0; transform: translateY(12px);
       transition: all 0.7s cubic-bezier(0.16,1,0.3,1); z-index: 10;
@@ -225,8 +386,6 @@
       content:''; display:inline-block; width:28px; height:1px;
       background: linear-gradient(90deg, transparent, rgba(200,180,255,0.5), transparent);
     }
-
-    /* 底部区域 */
     .splash-bottom-section {
       position: absolute; bottom: calc(env(safe-area-inset-bottom, 24px) + 28px);
       left: 0; right: 0;
@@ -306,43 +465,26 @@
     const ring = document.getElementById('splashRingCircle');
     const slogan = document.getElementById('splashSloganBox');
     const progress = document.getElementById('splashProgressFill');
-
     container.classList.remove('splash-exit'); container.style.display = 'flex';
-
-    // 重置
     if (logo) { logo.classList.remove('writing','bloom'); void logo.offsetWidth; }
     if (penTip) penTip.classList.remove('active');
     if (ring) { ring.classList.remove('draw','draw-done'); ring.style.strokeDashoffset = '760'; void ring.offsetWidth; }
     if (slogan) slogan.classList.remove('show');
     if (progress) { progress.style.transition='none'; progress.style.width='0%'; }
-
     container.onclick = exitSplashScreen;
-
-    // 进度条
     setTimeout(() => { if (progress) { progress.style.transition='width 3000ms cubic-bezier(0.2,0.8,0.2,1)'; progress.style.width='100%'; } }, 100);
-
-    // ===== 动画时间线 =====
-    // 1. 开始书写 (350ms)
     setTimeout(() => {
       if (logo) logo.classList.add('writing');
       if (penTip) penTip.classList.add('active');
     }, 350);
-
-    // 2. 书写完成 - 文字绽放 + 开始画圈 (2350ms)
     setTimeout(() => {
       if (logo) { logo.classList.remove('writing'); logo.classList.add('bloom'); }
       if (ring) { ring.classList.add('draw'); }
     }, 2350);
-
-    // 3. 圈画完 - 持续柔和发光 (3500ms)
     setTimeout(() => {
       if (ring) { ring.classList.remove('draw'); ring.classList.add('draw-done'); }
     }, 3500);
-
-    // 4. 副标题淡入 (2700ms)
     setTimeout(() => { if (slogan) slogan.classList.add('show'); }, 2700);
-
-    // 5. 自动退出 (4000ms)
     if (splashTimerId) clearTimeout(splashTimerId);
     splashTimerId = setTimeout(exitSplashScreen, 4000);
   }
@@ -357,6 +499,10 @@
 
   window.playSplashScreen = runSplashScreenAnimation;
   window.exitSplashScreen = exitSplashScreen;
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', runSplashScreenAnimation);
-  else runSplashScreenAnimation();
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', runSplashScreenAnimation, { once: true });
+  } else {
+    runSplashScreenAnimation();
+  }
 })();
