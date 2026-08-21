@@ -1310,10 +1310,10 @@ input:checked + .switch-slider:before {
 
 .profile-top-nav {
   position: absolute;
-  top: 0;
+  top: max(var(--safe-top), 12px);
   left: 0;
   right: 0;
-  padding: 12px 14px;
+  padding: 0 14px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
