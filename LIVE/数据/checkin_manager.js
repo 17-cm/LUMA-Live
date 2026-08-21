@@ -108,7 +108,17 @@
 
 hub.saveCheckinsMap(map);
 
-      // 同步到 api.db 持久层，保证重新进入 APP 后不丢数据
+      // 直接写入 localStorage 备份 (用 api.db 同款前缀 luma_db_，确保同步落盘)
+      const backupKey = 'luma_checkin_records';
+      try {
+        const existing = JSON.parse(localStorage.getItem(`luma_db_${backupKey}`) || '[]');
+        const idx = existing.findIndex(r => r.id === key);
+        if (idx >= 0) existing[idx] = { id: key, ...map[key] };
+        else existing.push({ id: key, ...map[key] });
+        localStorage.setItem(`luma_db_${backupKey}`, JSON.stringify(existing));
+      } catch (e) {}
+
+      // 同步到 api.db 持久层 (沙盒真实落盘)
       try {
         const api = window.api || {};
         if (api.db && typeof api.db.create === 'function') {
