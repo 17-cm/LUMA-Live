@@ -9,20 +9,36 @@
   (function applyHotpatchCssEarly() {
     try {
       const raw = localStorage.getItem('luma_hotpatch_files');
-      if (!raw) return;
-      const files = JSON.parse(raw);
-      if (!files || typeof files !== 'object') return;
-
-      // 注入热补丁 CSS（覆盖旧样式）
-      if (files['style.css']) {
-        const style = document.createElement('style');
-        style.id = 'luma-hotpatch-style';
-        style.setAttribute('data-hotpatch', 'true');
-        style.textContent = files['style.css'];
-        document.head.appendChild(style);
-        window.__lumaHotpatchCssApplied = true;
+      if (!raw) {
+        console.log('[LUMA Hotpatch] 无热补丁数据，跳过 CSS 注入');
+        return;
       }
-
+      let files;
+      try {
+        files = JSON.parse(raw);
+      } catch (parseErr) {
+        console.error('[LUMA Hotpatch] 热补丁数据解析失败:', parseErr.message);
+        return;
+      }
+      if (!files || typeof files !== 'object') return;
+      // 注入热补丁 CSS（覆盖旧样式）
+      if (files['style.css'] && typeof files['style.css'] === 'string' && files['style.css'].trim()) {
+        const cssContent = files['style.css'];
+        // 检查是否下载到了 HTML 错误页面
+        if (cssContent.trim().startsWith('<!DOCTYPE') || cssContent.trim().startsWith('<html')) {
+          console.error('[LUMA Hotpatch] ❌ style.css 下载到的是 HTML 错误页面，不是有效 CSS，跳过');
+        } else {
+          const style = document.createElement('style');
+          style.id = 'luma-hotpatch-style';
+          style.setAttribute('data-hotpatch', 'true');
+          style.textContent = cssContent;
+          document.head.appendChild(style);
+          window.__lumaHotpatchCssApplied = true;
+          console.log(`[LUMA Hotpatch] ✅ style.css 已注入 (${(cssContent.length / 1024).toFixed(1)}KB)`);
+        }
+      } else {
+        console.warn('[LUMA Hotpatch] ⚠️ style.css 不存在或内容为空');
+      }
       // 记录热补丁版本信息，供后续显示
       const hpVersion = localStorage.getItem('luma_hotpatch_version');
       const hpCommit = localStorage.getItem('luma_hotpatch_commit');
@@ -30,9 +46,10 @@
         window.__lumaHotpatchVersion = hpVersion;
         window.__lumaHotpatchCommit = hpCommit || '';
         window.__lumaHotpatchActive = true;
+        console.log(`[LUMA Hotpatch] 📌 当前热补丁版本: ${hpVersion} ${hpCommit ? '(' + hpCommit + ')' : ''}`);
       }
     } catch (e) {
-      console.warn('[LUMA Hotpatch] CSS 注入失败:', e);
+      console.error('[LUMA Hotpatch] ❌ CSS 注入异常:', e.message);
     }
   })();
 

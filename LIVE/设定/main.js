@@ -467,8 +467,6 @@ async function saveCustomApiSettingsModal() {
   window.customApiConfig.text.url = inputUrl?.value.trim() || '';
   window.customApiConfig.text.key = inputKey?.value.trim() || '';
   window.customApiConfig.text.model = selectModel?.value || 'gpt-3.5-turbo';
-  // 保存自定义接口时，自动切换为自定义模式以确保即时生效
-  window.customApiConfig.enableGlobalModel = false;
 
   if (typeof saveDbSetting === 'function') {
     await saveDbSetting("custom_api_config", window.customApiConfig);
@@ -677,8 +675,6 @@ async function saveCustomImageApiSettingsModal() {
   window.customApiConfig.image.url = inputUrl?.value.trim() || '';
   window.customApiConfig.image.key = inputKey?.value.trim() || '';
   window.customApiConfig.image.model = modelVal;
-  // 保存自定义生图接口时，自动切换为自定义生图模式
-  window.customApiConfig.enableGlobalImageModel = false;
 
   if (typeof saveDbSetting === 'function') {
     await saveDbSetting("custom_api_config", window.customApiConfig);
@@ -1238,28 +1234,48 @@ async function handleVersionUpdateClick() {
 
     const downloadedFiles = {};
     let successCount = 0;
+    let failCount = 0;
+    const totalFiles = filesToDownload.length;
+    console.log(`[LUMA Update] 开始下载 ${totalFiles} 个文件，仓库: ${repo}，分支: ${branch}`);
 
     for (const filePath of filesToDownload) {
       try {
         const fileContent = await fetchSingleRepoFile(repo, branch, filePath);
-        if (fileContent) {
-          downloadedFiles[filePath] = fileContent;
-          successCount++;
+        if (fileContent && typeof fileContent === 'string' && fileContent.trim()) {
+          // 检查是否下载到了 HTML 错误页面
+          if (fileContent.trim().startsWith('<!DOCTYPE') || fileContent.trim().startsWith('<html')) {
+            console.error(`[LUMA Update] ❌ ${filePath} 下载到 HTML 错误页面 (${(fileContent.length / 1024).toFixed(1)}KB)`);
+            failCount++;
+          } else {
+            downloadedFiles[filePath] = fileContent;
+            successCount++;
+            console.log(`[LUMA Update] ✅ ${filePath} 下载成功 (${(fileContent.length / 1024).toFixed(1)}KB)`);
+          }
+        } else {
+          console.warn(`[LUMA Update] ⚠️ ${filePath} 内容为空，下载失败`);
+          failCount++;
         }
       } catch (err) {
-        console.warn(`下载文件 ${filePath} 失败:`, err);
+        console.error(`[LUMA Update] ❌ ${filePath} 下载异常:`, err.message);
+        failCount++;
       }
     }
+
+    console.log(`[LUMA Update] 下载完成：成功 ${successCount}/${totalFiles}，失败 ${failCount}`);
 
     if (successCount >= 10) {
       // 成功下载大部分核心代码，写入热补丁引擎本地持久缓存
       try {
-        localStorage.setItem('luma_hotpatch_files', JSON.stringify(downloadedFiles));
+        const jsonStr = JSON.stringify(downloadedFiles);
+        localStorage.setItem('luma_hotpatch_files', jsonStr);
         localStorage.setItem('luma_hotpatch_version', gitUpdateState.latestVersion || APP_CURRENT_VERSION);
         localStorage.setItem('luma_hotpatch_commit', gitUpdateState.remoteCommit || '');
         localStorage.setItem('luma_hotpatch_time', String(Date.now()));
+        console.log(`[LUMA Update] 💾 热补丁已存入 localStorage，总大小: ${(jsonStr.length / 1024).toFixed(1)}KB`);
       } catch (e) {
-        console.warn('写入热更新缓存异常:', e);
+        console.error('[LUMA Update] ❌ 写入热更新缓存异常（可能是 localStorage 空间不足）:', e.message);
+        if (api.ui?.toast) api.ui.toast(`存储失败: ${e.message}`);
+        return;
       }
 
       gitUpdateState.currentVersion = gitUpdateState.latestVersion;
