@@ -6,27 +6,34 @@
   // =========================================================================
   // 【热补丁启动注入】在所有业务脚本加载前，先应用 localStorage 中的热补丁 CSS
   // =========================================================================
-  (function applyHotpatchCssEarly() {
+  // 【热补丁启动注入】从宿主数据库 api.db 读取热补丁并注入 CSS
+  // 沙盒 iframe 无法访问 localStorage，必须用 api.db
+  (async function applyHotpatchCssEarly() {
+    // 等待 api 对象可用（宿主注入可能需要一点时间）
+    let api = window.api || window.AiPhone || window.AiPhoneApp;
+    let waitCount = 0;
+    while (!api && waitCount < 50) {
+      await new Promise(r => setTimeout(r, 50));
+      api = window.api || window.AiPhone || window.AiPhoneApp;
+      waitCount++;
+    }
+    if (!api || !api.db) {
+      console.warn('[LUMA Hotpatch] ⚠️ api.db 不可用，跳过热补丁注入');
+      return;
+    }
     try {
-      const raw = localStorage.getItem('luma_hotpatch_files');
-      if (!raw) {
+      const hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
+      if (!hotpatchRec || !hotpatchRec.files) {
         console.log('[LUMA Hotpatch] 无热补丁数据，跳过 CSS 注入');
         return;
       }
-      let files;
-      try {
-        files = JSON.parse(raw);
-      } catch (parseErr) {
-        console.error('[LUMA Hotpatch] 热补丁数据解析失败:', parseErr.message);
-        return;
-      }
-      if (!files || typeof files !== 'object') return;
+      const files = hotpatchRec.files;
       // 注入热补丁 CSS（覆盖旧样式）
       if (files['style.css'] && typeof files['style.css'] === 'string' && files['style.css'].trim()) {
         const cssContent = files['style.css'];
         // 检查是否下载到了 HTML 错误页面
         if (cssContent.trim().startsWith('<!DOCTYPE') || cssContent.trim().startsWith('<html')) {
-          console.error('[LUMA Hotpatch] ❌ style.css 下载到的是 HTML 错误页面，不是有效 CSS，跳过');
+          console.error('[LUMA Hotpatch] ❌ style.css 是 HTML 错误页面，跳过');
         } else {
           const style = document.createElement('style');
           style.id = 'luma-hotpatch-style';
@@ -39,14 +46,12 @@
       } else {
         console.warn('[LUMA Hotpatch] ⚠️ style.css 不存在或内容为空');
       }
-      // 记录热补丁版本信息，供后续显示
-      const hpVersion = localStorage.getItem('luma_hotpatch_version');
-      const hpCommit = localStorage.getItem('luma_hotpatch_commit');
-      if (hpVersion) {
-        window.__lumaHotpatchVersion = hpVersion;
-        window.__lumaHotpatchCommit = hpCommit || '';
+      // 记录热补丁版本信息
+      if (hotpatchRec.version) {
+        window.__lumaHotpatchVersion = hotpatchRec.version;
+        window.__lumaHotpatchCommit = hotpatchRec.commit || '';
         window.__lumaHotpatchActive = true;
-        console.log(`[LUMA Hotpatch] 📌 当前热补丁版本: ${hpVersion} ${hpCommit ? '(' + hpCommit + ')' : ''}`);
+        console.log(`[LUMA Hotpatch] 📌 当前热补丁版本: ${hotpatchRec.version} ${hotpatchRec.commit ? '(' + hotpatchRec.commit + ')' : ''}`);
       }
     } catch (e) {
       console.error('[LUMA Hotpatch] ❌ CSS 注入异常:', e.message);

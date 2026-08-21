@@ -1266,14 +1266,22 @@ async function handleVersionUpdateClick() {
     if (successCount >= 10) {
       // 成功下载大部分核心代码，写入热补丁引擎本地持久缓存
       try {
-        const jsonStr = JSON.stringify(downloadedFiles);
-        localStorage.setItem('luma_hotpatch_files', jsonStr);
-        localStorage.setItem('luma_hotpatch_version', gitUpdateState.latestVersion || APP_CURRENT_VERSION);
-        localStorage.setItem('luma_hotpatch_commit', gitUpdateState.remoteCommit || '');
-        localStorage.setItem('luma_hotpatch_time', String(Date.now()));
-        console.log(`[LUMA Update] 💾 热补丁已存入 localStorage，总大小: ${(jsonStr.length / 1024).toFixed(1)}KB`);
+        // 用宿主数据库 api.db 存储热补丁（沙盒 iframe 无法访问 localStorage）
+        const hotpatchData = {
+          id: 'current_hotpatch',
+          files: downloadedFiles,
+          version: gitUpdateState.latestVersion || APP_CURRENT_VERSION,
+          commit: gitUpdateState.remoteCommit || '',
+          time: Date.now()
+        };
+        const totalSize = Object.values(downloadedFiles).reduce((sum, c) => sum + (typeof c === 'string' ? c.length : 0), 0);
+        // 先尝试 create，如果已存在则 update
+        await api.db.create('app_hotpatch', hotpatchData).catch(() => {
+          return api.db.update('app_hotpatch', 'current_hotpatch', hotpatchData);
+        });
+        console.log(`[LUMA Update] 💾 热补丁已存入数据库，总大小: ${(totalSize / 1024).toFixed(1)}KB`);
       } catch (e) {
-        console.error('[LUMA Update] ❌ 写入热更新缓存异常（可能是 localStorage 空间不足）:', e.message);
+        console.error('[LUMA Update] ❌ 写入热更新缓存异常:', e.message);
         if (api.ui?.toast) api.ui.toast(`存储失败: ${e.message}`);
         return;
       }

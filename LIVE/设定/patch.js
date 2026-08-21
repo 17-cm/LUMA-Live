@@ -3,25 +3,29 @@
   // =========================================================================
   // 【热补丁 JS 执行】所有业务脚本加载完成后，用新版本代码覆盖旧函数
   // =========================================================================
-  function applyHotpatchJs() {
+  // 【热补丁 JS 执行】从宿主数据库 api.db 读取热补丁，用新版本代码覆盖旧函数
+  // 沙盒 iframe 无法访问 localStorage，必须用 api.db
+  async function applyHotpatchJs() {
     if (window.__lumaHotpatchJsApplied) return;
+    // 等待 api 对象可用
+    let api = window.api || window.AiPhone || window.AiPhoneApp;
+    let waitCount = 0;
+    while (!api && waitCount < 50) {
+      await new Promise(r => setTimeout(r, 50));
+      api = window.api || window.AiPhone || window.AiPhoneApp;
+      waitCount++;
+    }
+    if (!api || !api.db) {
+      console.warn('[LUMA Hotpatch] ⚠️ api.db 不可用，跳过 JS 热补丁');
+      return;
+    }
     try {
-      const raw = localStorage.getItem('luma_hotpatch_files');
-      if (!raw) {
-        console.log('[LUMA Hotpatch] 无热补丁数据，跳过');
+      const hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
+      if (!hotpatchRec || !hotpatchRec.files) {
+        console.log('[LUMA Hotpatch] 无热补丁数据，跳过 JS 注入');
         return;
       }
-      let files;
-      try {
-        files = JSON.parse(raw);
-      } catch (parseErr) {
-        console.error('[LUMA Hotpatch] 热补丁数据解析失败，数据可能已损坏:', parseErr.message);
-        return;
-      }
-      if (!files || typeof files !== 'object') {
-        console.warn('[LUMA Hotpatch] 热补丁数据格式错误');
-        return;
-      }
+      const files = hotpatchRec.files;
       const fileCount = Object.keys(files).length;
       console.log(`[LUMA Hotpatch] 检测到 ${fileCount} 个热补丁文件，开始应用...`);
       // 需要排除的文件：splash.js（已执行完，重执行会重播启动动画）
@@ -37,15 +41,14 @@
           failCount++;
           continue;
         }
-        // 检查是否下载到了 HTML 错误页面（GitHub 404 等）
+        // 检查是否下载到了 HTML 错误页面
         if (fileContent.trim().startsWith('<!DOCTYPE') || fileContent.trim().startsWith('<html')) {
-          console.error(`[LUMA Hotpatch] ❌ ${filePath} 下载到的是 HTML 错误页面，不是有效 JS，跳过`);
+          console.error(`[LUMA Hotpatch] ❌ ${filePath} 是 HTML 错误页面，跳过`);
           failCount++;
           continue;
         }
         try {
           // 用动态创建 script 标签的方式加载，比 eval 更接近正常脚本加载
-          // 用 Blob URL 避免内联脚本限制
           const blob = new Blob([fileContent], { type: 'application/javascript' });
           const url = URL.createObjectURL(blob);
           const script = document.createElement('script');
@@ -76,6 +79,7 @@
       console.error('[LUMA Hotpatch] ❌ JS 热补丁应用异常:', e.message);
     }
   }
+
   function install() {
     // 先应用 JS 热补丁（更新所有函数到最新版本）
     applyHotpatchJs();
