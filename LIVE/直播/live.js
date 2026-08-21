@@ -1034,7 +1034,7 @@ function startComboTimer() {
   const counterNum = document.getElementById('comboCounterNumber');
 
   if (circleBtn) {
-    circleBtn.classList.remove('hidden');
+    circleBtn.classList.add('active');
     circleBtn.classList.add('bounce');
     setTimeout(() => circleBtn.classList.remove('bounce'), 200);
   }
@@ -1059,7 +1059,7 @@ function startComboTimer() {
 function endComboSession() {
   liveComboSession.active = false;
   const circleBtn = document.getElementById('liveComboCircleBtn');
-  if (circleBtn) circleBtn.classList.add('hidden');
+  if (circleBtn) circleBtn.classList.remove('active');
   if (liveComboSession.bannerEl && liveComboSession.bannerEl.parentNode) {
     setTimeout(() => {
       if (liveComboSession.bannerEl && liveComboSession.bannerEl.parentNode) {

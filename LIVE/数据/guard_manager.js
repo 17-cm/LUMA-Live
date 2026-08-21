@@ -311,8 +311,8 @@
     if (matrix[key]) {
       return matrix[key].totalAmount || 0;
     }
-    const raw = localStorage.getItem(`luma_char_contribution_${charId}`);
-    return raw ? parseInt(raw, 10) : 0;
+    // 沙盒 iframe 无 allow-same-origin 权限，localStorage 不可用，直接返回 0
+    return 0;
   };
 
   window.addCharContributionScore = function(charId, addAmount) {
