@@ -190,6 +190,43 @@ async function saveAllParamsExplicitly() {
 }
 window.saveAllParamsExplicitly = saveAllParamsExplicitly;
 
+// =========================================================================
+// API 请求间隔设置
+// =========================================================================
+function updateApiIntervalDisplay(value) {
+  const minutes = Number(value) || 5;
+  const valEl = document.getElementById('valApiInterval');
+  const tagEl = document.getElementById('tagApiInterval');
+  if (valEl) valEl.textContent = `${minutes} 分钟`;
+  if (tagEl) tagEl.textContent = `${minutes} 分钟`;
+  if (!window.appParams) window.appParams = {};
+  window.appParams.apiRequestInterval = minutes;
+}
+window.updateApiIntervalDisplay = updateApiIntervalDisplay;
+
+async function saveApiIntervalSetting() {
+  try {
+    if (!window.appParams) window.appParams = {};
+    const minutes = window.appParams.apiRequestInterval || 5;
+    await api.db.create("app_settings", { id: "global_params", ...window.appParams }).catch(() => {
+      api.db.update("app_settings", "global_params", window.appParams).catch(() => {});
+    });
+    api.ui.toast(`API请求间隔已保存为 ${minutes} 分钟`);
+  } catch (e) {
+    api.ui.toast("保存成功");
+  }
+}
+window.saveApiIntervalSetting = saveApiIntervalSetting;
+
+// 获取 API 请求间隔（分钟），默认 5 分钟
+function getApiRequestIntervalMinutes() {
+  if (window.appParams && window.appParams.apiRequestInterval) {
+    return Number(window.appParams.apiRequestInterval) || 5;
+  }
+  return 5;
+}
+window.getApiRequestIntervalMinutes = getApiRequestIntervalMinutes;
+
 // 4. 数据备份、导出与导入
 function downloadAppZipFile() {
   api.ui.toast("正在打包小手机应用离线运行包...");

@@ -509,6 +509,42 @@
           </div>
         </div>
 
+        <!-- 抽屉 1.5: API请求时间 -->
+        <div class="accordion-item" id="accItemApiInterval">
+          <div class="accordion-header" onclick="toggleAccordion('accItemApiInterval')">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <h4 class="text-xs font-black text-slate-900">API请求时间</h4>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-bold text-cyan-600 bg-cyan-50 px-1.5 py-0.5 rounded" id="tagApiInterval">5 分钟</span>
+              <svg class="accordion-chevron w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+          </div>
+          <div class="accordion-body space-y-2">
+            <div class="h-[1px] bg-slate-100 mb-2"></div>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-[11px] font-bold text-slate-700">直播间API请求间隔时间</span>
+                <span id="valApiInterval" class="text-cyan-600 font-bold">5 分钟</span>
+              </div>
+              <p class="text-[9px] text-slate-400 mb-1.5">弹幕池内容快用完时，间隔多久请求一次AI打包新内容。间隔越长越省请求次数，越短实时感越强。</p>
+              <input type="range" id="paramApiInterval" min="3" max="10" value="5" step="1" oninput="updateApiIntervalDisplay(this.value)" class="jelly-slider">
+              <div class="flex justify-between text-[8px] text-slate-400 font-bold">
+                <span>3 分钟（省请求）</span>
+                <span>10 分钟（最省）</span>
+              </div>
+            </div>
+            <div class="pt-2">
+              <button onclick="saveApiIntervalSetting()" class="btn-brand w-full py-2 justify-center text-xs font-bold shadow-sm">
+                <span>保存设置</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- 抽屉 2: 预设提示词 -->
         <div class="accordion-item" id="accItem2">
           <div class="accordion-header" onclick="toggleAccordion('accItem2')">

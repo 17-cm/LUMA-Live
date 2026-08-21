@@ -224,29 +224,28 @@
       console.warn('[GiftSystem] 全屏特效失败:', e.message);
     }
 
-    // 11. AI 生成主播感谢回复（try-catch，后台异步，不阻塞）
+    // 11. 送礼记录只存在当前直播间内存变量里（不写全局记忆，避免串台）
+    // 下次打包弹幕时，从这里检索送礼记录，让 AI 在台词里自然感谢
     try {
-      if (window.currentRoom && typeof window.aiGenerate === 'function') {
-        window.aiGenerate({
-          characterId: window.currentRoom.characterId,
-          appTags: ['live', 'reply'],
-          instruction: `【${uInfo.tag}】${uInfo.name}送了 ${qty} 个【${gift.name}】（总价值 ${totalCost} LUMA 币）给主播`
-        }).then(res => {
-          try {
-            const parsed = typeof window.extractJsonFromText === 'function' ? window.extractJsonFromText(res.text) : null;
-            if (parsed && parsed.speech) {
-              if (typeof window.renderHostSpeech === 'function') {
-                window.renderHostSpeech(parsed.speech, parsed.action || '激动地感谢');
-              }
-            } else {
-              if (typeof window.renderHostSpeech === 'function') {
-                window.renderHostSpeech(`哇！感谢【${uInfo.tag}】${uInfo.name}送出的 ${qty} 个【${gift.name}】，太给力了！`, '双手合十感谢');
-              }
-            }
-          } catch (e) {}
-        }).catch(() => {});
+      if (window.currentRoom) {
+        if (!window.currentRoom.giftHistory) {
+          window.currentRoom.giftHistory = [];
+        }
+        window.currentRoom.giftHistory.push({
+          giftName: gift.name,
+          count: qty,
+          totalCost: totalCost,
+          userName: uInfo.name,
+          time: Date.now()
+        });
+        // 只保留最近 20 条
+        if (window.currentRoom.giftHistory.length > 20) {
+          window.currentRoom.giftHistory = window.currentRoom.giftHistory.slice(-20);
+        }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[GiftSystem] 保存送礼记录失败:', e.message);
+    }
 
     console.log(`[GiftSystem] 送礼成功: ${gift.name} x${qty}, 花费 ${totalCost} 币`);
   }
