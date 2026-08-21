@@ -526,10 +526,15 @@ async function fetchBatchLivePackage() {
       giftHistoryText = '\n最近观众送礼记录：' + recentGifts.map(g => `${g.giftName}x${g.count}`).join('、') + '，请在台词里自然地感谢这些送礼。';
     }
     
+    // 从预设里读取打包 prompt，代码只保留动态内容（频道、标题、送礼记录）
+    const packagePrompt = (typeof window.getLivePackagePrompt === 'function') 
+      ? window.getLivePackagePrompt() 
+      : '请生成观众弹幕（danmakus数组）和主播互动台词（hostSpeeches数组，每条包含speech和action字段）。返回JSON格式。';
+    
     const res = await window.aiGenerate({
       characterId: currentRoom.characterId,
       appTags: ['live', 'package'],
-      instruction: `当前频道：${currentRoom.category}（${currentRoom.subTag}），标题：${currentRoom.topic}。请生成50条真实自然的观众弹幕（danmakus数组）和10条主播互动台词（hostSpeeches数组，每条包含speech和action字段）。弹幕内容要围绕当前话题，风格多样，有提问、有吐槽、有互动。台词要和弹幕内容呼应，有问有答。${giftHistoryText}`
+      instruction: `当前频道：${currentRoom.category}（${currentRoom.subTag}），标题：${currentRoom.topic}。${packagePrompt}${giftHistoryText}`
     });
 
     const parsed = window.extractJsonFromText(res.text);

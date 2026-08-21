@@ -631,7 +631,7 @@
           return await window.aiGenerate({
             characterId: session.characterId,
             appTags: ['live', 'package'],
-            instruction: `当前频道：${session.category || '综合'}（${session.subTag || '生活'}），标题：${session.topic || '直播间'}。请生成50条真实自然的观众弹幕（danmakus数组）和10条主播互动台词（hostSpeeches数组，每条包含speech和action字段）。弹幕内容要围绕当前话题，风格多样，有提问、有吐槽、有互动。台词要和弹幕内容呼应，有问有答。`
+            instruction: `当前频道：${session.category || '综合'}（${session.subTag || '生活'}），标题：${session.topic || '直播间'}。${(typeof window.getLivePackagePrompt === 'function') ? window.getLivePackagePrompt() : '请生成观众弹幕（danmakus数组）和主播互动台词（hostSpeeches数组，每条包含speech和action字段）。返回JSON格式。'}`
           });
         }
         return { text: '{"danmakus":[],"hostSpeeches":[]}' };

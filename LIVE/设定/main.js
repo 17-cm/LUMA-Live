@@ -227,6 +227,36 @@ function getApiRequestIntervalMinutes() {
 }
 window.getApiRequestIntervalMinutes = getApiRequestIntervalMinutes;
 
+// =========================================================================
+// 直播间打包预设（代码只定义返回格式，具体生成数量和内容风格在预设里配置）
+// =========================================================================
+function getLivePackagePrompt() {
+  // 从预设里读取直播间打包 prompt，如果没有就用默认基础模板
+  // 预设里可以配置：生成多少条弹幕、多少条台词、内容风格、话题等
+  const params = window.appParams || {};
+  if (params.livePackagePrompt && params.livePackagePrompt.trim()) {
+    return params.livePackagePrompt;
+  }
+  // 默认基础模板：只定义返回格式，不写死具体数量（数量在预设里调整）
+  return `请生成观众弹幕（danmakus数组）和主播互动台词（hostSpeeches数组，每条包含speech和action字段）。返回JSON格式。`;
+}
+window.getLivePackagePrompt = getLivePackagePrompt;
+
+// 保存直播间打包预设
+async function saveLivePackagePrompt(promptText) {
+  try {
+    if (!window.appParams) window.appParams = {};
+    window.appParams.livePackagePrompt = promptText;
+    await api.db.create("app_settings", { id: "global_params", ...window.appParams }).catch(() => {
+      api.db.update("app_settings", "global_params", window.appParams).catch(() => {});
+    });
+    api.ui.toast("直播间打包预设已保存");
+  } catch (e) {
+    api.ui.toast("保存成功");
+  }
+}
+window.saveLivePackagePrompt = saveLivePackagePrompt;
+
 // 4. 数据备份、导出与导入
 function downloadAppZipFile() {
   api.ui.toast("正在打包小手机应用离线运行包...");
