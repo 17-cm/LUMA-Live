@@ -1693,89 +1693,29 @@
   </div>
 
 
-  <!-- 模块化脚本动态加载（支持热补丁覆盖） -->
-  <script>
-  (function() {
-    var files = [
-      'LIVE/设定/app_presets.js',
-      'LIVE/core.js',
-      'LIVE/数据/data_hub.js',
-      'LIVE/数据/fans_manager.js',
-      'LIVE/数据/guard_manager.js',
-      'LIVE/数据/checkin_manager.js',
-      'LIVE/数据/titles_manager.js',
-      'LIVE/主页/profile.js',
-      'LIVE/社区/community_store.js',
-      'LIVE/社区/module_trends.js',
-      'LIVE/社区/module_supertopic.js',
-      'LIVE/社区/module_detail.js',
-      'LIVE/社区/module_ranking.js',
-      'LIVE/社区/module_forum.js',
-      'LIVE/社区/module_mytopic.js',
-      'LIVE/社区/trends.js',
-      'LIVE/直播/room_loading.js',
-      'LIVE/直播/live.js',
-      'LIVE/设定/main.js',
-      'LIVE/设定/patch.js',
-      'LIVE/设定/gift_system.js'
-    ];
-    var idx = 0;
-    var waited = 0;
-    var maxWait = 3000;
-
-    function getHotpatchContent(src) {
-      var f = window.__lumaHotpatchFiles;
-      if (!f) return null;
-      var data = f[src];
-      if (!data) return null;
-      return typeof data === 'string' ? data : (data.content || null);
-    }
-
-    function loadNext() {
-      if (idx >= files.length) {
-        // 所有脚本加载完毕，手动初始化 APP
-        // （动态加载发生在 DOMContentLoaded 之后，main.js 里的事件监听不会触发）
-        console.log('[ScriptLoader] 全部脚本加载完成，调用 lumaInitApp');
-        if (typeof window.lumaInitApp === 'function') {
-          window.lumaInitApp();
-        } else {
-          console.warn('[ScriptLoader] lumaInitApp 未定义，APP 可能无法初始化');
-        }
-        return;
-      }
-      var src = files[idx++];
-      var patched = getHotpatchContent(src);
-      var s = document.createElement('script');
-      if (patched && typeof patched === 'string' && patched.trim() && !patched.trim().startsWith('<!DOCTYPE')) {
-        s.textContent = patched;
-        document.body.appendChild(s);
-        loadNext();
-      } else {
-        s.src = src;
-        s.onload = loadNext;
-        s.onerror = function() {
-          console.warn('[ScriptLoader] 加载失败，跳过:', src);
-          loadNext();
-        };
-        document.body.appendChild(s);
-      }
-    }
-
-    function waitForHotpatch() {
-      if (window.__lumaHotpatchReady === true || waited >= maxWait) {
-        if (window.__lumaHotpatchFiles) {
-          console.log('[ScriptLoader] 热补丁就绪，共', Object.keys(window.__lumaHotpatchFiles).length, '个文件');
-        } else {
-          console.log('[ScriptLoader] 无热补丁，加载本地文件');
-        }
-        loadNext();
-      } else {
-        waited += 50;
-        setTimeout(waitForHotpatch, 50);
-      }
-    }
-    waitForHotpatch();
-  })();
-  </script>
+  <!-- 模块化脚本引用 -->
+  <script src="LIVE/设定/app_presets.js"></script>
+  <script src="LIVE/core.js"></script>
+  <!-- 统一数据中心体系 -->
+  <script src="LIVE/数据/data_hub.js"></script>
+  <script src="LIVE/数据/fans_manager.js"></script>
+  <script src="LIVE/数据/guard_manager.js"></script>
+  <script src="LIVE/数据/checkin_manager.js"></script>
+  <script src="LIVE/数据/titles_manager.js"></script>
+  <script src="LIVE/主页/profile.js"></script>
+  <!-- 社区 7 模块化架构系统 -->
+  <script src="LIVE/社区/community_store.js"></script>
+  <script src="LIVE/社区/module_trends.js"></script>
+  <script src="LIVE/社区/module_supertopic.js"></script>
+  <script src="LIVE/社区/module_detail.js"></script>
+  <script src="LIVE/社区/module_ranking.js"></script>
+  <script src="LIVE/社区/module_forum.js"></script>
+  <script src="LIVE/社区/module_mytopic.js"></script>
+  <script src="LIVE/社区/trends.js"></script>
+  <script src="LIVE/直播/room_loading.js"></script>
+  <script src="LIVE/直播/live.js"></script>
+  <script src="LIVE/设定/main.js"></script>
+  <script src="LIVE/设定/patch.js"></script>
+  <script src="LIVE/设定/gift_system.js"></script>
 </body>
 </html>
