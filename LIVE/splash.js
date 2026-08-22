@@ -124,7 +124,7 @@
         }
       }
 
-      // ---- 注入热补丁 JS（内联脚本，覆盖静态脚本已定义的函数）----
+      // ---- 注入热补丁 JS（module脚本，独立作用域，const/let不与全局冲突）----
       var jsInjected = 0;
       var jsFailed = false;
       for (var i = 0; i < JS_LOAD_ORDER.length; i++) {
@@ -137,6 +137,7 @@
         }
         try {
           var s = document.createElement('script');
+          s.type = 'module';
           s.textContent = jsContent;
           s.setAttribute('data-hotpatch', 'true');
           s.setAttribute('data-src', filePath);
@@ -151,8 +152,9 @@
 
       if (jsFailed) {
         console.error('[LUMA Hotpatch] ❌ 热补丁注入失败（' + jsInjected + '/' + JS_LOAD_ORDER.length + '），使用静态脚本');
+        finishInit();
       } else {
-        console.log('[LUMA Hotpatch] ✅ 全部 ' + jsInjected + ' 个 JS 文件内联注入成功');
+        console.log('[LUMA Hotpatch] ✅ 全部 ' + jsInjected + ' 个 JS 文件以 module 方式注入成功，等待执行...');
         window.__lumaHotpatchJsApplied = true;
         if (hotpatchRec.version) {
           window.__lumaHotpatchVersion = hotpatchRec.version;
@@ -161,9 +163,18 @@
           console.log('[LUMA Hotpatch] 📌 当前热补丁版本: ' + hotpatchRec.version
             + (hotpatchRec.commit ? ' (' + hotpatchRec.commit + ')' : ''));
         }
+        // module脚本异步执行（defer），轮询等待lumaInitApp可用后初始化
+        var initAttempts = 0;
+        function waitAndInit() {
+          initAttempts++;
+          if (initAttempts >= 10 || typeof window.lumaInitApp === 'function') {
+            finishInit();
+          } else {
+            setTimeout(waitAndInit, 50);
+          }
+        }
+        setTimeout(waitAndInit, 50);
       }
-
-      finishInit();
     } catch (e) {
       console.error('[LUMA Hotpatch] ❌ 热补丁注入异常:', e.message);
       finishInit();
