@@ -1178,20 +1178,24 @@
         </div>
       </div>
 
-      <!-- 微博 Tab 导航条 (粘性定位；动态 Tab 暂隐藏，等社区真实功能) -->
+      <!-- 微博 Tab 导航条 (粘性定位；动态 Tab 保留，随机内容已清空，等社区真实功能) -->
       <div class="sticky top-0 z-20 bg-white/95 backdrop-blur border-y border-slate-100 flex items-center justify-around px-2 shadow-xs">
-        <div onclick="switchSpTab('shows')" id="spTabShows" class="weibo-tab-item active">直播场次</div>
+        <div onclick="switchSpTab('posts')" id="spTabPosts" class="weibo-tab-item active">动态</div>
+        <div onclick="switchSpTab('shows')" id="spTabShows" class="weibo-tab-item">直播场次</div>
         <div onclick="switchSpTab('gallery')" id="spTabGallery" class="weibo-tab-item">相册</div>
         <div onclick="switchSpTab('guestbook')" id="spTabGuestbook" class="weibo-tab-item">留言墙</div>
       </div>
 
-      <!-- Tab 1: 直播场次与回放记录 -->
-      <div id="spPanelShows" class="p-3 space-y-3"></div>
+      <!-- Tab 1: 动态微博列表（随机内容已清空，显示空态） -->
+      <div id="spPanelPosts" class="p-3 space-y-3"></div>
+
+      <!-- Tab 2: 直播场次与回放记录 -->
+      <div id="spPanelShows" class="hidden p-3 space-y-3"></div>
 
       <!-- Tab 2: 相册影集 -->
       <div id="spPanelGallery" class="hidden p-3"></div>
 
-      <!-- Tab 3: 留言墙与守护榜 -->
+      <!-- Tab 4: 留言墙与守护榜 -->
       <div id="spPanelGuestbook" class="hidden p-3 space-y-3">
         <!-- 留言输入框 -->
         <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs space-y-2">

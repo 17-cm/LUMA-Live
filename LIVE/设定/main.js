@@ -935,7 +935,7 @@ window.executeConfirmResetAppData = executeConfirmResetAppData;
 // =========================================================================
 const APP_CURRENT_VERSION = ''; // 启动时从宿主 manifest 读取，不硬编码
 const DEFAULT_GIT_REPO = '17-cm/LUMA-Live';
-const DEFAULT_GIT_BRANCH = 'moon';
+const DEFAULT_GIT_BRANCH = 'star';
 
 let gitUpdateState = {
   currentVersion: APP_CURRENT_VERSION,

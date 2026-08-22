@@ -12,7 +12,7 @@ var api = window.api || {};
 // -------------------------------------------------------------------------
 window.streamerProfilesMap = window.streamerProfilesMap || {};
 window.currentViewingProfile = null;
-window.activeSpTab = 'shows';   // 默认 Tab：直播场次（动态 Tab 已隐藏，等社区真实功能）
+window.activeSpTab = 'posts';   // 默认 Tab：动态（动态 Tab 保留，随机内容已清空）
 
 // -------------------------------------------------------------------------
 // 主播人设预设（初始值兜底库：AI 生成不可用/失败时回退）
@@ -188,13 +188,108 @@ function incrementStreamerLiveShow(characterId) {
 window.incrementStreamerLiveShow = incrementStreamerLiveShow;
 
 // -------------------------------------------------------------------------
-// AI 初始值生成：读取角色人设 + 世界书，生成符合设定的档案五项
-// （个性签名 / 平台认证 / IP属地 / 粉丝团前缀 / 四个#标签）
-// 失败时返回 null，由调用方回退到兜底预设值
+// 【本地规则引擎】档案初始值生成（不调 API，纯本地 SDK 读取 + 规则匹配）
+// 首次打开主播主页时：读取角色人设 + 世界书 → 本地关键词识别风格/世界观
+// → 从预置模板库按风格随机组合生成档案五项，瞬时完成，结果缓存到宿主 db
 // -------------------------------------------------------------------------
-async function generateProfileAISettings(characterId) {
+
+// 风格库：关键词 → 档案模板（个签/认证/粉丝团前缀/标签候选池）
+const PROFILE_STYLE_LIBRARY = {
+  cool: {
+    keywords: ['傲', '冷', '高冷', '毒舌', '犀利', '不服', '学霸', '女王', '酷', '拽', '冰山'],
+    bioPool: ['白天高冷话少，晚上峡谷乱杀，别惹我。', '我行我素，只对值得的人温柔。', '胜负欲拉满，菜就多练，谢绝抬杠。'],
+    verifyPool: ['LUMA年度认证大V主播 · 个性赛道', 'LUMA平台认证人气主播 · 高能对决'],
+    fanClubPool: ['星环战队', '冷焰骑士', '孤傲之巅'],
+    tagsPool: ['#高冷学霸', '#峡谷之巅', '#深夜开黑', '#人间清醒', '#单排百星', '#技术流', '#不服来战', '#反差萌']
+  },
+  warm: {
+    keywords: ['温柔', '治愈', '暖', '甜', '贴心', '邻家', '软', '陪伴'],
+    bioPool: ['把温柔和好心情都留给你，每晚见。', '想成为你屏幕那头的治愈小太阳。', '生活很苦，但直播间很甜。'],
+    verifyPool: ['LUMA年度认证大V主播 · 治愈赛道', 'LUMA平台认证人气主播 · 暖心陪伴'],
+    fanClubPool: ['暖阳小筑', '蜜糖小屋', '星语心愿'],
+    tagsPool: ['#治愈系', '#温柔电台', '#深夜陪伴', '#暖心互动', '#睡前故事', '#晚安电台']
+  },
+  tech: {
+    keywords: ['赛博', '科技', '机械', '未来', '虚拟', '数据', '芯片', '电子', '歌姬', 'AI', '星舰'],
+    bioPool: ['来自赛博星云的低语，数据流里为你亮灯。', '代码写不出心跳，但直播间可以。', '穿越数据洪流，只为今晚见你。'],
+    verifyPool: ['LUMA年度认证大V主播 · 次元科技赛道', 'LUMA平台认证人气主播 · 未来之声'],
+    fanClubPool: ['量子脉冲', '霓虹数据', '星环协议'],
+    tagsPool: ['#赛博歌姬', '#虚拟偶像', '#电子音乐', '#未来之声', '#数据幻境', '#深夜电波']
+  },
+  cute: {
+    keywords: ['可爱', '萌', '元气', '活泼', '萝莉', '甜妹', '俏皮', '治愈系'],
+    bioPool: ['元气满满营业中，今天也要开心呀！', '可可爱爱没有脑袋，只会唱歌跳舞。', '小太阳本阳，把好心情传染给你！'],
+    verifyPool: ['LUMA年度认证大V主播 · 元气赛道', 'LUMA平台认证人气主播 · 青春活力'],
+    fanClubPool: ['糖果星球', '元气补给站', '奶糖作坊'],
+    tagsPool: ['#元气少女', '#可可爱爱', '#唱歌跳舞', '#快乐星球', '#今日份甜', '#活力日常']
+  },
+  elegant: {
+    keywords: ['古风', '舞', '仙', '雅', '琴', '国风', '汉服', '古筝'],
+    bioPool: ['一袭清欢，舞动人间烟火。', '抚琴听雨，把古韵唱给你听。', '罗衣飘飘，半阙清歌寄相思。'],
+    verifyPool: ['LUMA年度认证大V主播 · 国风艺术赛道', 'LUMA平台认证人气主播 · 古典雅韵'],
+    fanClubPool: ['青鸾阁', '云锦坊', '烟雨楼'],
+    tagsPool: ['#国风舞蹈', '#古典舞', '#汉服日常', '#古筝弹唱', '#仙气飘飘', '#传统文化']
+  },
+  lively: {
+    keywords: ['搞笑', '幽默', '段子', '脱口秀', '逗', '整活', '话痨', '欢乐'],
+    bioPool: ['全网最严肃的搞笑主播，笑死不偿命。', '人形段子生成器，快乐源泉本泉。', '进直播间记得放下水杯，笑喷不赔。'],
+    verifyPool: ['LUMA年度认证大V主播 · 娱乐赛道', 'LUMA平台认证人气主播 · 快乐制造机'],
+    fanClubPool: ['快乐制造局', '爆笑补给站', '段子手联盟'],
+    tagsPool: ['#搞笑博主', '#人间清醒', '#连麦整活', '#段子手', '#快乐源泉', '#嘴瓢日常']
+  }
+};
+
+// 世界观 → IP 属地候选池（本地规则）
+const PROFILE_IP_POOL = {
+  tech: ['赛博星云-新京都', '数据之都-零号城', '霓虹港-东区', '量子深海城'],
+  fantasy: ['云梦泽', '昆仑墟', '蓬莱仙岛', '长安旧梦'],
+  modern: ['上海', '北京', '深圳', '杭州', '成都', '广州'],
+  default: ['上海', '北京', '广东', '浙江', '四川', '东京']
+};
+
+// 字符串 → 稳定 hash（同一角色每次生成一致）
+function hashStr(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+// 从候选池取 n 个不重复项（基于 hash 种子）
+function pickDistinct(arr, seed, n) {
+  const copy = arr.slice();
+  const out = [];
+  for (let i = 0; i < n && copy.length; i++) {
+    out.push(copy.splice((seed + i * 7) % copy.length, 1)[0]);
+  }
+  return out;
+}
+
+// 人设文本 → 风格 key 列表（按命中关键词数排序）
+function detectProfileStyle(fullText) {
+  const scores = [];
+  for (const key of Object.keys(PROFILE_STYLE_LIBRARY)) {
+    let hit = 0;
+    for (const kw of PROFILE_STYLE_LIBRARY[key].keywords) {
+      if (fullText.includes(kw)) hit++;
+    }
+    if (hit > 0) scores.push({ key, hit });
+  }
+  scores.sort((a, b) => b.hit - a.hit);
+  return scores.map(s => s.key);
+}
+
+// 世界书文本 → 世界观主题（决定 IP 属地风格）
+function detectWorldTheme(worldText) {
+  if (!worldText) return 'modern';
+  if (/(赛博|科技|机械|未来|AI|数据|虚拟|电子|芯片|星舰|网络|数码|量子)/.test(worldText)) return 'tech';
+  if (/(古风|仙侠|剑|江湖|汉服|大唐|修仙|玄幻|异界|龙|仙)/.test(worldText)) return 'fantasy';
+  return 'modern';
+}
+
+// 本地规则生成档案五项（不调 API，瞬时完成）
+async function generateProfileLocalSettings(characterId) {
   try {
-    // 1. 读取角色人设（persona / description）
+    // 1. SDK 读取角色人设（与直播间显示头像名字同源的读取方式）
     let persona = '';
     try {
       if (api.characters && typeof api.characters.get === 'function') {
@@ -205,71 +300,51 @@ async function generateProfileAISettings(characterId) {
     const charObj = (window.allCharacters || []).find(c => c.id === characterId);
     const charName = charObj?.name || '主播';
 
-    // 2. 读取世界书（世界观背景，取前若干条摘要）
-    let worldSummary = '';
+    // 2. SDK 读取世界书（世界观）
+    let worldText = '';
     try {
       if (api.world && typeof api.world.list === 'function') {
         const entries = await api.world.list();
         if (entries && entries.length) {
-          worldSummary = entries.slice(0, 3).map(en => {
-            const title = en?.title || en?.name || '';
-            const content = String(en?.content || en?.text || '').slice(0, 120);
-            return title ? `${title}：${content}` : content;
-          }).filter(Boolean).join('\n').slice(0, 500);
+          worldText = entries.slice(0, 3)
+            .map(en => `${en?.title || ''} ${en?.content || en?.text || ''}`)
+            .join(' ').slice(0, 600);
         }
       }
     } catch (e) {}
 
-    // 3. 构造提示词，请求 AI 生成档案
-    const instruction = [
-      '你是 LUMA 直播平台的【主播档案生成系统】。',
-      '请根据角色人设与世界观，为直播间主播生成一份个性化档案。',
-      '',
-      `角色名：${charName}`,
-      `角色人设：${persona || '（无详细设定）'}`,
-      `世界观背景：${worldSummary || '（无世界书设定）'}`,
-      '',
-      '要求：',
-      '1. 个性签名(bio)：贴合角色性格的一句话，20字以内',
-      '2. 平台认证(verifyTitle)：如"LUMA年度认证大V主播·赛道名"，16字以内',
-      '3. IP属地(ipLocation)：结合世界观风格生成，2~6字（如：广东 / 上海 / 赛博星云-新京都）',
-      '4. 粉丝团前缀(fanClubPrefix)：2~4字，与角色气质相符，不要包含"粉丝团"三个字',
-      '5. 四个标签(tags)：以#开头，与角色特质相关',
-      '',
-      '只输出 JSON，不要输出任何其他内容：',
-      '{"bio":"","verifyTitle":"","ipLocation":"","fanClubPrefix":"","tags":["#","#","#","#"]}'
-    ].join('\n');
+    // 3. 本地规则匹配：人设 → 风格，世界观 → IP 属地
+    const fullText = `${charName} ${persona}`;
+    const styleKeys = detectProfileStyle(fullText);
+    const theme = detectWorldTheme(worldText);
+    const seed = hashStr(characterId);
 
-    const res = await window.aiGenerate({ characterId, instruction, appTags: ['luma', 'profile'] });
-    const data = (window.extractJsonFromText && typeof window.extractJsonFromText === 'function')
-      ? window.extractJsonFromText(res.text)
-      : null;
-    if (!data) return null;
+    const primary = styleKeys.length ? PROFILE_STYLE_LIBRARY[styleKeys[0]] : null;
+    const fallback = STREAMER_PERSONA_PRESETS.find(p => p.keywords.some(k => fullText.includes(k)))
+      || STREAMER_PERSONA_PRESETS[STREAMER_PERSONA_PRESETS.length - 1];
 
     const settings = {
-      bio: String(data.bio || '').trim(),
-      verifyTitle: String(data.verifyTitle || '').trim(),
-      ipLocation: String(data.ipLocation || '').trim(),
-      fanClubPrefix: String(data.fanClubPrefix || '').trim().replace(/粉丝团$/, ''),
-      tags: (Array.isArray(data.tags) ? data.tags : [])
-        .slice(0, 4)
-        .map(t => String(t).trim())
-        .filter(Boolean)
+      bio: primary ? pickDistinct(primary.bioPool, seed, 1)[0] : fallback.bio,
+      verifyTitle: primary ? pickDistinct(primary.verifyPool, seed >> 3, 1)[0] : `LUMA 平台年度认证大V主播 · ${fallback.category}`,
+      ipLocation: pickDistinct(PROFILE_IP_POOL[theme] || PROFILE_IP_POOL.default, seed >> 1, 1)[0],
+      fanClubPrefix: primary ? pickDistinct(primary.fanClubPool, seed >> 2, 1)[0] : fallback.fanClub,
+      tags: primary ? pickDistinct(primary.tagsPool, seed, 4) : fallback.tags
     };
-    // 标签不足 4 个时用默认补齐
-    const defaultTags = ['#签约主播', '#人气新星', '#直播日常', '#互动达人'];
-    while (settings.tags.length < 4) {
-      settings.tags.push(defaultTags[settings.tags.length]);
+    if (settings.tags.length < 4) {
+      const defaultTags = ['#签约主播', '#人气新星', '#直播日常', '#互动达人'];
+      while (settings.tags.length < 4) {
+        settings.tags.push(defaultTags[settings.tags.length]);
+      }
     }
     return settings;
   } catch (e) {
-    console.warn('[LUMA] AI 档案生成失败，使用兜底初始值:', e);
+    console.warn('[LUMA] 本地档案生成异常，使用兜底初始值:', e);
     return null;
   }
 }
-window.generateProfileAISettings = generateProfileAISettings;
+window.generateProfileLocalSettings = generateProfileLocalSettings;
 
-function applyAISettings(profile, settings) {
+function applyProfileSettings(profile, settings) {
   if (!profile || !settings) return;
   if (settings.bio) profile.bio = settings.bio;
   if (settings.verifyTitle) profile.verifyTitle = settings.verifyTitle;
@@ -301,7 +376,7 @@ async function openStreamerProfilePage(id) {
     }
   } catch (e) {}
 
-  // 读取档案：编辑存档 > AI 生成存档 > 实时 AI 生成（失败回退兜底预设）
+  // 读取档案：编辑存档 > 本地规则生成存档 > 首次打开本地生成（失败回退兜底预设）
   try {
     const saved = await api.db.get('streamer_profile_edits', profile.characterId).catch(() => null);
     if (saved) {
@@ -311,19 +386,16 @@ async function openStreamerProfilePage(id) {
       if (saved.fanClubName) profile.fanClubName = saved.fanClubName;
       if (Array.isArray(saved.tags) && saved.tags.length) profile.tags = saved.tags;
     } else {
-      const cached = await api.db.get('streamer_profile_ai', profile.characterId).catch(() => null);
+      const cached = await api.db.get('streamer_profile_local', profile.characterId).catch(() => null);
       if (cached && cached.settings) {
-        applyAISettings(profile, cached.settings);
+        applyProfileSettings(profile, cached.settings);
       } else {
-        // 异步 AI 生成（人设 + 世界书），成功后应用并缓存；失败静默保持兜底值
-        generateProfileAISettings(profile.characterId).then(settings => {
-          if (!settings) return;
-          applyAISettings(profile, settings);
-          api.db.create('streamer_profile_ai', { id: profile.characterId, settings, time: Date.now() }).catch(() => {});
-          if (window.currentViewingProfile && window.currentViewingProfile.characterId === profile.characterId) {
-            renderStreamerProfileToUI(profile);
-          }
-        });
+        // 首次打开：SDK 读取人设+世界书 → 本地规则瞬时生成，缓存后应用
+        const settings = await generateProfileLocalSettings(profile.characterId);
+        if (settings) {
+          applyProfileSettings(profile, settings);
+          api.db.create('streamer_profile_local', { id: profile.characterId, settings, time: Date.now() }).catch(() => {});
+        }
       }
     }
   } catch (e) {}
@@ -502,11 +574,11 @@ async function spToggleFollow() {
 window.spToggleFollow = spToggleFollow;
 
 // -------------------------------------------------------------------------
-// Tab 切换（动态 Tab 已下线，仅保留：直播场次 / 相册 / 留言墙）
+// Tab 切换（动态 Tab 保留，随机内容已清空显示空态）
 // -------------------------------------------------------------------------
 function switchSpTab(tab) {
   window.activeSpTab = tab;
-  const tabs = ['shows', 'gallery', 'guestbook'];
+  const tabs = ['posts', 'shows', 'gallery', 'guestbook'];
   tabs.forEach(t => {
     const tabEl = document.getElementById(`spTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
     const panelEl = document.getElementById(`spPanel${t.charAt(0).toUpperCase() + t.slice(1)}`);
@@ -522,11 +594,27 @@ function switchSpTab(tab) {
 
   if (!window.currentViewingProfile) return;
 
-  if (tab === 'shows') renderSpShows();
+  if (tab === 'posts') renderSpPosts();
+  else if (tab === 'shows') renderSpShows();
   else if (tab === 'gallery') renderSpGallery();
   else if (tab === 'guestbook') renderSpGuestbook();
 }
 window.switchSpTab = switchSpTab;
+
+// 动态面板：随机内容已全部清空，显示空态占位（等社区真实功能接入）
+function renderSpPosts() {
+  const box = document.getElementById('spPanelPosts');
+  if (!box || !window.currentViewingProfile) return;
+  box.innerHTML = `
+    <div class="py-16 flex flex-col items-center justify-center text-center">
+      <div class="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
+        <svg class="w-6 h-6 text-slate-300 stroke-[1.8]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+      </div>
+      <p class="text-xs text-slate-400 font-medium">主播还没有发布动态</p>
+      <p class="text-[10px] text-slate-300 mt-1">动态功能准备中，敬请期待</p>
+    </div>
+  `;
+}
 
 function renderSpShows() {
   const box = document.getElementById('spPanelShows');
