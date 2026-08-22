@@ -145,17 +145,18 @@
         throw new Error('RepoCloner 加载失败');
       }
       
-      // 等待宿主 api 初始化完成
+      // 等待宿主 SDK 初始化完成（主入口是 window.AiPhone）
       waitCount = 0;
-      while (!window.api && waitCount < 100) {
+      while (!window.AiPhone && !window.AiPhoneApp && !window.api && waitCount < 100) {
         await new Promise(r => setTimeout(r, 100));
         waitCount++;
       }
       
-      if (!window.api) {
-        console.warn('[CodeLoader] 警告：window.api 未找到，尝试使用全局 api');
+      const hostApi = window.AiPhone || window.AiPhoneApp || window.api;
+      if (!hostApi) {
+        console.warn('[CodeLoader] 警告：宿主 SDK 未找到');
       } else {
-        console.log('[CodeLoader] 宿主 api 已初始化');
+        console.log('[CodeLoader] 宿主 SDK 已初始化');
       }
       
       // 检查当前版本

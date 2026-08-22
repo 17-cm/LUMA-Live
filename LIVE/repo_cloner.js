@@ -13,6 +13,11 @@
 
   // 安全获取 api 对象
   function getApi() {
+    // 宿主 SDK 主入口是 window.AiPhone
+    if (window.AiPhone) return window.AiPhone;
+    // 兼容别名
+    if (window.AiPhoneApp) return window.AiPhoneApp;
+    // 有些代码里用 api 别名
     if (window.api) return window.api;
     if (typeof api !== 'undefined') return api;
     return null;
