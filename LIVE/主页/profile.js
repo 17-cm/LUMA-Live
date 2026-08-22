@@ -544,6 +544,64 @@ window.syncWalletDisplays = syncWalletDisplays;
 
 
 // =========================================================================
+// 【动态创建页面元素】关注列表 + 钱包
+// 因为这两个页面不在 index.html 里，需要动态创建
+// =========================================================================
+function ensureFollowAndWalletPages() {
+  // 创建关注列表页面
+  if (!document.getElementById('followListPageView')) {
+    const followPage = document.createElement('div');
+    followPage.id = 'followListPageView';
+    followPage.className = 'fixed inset-0 z-50 bg-slate-50 hidden overflow-y-auto';
+    followPage.innerHTML = `
+      <div class="page-nav-bar flex items-center justify-between px-4 py-3 bg-white border-b border-slate-100 sticky top-0 z-10">
+        <button onclick="closeFollowListPageView()" class="flex items-center gap-1 text-slate-600 text-sm font-bold">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+          返回
+        </button>
+        <h3 class="text-sm font-black text-slate-800">我的关注</h3>
+        <div class="w-12"></div>
+      </div>
+      <div id="followListContentContainer" class="p-4 space-y-3 pb-20"></div>
+    `;
+    document.body.appendChild(followPage);
+  }
+  
+  // 创建钱包页面
+  if (!document.getElementById('walletPageView')) {
+    const walletPage = document.createElement('div');
+    walletPage.id = 'walletPageView';
+    walletPage.className = 'fixed inset-0 z-50 bg-slate-50 hidden overflow-y-auto';
+    walletPage.innerHTML = `
+      <div class="page-nav-bar flex items-center justify-between px-4 py-3 bg-white border-b border-slate-100 sticky top-0 z-10">
+        <button onclick="closeWalletPageView()" class="flex items-center gap-1 text-slate-600 text-sm font-bold">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+          返回
+        </button>
+        <h3 class="text-sm font-black text-slate-800">我的钱包</h3>
+        <div class="w-12"></div>
+      </div>
+      <div class="p-4 space-y-3 pb-20">
+        <!-- 钱包余额卡片 -->
+        <div class="luxe-card p-4 bg-gradient-to-br from-amber-400 to-rose-500 text-white">
+          <p class="text-[10px] opacity-80 font-bold">LUMA 币余额</p>
+          <p class="text-2xl font-black mt-1" id="pageRevenueBalance">0</p>
+        </div>
+        <!-- 交易流水 -->
+        <div>
+          <h4 class="text-xs font-black text-slate-700 mb-2">交易流水</h4>
+          <div id="transactionLedgerContainer" class="space-y-2"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(walletPage);
+  }
+}
+
+// 先创建页面元素，再注册到 PageStack
+ensureFollowAndWalletPages();
+
+// =========================================================================
 // 【统一页面栈注册】关注列表 + 钱包
 // =========================================================================
 if (window.PageStack) {
