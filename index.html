@@ -1071,24 +1071,29 @@
 
   <!-- 微博风格：角色/主播个人主页大页面 -->
   <div id="streamerProfilePageView">
-    <!-- 顶部封面与浮动导航 -->
-    <div class="profile-cover-banner">
-      <img id="spCoverImg" src="" class="profile-cover-img" alt="Cover">
-      <div class="profile-cover-mask"></div>
-      <div class="profile-top-nav">
-        <button onclick="closeStreamerProfilePage()" class="profile-nav-btn" title="返回">
-          <svg class="w-5 h-5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <!-- 浮动导航（固定在顶部，不随内容滚动） -->
+    <div class="profile-top-nav">
+      <button onclick="closeStreamerProfilePage()" class="profile-nav-btn" title="返回">
+        <svg class="w-5 h-5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div class="flex items-center gap-2">
+        <button onclick="shareCurrentStreamerProfile()" class="profile-nav-btn" title="分享">
+          <svg class="w-4 h-4 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
         </button>
-        <div class="flex items-center gap-2">
-          <button onclick="shareCurrentStreamerProfile()" class="profile-nav-btn" title="分享">
-            <svg class="w-4 h-4 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-          </button>
-        </div>
       </div>
     </div>
 
     <!-- 滚动内容容器 -->
     <div class="profile-content-scroll">
+      <!-- 顶部封面（朋友圈风格，随内容滚动） -->
+      <div class="profile-cover-banner">
+        <img id="spCoverImg" src="" class="profile-cover-img" alt="Cover">
+        <div class="profile-cover-mask"></div>
+        <button class="profile-cover-upload-btn" onclick="document.getElementById('spCoverInput').click()" title="更换封面">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+        </button>
+        <input type="file" id="spCoverInput" accept="image/*" class="hidden" onchange="handleStreamerCoverUpload(event)">
+      </div>
       <!-- 头部档案资料区 -->
       <div class="px-4 pb-3 bg-white">
         <div class="flex items-end justify-between mb-3">
