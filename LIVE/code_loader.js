@@ -156,17 +156,23 @@
       if (isFirstLaunch) {
         // 第一次启动，从 GitHub 克隆仓库，更新 splash 进度
         console.log('[CodeLoader] 第一次启动，从 GitHub 克隆仓库...');
-        updateSplash('正在从云端下载代码...', 10);
+        
+        // 禁用自动关闭，等下载和加载全部完成后才关闭
+        if (window.setSplashAutoExit) window.setSplashAutoExit(false);
+        // 显示第一次启动提示
+        if (window.setSplashHint) window.setSplashHint('第一次启动需要下载代码，请稍候...');
+        // 显示初始进度
+        if (window.setSplashProgress) window.setSplashProgress(5, '正在从云端下载代码...');
         
         const result = await window.RepoCloner.cloneRepoToDb((msg, percent) => {
-          updateSplash(msg, Math.min(90, percent));
+          if (window.setSplashProgress) window.setSplashProgress(Math.min(90, percent), msg);
         });
         
         if (!result.success) {
           throw new Error('克隆仓库失败: ' + result.error);
         }
         
-        updateSplash('下载完成，正在加载...', 90);
+        if (window.setSplashProgress) window.setSplashProgress(90, '下载完成，正在加载...');
       } else {
         // 有缓存，静默加载，不更新 splash（让 splash 自己播完）
         console.log('[CodeLoader] 当前版本:', currentVersion.commit_hash);
@@ -241,18 +247,27 @@
         }
       }
       
-      // 等 splash 播完再隐藏（splash 总共 4 秒，从启动开始算）
-      // 如果已经超过 4 秒，立即隐藏
-      const splashStartTime = window.__splashStartTime || Date.now();
-      const elapsed = Date.now() - splashStartTime;
-      const remaining = Math.max(0, 4000 - elapsed);
-      
-      console.log('[CodeLoader] 等待 splash 播完，剩余', remaining, 'ms');
-      
-      setTimeout(() => {
-        hideSplash();
-        console.log('[CodeLoader] splash 已隐藏，APP 启动完成');
-      }, remaining);
+      if (isFirstLaunch) {
+        // 第一次启动：全部加载完成后立即关闭 splash
+        console.log('[CodeLoader] 第一次启动完成，关闭 splash');
+        if (window.setSplashProgress) window.setSplashProgress(100, '加载完成！');
+        setTimeout(() => {
+          hideSplash();
+          console.log('[CodeLoader] splash 已隐藏，APP 启动完成');
+        }, 500);
+      } else {
+        // 后续启动：等 splash 播完（3秒）再隐藏
+        const splashStartTime = window.__splashStartTime || Date.now();
+        const elapsed = Date.now() - splashStartTime;
+        const remaining = Math.max(0, 3000 - elapsed);
+        
+        console.log('[CodeLoader] 等待 splash 播完，剩余', remaining, 'ms');
+        
+        setTimeout(() => {
+          hideSplash();
+          console.log('[CodeLoader] splash 已隐藏，APP 启动完成');
+        }, remaining);
+      }
       
     } catch (err) {
       console.error('[CodeLoader] 加载失败:', err);

@@ -296,8 +296,7 @@
     if (ring) { ring.classList.remove('draw','draw-done'); ring.style.strokeDashoffset = '760'; void ring.offsetWidth; }
     if (slogan) slogan.classList.remove('show');
     if (progress) { progress.style.transition='none'; progress.style.width='0%'; }
-    container.onclick = exitSplashScreen;
-    setTimeout(() => { if (progress) { progress.style.transition='width 3000ms cubic-bezier(0.2,0.8,0.2,1)'; progress.style.width='100%'; } }, 100);
+    // 进度条不再自动播放，由外部通过 setSplashProgress 控制
     setTimeout(() => {
       if (logo) logo.classList.add('writing');
       if (penTip) penTip.classList.add('active');
@@ -311,7 +310,7 @@
     }, 3500);
     setTimeout(() => { if (slogan) slogan.classList.add('show'); }, 2700);
     if (splashTimerId) clearTimeout(splashTimerId);
-    splashTimerId = setTimeout(exitSplashScreen, 4000);
+    splashTimerId = setTimeout(exitSplashScreen, 3000);
   }
 
   function exitSplashScreen() {
@@ -324,6 +323,43 @@
 
   window.playSplashScreen = runSplashScreenAnimation;
   window.exitSplashScreen = exitSplashScreen;
+  
+  // 设置进度条百分比和文字（用于下载进度显示）
+  window.setSplashProgress = function(percent, message) {
+    const progress = document.getElementById('splashProgressFill');
+    const slogan = document.getElementById('splashSloganBox');
+    const sloganText = slogan ? slogan.querySelector('.splash-slogan-text') : null;
+    
+    if (progress) {
+      progress.style.transition = 'width 0.3s ease';
+      progress.style.width = Math.max(0, Math.min(100, percent)) + '%';
+    }
+    
+    if (sloganText && message) {
+      sloganText.textContent = message;
+      slogan.classList.add('show');
+    }
+  };
+  
+  // 设置底部提示文字（用于"第一次启动较慢"等提示）
+  window.setSplashHint = function(text) {
+    const footerSub = document.querySelector('.splash-footer-sub');
+    if (footerSub) {
+      footerSub.textContent = text;
+    }
+  };
+  
+  // 禁用/启用自动关闭（禁用后需要外部手动调用 exitSplashScreen）
+  window.setSplashAutoExit = function(enabled, duration) {
+    if (splashTimerId) {
+      clearTimeout(splashTimerId);
+      splashTimerId = null;
+    }
+    if (enabled) {
+      const dur = duration || 3000;
+      splashTimerId = setTimeout(exitSplashScreen, dur);
+    }
+  };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', runSplashScreenAnimation, { once: true });

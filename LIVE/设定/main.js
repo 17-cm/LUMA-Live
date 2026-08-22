@@ -1062,12 +1062,23 @@ async function handleVersionUpdateClick() {
   }
 
   if (gitUpdateState.hasUpdate) {
-    if (api.ui?.toast) api.ui.toast('🚀 正在从 GitHub 下载最新代码...');
+    // 显示启动画面，用第一次启动那种方式显示下载进度
+    if (window.playSplashScreen) {
+      window.playSplashScreen();
+      // 禁用自动关闭，等下载完成后刷新
+      if (window.setSplashAutoExit) window.setSplashAutoExit(false);
+      // 显示更新提示
+      if (window.setSplashHint) window.setSplashHint('正在更新到最新版本...');
+      // 显示初始进度
+      if (window.setSplashProgress) window.setSplashProgress(5, '正在从 GitHub 下载最新代码...');
+    }
     
     try {
       // 使用新的云端加载方案拉取最新代码
       const result = await window.RepoCloner.cloneRepoToDb((msg, percent) => {
         console.log(`[VersionUpdate] ${msg} (${percent}%)`);
+        // 更新启动画面的进度条和文字
+        if (window.setSplashProgress) window.setSplashProgress(Math.min(90, percent), msg);
       });
       
       if (result.success) {
