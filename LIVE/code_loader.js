@@ -205,6 +205,14 @@
       }, 500);
       
       console.log('[CodeLoader] 所有文件加载完成！');
+      
+      // 手动触发 DOMContentLoaded 事件
+      // 因为我们是在 DOMContentLoaded 之后才 eval 执行 JS 的
+      // 所以 main.js 里的 DOMContentLoaded 事件监听器不会自动执行
+      // 需要手动触发一次，让初始化逻辑运行
+      console.log('[CodeLoader] 手动触发 DOMContentLoaded 事件...');
+      document.dispatchEvent(new Event('DOMContentLoaded'));
+      console.log('[CodeLoader] DOMContentLoaded 事件已触发');
     } catch (err) {
       console.error('[CodeLoader] 加载失败:', err);
       showLoadingScreen('加载失败: ' + err.message, 100);
