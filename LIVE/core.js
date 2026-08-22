@@ -565,6 +565,7 @@ const lumaOpsGateway = {
       isNPC: false
     };
 
+    console.trace('[LUMA Debug] 🎬 创建直播(core.js/requestStartLive):', characterId, newSession.topic);
     const created = await api.db.create("live_sessions", newSession);
 
     window.charSchedulesMap[characterId] = {

@@ -1494,6 +1494,7 @@ window.closePlayerLiveView = closePlayerLiveView;
 // =========================================================================
 async function lumaInitApp(options) {
   var isHotupdate = !!(options && options.hotupdate);
+  console.trace('[LUMA Debug] 🚀 lumaInitApp 被调用, hotupdate=', isHotupdate);
   if (isHotupdate) console.log('[LUMA Init] 🔄 热更新模式：保留已有直播数据，不重新生成');
   if (typeof registerAiPhoneToolHandlers === 'function') {
     registerAiPhoneToolHandlers();
