@@ -1629,8 +1629,12 @@ async function lumaInitApp() {
   }, 30000);
 }
 
-// DOMContentLoaded 可能在脚本注入前已触发，需手动判断
-if (document.readyState === 'loading') {
+// 初始化逻辑：
+// - splash.js 设置了 __lumaHotpatchPending=true 时，等 splash.js 注入热补丁后调用 lumaInitApp
+// - 否则正常初始化（DOMContentLoaded 或直接调用）
+if (window.__lumaHotpatchPending === true) {
+  console.log('[LUMA Init] ⏳ 热补丁待注入，跳过本次初始化，等待 splash.js 调用');
+} else if (document.readyState === 'loading') {
   window.addEventListener('DOMContentLoaded', lumaInitApp);
 } else {
   lumaInitApp();
