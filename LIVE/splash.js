@@ -68,31 +68,55 @@
         && !content.trim().startsWith('<!DOCTYPE') && !content.trim().startsWith('<html');
     }
     // 激活 fallback 脚本（index.html 中 type="text/luma-fallback" 的脚本）
+    // 用 fetch 拿内容后内联注入，避免动态 src 在沙盒中不执行的问题
     function activateFallbackScripts() {
       var fallbacks = Array.prototype.slice.call(
         document.querySelectorAll('script[type="text/luma-fallback"]')
       );
       if (!fallbacks.length) {
         console.warn('[LUMA Hotpatch] ⚠️ 无 fallback 脚本可激活');
+        ensureAppInitialized();
         return;
       }
-      console.log('[LUMA Hotpatch] 🔄 激活 fallback 脚本（' + fallbacks.length + '个）');
+      console.log('[LUMA Hotpatch] 🔄 激活 fallback 脚本（' + fallbacks.length + '个，内联注入）');
       var idx = 0;
+      var successCount = 0;
       function loadNext() {
         if (idx >= fallbacks.length) {
-          console.log('[LUMA Hotpatch] ✅ fallback 脚本全部加载完成');
+          console.log('[LUMA Hotpatch] ✅ fallback 脚本全部内联注入完成（' + successCount + '/' + fallbacks.length + '）');
           ensureAppInitialized();
           return;
         }
         var oldScript = fallbacks[idx++];
-        var s = document.createElement('script');
-        s.src = oldScript.src;
-        s.onload = function() { loadNext(); };
-        s.onerror = function() {
-          console.error('[LUMA Hotpatch] ❌ fallback 加载失败:', oldScript.src);
+        var src = oldScript.src || oldScript.getAttribute('src');
+        if (!src) {
+          console.warn('[LUMA Hotpatch] ⚠️ fallback 脚本无 src，跳过');
           loadNext();
-        };
-        document.body.appendChild(s);
+          return;
+        }
+        // fetch 拿内容（data URL / http 都可以）
+        fetch(src).then(function(res) {
+          return res.text();
+        }).then(function(text) {
+          if (text && text.trim()) {
+            try {
+              var s = document.createElement('script');
+              s.textContent = text;
+              s.setAttribute('data-fallback', 'true');
+              s.setAttribute('data-src', src.slice(0, 80));
+              document.body.appendChild(s);
+              successCount++;
+            } catch (e) {
+              console.error('[LUMA Hotpatch] ❌ fallback 内联注入失败:', e.message);
+            }
+          } else {
+            console.warn('[LUMA Hotpatch] ⚠️ fallback 脚本内容为空:', src.slice(0, 80));
+          }
+          loadNext();
+        }).catch(function(err) {
+          console.error('[LUMA Hotpatch] ❌ fallback fetch 失败:', src.slice(0, 80), err.message);
+          loadNext();
+        });
       }
       loadNext();
     }
