@@ -1638,14 +1638,31 @@ async function lumaInitApp(options) {
   }
 }
 
-// 初始化逻辑：
-// - splash.js 设置了 __lumaHotpatchPending=true 时，等 splash.js 注入热补丁后调用 lumaInitApp
-// - 否则正常初始化（DOMContentLoaded 或直接调用）
-if (window.__lumaHotpatchPending === true) {
-  console.log('[LUMA Init] ⏳ 热补丁待注入，跳过本次初始化，等待 splash.js 调用');
-} else if (document.readyState === 'loading') {
-  window.addEventListener('DOMContentLoaded', lumaInitApp);
+// 初始化逻辑：覆盖更新模式
+// - splash.js 同步设置 __lumaHotpatchLoading=true，注入完热补丁后设为 false
+// - main.js 等待标志变为 false 后自行调用 lumaInitApp（只一次）
+// - splash.js 未运行时（标志为 undefined）直接初始化
+function initWhenReady() {
+  if (window.__lumaHotpatchLoading === undefined) {
+    console.log('[LUMA Init] splash.js 未运行，直接初始化');
+    lumaInitApp();
+    return;
+  }
+  var attempts = 0;
+  (function wait() {
+    if (window.__lumaHotpatchLoading === false || attempts > 100) {
+      console.log('[LUMA Init] 🚀 热补丁注入完成，开始初始化（attempts=' + attempts + '）');
+      lumaInitApp();
+    } else {
+      attempts++;
+      setTimeout(wait, 50);
+    }
+  })();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initWhenReady);
 } else {
-  lumaInitApp();
+  initWhenReady();
 }
 window.lumaInitApp = lumaInitApp;

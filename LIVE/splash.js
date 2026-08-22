@@ -5,16 +5,16 @@
 (function initSplashScreenModule() {
   // =========================================================================
   // 【热补丁启动注入】
-  // 流程：
-  // 1. 同步设置 __lumaHotpatchPending=true，阻止 main.js 提前初始化
+  // 覆盖更新模式：
+  // 1. 同步设置 __lumaHotpatchLoading=true，main.js 会等待此标志变为 false
   // 2. 异步从 api.db 读取热补丁
-  // 3. 有热补丁 → 内联注入 CSS+JS（覆盖静态脚本已定义的函数）
-  // 4. 无热补丁/注入失败 → 什么都不做（静态脚本已正常执行）
-  // 5. 最后设置 pending=false 并调用 lumaInitApp() 初始化
+  // 3. 有热补丁 → 注入 CSS+JS module脚本（覆盖 window.xxx 函数），不调用初始化
+  // 4. 无热补丁/注入失败 → 直接设置 loading=false
+  // 5. main.js 检测到 loading=false 后自行调用 lumaInitApp（只一次）
   // =========================================================================
   (async function applyHotpatchEarly() {
-    // 同步设置标志：main.js 看到此标志会跳过初始化，等我们来调用
-    window.__lumaHotpatchPending = true;
+    // 同步设置标志：main.js 会等待热补丁注入完成
+    window.__lumaHotpatchLoading = true;
 
     var JS_LOAD_ORDER = [
       'LIVE/设定/app_presets.js',
@@ -66,15 +66,9 @@
       return content && typeof content === 'string' && content.trim()
         && !content.trim().startsWith('<!DOCTYPE') && !content.trim().startsWith('<html');
     }
-    function finishInit(isHotupdate) {
-      window.__lumaHotpatchPending = false;
-      if (typeof window.lumaInitApp === 'function') {
-        console.log('[LUMA Hotpatch] 🚀 调用 lumaInitApp 初始化' + (isHotupdate ? '（热更新模式，保留已有数据不重新生成）' : ''));
-        window.lumaInitApp({ hotupdate: !!isHotupdate });
-      } else {
-        console.warn('[LUMA Hotpatch] ⚠️ lumaInitApp 未定义，延迟重试');
-        setTimeout(function() { finishInit(isHotupdate); }, 200);
-      }
+    function signalReady() {
+      window.__lumaHotpatchLoading = false;
+      console.log('[LUMA Hotpatch] ✅ 热补丁注入流程结束，main.js 可初始化');
     }
 
     // 等待 api 对象可用
@@ -87,7 +81,7 @@
     }
     if (!api || !api.db) {
       console.warn('[LUMA Hotpatch] ⚠️ api.db 不可用，使用静态脚本');
-      finishInit();
+      signalReady();
       return;
     }
 
@@ -95,7 +89,7 @@
       var hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(function() { return null; });
       if (!hotpatchRec || !hotpatchRec.files) {
         console.log('[LUMA Hotpatch] 无热补丁数据，使用静态脚本');
-        finishInit();
+        signalReady();
         return;
       }
 
@@ -104,7 +98,7 @@
         console.warn('[LUMA Hotpatch] 🗑️ 热补丁版本', hotpatchRec.version,
           '低于基础版本', LUMA_BASE_VERSION, '，清除旧缓存');
         await api.db.remove('app_hotpatch', 'current_hotpatch').catch(function() {});
-        finishInit();
+        signalReady();
         return;
       }
 
@@ -152,7 +146,7 @@
 
       if (jsFailed) {
         console.error('[LUMA Hotpatch] ❌ 热补丁注入失败（' + jsInjected + '/' + JS_LOAD_ORDER.length + '），使用静态脚本');
-        finishInit();
+        signalReady();
       } else {
         console.log('[LUMA Hotpatch] ✅ 全部 ' + jsInjected + ' 个 JS 文件以 module 方式注入成功，等待执行...');
         window.__lumaHotpatchJsApplied = true;
@@ -163,21 +157,15 @@
           console.log('[LUMA Hotpatch] 📌 当前热补丁版本: ' + hotpatchRec.version
             + (hotpatchRec.commit ? ' (' + hotpatchRec.commit + ')' : ''));
         }
-        // module脚本异步执行（defer），轮询等待lumaInitApp可用后初始化
-        var initAttempts = 0;
-        function waitAndInit() {
-          initAttempts++;
-          if (initAttempts >= 10 || typeof window.lumaInitApp === 'function') {
-            finishInit(true);
-          } else {
-            setTimeout(waitAndInit, 50);
-          }
-        }
-        setTimeout(waitAndInit, 50);
+        // module脚本异步执行（defer），等待执行完成后发信号让 main.js 初始化
+        setTimeout(function() {
+          console.log('[LUMA Hotpatch] ✅ 热补丁函数覆盖完成，共 ' + jsInjected + ' 个 JS 文件');
+          signalReady();
+        }, 200);
       }
     } catch (e) {
       console.error('[LUMA Hotpatch] ❌ 热补丁注入异常:', e.message);
-      finishInit();
+      signalReady();
     }
   })();
 
