@@ -1643,6 +1643,11 @@ async function lumaInitApp(options) {
 // - main.js 等待标志变为 false 后自行调用 lumaInitApp（只一次）
 // - splash.js 未运行时（标志为 undefined）直接初始化
 function initWhenReady() {
+  if (window.__lumaInitStarted) {
+    console.log('[LUMA Init] ⏭️ 已在初始化中/已完成，跳过重复调用');
+    return;
+  }
+  window.__lumaInitStarted = true;
   if (window.__lumaHotpatchLoading === undefined) {
     console.log('[LUMA Init] splash.js 未运行，直接初始化');
     lumaInitApp();
