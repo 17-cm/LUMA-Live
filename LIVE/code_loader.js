@@ -2,8 +2,8 @@
 // LUMA Live 代码加载器
 // 从 api.db 读取缓存的文件，按顺序加载运行
 // 第一次启动时从 GitHub 克隆整个仓库到 api.db
+// 用 splash 启动画面显示加载进度，不单独搞紫色界面
 // =========================================================================
-
 (function() {
   'use strict';
 
@@ -38,41 +38,30 @@
     'style.css'
   ];
 
-  // 显示加载界面
-  function showLoadingScreen(message, percent) {
-    let overlay = document.getElementById('cloud-loading-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'cloud-loading-overlay';
-      overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999998;color:white;font-family:-apple-system,sans-serif;';
-      overlay.innerHTML = `
-        <div style="font-size:48px;margin-bottom:20px;">🎬</div>
-        <div style="font-size:24px;font-weight:bold;margin-bottom:10px;">LUMA Live</div>
-        <div id="cloud-loading-message" style="font-size:14px;margin-bottom:20px;opacity:0.9;">正在加载...</div>
-        <div style="width:200px;height:6px;background:rgba(255,255,255,0.2);border-radius:3px;overflow:hidden;">
-          <div id="cloud-loading-bar" style="height:100%;width:0%;background:white;border-radius:3px;transition:width 0.3s;"></div>
-        </div>
-        <div id="cloud-loading-percent" style="font-size:12px;margin-top:10px;opacity:0.7;">0%</div>
-      `;
-      document.body.appendChild(overlay);
+  // 更新 splash 进度条和文字
+  function updateSplash(message, percent) {
+    const progress = document.getElementById('splashProgressFill');
+    const slogan = document.getElementById('splashSloganBox');
+    
+    if (progress && percent !== undefined) {
+      progress.style.transition = 'width 0.3s ease';
+      progress.style.width = percent + '%';
     }
     
-    document.getElementById('cloud-loading-message').textContent = message;
-    document.getElementById('cloud-loading-bar').style.width = percent + '%';
-    document.getElementById('cloud-loading-percent').textContent = percent + '%';
+    if (slogan && message) {
+      slogan.textContent = message;
+      slogan.classList.add('show');
+    }
   }
 
-  // 隐藏加载界面
-  function hideLoadingScreen() {
-    const overlay = document.getElementById('cloud-loading-overlay');
-    if (overlay) {
-      overlay.style.opacity = '0';
-      overlay.style.transition = 'opacity 0.5s';
-      setTimeout(() => {
-        if (overlay.parentNode) {
-          overlay.parentNode.removeChild(overlay);
-        }
-      }, 500);
+  // 隐藏 splash
+  function hideSplash() {
+    if (typeof window.exitSplashScreen === 'function') {
+      window.exitSplashScreen();
+    }
+    const splashEl = document.getElementById('lumaSplashContainer') || document.querySelector('.splash-container');
+    if (splashEl) {
+      splashEl.style.display = 'none';
     }
   }
 
@@ -133,7 +122,7 @@
   // 主加载流程
   async function startLoading() {
     try {
-      showLoadingScreen('正在初始化...', 0);
+      console.log('[CodeLoader] 开始加载...');
       
       // 等待 RepoCloner 加载完成
       let waitCount = 0;
@@ -161,70 +150,48 @@
       }
       
       // 检查当前版本
-      showLoadingScreen('正在检查版本...', 5);
       const currentVersion = await window.RepoCloner.getCurrentVersion();
+      const isFirstLaunch = !currentVersion;
       
-      if (!currentVersion) {
-        // 第一次启动，从 GitHub 克隆仓库
-        showLoadingScreen('第一次启动，正在从云端下载代码...', 10);
+      if (isFirstLaunch) {
+        // 第一次启动，从 GitHub 克隆仓库，更新 splash 进度
+        console.log('[CodeLoader] 第一次启动，从 GitHub 克隆仓库...');
+        updateSplash('正在从云端下载代码...', 10);
+        
         const result = await window.RepoCloner.cloneRepoToDb((msg, percent) => {
-          showLoadingScreen(msg, percent);
+          updateSplash(msg, Math.min(90, percent));
         });
         
         if (!result.success) {
           throw new Error('克隆仓库失败: ' + result.error);
         }
+        
+        updateSplash('下载完成，正在加载...', 90);
       } else {
+        // 有缓存，静默加载，不更新 splash（让 splash 自己播完）
         console.log('[CodeLoader] 当前版本:', currentVersion.commit_hash);
       }
       
-      // 加载 CSS
-      showLoadingScreen('正在加载样式...', 80);
+      // 加载 CSS（静默）
       for (const cssFile of CSS_FILES) {
         await loadCssFile(cssFile);
       }
       
-      // 加载 JSON 配置
+      // 加载 JSON 配置（静默）
       await loadJsonFile('presets.json', 'appPresetsConfig');
       await loadJsonFile('regex.json', 'appRegexConfig');
       await loadJsonFile('world.json', 'appWorldConfig');
       
-      // 按顺序加载 JS
-      showLoadingScreen('正在加载核心模块...', 85);
+      // 按顺序加载 JS（静默）
       for (let i = 0; i < LOAD_ORDER.length; i++) {
         const jsFile = LOAD_ORDER[i];
-        const percent = 85 + Math.round((i / LOAD_ORDER.length) * 13);
-        showLoadingScreen(`正在加载: ${jsFile.split('/').pop()}`, percent);
         await loadJsFile(jsFile);
       }
       
-      showLoadingScreen('加载完成！', 100);
-      
-      // 延迟隐藏加载界面
-      setTimeout(() => {
-        hideLoadingScreen();
-      }, 500);
-      
       console.log('[CodeLoader] 所有文件加载完成！');
       
-      // 手动触发 DOMContentLoaded 事件
-      // 因为我们是在 DOMContentLoaded 之后才 eval 执行 JS 的
-      // 所以 main.js 里的 DOMContentLoaded 事件监听器不会自动执行
-      // 需要手动触发一次，让初始化逻辑运行
-      // 先隐藏 splash 启动画面，避免手动触发事件导致 splash 重新播放
-      if (typeof window.exitSplashScreen === 'function') {
-        console.log('[CodeLoader] 隐藏 splash 启动画面');
-        window.exitSplashScreen();
-      }
-      const splashEl = document.getElementById('lumaSplashContainer') || document.querySelector('.splash-container');
-      if (splashEl) {
-        splashEl.style.display = 'none';
-      }
-      
       // 加标志位，避免重复触发事件
-      if (window.__codeLoaderEventsTriggered) {
-        console.log('[CodeLoader] 事件已触发过，跳过');
-      } else {
+      if (!window.__codeLoaderEventsTriggered) {
         window.__codeLoaderEventsTriggered = true;
         
         // 手动触发 DOMContentLoaded 事件
@@ -238,14 +205,22 @@
         console.log('[CodeLoader] load 事件已触发');
       }
       
-      // 延迟隐藏加载界面，让初始化逻辑有时间执行
+      // 等 splash 播完再隐藏（splash 总共 4 秒，从启动开始算）
+      // 如果已经超过 4 秒，立即隐藏
+      const splashStartTime = window.__splashStartTime || Date.now();
+      const elapsed = Date.now() - splashStartTime;
+      const remaining = Math.max(0, 4000 - elapsed);
+      
+      console.log('[CodeLoader] 等待 splash 播完，剩余', remaining, 'ms');
+      
       setTimeout(() => {
-        hideLoadingScreen();
-        console.log('[CodeLoader] 加载界面已隐藏');
-      }, 500);
+        hideSplash();
+        console.log('[CodeLoader] splash 已隐藏，APP 启动完成');
+      }, remaining);
+      
     } catch (err) {
       console.error('[CodeLoader] 加载失败:', err);
-      showLoadingScreen('加载失败: ' + err.message, 100);
+      updateSplash('加载失败: ' + err.message, 100);
       
       // 显示错误提示，让用户可以重试
       setTimeout(() => {
@@ -264,6 +239,9 @@
     loadCssFile,
     loadJsonFile
   };
+
+  // 记录 splash 开始时间
+  window.__splashStartTime = Date.now();
 
   // 自动开始加载
   if (document.readyState === 'loading') {
