@@ -74,7 +74,6 @@
         element.classList.add(this.pages[pageId].hiddenClass);
       }
 
-      console.log('[PageStack] 页面已注册:', pageId, '动画:', animationType);
     },
 
     /**
@@ -85,14 +84,12 @@
     open(pageId, options = {}) {
       // 防快速点击
       if (this.isAnimating) {
-        console.log('[PageStack] 动画中，忽略点击');
         return;
       }
 
       // 已经在当前页面，不重复打开
       const currentPageId = this.current();
       if (currentPageId === pageId) {
-        console.log('[PageStack] 已经在当前页面:', pageId);
         return;
       }
 
@@ -102,7 +99,6 @@
         return;
       }
 
-      console.log('[PageStack] 打开页面:', pageId, '动画:', page.animationType, '当前栈:', [...this.stack]);
 
       this.isAnimating = true;
 
@@ -134,7 +130,6 @@
       // 动画结束后解锁
       setTimeout(() => {
         this.isAnimating = false;
-        console.log('[PageStack] 页面打开完成:', pageId);
       }, this.animationDuration);
     },
 
@@ -145,13 +140,11 @@
     back() {
       // 防快速点击
       if (this.isAnimating) {
-        console.log('[PageStack] 动画中，忽略返回');
         return false;
       }
 
       // 已经在首页了，不能再返回
       if (this.stack.length <= 1) {
-        console.log('[PageStack] 已经在首页，不能返回');
         return false;
       }
 
@@ -159,7 +152,6 @@
       const currentPage = this.pages[currentPageId];
       const prevPageId = this.current();
 
-      console.log('[PageStack] 返回上一页:', currentPageId, '->', prevPageId, '当前栈:', [...this.stack]);
 
       this.isAnimating = true;
 
@@ -190,7 +182,6 @@
       // 动画结束后解锁
       setTimeout(() => {
         this.isAnimating = false;
-        console.log('[PageStack] 返回完成');
       }, this.animationDuration);
 
       return true;
@@ -216,7 +207,6 @@
      * 重置页面栈（回到首页，关闭所有页面）
      */
     reset() {
-      console.log('[PageStack] 重置页面栈');
 
       // 关闭所有页面（除了首页）
       while (this.stack.length > 1) {
@@ -276,5 +266,4 @@
   // 暴露到全局
   window.PageStack = PageStack;
 
-  console.log('[PageStack] 页面栈管理器已加载');
 })();

@@ -2133,5 +2133,4 @@ if (window.PageStack) {
     animationType: 'slide-bottom',
     zIndex: 150,  // 直播间层级高一些
   });
-  console.log('[PageStack] 个人主页 + 直播间已注册');
 }

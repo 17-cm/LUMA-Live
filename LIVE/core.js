@@ -489,7 +489,6 @@ window.saveDbSetting = saveDbSetting;
 // 【调试回调与运营组专用通知系统】(正式运行已静默调试弹层)
 // =========================================================================
 function lumaOpsNotify(title, detail, type = 'info') {
-  console.log(`[LUMA 官方运营组] ${title}: ${detail}`);
 }
 window.lumaOpsNotify = lumaOpsNotify;
 

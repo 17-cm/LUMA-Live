@@ -302,5 +302,4 @@ if (window.PageStack) {
   window.PageStack.register('trendDetailModal', {
     animationType: 'slide-right',
   });
-  console.log('[PageStack] 动态详情已注册');
 }

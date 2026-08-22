@@ -247,7 +247,6 @@
       console.warn('[GiftSystem] 保存送礼记录失败:', e.message);
     }
 
-    console.log(`[GiftSystem] 送礼成功: ${gift.name} x${qty}, 花费 ${totalCost} 币`);
   }
 
   // =========================================================================
@@ -415,7 +414,6 @@
   // =========================================================================
   function init() {
     renderGiftList();
-    console.log('[GiftSystem] 礼物系统已加载，共', GIFT_LIST.length, '个礼物');
   }
 
   // 暴露到全局

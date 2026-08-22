@@ -553,5 +553,4 @@ if (window.PageStack) {
   window.PageStack.register('walletPageView', {
     animationType: 'slide-right',
   });
-  console.log('[PageStack] 关注列表 + 钱包已注册');
 }
