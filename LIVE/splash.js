@@ -27,6 +27,8 @@
         return;
       }
       const files = hotpatchRec.files;
+      // 暴露热补丁文件给 index.html 动态脚本加载器（JS 热补丁注入）
+      window.__lumaHotpatchFiles = files;
       // 注入热补丁 CSS（覆盖旧样式）
       let cssContent = null;
       const styleData = files['style.css'];

@@ -1693,95 +1693,79 @@
   </div>
 
 
-  <!-- 模块化脚本引用 -->
-  <script src="LIVE/设定/app_presets.js"></script>
-  <script src="LIVE/core.js"></script>
-  <!-- 统一数据中心体系 -->
-  <script src="LIVE/数据/data_hub.js"></script>
-  <script src="LIVE/数据/fans_manager.js"></script>
-  <script src="LIVE/数据/guard_manager.js"></script>
-  <script src="LIVE/数据/checkin_manager.js"></script>
-  <script src="LIVE/数据/titles_manager.js"></script>
-  <script src="LIVE/主页/profile.js"></script>
-  <!-- 社区 7 模块化架构系统 -->
-  <script src="LIVE/社区/community_store.js"></script>
-  <script src="LIVE/社区/module_trends.js"></script>
-  <script src="LIVE/社区/module_supertopic.js"></script>
-  <script src="LIVE/社区/module_detail.js"></script>
-  <script src="LIVE/社区/module_ranking.js"></script>
-  <script src="LIVE/社区/module_forum.js"></script>
-  <script src="LIVE/社区/module_mytopic.js"></script>
-  <script src="LIVE/社区/trends.js"></script>
-  <script src="LIVE/直播/room_loading.js"></script>
-  <script src="LIVE/直播/live.js"></script>
-  <script src="LIVE/设定/main.js"></script>
-  <script src="LIVE/设定/patch.js"></script>
-  <script src="LIVE/设定/gift_system.js"></script>
+  <!-- 模块化脚本动态加载（支持热补丁覆盖） -->
+  <script>
+  (function() {
+    var files = [
+      'LIVE/设定/app_presets.js',
+      'LIVE/core.js',
+      'LIVE/数据/data_hub.js',
+      'LIVE/数据/fans_manager.js',
+      'LIVE/数据/guard_manager.js',
+      'LIVE/数据/checkin_manager.js',
+      'LIVE/数据/titles_manager.js',
+      'LIVE/主页/profile.js',
+      'LIVE/社区/community_store.js',
+      'LIVE/社区/module_trends.js',
+      'LIVE/社区/module_supertopic.js',
+      'LIVE/社区/module_detail.js',
+      'LIVE/社区/module_ranking.js',
+      'LIVE/社区/module_forum.js',
+      'LIVE/社区/module_mytopic.js',
+      'LIVE/社区/trends.js',
+      'LIVE/直播/room_loading.js',
+      'LIVE/直播/live.js',
+      'LIVE/设定/main.js',
+      'LIVE/设定/patch.js',
+      'LIVE/设定/gift_system.js'
+    ];
+    var idx = 0;
+    var waited = 0;
+    var maxWait = 3000;
 
-<!-- 测试按钮：验证 fetch + eval 在沙盒里是否可行 -->
-<div id="evalTestBtn" style="position:fixed;bottom:20px;right:20px;z-index:99999;background:#FF5722;color:white;padding:10px 16px;border-radius:20px;font-size:12px;font-weight:bold;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.3);">
-  🧪 测试eval
-</div>
-<div id="evalTestResult" style="position:fixed;bottom:70px;right:20px;z-index:99999;background:#333;color:white;padding:10px;border-radius:8px;font-size:11px;max-width:250px;display:none;word-break:break-all;"></div>
-<script>
-(function() {
-  const btn = document.getElementById('evalTestBtn');
-  const result = document.getElementById('evalTestResult');
-  
-  btn.addEventListener('click', async function() {
-    result.style.display = 'block';
-    result.textContent = '⏳ 正在从 GitHub 拉取测试文件...';
-    btn.textContent = '⏳ 测试中...';
-    
-    try {
-      const testUrl = 'https://raw.githubusercontent.com/17-cm/LUMA-Live/test/test_eval.js';
-      console.log('[eval测试] 开始 fetch:', testUrl);
-      
-      const response = await fetch(testUrl);
-      console.log('[eval测试] fetch 状态:', response.status, response.statusText);
-      
-      if (!response.ok) {
-        throw new Error('HTTP ' + response.status + ' ' + response.statusText);
-      }
-      
-      const code = await response.text();
-      console.log('[eval测试] 下载成功，代码长度:', code.length, '字符');
-      console.log('[eval测试] 代码前100字符:', code.substring(0, 100));
-      
-      result.textContent = '⏳ 下载成功，正在 eval 执行...';
-      
-      // 用 eval 执行
-      eval(code);
-      
-      console.log('[eval测试] eval 执行完成');
-      console.log('[eval测试] window.__evalTestSuccess:', window.__evalTestSuccess);
-      
-      if (window.__evalTestSuccess) {
-        result.style.background = '#4CAF50';
-        result.textContent = '✅ 测试成功！fetch + eval 在沙盒里可行！';
-        btn.textContent = '✅ 成功';
-        btn.style.background = '#4CAF50';
-      } else {
-        throw new Error('eval 执行了但是没有设置成功标记');
-      }
-      
-    } catch (err) {
-      console.error('[eval测试] 失败:', err);
-      result.style.background = '#f44336';
-      result.textContent = '❌ 测试失败：' + err.message + '\n\n详细错误请看控制台';
-      btn.textContent = '❌ 失败';
-      btn.style.background = '#f44336';
+    function getHotpatchContent(src) {
+      var f = window.__lumaHotpatchFiles;
+      if (!f) return null;
+      var data = f[src];
+      if (!data) return null;
+      return typeof data === 'string' ? data : (data.content || null);
     }
-    
-    // 5秒后恢复按钮
-    setTimeout(() => {
-      btn.textContent = '🧪 测试eval';
-      btn.style.background = '#FF5722';
-      result.style.display = 'none';
-    }, 8000);
-  });
-})();
-</script>
 
+    function loadNext() {
+      if (idx >= files.length) return;
+      var src = files[idx++];
+      var patched = getHotpatchContent(src);
+      var s = document.createElement('script');
+      if (patched && typeof patched === 'string' && patched.trim() && !patched.trim().startsWith('<!DOCTYPE')) {
+        s.textContent = patched;
+        document.body.appendChild(s);
+        loadNext();
+      } else {
+        s.src = src;
+        s.onload = loadNext;
+        s.onerror = function() {
+          console.warn('[ScriptLoader] 加载失败，跳过:', src);
+          loadNext();
+        };
+        document.body.appendChild(s);
+      }
+    }
+
+    function waitForHotpatch() {
+      if (window.__lumaHotpatchFiles !== undefined || waited >= maxWait) {
+        if (window.__lumaHotpatchFiles) {
+          console.log('[ScriptLoader] 热补丁就绪，共', Object.keys(window.__lumaHotpatchFiles).length, '个文件');
+        } else {
+          console.log('[ScriptLoader] 无热补丁（等待超时），加载本地文件');
+        }
+        loadNext();
+      } else {
+        waited += 50;
+        setTimeout(waitForHotpatch, 50);
+      }
+    }
+    waitForHotpatch();
+  })();
+  </script>
 </body>
 </html>

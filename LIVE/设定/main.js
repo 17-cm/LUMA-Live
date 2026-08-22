@@ -935,7 +935,7 @@ window.executeConfirmResetAppData = executeConfirmResetAppData;
 // =========================================================================
 const APP_CURRENT_VERSION = 'v3.4.1';
 const DEFAULT_GIT_REPO = '17-cm/LUMA-Live';
-const DEFAULT_GIT_BRANCH = 'test';
+const DEFAULT_GIT_BRANCH = 'moon';
 
 let gitUpdateState = {
   currentVersion: APP_CURRENT_VERSION,
@@ -1168,6 +1168,7 @@ const HOTPATCH_FILES = [
   'manifest.json',
   'style.css',
   'LIVE/设定/page_stack.js',
+  'LIVE/设定/app_presets.js',
   'LIVE/core.js',
   'LIVE/数据/data_hub.js',
   'LIVE/数据/fans_manager.js',
@@ -1186,7 +1187,8 @@ const HOTPATCH_FILES = [
   'LIVE/直播/room_loading.js',
   'LIVE/直播/live.js',
   'LIVE/设定/main.js',
-  'LIVE/设定/patch.js'
+  'LIVE/设定/patch.js',
+  'LIVE/设定/gift_system.js'
 ];
 
 // 从 GitHub API 获取文件树（包含每个文件的 git SHA，用于增量更新对比）
