@@ -211,15 +211,38 @@
       // 因为我们是在 DOMContentLoaded 之后才 eval 执行 JS 的
       // 所以 main.js 里的 DOMContentLoaded 事件监听器不会自动执行
       // 需要手动触发一次，让初始化逻辑运行
-      console.log('[CodeLoader] 手动触发 DOMContentLoaded 事件...');
-      document.dispatchEvent(new Event('DOMContentLoaded'));
-      console.log('[CodeLoader] DOMContentLoaded 事件已触发');
+      // 先隐藏 splash 启动画面，避免手动触发事件导致 splash 重新播放
+      if (typeof window.exitSplashScreen === 'function') {
+        console.log('[CodeLoader] 隐藏 splash 启动画面');
+        window.exitSplashScreen();
+      }
+      const splashEl = document.getElementById('lumaSplashContainer') || document.querySelector('.splash-container');
+      if (splashEl) {
+        splashEl.style.display = 'none';
+      }
       
-      // 手动触发 load 事件
-      // live.js 等文件可能依赖 load 事件
-      console.log('[CodeLoader] 手动触发 load 事件...');
-      window.dispatchEvent(new Event('load'));
-      console.log('[CodeLoader] load 事件已触发');
+      // 加标志位，避免重复触发事件
+      if (window.__codeLoaderEventsTriggered) {
+        console.log('[CodeLoader] 事件已触发过，跳过');
+      } else {
+        window.__codeLoaderEventsTriggered = true;
+        
+        // 手动触发 DOMContentLoaded 事件
+        console.log('[CodeLoader] 手动触发 DOMContentLoaded 事件...');
+        document.dispatchEvent(new Event('DOMContentLoaded'));
+        console.log('[CodeLoader] DOMContentLoaded 事件已触发');
+        
+        // 手动触发 load 事件
+        console.log('[CodeLoader] 手动触发 load 事件...');
+        window.dispatchEvent(new Event('load'));
+        console.log('[CodeLoader] load 事件已触发');
+      }
+      
+      // 延迟隐藏加载界面，让初始化逻辑有时间执行
+      setTimeout(() => {
+        hideLoadingScreen();
+        console.log('[CodeLoader] 加载界面已隐藏');
+      }, 500);
     } catch (err) {
       console.error('[CodeLoader] 加载失败:', err);
       showLoadingScreen('加载失败: ' + err.message, 100);
