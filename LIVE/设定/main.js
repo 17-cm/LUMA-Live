@@ -996,377 +996,129 @@ async function checkGitRepoUpdate(silent = false) {
   gitUpdateState.isChecking = true;
   renderGitUpdateButton();
 
-  const repo = (gitUpdateState.repoUrl || DEFAULT_GIT_REPO).trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
-  const branch = (gitUpdateState.branch || DEFAULT_GIT_BRANCH).trim();
-  
   try {
-    let remoteVer = null;
-    let remoteCommit = null;
-    let updateMessage = '';
-    let fetchErrorReason = '';
-
-    const reqHeaders = {
-      'Accept': 'application/vnd.github.v3+json'
-    };
-
-    // 1. 尝试从 GitHub Commits 接口拉取指定 branch 的最新 Commit
-    try {
-      const comRes = await robustNetworkRequest({
-        url: `https://api.github.com/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=1`,
-        method: 'GET',
-        headers: reqHeaders
-      });
-      if (comRes && comRes.ok && comRes.json && Array.isArray(comRes.json) && comRes.json[0]) {
-        const c = comRes.json[0];
-        remoteCommit = c.sha ? c.sha.slice(0, 7) : null;
-        updateMessage = c.commit?.message || `最新提交代码更新`;
-      } else if (comRes && comRes.status === 404) {
-        fetchErrorReason = '404_private_or_not_found';
-      }
-    } catch (e) {}
-
-    // 2. 尝试从 GitHub Contents API 或 raw content 拉取指定 branch 的 manifest.json
-    try {
-      // 方式 A: GitHub Contents API
-      const contentRes = await robustNetworkRequest({
-        url: `https://api.github.com/repos/${repo}/contents/manifest.json?ref=${encodeURIComponent(branch)}`,
-        method: 'GET',
-        headers: { 'Accept': 'application/vnd.github.v3.raw' }
-      });
-      let mData = contentRes?.json;
-      if (!mData && contentRes?.text) {
-        try { mData = JSON.parse(contentRes.text); } catch (e) {}
-      }
-      
-      // 方式 B: raw content
-      if (!mData || !mData.version) {
-        const manifestRes = await robustNetworkRequest({
-          url: `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/manifest.json`,
-          method: 'GET'
-        });
-        mData = manifestRes?.json || (manifestRes?.text ? JSON.parse(manifestRes.text) : null);
-      }
-
-      if (mData && mData.version) {
-        const rawVer = String(mData.version).trim();
-        remoteVer = rawVer.startsWith('v') ? rawVer : `v${rawVer}`;
-        if (mData.description) {
-          updateMessage = mData.description;
-        }
-      }
-    } catch (e) {}
-
-    // 3. 备用：若未读取到则尝试从 metadata.json 解析
-    if (!remoteVer) {
-      try {
-        const metaRes = await robustNetworkRequest({
-          url: `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/metadata.json`,
-          method: 'GET'
-        });
-        const metaData = metaRes?.json || (metaRes?.text ? JSON.parse(metaRes.text) : null);
-        if (metaData && metaData.description) {
-          const match = String(metaData.description).match(/v\d+\.\d+\.\d+/i);
-          if (match) remoteVer = match[0];
-        }
-      } catch (e) {}
+    // 使用新的云端加载方案检查更新
+    if (!window.RepoCloner) {
+      console.warn('[VersionUpdate] RepoCloner 未加载，跳过检查');
+      gitUpdateState.hasUpdate = false;
+      return;
     }
 
-    // 4. 尝试从 Releases 接口拉取最新 Release
-    if (!remoteVer) {
+    const result = await window.RepoCloner.checkForUpdate();
+    
+    if (result.error) {
+      console.warn('[VersionUpdate] 检查更新失败:', result.error);
+      if (!silent && api.ui?.toast) {
+        api.ui.toast('检测更新失败，请稍后重试');
+      }
+      gitUpdateState.hasUpdate = false;
+    } else {
+      gitUpdateState.hasUpdate = result.hasUpdate;
+      gitUpdateState.localCommit = result.currentHash ? result.currentHash.slice(0, 7) : '';
+      gitUpdateState.remoteCommit = result.latestHash ? result.latestHash.slice(0, 7) : '';
+      
+      // 从 manifest.json 读取版本号
       try {
-        const relRes = await robustNetworkRequest({
-          url: `https://api.github.com/repos/${repo}/releases/latest`,
-          method: 'GET',
-          headers: reqHeaders
-        });
-        if (relRes && relRes.ok && relRes.json) {
-          remoteVer = relRes.json.tag_name || relRes.json.name;
-          if (!updateMessage) updateMessage = relRes.json.body || relRes.json.name || '';
+        const manifestContent = await window.RepoCloner.getFileFromDb('manifest.json');
+        if (manifestContent) {
+          const manifest = JSON.parse(manifestContent);
+          if (manifest.version) {
+            gitUpdateState.currentVersion = manifest.version.startsWith('v') ? manifest.version : 'v' + manifest.version;
+          }
         }
       } catch (e) {}
-    }
-
-    const nowStr = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-    gitUpdateState.lastCheckTime = nowStr;
-
-    if (remoteVer || remoteCommit) {
-      gitUpdateState.remoteCommit = remoteCommit ? `${remoteCommit} (${branch})` : (remoteVer ? `${remoteVer}-${branch}` : branch);
-      gitUpdateState.latestVersion = remoteVer || (remoteCommit ? `v3.4.${remoteCommit}` : APP_CURRENT_VERSION);
-      gitUpdateState.updateLog = updateMessage || '检测到更新。';
-
-      // 判定是否有新版本 (版本号不同 或 Commit 产生变化)
-      // 注意：用 gitUpdateState.currentVersion（实际运行的版本，从数据库读取），
-      // 而不是 APP_CURRENT_VERSION（硬编码的原始版本），否则热补丁更新后会一直显示有更新
-      const isNewVer = remoteVer && remoteVer.trim() !== gitUpdateState.currentVersion;
-      const isNewCommit = remoteCommit && gitUpdateState.localCommit && !gitUpdateState.localCommit.includes(remoteCommit);
       
-      gitUpdateState.hasUpdate = Boolean(isNewVer || isNewCommit);
-
+      // 最新版本号用 commit hash 前 7 位表示
+      gitUpdateState.latestVersion = result.latestHash ? result.latestHash.slice(0, 7) : gitUpdateState.currentVersion;
+      
       if (gitUpdateState.hasUpdate) {
         if (!silent && api.ui?.toast) {
-          api.ui.toast(`🎉 发现新版本 ${gitUpdateState.latestVersion}！`);
+          api.ui.toast('🎉 发现新版本！点击更新按钮即可更新');
         }
       } else {
         if (!silent && api.ui?.toast) {
-          api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
-        }
-      }
-    } else {
-      gitUpdateState.latestVersion = APP_CURRENT_VERSION;
-      gitUpdateState.hasUpdate = false;
-      if (!silent && api.ui?.toast) {
-        if (fetchErrorReason === '404_private_or_not_found') {
-          api.ui.toast(`未找到仓库，若仓库为私有(Private)请设为公开(Public)`);
-        } else {
-          api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
+          api.ui.toast('当前已是最新版本');
         }
       }
     }
+    
+    const nowStr = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    gitUpdateState.lastCheckTime = nowStr;
   } catch (err) {
-    console.warn("检查 Git 更新异常:", err);
+    console.warn('[VersionUpdate] 检查更新异常:', err);
     if (!silent && api.ui?.toast) {
-      api.ui.toast("检测更新超时，请稍后重试");
+      api.ui.toast('检测更新超时，请稍后重试');
     }
   } finally {
     gitUpdateState.isChecking = false;
     renderGitUpdateButton();
   }
 }
-window.checkGitRepoUpdate = checkGitRepoUpdate;
-
-async function fetchSingleRepoFile(repo, branch, filePath) {
-  // 方式 1: GitHub Raw 直连
-  try {
-    const rawUrl = `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/${filePath}`;
-    const rawRes = await robustNetworkRequest({
-      url: rawUrl,
-      method: 'GET'
-    });
-    if (rawRes && rawRes.ok && rawRes.text) {
-      return rawRes.text;
-    }
-  } catch (e) {}
-
-  // 方式 2: GitHub Contents API
-  try {
-    const apiUrl = `https://api.github.com/repos/${repo}/contents/${filePath}?ref=${encodeURIComponent(branch)}`;
-    const apiRes = await robustNetworkRequest({
-      url: apiUrl,
-      method: 'GET',
-      headers: { 'Accept': 'application/vnd.github.v3.raw' }
-    });
-    if (apiRes && apiRes.ok && apiRes.text) {
-      return apiRes.text;
-    }
-  } catch (e) {}
-
-  return null;
-}
-
-// 需要热补丁更新的文件列表（splash.js 是启动器，不参与热补丁）
-const HOTPATCH_FILES = [
-  'manifest.json',
-  'style.css',
-  'LIVE/设定/page_stack.js',
-  'LIVE/core.js',
-  'LIVE/数据/data_hub.js',
-  'LIVE/数据/fans_manager.js',
-  'LIVE/数据/guard_manager.js',
-  'LIVE/数据/checkin_manager.js',
-  'LIVE/数据/titles_manager.js',
-  'LIVE/主页/profile.js',
-  'LIVE/社区/community_store.js',
-  'LIVE/社区/module_trends.js',
-  'LIVE/社区/module_supertopic.js',
-  'LIVE/社区/module_detail.js',
-  'LIVE/社区/module_ranking.js',
-  'LIVE/社区/module_forum.js',
-  'LIVE/社区/module_mytopic.js',
-  'LIVE/社区/trends.js',
-  'LIVE/直播/room_loading.js',
-  'LIVE/直播/live.js',
-  'LIVE/设定/main.js',
-  'LIVE/设定/patch.js'
-];
-
-// 从 GitHub API 获取文件树（包含每个文件的 git SHA，用于增量更新对比）
-async function fetchRepoFileTree(repo, branch) {
-  try {
-    const apiUrl = `https://api.github.com/repos/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
-    const res = await robustNetworkRequest({
-      url: apiUrl,
-      method: 'GET',
-      headers: { 'Accept': 'application/vnd.github.v3+json' }
-    });
-    if (res && res.ok && res.json && res.json.tree) {
-      const fileMap = {};
-      res.json.tree.forEach(item => {
-        if (item.type === 'blob' && item.path) {
-          fileMap[item.path] = item.sha;
-        }
-      });
-      return fileMap;
-    }
-  } catch (e) {
-    console.warn('[LUMA Update] ⚠️ 获取文件树失败，将全量下载:', e.message);
-  }
-  return null;
-}
-
-// 从本地热补丁记录中获取文件的 hash
-function getLocalFileHash(localFiles, filePath) {
-  if (!localFiles) return null;
-  const fileData = localFiles[filePath];
-  if (!fileData) return null;
-  if (typeof fileData === 'string') return null; // 旧格式没有 hash
-  if (fileData && fileData.hash) return fileData.hash;
-  return null;
-}
-
-// 从本地热补丁记录中获取文件内容
-function getLocalFileContent(localFiles, filePath) {
-  if (!localFiles) return null;
-  const fileData = localFiles[filePath];
-  if (!fileData) return null;
-  if (typeof fileData === 'string') return fileData;
-  if (fileData && typeof fileData.content === 'string') return fileData.content;
-  return null;
-}
 
 async function handleVersionUpdateClick() {
-  const repo = (gitUpdateState.repoUrl || DEFAULT_GIT_REPO).trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
-  const branch = (gitUpdateState.branch || DEFAULT_GIT_BRANCH).trim();
+  if (!window.RepoCloner) {
+    if (api.ui?.toast) api.ui.toast('更新模块未加载，请重启应用');
+    return;
+  }
+
   if (gitUpdateState.hasUpdate) {
-    if (api.ui?.toast) api.ui.toast(`🚀 正在从 GitHub (${repo}) 检查并下载更新...`);
+    if (api.ui?.toast) api.ui.toast('🚀 正在从 GitHub 下载最新代码...');
     
-    // 1. 获取本地热补丁记录（用于增量更新）
-    let localHotpatch = null;
     try {
-      localHotpatch = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
-    } catch (e) {}
-    const localFiles = localHotpatch ? localHotpatch.files : null;
-    
-    // 2. 获取远程文件树（包含每个文件的 git SHA）
-    const remoteFileTree = await fetchRepoFileTree(repo, branch);
-    
-    // 3. 对比本地和远程的文件 hash，确定需要下载的文件
-    const filesToDownload = [];
-    const unchangedFiles = {};
-    
-    for (const filePath of HOTPATCH_FILES) {
-      const remoteHash = remoteFileTree ? remoteFileTree[filePath] : null;
-      const localHash = getLocalFileHash(localFiles, filePath);
-      
-      if (remoteHash && localHash && remoteHash === localHash) {
-        // 文件没变化，从本地复制
-        const localContent = getLocalFileContent(localFiles, filePath);
-        if (localContent) {
-          unchangedFiles[filePath] = { content: localContent, hash: localHash };
-          console.log(`[LUMA Update] ⏭️ ${filePath} 未变化，复用本地 (${localHash.slice(0, 7)})`);
-          continue;
-        }
-      }
-      
-      // 文件变化了或本地没有，需要下载
-      filesToDownload.push(filePath);
-    }
-    
-    console.log(`[LUMA Update] 📊 增量更新：共 ${HOTPATCH_FILES.length} 个文件，${filesToDownload.length} 个需要下载，${Object.keys(unchangedFiles).length} 个复用本地`);
-    
-    // 4. 下载变化的文件
-    const downloadedFiles = {};
-    let successCount = 0;
-    let failCount = 0;
-    
-    for (const filePath of filesToDownload) {
-      try {
-        const fileContent = await fetchSingleRepoFile(repo, branch, filePath);
-        if (fileContent && typeof fileContent === 'string' && fileContent.trim()) {
-          if (fileContent.trim().startsWith('<!DOCTYPE') || fileContent.trim().startsWith('<html')) {
-            console.error(`[LUMA Update] ❌ ${filePath} 下载到 HTML 错误页面`);
-            failCount++;
-          } else {
-            // 新格式：保存 content 和 hash（用远程 git SHA 作为 hash）
-            const remoteHash = remoteFileTree ? remoteFileTree[filePath] : '';
-            downloadedFiles[filePath] = { content: fileContent, hash: remoteHash };
-            successCount++;
-            console.log(`[LUMA Update] ✅ ${filePath} 下载成功 (${(fileContent.length / 1024).toFixed(1)}KB)${remoteHash ? ' [' + remoteHash.slice(0, 7) + ']' : ''}`);
-          }
-        } else {
-          console.warn(`[LUMA Update] ⚠️ ${filePath} 内容为空，下载失败`);
-          failCount++;
-        }
-      } catch (err) {
-        console.error(`[LUMA Update] ❌ ${filePath} 下载异常:`, err.message);
-        failCount++;
-      }
-    }
-    
-    // 5. 合并下载的文件和未变化的文件
-    const allFiles = { ...unchangedFiles, ...downloadedFiles };
-    const totalSuccess = Object.keys(allFiles).length;
-    
-    console.log(`[LUMA Update] 下载完成：新下载 ${successCount} 个，复用 ${Object.keys(unchangedFiles).length} 个，失败 ${failCount} 个，共 ${totalSuccess} 个可用`);
-    
-    if (totalSuccess >= 10) {
-      // 成功获取大部分核心代码，写入热补丁引擎本地持久缓存
-      try {
-        const hotpatchData = {
-          id: 'current_hotpatch',
-          files: allFiles,
-          version: gitUpdateState.latestVersion || APP_CURRENT_VERSION,
-          commit: gitUpdateState.remoteCommit || '',
-          time: Date.now()
-        };
-        const totalSize = Object.values(allFiles).reduce((sum, f) => {
-          const content = typeof f === 'string' ? f : (f.content || '');
-          return sum + content.length;
-        }, 0);
-        
-        await api.db.create('app_hotpatch', hotpatchData).catch(() => {
-          return api.db.update('app_hotpatch', 'current_hotpatch', hotpatchData);
-        });
-        console.log(`[LUMA Update] 💾 热补丁已存入数据库，总大小: ${(totalSize / 1024).toFixed(1)}KB，文件数: ${totalSuccess}`);
-      } catch (e) {
-        console.error('[LUMA Update] ❌ 写入热更新缓存异常:', e.message);
-        if (api.ui?.toast) api.ui.toast(`存储失败: ${e.message}`);
-        return;
-      }
-      gitUpdateState.currentVersion = gitUpdateState.latestVersion;
-      if (gitUpdateState.remoteCommit) {
-        gitUpdateState.localCommit = gitUpdateState.remoteCommit;
-      }
-      gitUpdateState.hasUpdate = false;
-      await api.db.create("app_settings", {
-        id: "git_repo_config",
-        repoUrl: gitUpdateState.repoUrl,
-        branch: gitUpdateState.branch,
-        installedVersion: gitUpdateState.currentVersion,
-        installedCommit: gitUpdateState.localCommit,
-        lastUpdated: Date.now()
-      }).catch(() => {
-        api.db.update("app_settings", "git_repo_config", {
-          repoUrl: gitUpdateState.repoUrl,
-          branch: gitUpdateState.branch,
-          installedVersion: gitUpdateState.currentVersion,
-          installedCommit: gitUpdateState.localCommit,
-          lastUpdated: Date.now()
-        }).catch(() => {});
+      // 使用新的云端加载方案拉取最新代码
+      const result = await window.RepoCloner.cloneRepoToDb((msg, percent) => {
+        console.log(`[VersionUpdate] ${msg} (${percent}%)`);
       });
-      renderGitUpdateButton();
-      if (api.ui?.toast) api.ui.toast(`🎉 最新版本 (${gitUpdateState.currentVersion}) 下载成功！即将自动重启应用...`);
-      // 刷新页面，splash.js 会从 api.db 读取热补丁并动态加载最新代码
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } else {
-      if (api.ui?.toast) api.ui.toast(`网络连接超时，下载代码失败，请稍后重试`);
+      
+      if (result.success) {
+        // 更新本地版本状态
+        gitUpdateState.currentVersion = gitUpdateState.latestVersion;
+        gitUpdateState.localCommit = gitUpdateState.remoteCommit;
+        gitUpdateState.hasUpdate = false;
+        
+        // 保存配置到数据库
+        try {
+          await api.db.create("app_settings", {
+            id: "git_repo_config",
+            repoUrl: gitUpdateState.repoUrl,
+            branch: gitUpdateState.branch,
+            installedVersion: gitUpdateState.currentVersion,
+            installedCommit: gitUpdateState.localCommit,
+            lastUpdated: Date.now()
+          }).catch(() => {
+            return api.db.update("app_settings", "git_repo_config", {
+              repoUrl: gitUpdateState.repoUrl,
+              branch: gitUpdateState.branch,
+              installedVersion: gitUpdateState.currentVersion,
+              installedCommit: gitUpdateState.localCommit,
+              lastUpdated: Date.now()
+            }).catch(() => {});
+          });
+        } catch (e) {}
+        
+        renderGitUpdateButton();
+        
+        if (api.ui?.toast) api.ui.toast('🎉 更新成功！即将自动重启应用...');
+        
+        // 刷新页面，code_loader.js 会从 api.db 读取最新代码
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        console.error('[VersionUpdate] 更新失败:', result.error);
+        if (api.ui?.toast) api.ui.toast('更新失败: ' + (result.error || '未知错误'));
+      }
+    } catch (err) {
+      console.error('[VersionUpdate] 更新异常:', err);
+      if (api.ui?.toast) api.ui.toast('更新失败: ' + err.message);
     }
   } else {
-    if (api.ui?.toast) api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
+    // 没有更新，点击后检查更新
+    if (api.ui?.toast) api.ui.toast('正在检查更新...');
     checkGitRepoUpdate(true);
   }
 }
+
 window.handleVersionUpdateClick = handleVersionUpdateClick;
 
 // =========================================================================
