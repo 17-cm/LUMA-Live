@@ -933,7 +933,7 @@ window.executeConfirmResetAppData = executeConfirmResetAppData;
 // =========================================================================
 // 10. 【版本更新与 Git 仓库直连系统】
 // =========================================================================
-const APP_CURRENT_VERSION = 'v3.4.1';
+const APP_CURRENT_VERSION = ''; // 启动时从宿主 manifest 读取，不硬编码
 const DEFAULT_GIT_REPO = '17-cm/LUMA-Live';
 const DEFAULT_GIT_BRANCH = 'moon';
 
@@ -985,7 +985,7 @@ function renderGitUpdateButton() {
     }
     if (badge) {
       badge.className = 'absolute right-3 bottom-1.5 text-[9px] font-mono text-rose-400 font-normal';
-      badge.textContent = gitUpdateState.currentVersion;
+      badge.textContent = gitUpdateState.currentVersion || '';
     }
   }
 }
@@ -1031,7 +1031,7 @@ async function checkGitRepoUpdate(silent = false) {
 
     // 比对：Commit SHA 不同 或 版本号不同 → 有更新
     const isNewCommit = remoteCommit && gitUpdateState.localCommit && !gitUpdateState.localCommit.includes(remoteCommit);
-    const isNewVer = remoteVer && remoteVer.trim() !== gitUpdateState.currentVersion;
+    const isNewVer = remoteVer && gitUpdateState.currentVersion && remoteVer.trim() !== gitUpdateState.currentVersion;
     gitUpdateState.hasUpdate = Boolean(isNewCommit || isNewVer);
 
     if (remoteCommit) {
@@ -1306,7 +1306,7 @@ window.handleVersionUpdateClick = handleVersionUpdateClick;
 function exportAppDataFile() {
   try {
     const backupData = {
-      version: APP_CURRENT_VERSION,
+      version: gitUpdateState.currentVersion || '',
       exportTime: new Date().toISOString(),
       appParams: window.appParams || {},
       customApiConfig: window.customApiConfig || {},
@@ -1495,6 +1495,15 @@ async function lumaInitApp(options) {
 
     const ledgerRec = await api.db.list("app_ledger") || [];
     if (ledgerRec.length > 0) window.transactionLedger = ledgerRec;
+
+    // 从宿主读取当前安装版本（最可靠的来源，不需要手动同步常量）
+    try {
+      const hostManifest = await api.app?.getManifest?.();
+      if (hostManifest?.version) {
+        const ver = String(hostManifest.version).trim();
+        window.gitUpdateState.currentVersion = ver.startsWith('v') ? ver : `v${ver}`;
+      }
+    } catch (e) {}
 
     const gitCfg = await api.db.get("app_settings", "git_repo_config");
     if (gitCfg) {
