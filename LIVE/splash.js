@@ -68,7 +68,6 @@
     }
     function signalReady() {
       window.__lumaHotpatchLoading = false;
-      console.log('[LUMA Hotpatch] ✅ 热补丁注入流程结束，main.js 可初始化');
     }
 
     // 等待 api 对象可用
@@ -88,7 +87,6 @@
     try {
       var hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(function() { return null; });
       if (!hotpatchRec || !hotpatchRec.files) {
-        console.log('[LUMA Hotpatch] 无热补丁数据，使用静态脚本');
         signalReady();
         return;
       }
@@ -114,7 +112,6 @@
           style.textContent = cssContent;
           document.head.appendChild(style);
           window.__lumaHotpatchCssApplied = true;
-          console.log('[LUMA Hotpatch] ✅ style.css 已注入 (' + (cssContent.length / 1024).toFixed(1) + 'KB)');
         }
       }
 
@@ -148,18 +145,14 @@
         console.error('[LUMA Hotpatch] ❌ 热补丁注入失败（' + jsInjected + '/' + JS_LOAD_ORDER.length + '），使用静态脚本');
         signalReady();
       } else {
-        console.log('[LUMA Hotpatch] ✅ 全部 ' + jsInjected + ' 个 JS 文件以 module 方式注入成功，等待执行...');
         window.__lumaHotpatchJsApplied = true;
         if (hotpatchRec.version) {
           window.__lumaHotpatchVersion = hotpatchRec.version;
           window.__lumaHotpatchCommit = hotpatchRec.commit || '';
           window.__lumaHotpatchActive = true;
-          console.log('[LUMA Hotpatch] 📌 当前热补丁版本: ' + hotpatchRec.version
-            + (hotpatchRec.commit ? ' (' + hotpatchRec.commit + ')' : ''));
         }
         // module脚本异步执行（defer），等待执行完成后发信号让 main.js 初始化
         setTimeout(function() {
-          console.log('[LUMA Hotpatch] ✅ 热补丁函数覆盖完成，共 ' + jsInjected + ' 个 JS 文件');
           signalReady();
         }, 200);
       }
