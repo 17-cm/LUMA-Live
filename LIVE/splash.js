@@ -319,6 +319,8 @@
     if (splashTimerId) clearTimeout(splashTimerId);
     const container = document.getElementById('appSplashScreen');
     if (container) { container.classList.add('splash-exit'); setTimeout(() => { container.style.display='none'; }, 750); }
+    // 移除 body 的 splash-loading 类，显示 APP 内容
+    document.body.classList.remove('splash-loading');
   }
 
   window.playSplashScreen = runSplashScreenAnimation;

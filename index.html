@@ -11,8 +11,17 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="style.css">
   <!-- 独立启动页模块 (Plan A) -->
+  <!-- 启动画面防闪烁：splash 显示前隐藏所有内容 -->
+  <style>
+    body.splash-loading > *:not(#appSplashScreen) {
+      visibility: hidden !important;
+    }
+    body.splash-loading {
+      background: #060410 !important;
+    }
+  </style>
 </head>
-<body class="h-screen w-screen flex flex-col relative select-none">
+<body class="h-screen w-screen flex flex-col relative select-none splash-loading">
 
   <!-- 隐藏的文件导入选择器 -->
   <input type="file" id="fileInputData" class="hidden" accept=".json" onchange="handleFileImportData(event)">
