@@ -1732,7 +1732,17 @@
     }
 
     function loadNext() {
-      if (idx >= files.length) return;
+      if (idx >= files.length) {
+        // 所有脚本加载完毕，手动初始化 APP
+        // （动态加载发生在 DOMContentLoaded 之后，main.js 里的事件监听不会触发）
+        console.log('[ScriptLoader] 全部脚本加载完成，调用 lumaInitApp');
+        if (typeof window.lumaInitApp === 'function') {
+          window.lumaInitApp();
+        } else {
+          console.warn('[ScriptLoader] lumaInitApp 未定义，APP 可能无法初始化');
+        }
+        return;
+      }
       var src = files[idx++];
       var patched = getHotpatchContent(src);
       var s = document.createElement('script');
@@ -1752,11 +1762,11 @@
     }
 
     function waitForHotpatch() {
-      if (window.__lumaHotpatchFiles !== undefined || waited >= maxWait) {
+      if (window.__lumaHotpatchReady === true || waited >= maxWait) {
         if (window.__lumaHotpatchFiles) {
           console.log('[ScriptLoader] 热补丁就绪，共', Object.keys(window.__lumaHotpatchFiles).length, '个文件');
         } else {
-          console.log('[ScriptLoader] 无热补丁（等待超时），加载本地文件');
+          console.log('[ScriptLoader] 无热补丁，加载本地文件');
         }
         loadNext();
       } else {

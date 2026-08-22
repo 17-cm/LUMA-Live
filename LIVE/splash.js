@@ -7,6 +7,8 @@
   // 【热补丁启动注入】在所有业务脚本加载前，先应用 api.db 中的热补丁 CSS
   // 沙盒 iframe 无法访问 localStorage，必须用 api.db
   // =========================================================================
+  // 标记热补丁检查是否完成（供动态脚本加载器判断是否可以开始加载）
+  window.__lumaHotpatchReady = false;
   (async function applyHotpatchCssEarly() {
     // 等待 api 对象可用（宿主注入可能需要一点时间）
     let api = window.api || window.AiPhone || window.AiPhoneApp;
@@ -18,12 +20,14 @@
     }
     if (!api || !api.db) {
       console.warn('[LUMA Hotpatch] ⚠️ api.db 不可用，跳过热补丁注入');
+      window.__lumaHotpatchReady = true;
       return;
     }
     try {
       const hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
       if (!hotpatchRec || !hotpatchRec.files) {
         console.log('[LUMA Hotpatch] 无热补丁数据，跳过 CSS 注入');
+        window.__lumaHotpatchReady = true;
         return;
       }
       const files = hotpatchRec.files;
@@ -62,6 +66,7 @@
     } catch (e) {
       console.error('[LUMA Hotpatch] ❌ CSS 注入异常:', e.message);
     }
+    window.__lumaHotpatchReady = true;
   })();
 
   // 加载字体
