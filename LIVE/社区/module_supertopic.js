@@ -184,7 +184,7 @@ function renderSuperTopicPostsTab(charId) {
           badge: '超话大咖',
           verified: true
         },
-        time: '刚刚 · 来自 LUMA 超话客户端',
+        time: `刚刚 · 来自 ${window.getFloatClientTag(false)}`,
         tag: `#${char.name}超话#`,
         mention: `@${char.name}`,
         linkText: '',

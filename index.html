@@ -1076,11 +1076,6 @@
       <button onclick="closeStreamerProfilePage()" class="profile-nav-btn" title="返回">
         <svg class="w-5 h-5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </button>
-      <div class="flex items-center gap-2">
-        <button onclick="shareCurrentStreamerProfile()" class="profile-nav-btn" title="分享">
-          <svg class="w-4 h-4 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-        </button>
-      </div>
     </div>
 
     <!-- 滚动内容容器 -->
@@ -1119,9 +1114,9 @@
               <span id="spFollowBtnText">关注</span>
             </button>
 
-            <!-- 发私信/互动 -->
-            <button onclick="spOpenPrivateChat()" class="p-2 rounded-full bg-slate-100 text-slate-700 active:scale-95 transition" title="发私信">
-              <svg class="w-4 h-4 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            <!-- 铅笔：编辑主播档案 -->
+            <button onclick="spOpenProfileEdit()" class="p-2 rounded-full bg-slate-100 text-slate-700 active:scale-95 transition" title="编辑档案">
+              <svg class="w-4 h-4 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
             </button>
           </div>
         </div>
@@ -1183,24 +1178,20 @@
         </div>
       </div>
 
-      <!-- 微博 4 大专属 Tab 导航条 (粘性定位) -->
+      <!-- 微博 Tab 导航条 (粘性定位；动态 Tab 暂隐藏，等社区真实功能) -->
       <div class="sticky top-0 z-20 bg-white/95 backdrop-blur border-y border-slate-100 flex items-center justify-around px-2 shadow-xs">
-        <div onclick="switchSpTab('posts')" id="spTabPosts" class="weibo-tab-item active">动态</div>
-        <div onclick="switchSpTab('shows')" id="spTabShows" class="weibo-tab-item">直播场次</div>
+        <div onclick="switchSpTab('shows')" id="spTabShows" class="weibo-tab-item active">直播场次</div>
         <div onclick="switchSpTab('gallery')" id="spTabGallery" class="weibo-tab-item">相册</div>
         <div onclick="switchSpTab('guestbook')" id="spTabGuestbook" class="weibo-tab-item">留言墙</div>
       </div>
 
-      <!-- Tab 1: 动态微博列表 -->
-      <div id="spPanelPosts" class="p-3 space-y-3"></div>
+      <!-- Tab 1: 直播场次与回放记录 -->
+      <div id="spPanelShows" class="p-3 space-y-3"></div>
 
-      <!-- Tab 2: 直播场次与回放记录 -->
-      <div id="spPanelShows" class="hidden p-3 space-y-3"></div>
-
-      <!-- Tab 3: 相册影集 -->
+      <!-- Tab 2: 相册影集 -->
       <div id="spPanelGallery" class="hidden p-3"></div>
 
-      <!-- Tab 4: 留言墙与守护榜 -->
+      <!-- Tab 3: 留言墙与守护榜 -->
       <div id="spPanelGuestbook" class="hidden p-3 space-y-3">
         <!-- 留言输入框 -->
         <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs space-y-2">
@@ -1215,6 +1206,49 @@
         </div>
         <div id="spaceGuestbookList" class="space-y-2.5"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- 编辑主播档案弹窗（铅笔入口） -->
+  <div id="profileEditModal" class="hidden center-modal-backdrop">
+    <div class="center-modal-card p-5 space-y-3 max-h-[85vh] overflow-y-auto no-scrollbar">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-black text-slate-900">编辑主播档案</h3>
+        <button onclick="closeProfileEditModal()" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center active:scale-90 transition" title="关闭">
+          <svg class="w-3.5 h-3.5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">个人认证</label>
+        <input id="peVerifyTitle" class="input-ins w-full mt-1" placeholder="如：LUMA 年度认证大V主播 · 音乐主唱">
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">个性签名</label>
+        <input id="peBio" class="input-ins w-full mt-1" placeholder="一句话介绍自己">
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">IP属地</label>
+        <input id="peIpLocation" class="input-ins w-full mt-1" placeholder="如：广东 / 赛博星云-新京都">
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">粉丝团（只能修改前缀，"粉丝团"三个字固定）</label>
+        <div class="flex items-center gap-2 mt-1">
+          <input id="peFanClubPrefix" class="input-ins flex-1" placeholder="粉丝团前缀">
+          <span class="text-xs font-black text-rose-600 bg-rose-50 px-3 py-2.5 rounded-xl border border-rose-100 flex-shrink-0">粉丝团</span>
+        </div>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">四个标签（带 #）</label>
+        <div class="space-y-2 mt-1">
+          <input id="peTag1" class="input-ins w-full" placeholder="#标签一">
+          <input id="peTag2" class="input-ins w-full" placeholder="#标签二">
+          <input id="peTag3" class="input-ins w-full" placeholder="#标签三">
+          <input id="peTag4" class="input-ins w-full" placeholder="#标签四">
+        </div>
+      </div>
+
+      <button onclick="spSaveProfileEdit()" class="btn-brand w-full py-3">保存</button>
     </div>
   </div>
 
@@ -1762,6 +1796,7 @@
   <script src="LIVE/社区/trends.js"></script>
   <script src="LIVE/直播/room_loading.js"></script>
   <script src="LIVE/直播/live.js"></script>
+  <script src="LIVE/主页/streamer_profile.js"></script>
   <script src="LIVE/设定/main.js"></script>
   <script src="LIVE/设定/patch.js"></script>
   <script src="LIVE/设定/gift_system.js"></script>

@@ -140,7 +140,7 @@ async function handlePublishNewPost() {
       badge: '社区达人',
       verified: true
     },
-    time: '刚刚 · 来自 LUMA Pro客户端',
+    time: `刚刚 · 来自 ${window.getFloatClientTag(true)}`,
     tag: tagInput ? tagInput.value.trim() : '#社区热点#',
     mention: mentionInput ? mentionInput.value.trim() : '',
     linkText: '网页链接 🔗 动态详情',
@@ -204,7 +204,7 @@ async function handleGenerateNewTrend() {
       badge: '独家爆料',
       verified: true
     },
-    time: '刚刚 · 来自 LUMA Pro客户端',
+    time: `刚刚 · 来自 ${window.getFloatClientTag(true)}`,
     tag: parsed.tag,
     mention: `@${host.name}`,
     linkText: '网页链接 🔗 直播间切片',

@@ -965,3 +965,20 @@ function extractJsonFromText(text) {
   }
 }
 window.extractJsonFromText = extractJsonFromText;
+
+// =========================================================================
+// 【Float 品牌设备标识】所有"来源/设备/客户端"显示统一品牌
+// 品牌固定为 Float，型号随机（17 Pro / 17 Pro Max / 17 Ultra / 17 mini / 17）
+// =========================================================================
+window.FLOAT_BRAND = 'Float';
+window.FLOAT_MODEL_POOL = ['17 Pro', '17 Pro Max', '17 Ultra', '17 mini', '17'];
+function getFloatClientTag(useModel) {
+  const brand = window.FLOAT_BRAND || 'Float';
+  if (useModel) {
+    const pool = window.FLOAT_MODEL_POOL || ['17 Pro'];
+    const model = pool[Math.floor(Math.random() * pool.length)];
+    return `${brand} ${model}`;
+  }
+  return `${brand} 客户端`;
+}
+window.getFloatClientTag = getFloatClientTag;

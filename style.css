@@ -1305,7 +1305,7 @@ input:checked + .switch-slider:before {
   position: fixed;
   inset: 0;
   z-index: 90;
-  background: #f8fafc;
+  background: #ffffff;
   display: flex;
   flex-direction: column;
   transform: translateX(100%);
@@ -1321,7 +1321,7 @@ input:checked + .switch-slider:before {
   height: 260px;
   width: 100%;
   overflow: hidden;
-  background: #f1f5f9;
+  background: #ffffff;
   flex-shrink: 0;
 }
 .profile-cover-img {
