@@ -1695,71 +1695,10 @@
   <!-- 统一数据中心体系 -->
   <!-- 社区 7 模块化架构系统 -->
 
-<!-- 测试按钮：验证 fetch + eval 在沙盒里是否可行 -->
-<div id="evalTestBtn" style="position:fixed;bottom:20px;right:20px;z-index:99999;background:#FF5722;color:white;padding:10px 16px;border-radius:20px;font-size:12px;font-weight:bold;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.3);">
-  🧪 测试eval
-</div>
-<div id="evalTestResult" style="position:fixed;bottom:70px;right:20px;z-index:99999;background:#333;color:white;padding:10px;border-radius:8px;font-size:11px;max-width:250px;display:none;word-break:break-all;"></div>
-<script>
-(function() {
-  const btn = document.getElementById('evalTestBtn');
-  const result = document.getElementById('evalTestResult');
-  
-  btn.addEventListener('click', async function() {
-    result.style.display = 'block';
-    result.textContent = '⏳ 正在从 GitHub 拉取测试文件...';
-    btn.textContent = '⏳ 测试中...';
-    
-    try {
-      const testUrl = 'https://raw.githubusercontent.com/17-cm/LUMA-Live/test/test_eval.js';
-      console.log('[eval测试] 开始 fetch:', testUrl);
-      
-      const response = await fetch(testUrl);
-      console.log('[eval测试] fetch 状态:', response.status, response.statusText);
-      
-      if (!response.ok) {
-        throw new Error('HTTP ' + response.status + ' ' + response.statusText);
-      }
-      
-      const code = await response.text();
-      console.log('[eval测试] 下载成功，代码长度:', code.length, '字符');
-      console.log('[eval测试] 代码前100字符:', code.substring(0, 100));
-      
-      result.textContent = '⏳ 下载成功，正在 eval 执行...';
-      
-      // 用 eval 执行
-      eval(code);
-      
-      console.log('[eval测试] eval 执行完成');
-      console.log('[eval测试] window.__evalTestSuccess:', window.__evalTestSuccess);
-      
-      if (window.__evalTestSuccess) {
-        result.style.background = '#4CAF50';
-        result.textContent = '✅ 测试成功！fetch + eval 在沙盒里可行！';
-        btn.textContent = '✅ 成功';
-        btn.style.background = '#4CAF50';
-      } else {
-        throw new Error('eval 执行了但是没有设置成功标记');
-      }
-      
-    } catch (err) {
-      console.error('[eval测试] 失败:', err);
-      result.style.background = '#f44336';
-      result.textContent = '❌ 测试失败：' + err.message + '\n\n详细错误请看控制台';
-      btn.textContent = '❌ 失败';
-      btn.style.background = '#f44336';
-    }
-    
-    // 5秒后恢复按钮
-    setTimeout(() => {
-      btn.textContent = '🧪 测试eval';
-      btn.style.background = '#FF5722';
-      result.style.display = 'none';
-    }, 8000);
-  });
-})();
-</script>
 
+
+  <!-- 启动画面 -->
+  <script src="LIVE/splash.js"></script>
 
   <!-- 云端代码加载器：从 GitHub 克隆仓库到 api.db，然后加载运行 -->
   <script src="LIVE/repo_cloner.js"></script>

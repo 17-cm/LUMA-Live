@@ -29,6 +29,7 @@
     'LIVE/直播/room_loading.js',
     'LIVE/直播/live.js',
     'LIVE/设定/main.js',
+    'LIVE/设定/patch.js',
     'LIVE/设定/gift_system.js'
   ];
 
@@ -43,7 +44,7 @@
     if (!overlay) {
       overlay = document.createElement('div');
       overlay.id = 'cloud-loading-overlay';
-      overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999999;color:white;font-family:-apple-system,sans-serif;';
+      overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999998;color:white;font-family:-apple-system,sans-serif;';
       overlay.innerHTML = `
         <div style="font-size:48px;margin-bottom:20px;">🎬</div>
         <div style="font-size:24px;font-weight:bold;margin-bottom:10px;">LUMA Live</div>
@@ -213,6 +214,12 @@
       console.log('[CodeLoader] 手动触发 DOMContentLoaded 事件...');
       document.dispatchEvent(new Event('DOMContentLoaded'));
       console.log('[CodeLoader] DOMContentLoaded 事件已触发');
+      
+      // 手动触发 load 事件
+      // live.js 等文件可能依赖 load 事件
+      console.log('[CodeLoader] 手动触发 load 事件...');
+      window.dispatchEvent(new Event('load'));
+      console.log('[CodeLoader] load 事件已触发');
     } catch (err) {
       console.error('[CodeLoader] 加载失败:', err);
       showLoadingScreen('加载失败: ' + err.message, 100);
