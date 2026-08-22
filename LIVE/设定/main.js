@@ -1171,8 +1171,10 @@ async function handleVersionUpdateClick() {
   const repo = (gitUpdateState.repoUrl || DEFAULT_GIT_REPO).trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
   const branch = (gitUpdateState.branch || DEFAULT_GIT_BRANCH).trim();
   if (gitUpdateState.hasUpdate) {
-    if (api.ui?.toast) api.ui.toast(`🚀 正在从 GitHub (${repo}) 检查并下载更新...`);
-    
+    // 直接显示启动画面，在画面上展示下载进度
+    if (typeof window.showSplashForUpdate === 'function') window.showSplashForUpdate();
+
+    try {
     // 1. 获取本地热补丁记录（用于增量更新）
     let localHotpatch = null;
     try {
@@ -1205,12 +1207,17 @@ async function handleVersionUpdateClick() {
     }
     
     console.log(`[LUMA Update] 📊 增量更新：共 ${HOTPATCH_FILES.length} 个文件，${filesToDownload.length} 个需要下载，${Object.keys(unchangedFiles).length} 个复用本地`);
-    
-    // 4. 下载变化的文件
+
+    // 4. 下载变化的文件（在启动画面上展示进度）
     const downloadedFiles = {};
     let successCount = 0;
     let failCount = 0;
-    
+    const totalFiles = HOTPATCH_FILES.length;
+    let completedFiles = Object.keys(unchangedFiles).length;
+    if (typeof window.setSplashProgress === 'function') {
+      window.setSplashProgress(Math.round((completedFiles / totalFiles) * 100));
+    }
+
     for (const filePath of filesToDownload) {
       try {
         const fileContent = await fetchSingleRepoFile(repo, branch, filePath);
@@ -1231,6 +1238,10 @@ async function handleVersionUpdateClick() {
       } catch (err) {
         console.error(`[LUMA Update] ❌ ${filePath} 下载异常:`, err.message);
         failCount++;
+      }
+      completedFiles++;
+      if (typeof window.setSplashProgress === 'function') {
+        window.setSplashProgress(Math.round((completedFiles / totalFiles) * 100));
       }
     }
     
@@ -1261,6 +1272,7 @@ async function handleVersionUpdateClick() {
         console.log(`[LUMA Update] 💾 热补丁已存入数据库，总大小: ${(totalSize / 1024).toFixed(1)}KB，文件数: ${totalSuccess}`);
       } catch (e) {
         console.error('[LUMA Update] ❌ 写入热更新缓存异常:', e.message);
+        if (typeof window.exitSplashScreen === 'function') window.exitSplashScreen();
         if (api.ui?.toast) api.ui.toast(`存储失败: ${e.message}`);
         return;
       }
@@ -1286,13 +1298,19 @@ async function handleVersionUpdateClick() {
         }).catch(() => {});
       });
       renderGitUpdateButton();
-      if (api.ui?.toast) api.ui.toast(`🎉 最新版本 (${gitUpdateState.currentVersion}) 下载成功！即将自动重启应用...`);
+      if (typeof window.setSplashProgress === 'function') window.setSplashProgress(100);
       // 刷新页面，splash.js 会从 api.db 读取热补丁并动态加载最新代码
       setTimeout(() => {
         window.location.reload();
-      }, 1000);
+      }, 800);
     } else {
+      if (typeof window.exitSplashScreen === 'function') window.exitSplashScreen();
       if (api.ui?.toast) api.ui.toast(`网络连接超时，下载代码失败，请稍后重试`);
+    }
+    } catch (err) {
+      console.error('[LUMA Update] ❌ 更新过程异常:', err);
+      if (typeof window.exitSplashScreen === 'function') window.exitSplashScreen();
+      if (api.ui?.toast) api.ui.toast(`更新失败：${err?.message || '网络异常'}`);
     }
   } else {
     if (api.ui?.toast) api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);

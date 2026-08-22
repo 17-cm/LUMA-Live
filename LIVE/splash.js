@@ -329,6 +329,10 @@
   `;
   document.head.appendChild(styleEl);
 
+  // 立即创建 splash DOM 并插入文档（body 可能还没解析完，挂到 documentElement 上），
+  // 确保第一帧就有不透明遮罩盖住后续渲染的 APP 内容，杜绝启动闪一下主页的问题。
+  createSplashDOM();
+
   function createStars() {
     const c = document.createElement('div'); c.className = 'splash-stars';
     for (let i = 0; i < 25; i++) {
@@ -365,7 +369,7 @@
             <div class="splash-pen-tip" id="splashPenTip"></div>
           </div>
           <div class="splash-slogan-box" id="splashSloganBox">
-            <p class="splash-slogan-text">开启你的直播之旅</p>
+            <p class="splash-slogan-text" id="splashSloganText">开启你的直播之旅</p>
           </div>
         </div>
         <div class="splash-bottom-section">
@@ -375,7 +379,7 @@
             <span class="splash-footer-sub">AI Live Streaming Simulation Engine</span>
           </div>
         </div>`;
-      document.body.prepend(container);
+      (document.body || document.documentElement).prepend(container);
     }
     return container;
   }
@@ -384,6 +388,10 @@
 
   function runSplashScreenAnimation() {
     const container = createSplashDOM();
+    // 如果 splash 是在 head 阶段挂到 documentElement 上的，body 解析完后移回 body
+    if (container.parentElement !== document.body && document.body) {
+      document.body.prepend(container);
+    }
     isSplashExited = false;
     const logo = document.getElementById('splashLogoLetters');
     const penTip = document.getElementById('splashPenTip');
@@ -424,6 +432,46 @@
 
   window.playSplashScreen = runSplashScreenAnimation;
   window.exitSplashScreen = exitSplashScreen;
+
+  // ── 更新模式：点"版本更新"时直接显示启动画面，在画面上展示下载进度 ──
+  function showSplashForUpdate() {
+    const container = createSplashDOM();
+    if (container.parentElement !== document.body && document.body) {
+      document.body.prepend(container);
+    }
+    isSplashExited = false;
+    if (splashTimerId) { clearTimeout(splashTimerId); splashTimerId = null; }
+
+    const logo = document.getElementById('splashLogoLetters');
+    const penTip = document.getElementById('splashPenTip');
+    const ring = document.getElementById('splashRingCircle');
+    const slogan = document.getElementById('splashSloganBox');
+    const sloganText = document.getElementById('splashSloganText');
+    const progress = document.getElementById('splashProgressFill');
+
+    container.classList.remove('splash-exit');
+    container.style.display = 'flex';
+    container.onclick = null; // 更新过程中不允许点击跳过
+
+    // Logo 和光环直接显示完成态，不播书写动画
+    if (logo) { logo.classList.remove('writing'); logo.classList.add('bloom'); }
+    if (penTip) penTip.classList.remove('active');
+    if (ring) { ring.classList.remove('draw'); ring.classList.add('draw-done'); ring.style.strokeDashoffset = '0'; }
+    if (sloganText) sloganText.textContent = '正在更新中…';
+    if (slogan) slogan.classList.add('show');
+    if (progress) { progress.style.transition = 'width 0.3s ease'; progress.style.width = '0%'; }
+  }
+
+  function setSplashProgress(percent) {
+    const progress = document.getElementById('splashProgressFill');
+    if (progress) {
+      const p = Math.max(0, Math.min(100, Number(percent) || 0));
+      progress.style.width = p + '%';
+    }
+  }
+
+  window.showSplashForUpdate = showSplashForUpdate;
+  window.setSplashProgress = setSplashProgress;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', runSplashScreenAnimation, { once: true });
