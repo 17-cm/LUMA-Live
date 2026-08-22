@@ -182,6 +182,19 @@
       await loadJsonFile('regex.json', 'appRegexConfig');
       await loadJsonFile('world.json', 'appWorldConfig');
       
+      // 定义全局 api 变量，指向宿主 SDK
+      // 之前的代码里用 api.characters.list()、api.db.get() 等
+      // 但是 eval 环境里 api 变量不存在，需要手动定义
+      if (window.AiPhone && typeof api === 'undefined') {
+        window.api = window.AiPhone;
+        try {
+          eval('var api = window.AiPhone;');
+        } catch (e) {
+          console.warn('[CodeLoader] 定义 api 变量失败:', e);
+        }
+        console.log('[CodeLoader] 已定义全局 api 变量 -> window.AiPhone');
+      }
+      
       // 按顺序加载 JS（静默）
       for (let i = 0; i < LOAD_ORDER.length; i++) {
         const jsFile = LOAD_ORDER[i];
