@@ -1622,6 +1622,23 @@ async function lumaInitApp(options) {
     }, 1200);
   }
 
+  // 7b. 后台定时轮询（每30分钟检测一次更新）
+  if (!window.__lumaGitPollTimer) {
+    window.__lumaGitPollTimer = setInterval(() => {
+      checkGitRepoUpdate(true);
+    }, 30 * 60 * 1000);
+  }
+
+  // 7c. APP从后台切回前台时检测一次
+  if (!window.__lumaGitVisibilityBound) {
+    window.__lumaGitVisibilityBound = true;
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        checkGitRepoUpdate(true);
+      }
+    });
+  }
+
   // 8. 启动周期性作息推演定时器 (每 30 秒轮询)
   if (!window.__lumaLiveSyncInterval) {
     window.__lumaLiveSyncInterval = setInterval(() => {
