@@ -785,13 +785,12 @@ function getEffectivePresetTemplate(tagKey) {
     return p[tagKey].entries.map(e => e.content).join('\n\n');
   }
   if (tagKey === 'package') {
-    const danmakuContent = p['danmaku']?.entries?.map(e => e.content).join('\n') || '';
-    const hostContent = p['host']?.entries?.map(e => e.content).join('\n') || '';
-    return CUSTOM_API_PRESET_TEMPLATES['package'] + (danmakuContent ? `\n\n# 弹幕参考规则：\n${danmakuContent}` : '') + (hostContent ? `\n\n# 主播参考规则：\n${hostContent}` : '');
+    const liveContent = p['live']?.entries?.map(e => e.content).join('\n') || '';
+    return CUSTOM_API_PRESET_TEMPLATES['package'] + (liveContent ? `\n\n# 直播间预设：\n${liveContent}` : '');
   }
   if (tagKey === 'reply') {
-    if (p['host']?.entries?.length > 0) {
-      return p['host'].entries.map(e => e.content).join('\n\n');
+    if (p['live']?.entries?.length > 0) {
+      return p['live'].entries.map(e => e.content).join('\n\n');
     }
   }
   return CUSTOM_API_PRESET_TEMPLATES[tagKey] || '';

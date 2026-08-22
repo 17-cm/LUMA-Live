@@ -236,23 +236,13 @@ function getLivePackagePrompt() {
   if (params.livePackagePrompt && params.livePackagePrompt.trim()) {
     return params.livePackagePrompt;
   }
-  // 优先级2：从 APP 内部预设（appPresets）读取弹幕生态预设 + 主播互动预设
-  // 用户在"设置 → 预设提示词"里编辑的内容会在这里生效
+  // 优先级2：从 APP 内部预设（appPresets）读取「直播间」分类下的所有条目
+  // 用户在"设置 → 预设设置 → 直播间"里编辑的内容会在这里生效
   const p = window.appPresets || {};
-  const danmakuEntries = p['danmaku']?.entries || [];
-  const hostEntries = p['host']?.entries || [];
-  const danmakuContent = danmakuEntries.map(e => e.content).filter(Boolean).join('\n\n');
-  const hostContent = hostEntries.map(e => e.content).filter(Boolean).join('\n\n');
-  if (danmakuContent || hostContent) {
-    let prompt = '';
-    if (danmakuContent) {
-      prompt += `## 弹幕生成规则（来自预设）\n${danmakuContent}\n\n`;
-    }
-    if (hostContent) {
-      prompt += `## 主播台词规则（来自预设）\n${hostContent}\n\n`;
-    }
-    prompt += `## 输出格式要求\n请生成观众弹幕（danmakus数组）和主播互动台词（hostSpeeches数组，每条包含speech和action字段）。严格返回JSON格式，不要输出JSON之外的任何文字。`;
-    return prompt;
+  const liveEntries = p['live']?.entries || [];
+  const liveContent = liveEntries.map(e => e.content).filter(Boolean).join('\n\n');
+  if (liveContent) {
+    return `${liveContent}\n\n## 输出格式要求\n请生成观众弹幕（danmakus数组）和主播互动台词（hostSpeeches数组，每条包含speech和action字段）。严格返回JSON格式，不要输出JSON之外的任何文字。`;
   }
   // 优先级3：默认基础模板（预设全为空时才用）
   return `请生成观众弹幕（danmakus数组）和主播互动台词（hostSpeeches数组，每条包含speech和action字段）。返回JSON格式。`;
