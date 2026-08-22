@@ -1330,7 +1330,6 @@ async function handleGenerateWildNPC() {
     const chosenName = `野生主播·${npcNames[Math.floor(Math.random() * npcNames.length)]}`;
     const now = Date.now();
 
-    console.trace('[LUMA Debug] 🎬 创建直播(live.js/NPC野生主播):', chosenName);
     const newNPC = await api.db.create("live_sessions", {
       characterId: `npc_${Date.now()}`,
       name: chosenName,
@@ -1923,7 +1922,6 @@ window.openCurrentHostProfile = openCurrentHostProfile;
 // 8. 周期性作息推演与同步服务
 // =========================================================================
 async function syncLiveSessions(options = {}) {
-  console.trace('[LUMA Debug] 🔄 syncLiveSessions 被调用, allowSpawn=', options.allowSpawn, '当前直播数=', (await api.db.list("live_sessions") || []).length);
   let sessions = await api.db.list("live_sessions") || [];
   const now = Date.now();
   const params = window.appParams || {};
@@ -2035,7 +2033,6 @@ async function syncLiveSessions(options = {}) {
       const subs = SUB_CATEGORIES[cat] || ['热门专场'];
       const subTag = subs[Math.floor(Math.random() * subs.length)];
 
-      console.trace('[LUMA Debug] 🎬 创建直播(live.js/syncLiveSessions):', c.id, c.name);
       const newSession = await api.db.create("live_sessions", {
         characterId: c.id,
         name: c.name,

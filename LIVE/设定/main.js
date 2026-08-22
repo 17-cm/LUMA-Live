@@ -1264,7 +1264,6 @@ async function handleVersionUpdateClick() {
         const localContent = getLocalFileContent(localFiles, filePath);
         if (localContent) {
           unchangedFiles[filePath] = { content: localContent, hash: localHash };
-          console.log(`[LUMA Update] ⏭️ ${filePath} 未变化，复用本地 (${localHash.slice(0, 7)})`);
           continue;
         }
       }
@@ -1292,7 +1291,6 @@ async function handleVersionUpdateClick() {
             const remoteHash = remoteFileTree ? remoteFileTree[filePath] : '';
             downloadedFiles[filePath] = { content: fileContent, hash: remoteHash };
             successCount++;
-            console.log(`[LUMA Update] ✅ ${filePath} 下载成功 (${(fileContent.length / 1024).toFixed(1)}KB)${remoteHash ? ' [' + remoteHash.slice(0, 7) + ']' : ''}`);
           }
         } else {
           console.warn(`[LUMA Update] ⚠️ ${filePath} 内容为空，下载失败`);
@@ -1494,8 +1492,6 @@ window.closePlayerLiveView = closePlayerLiveView;
 // =========================================================================
 async function lumaInitApp(options) {
   var isHotupdate = !!(options && options.hotupdate);
-  console.trace('[LUMA Debug] 🚀 lumaInitApp 被调用, hotupdate=', isHotupdate);
-  if (isHotupdate) console.log('[LUMA Init] 🔄 热更新模式：保留已有直播数据，不重新生成');
   if (typeof registerAiPhoneToolHandlers === 'function') {
     registerAiPhoneToolHandlers();
   }
