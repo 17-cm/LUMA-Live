@@ -1591,6 +1591,49 @@
     </div>
   </div>
 
+
+  <!-- 关注列表页面 -->
+  <div id="followListPageView" class="full-page-view hidden bg-[#f1f4f9]">
+    <div class="page-nav-bar">
+      <button onclick="closeFollowListPageView()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div class="text-center">
+        <h3 class="text-xs font-black text-slate-900 leading-none">关注列表</h3>
+        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">FOLLOWING LIST</span>
+      </div>
+      <div class="w-8"></div>
+    </div>
+    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-2.5" id="followListContentContainer">
+    </div>
+  </div>
+
+  <!-- 钱包页面 -->
+  <div id="walletPageView" class="full-page-view hidden bg-[#f1f4f9]">
+    <div class="page-nav-bar">
+      <button onclick="closeWalletPageView()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div class="text-center">
+        <h3 class="text-xs font-black text-slate-900 leading-none">我的钱包</h3>
+        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">LUMA WALLET</span>
+      </div>
+      <div class="w-8"></div>
+    </div>
+    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-4">
+      <div class="luxe-card p-4 bg-gradient-to-br from-amber-500 to-rose-500 text-white">
+        <p class="text-[10px] opacity-80 font-bold">营收余额</p>
+        <p class="text-2xl font-black mt-1" id="pageRevenueBalance">0</p>
+        <p class="text-[9px] opacity-70 mt-1">LUMA 币</p>
+      </div>
+      <div>
+        <h4 class="text-xs font-black text-slate-700 mb-2 px-1">交易流水</h4>
+        <div class="space-y-2" id="transactionLedgerContainer">
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 全屏帖子详情页 (原生全屏推入二级页面) -->
   <div id="trendDetailModal" class="full-page-view hidden !z-[110]">
     <div class="page-nav-bar">
