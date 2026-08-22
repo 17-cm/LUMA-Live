@@ -1499,6 +1499,22 @@ async function lumaInitApp(options) {
       if (gitCfg.installedCommit) window.gitUpdateState.localCommit = gitCfg.installedCommit;
     }
 
+    // 从热补丁数据里读取 manifest.json 版本号，确保显示版本和 manifest 同步
+    try {
+      const hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
+      if (hotpatchRec && hotpatchRec.files) {
+        const manifestRaw = hotpatchRec.files['manifest.json'];
+        const manifestContent = typeof manifestRaw === 'string' ? manifestRaw : (manifestRaw?.content || '');
+        if (manifestContent) {
+          const manifestData = JSON.parse(manifestContent);
+          if (manifestData.version) {
+            const ver = String(manifestData.version).trim();
+            window.gitUpdateState.currentVersion = ver.startsWith('v') ? ver : `v${ver}`;
+          }
+        }
+      }
+    } catch (e) {}
+
     const guestbookRec = await api.db.list("guestbook") || [];
     guestbookRec.forEach(item => {
       if (item.hostId) {
