@@ -940,7 +940,7 @@ const DEFAULT_GIT_BRANCH = 'moon';
 let gitUpdateState = {
   currentVersion: APP_CURRENT_VERSION,
   latestVersion: APP_CURRENT_VERSION,
-  localCommit: 'v3.4.1-test',
+  localCommit: '',
   remoteCommit: '',
   hasUpdate: false,
   updateLog: '',
@@ -992,7 +992,6 @@ function renderGitUpdateButton() {
 window.renderGitUpdateButton = renderGitUpdateButton;
 
 async function checkGitRepoUpdate(silent = false) {
-  if (gitUpdateState.isChecking) return;
   gitUpdateState.isChecking = true;
   renderGitUpdateButton();
 
@@ -1363,8 +1362,7 @@ async function handleVersionUpdateClick() {
       if (api.ui?.toast) api.ui.toast(`网络连接超时，下载代码失败，请稍后重试`);
     }
   } else {
-    if (api.ui?.toast) api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
-    checkGitRepoUpdate(true);
+    checkGitRepoUpdate(false);
   }
 }
 window.handleVersionUpdateClick = handleVersionUpdateClick;
