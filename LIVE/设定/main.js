@@ -1671,3 +1671,45 @@ if (document.readyState === 'loading') {
   initWhenReady();
 }
 window.lumaInitApp = lumaInitApp;
+
+// ===== 调试浮层（页面角落显示关键信息，无需切换控制台上下文）=====
+(function createDebugOverlay() {
+  var box = document.createElement('div');
+  box.id = 'luma-debug-overlay';
+  box.style.cssText = 'position:fixed;top:8px;right:8px;z-index:999999;background:rgba(0,0,0,0.85);color:#0f0;font:11px monospace;padding:8px 10px;border-radius:6px;max-width:280px;word-break:break-all;line-height:1.5;cursor:move;user-select:none;';
+  box.innerHTML = '<div style="color:#ff0;font-weight:bold;margin-bottom:4px;">🔍 LUMA 调试面板</div><div id="luma-debug-content">加载中...</div>';
+  document.body.appendChild(box);
+
+  // 拖动
+  var isDragging = false, startX, startY, origX, origY;
+  box.addEventListener('mousedown', function(e) { isDragging = true; startX = e.clientX; startY = e.clientY; var r = box.getBoundingClientRect(); origX = r.left; origY = r.top; box.style.right = 'auto'; });
+  document.addEventListener('mousemove', function(e) { if (isDragging) { box.style.left = (origX + e.clientX - startX) + 'px'; box.style.top = (origY + e.clientY - startY) + 'px'; } });
+  document.addEventListener('mouseup', function() { isDragging = false; });
+
+  async function refresh() {
+    try {
+      var sessions = await api.db.list('live_sessions') || [];
+      var ids = sessions.map(function(s) { return s.characterId; });
+      var dupes = ids.filter(function(id, i) { return ids.indexOf(id) !== i; });
+      var html = '';
+      html += '初始化标志: ' + (window.__lumaInitStarted ? '✅ 已初始化' : '❌ 未初始化') + '<br>';
+      html += '热补丁激活: ' + (window.__lumaHotpatchActive ? '✅ v' + (window.__lumaHotpatchVersion || '?') : '❌ 无') + '<br>';
+      html += '直播轮询定时器: ' + (window.__lumaLiveSyncInterval ? '✅ 运行中' : '❌ 未启动') + '<br>';
+      html += '当前直播数: <b style="color:#0ff">' + sessions.length + '</b><br>';
+      html += '重复char: ' + (dupes.length ? '<span style="color:#f00">' + dupes.length + '个 ❌</span>' : '无 ✅') + '<br>';
+      html += '--- 直播列表 ---<br>';
+      if (sessions.length === 0) {
+        html += '<span style="color:#888">（无直播）</span><br>';
+      } else {
+        sessions.forEach(function(s) {
+          html += '• ' + s.name + ' | ' + s.category + '<br>';
+        });
+      }
+      document.getElementById('luma-debug-content').innerHTML = html;
+    } catch(e) {
+      document.getElementById('luma-debug-content').innerHTML = '<span style="color:#f00">错误: ' + e.message + '</span>';
+    }
+  }
+  refresh();
+  setInterval(refresh, 3000);
+})();
