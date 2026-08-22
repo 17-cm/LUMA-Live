@@ -1362,7 +1362,7 @@ async function handleVersionUpdateClick() {
       if (api.ui?.toast) api.ui.toast(`网络连接超时，下载代码失败，请稍后重试`);
     }
   } else {
-    checkGitRepoUpdate(false);
+    if (api.ui?.toast) api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
   }
 }
 window.handleVersionUpdateClick = handleVersionUpdateClick;
