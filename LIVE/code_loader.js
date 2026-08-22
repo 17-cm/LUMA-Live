@@ -203,19 +203,42 @@
       
       console.log('[CodeLoader] 所有文件加载完成！');
       
-      // 加标志位，避免重复触发事件
-      if (!window.__codeLoaderEventsTriggered) {
-        window.__codeLoaderEventsTriggered = true;
+      // 直接调用初始化函数，不要手动触发 DOMContentLoaded/load 事件
+      // 手动触发事件会导致宿主 SDK 被卸载（window.AiPhone 变成 undefined）
+      if (!window.__codeLoaderInitDone) {
+        window.__codeLoaderInitDone = true;
         
-        // 手动触发 DOMContentLoaded 事件
-        console.log('[CodeLoader] 手动触发 DOMContentLoaded 事件...');
-        document.dispatchEvent(new Event('DOMContentLoaded'));
-        console.log('[CodeLoader] DOMContentLoaded 事件已触发');
+        console.log('[CodeLoader] 调用 main.js 初始化函数...');
+        if (typeof window.lumaInitApp === 'function') {
+          try {
+            await window.lumaInitApp();
+            console.log('[CodeLoader] main.js 初始化完成');
+          } catch (e) {
+            console.error('[CodeLoader] main.js 初始化失败:', e);
+          }
+        } else {
+          console.warn('[CodeLoader] window.lumaInitApp 不存在，跳过初始化');
+        }
         
-        // 手动触发 load 事件
-        console.log('[CodeLoader] 手动触发 load 事件...');
-        window.dispatchEvent(new Event('load'));
-        console.log('[CodeLoader] load 事件已触发');
+        // 调用 gift_system.js 的初始化（如果存在）
+        if (typeof window.initGiftSystem === 'function') {
+          try {
+            window.initGiftSystem();
+            console.log('[CodeLoader] gift_system.js 初始化完成');
+          } catch (e) {
+            console.error('[CodeLoader] gift_system.js 初始化失败:', e);
+          }
+        }
+        
+        // 调用 patch.js 的初始化（如果存在）
+        if (typeof window.installHotpatch === 'function') {
+          try {
+            window.installHotpatch();
+            console.log('[CodeLoader] patch.js 初始化完成');
+          } catch (e) {
+            console.error('[CodeLoader] patch.js 初始化失败:', e);
+          }
+        }
       }
       
       // 等 splash 播完再隐藏（splash 总共 4 秒，从启动开始算）
