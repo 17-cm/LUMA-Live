@@ -997,134 +997,62 @@ async function checkGitRepoUpdate(silent = false) {
 
   const repo = (gitUpdateState.repoUrl || DEFAULT_GIT_REPO).trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
   const branch = (gitUpdateState.branch || DEFAULT_GIT_BRANCH).trim();
-  
+
+  let remoteCommit = null;
+  let remoteVer = null;
+
   try {
-    let remoteVer = null;
-    let remoteCommit = null;
-    let updateMessage = '';
-    let fetchErrorReason = '';
-
-    const reqHeaders = {
-      'Accept': 'application/vnd.github.v3+json'
-    };
-
-    // 1. 尝试从 GitHub Commits 接口拉取指定 branch 的最新 Commit
-    try {
-      const comRes = await robustNetworkRequest({
-        url: `https://api.github.com/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=1`,
-        method: 'GET',
-        headers: reqHeaders
-      });
-      if (comRes && comRes.ok && comRes.json && Array.isArray(comRes.json) && comRes.json[0]) {
-        const c = comRes.json[0];
-        remoteCommit = c.sha ? c.sha.slice(0, 7) : null;
-        updateMessage = c.commit?.message || `最新提交代码更新`;
-      } else if (comRes && comRes.status === 404) {
-        fetchErrorReason = '404_private_or_not_found';
-      }
-    } catch (e) {}
-
-    // 2. 尝试从 GitHub Contents API 或 raw content 拉取指定 branch 的 manifest.json
-    try {
-      // 方式 A: GitHub Contents API
-      const contentRes = await robustNetworkRequest({
-        url: `https://api.github.com/repos/${repo}/contents/manifest.json?ref=${encodeURIComponent(branch)}`,
-        method: 'GET',
-        headers: { 'Accept': 'application/vnd.github.v3.raw' }
-      });
-      let mData = contentRes?.json;
-      if (!mData && contentRes?.text) {
-        try { mData = JSON.parse(contentRes.text); } catch (e) {}
-      }
-      
-      // 方式 B: raw content
-      if (!mData || !mData.version) {
-        const manifestRes = await robustNetworkRequest({
-          url: `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/manifest.json`,
-          method: 'GET'
-        });
-        mData = manifestRes?.json || (manifestRes?.text ? JSON.parse(manifestRes.text) : null);
-      }
-
-      if (mData && mData.version) {
-        const rawVer = String(mData.version).trim();
-        remoteVer = rawVer.startsWith('v') ? rawVer : `v${rawVer}`;
-        if (mData.description) {
-          updateMessage = mData.description;
-        }
-      }
-    } catch (e) {}
-
-    // 3. 备用：若未读取到则尝试从 metadata.json 解析
-    if (!remoteVer) {
-      try {
-        const metaRes = await robustNetworkRequest({
-          url: `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/metadata.json`,
-          method: 'GET'
-        });
-        const metaData = metaRes?.json || (metaRes?.text ? JSON.parse(metaRes.text) : null);
-        if (metaData && metaData.description) {
-          const match = String(metaData.description).match(/v\d+\.\d+\.\d+/i);
-          if (match) remoteVer = match[0];
-        }
-      } catch (e) {}
+    // 通道A：查最新 Commit SHA
+    const comRes = await robustNetworkRequest({
+      url: `https://api.github.com/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=1`,
+      method: 'GET',
+      headers: { 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (comRes && comRes.ok && comRes.json && Array.isArray(comRes.json) && comRes.json[0]) {
+      remoteCommit = comRes.json[0].sha ? comRes.json[0].sha.slice(0, 7) : null;
     }
 
-    // 4. 尝试从 Releases 接口拉取最新 Release
-    if (!remoteVer) {
-      try {
-        const relRes = await robustNetworkRequest({
-          url: `https://api.github.com/repos/${repo}/releases/latest`,
-          method: 'GET',
-          headers: reqHeaders
-        });
-        if (relRes && relRes.ok && relRes.json) {
-          remoteVer = relRes.json.tag_name || relRes.json.name;
-          if (!updateMessage) updateMessage = relRes.json.body || relRes.json.name || '';
-        }
-      } catch (e) {}
+    // 通道B：查 manifest.json 版本号
+    const manRes = await robustNetworkRequest({
+      url: `https://api.github.com/repos/${repo}/contents/manifest.json?ref=${encodeURIComponent(branch)}`,
+      method: 'GET',
+      headers: { 'Accept': 'application/vnd.github.v3.raw' }
+    });
+    let mData = manRes?.json;
+    if (!mData && manRes?.text) {
+      try { mData = JSON.parse(manRes.text); } catch (e) {}
+    }
+    if (mData && mData.version) {
+      const rawVer = String(mData.version).trim();
+      remoteVer = rawVer.startsWith('v') ? rawVer : `v${rawVer}`;
     }
 
-    const nowStr = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-    gitUpdateState.lastCheckTime = nowStr;
+    // 比对：Commit SHA 不同 或 版本号不同 → 有更新
+    const isNewCommit = remoteCommit && gitUpdateState.localCommit && !gitUpdateState.localCommit.includes(remoteCommit);
+    const isNewVer = remoteVer && remoteVer.trim() !== gitUpdateState.currentVersion;
+    gitUpdateState.hasUpdate = Boolean(isNewCommit || isNewVer);
 
-    if (remoteVer || remoteCommit) {
-      gitUpdateState.remoteCommit = remoteCommit ? `${remoteCommit} (${branch})` : (remoteVer ? `${remoteVer}-${branch}` : branch);
-      gitUpdateState.latestVersion = remoteVer || (remoteCommit ? `v3.4.${remoteCommit}` : APP_CURRENT_VERSION);
-      gitUpdateState.updateLog = updateMessage || '检测到更新。';
+    if (remoteCommit) {
+      gitUpdateState.remoteCommit = `${remoteCommit} (${branch})`;
+    }
+    if (remoteVer) {
+      gitUpdateState.latestVersion = remoteVer;
+    } else if (remoteCommit) {
+      gitUpdateState.latestVersion = `commit-${remoteCommit}`;
+    }
 
-      // 判定是否有新版本 (版本号不同 或 Commit 产生变化)
-      // 注意：用 gitUpdateState.currentVersion（实际运行的版本，从数据库读取），
-      // 而不是 APP_CURRENT_VERSION（硬编码的原始版本），否则热补丁更新后会一直显示有更新
-      const isNewVer = remoteVer && remoteVer.trim() !== gitUpdateState.currentVersion;
-      const isNewCommit = remoteCommit && gitUpdateState.localCommit && !gitUpdateState.localCommit.includes(remoteCommit);
-      
-      gitUpdateState.hasUpdate = Boolean(isNewVer || isNewCommit);
-
+    if (!silent && api.ui?.toast) {
       if (gitUpdateState.hasUpdate) {
-        if (!silent && api.ui?.toast) {
-          api.ui.toast(`🎉 发现新版本 ${gitUpdateState.latestVersion}！`);
-        }
+        api.ui.toast(`🎉 发现新版本 ${gitUpdateState.latestVersion}！`);
       } else {
-        if (!silent && api.ui?.toast) {
-          api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
-        }
-      }
-    } else {
-      gitUpdateState.latestVersion = APP_CURRENT_VERSION;
-      gitUpdateState.hasUpdate = false;
-      if (!silent && api.ui?.toast) {
-        if (fetchErrorReason === '404_private_or_not_found') {
-          api.ui.toast(`未找到仓库，若仓库为私有(Private)请设为公开(Public)`);
-        } else {
-          api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
-        }
+        api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
       }
     }
   } catch (err) {
     console.warn("检查 Git 更新异常:", err);
+    gitUpdateState.hasUpdate = false;
     if (!silent && api.ui?.toast) {
-      api.ui.toast("检测更新超时，请稍后重试");
+      api.ui.toast("检测更新失败，请稍后重试");
     }
   } finally {
     gitUpdateState.isChecking = false;
