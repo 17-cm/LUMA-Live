@@ -4,61 +4,161 @@
  */
 (function initSplashScreenModule() {
   // =========================================================================
-  // 【热补丁启动注入】在所有业务脚本加载前，先应用 api.db 中的热补丁 CSS
-  // 沙盒 iframe 无法访问 localStorage，必须用 api.db
+  // 【热补丁启动注入】
+  // 覆盖更新模式：
+  // 1. 同步设置 __lumaHotpatchLoading=true，main.js 会等待此标志变为 false
+  // 2. 异步从 api.db 读取热补丁
+  // 3. 有热补丁 → 注入 CSS+JS module脚本（覆盖 window.xxx 函数），不调用初始化
+  // 4. 无热补丁/注入失败 → 直接设置 loading=false
+  // 5. main.js 检测到 loading=false 后自行调用 lumaInitApp（只一次）
   // =========================================================================
-  (async function applyHotpatchCssEarly() {
-    // 等待 api 对象可用（宿主注入可能需要一点时间）
-    let api = window.api || window.AiPhone || window.AiPhoneApp;
-    let waitCount = 0;
+  (async function applyHotpatchEarly() {
+    // 同步设置标志：main.js 会等待热补丁注入完成
+    window.__lumaHotpatchLoading = true;
+
+    var JS_LOAD_ORDER = [
+      'LIVE/设定/app_presets.js',
+      'LIVE/core.js',
+      'LIVE/数据/data_hub.js',
+      'LIVE/数据/fans_manager.js',
+      'LIVE/数据/guard_manager.js',
+      'LIVE/数据/checkin_manager.js',
+      'LIVE/数据/titles_manager.js',
+      'LIVE/主页/profile.js',
+      'LIVE/社区/community_store.js',
+      'LIVE/社区/module_trends.js',
+      'LIVE/社区/module_supertopic.js',
+      'LIVE/社区/module_detail.js',
+      'LIVE/社区/module_ranking.js',
+      'LIVE/社区/module_forum.js',
+      'LIVE/社区/module_mytopic.js',
+      'LIVE/社区/trends.js',
+      'LIVE/直播/room_loading.js',
+      'LIVE/直播/live.js',
+      'LIVE/设定/main.js',
+      'LIVE/设定/patch.js',
+      'LIVE/设定/gift_system.js'
+    ];
+    var LUMA_BASE_VERSION = 'v3.4.1';
+
+    function parseVersion(v) {
+      var m = String(v).match(/(\d+)\.(\d+)\.(\d+)/);
+      if (!m) return [0, 0, 0];
+      return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)];
+    }
+    function compareVersion(a, b) {
+      var pa = parseVersion(a), pb = parseVersion(b);
+      for (var i = 0; i < 3; i++) {
+        if (pa[i] > pb[i]) return 1;
+        if (pa[i] < pb[i]) return -1;
+      }
+      return 0;
+    }
+    function getFileContent(files, path) {
+      if (!files) return null;
+      var d = files[path];
+      if (!d) return null;
+      if (typeof d === 'string') return d;
+      if (d && typeof d.content === 'string') return d.content;
+      return null;
+    }
+    function isValidJs(content) {
+      return content && typeof content === 'string' && content.trim()
+        && !content.trim().startsWith('<!DOCTYPE') && !content.trim().startsWith('<html');
+    }
+    function signalReady() {
+      window.__lumaHotpatchLoading = false;
+    }
+
+    // 等待 api 对象可用
+    var api = window.api || window.AiPhone || window.AiPhoneApp;
+    var waitCount = 0;
     while (!api && waitCount < 50) {
-      await new Promise(r => setTimeout(r, 50));
+      await new Promise(function(r) { setTimeout(r, 50); });
       api = window.api || window.AiPhone || window.AiPhoneApp;
       waitCount++;
     }
     if (!api || !api.db) {
-      console.warn('[LUMA Hotpatch] ⚠️ api.db 不可用，跳过热补丁注入');
+      console.warn('[LUMA Hotpatch] ⚠️ api.db 不可用，使用静态脚本');
+      signalReady();
       return;
     }
+
     try {
-      const hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
+      var hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(function() { return null; });
       if (!hotpatchRec || !hotpatchRec.files) {
-        console.log('[LUMA Hotpatch] 无热补丁数据，跳过 CSS 注入');
+        signalReady();
         return;
       }
-      const files = hotpatchRec.files;
-      // 注入热补丁 CSS（覆盖旧样式）
-      let cssContent = null;
-      const styleData = files['style.css'];
-      if (styleData) {
-        // 兼容两种格式：字符串 或 { content: "...", hash: "..." }
-        cssContent = typeof styleData === 'string' ? styleData : (styleData.content || null);
+
+      // 版本校验：热补丁版本低于本地基础版本时清除
+      if (hotpatchRec.version && compareVersion(hotpatchRec.version, LUMA_BASE_VERSION) < 0) {
+        console.warn('[LUMA Hotpatch] 🗑️ 热补丁版本', hotpatchRec.version,
+          '低于基础版本', LUMA_BASE_VERSION, '，清除旧缓存');
+        await api.db.remove('app_hotpatch', 'current_hotpatch').catch(function() {});
+        signalReady();
+        return;
       }
+
+      var files = hotpatchRec.files;
+
+      // ---- 注入热补丁 CSS ----
+      var cssContent = getFileContent(files, 'style.css');
       if (cssContent && typeof cssContent === 'string' && cssContent.trim()) {
-        // 检查是否下载到了 HTML 错误页面
-        if (cssContent.trim().startsWith('<!DOCTYPE') || cssContent.trim().startsWith('<html')) {
-          console.error('[LUMA Hotpatch] ❌ style.css 是 HTML 错误页面，跳过');
-        } else {
-          const style = document.createElement('style');
+        if (!cssContent.trim().startsWith('<!DOCTYPE') && !cssContent.trim().startsWith('<html')) {
+          var style = document.createElement('style');
           style.id = 'luma-hotpatch-style';
           style.setAttribute('data-hotpatch', 'true');
           style.textContent = cssContent;
           document.head.appendChild(style);
           window.__lumaHotpatchCssApplied = true;
-          console.log(`[LUMA Hotpatch] ✅ style.css 已注入 (${(cssContent.length / 1024).toFixed(1)}KB)`);
         }
-      } else {
-        console.warn('[LUMA Hotpatch] ⚠️ style.css 不存在或内容为空');
       }
-      // 记录热补丁版本信息
-      if (hotpatchRec.version) {
-        window.__lumaHotpatchVersion = hotpatchRec.version;
-        window.__lumaHotpatchCommit = hotpatchRec.commit || '';
-        window.__lumaHotpatchActive = true;
-        console.log(`[LUMA Hotpatch] 📌 当前热补丁版本: ${hotpatchRec.version} ${hotpatchRec.commit ? '(' + hotpatchRec.commit + ')' : ''}`);
+
+      // ---- 注入热补丁 JS（module脚本，独立作用域，const/let不与全局冲突）----
+      var jsInjected = 0;
+      var jsFailed = false;
+      for (var i = 0; i < JS_LOAD_ORDER.length; i++) {
+        var filePath = JS_LOAD_ORDER[i];
+        var jsContent = getFileContent(files, filePath);
+        if (!isValidJs(jsContent)) {
+          console.error('[LUMA Hotpatch] ❌ JS 文件缺失或无效:', filePath);
+          jsFailed = true;
+          break;
+        }
+        try {
+          var s = document.createElement('script');
+          s.type = 'module';
+          s.textContent = jsContent;
+          s.setAttribute('data-hotpatch', 'true');
+          s.setAttribute('data-src', filePath);
+          document.body.appendChild(s);
+          jsInjected++;
+        } catch (e) {
+          console.error('[LUMA Hotpatch] ❌ JS 注入异常:', filePath, e.message);
+          jsFailed = true;
+          break;
+        }
+      }
+
+      if (jsFailed) {
+        console.error('[LUMA Hotpatch] ❌ 热补丁注入失败（' + jsInjected + '/' + JS_LOAD_ORDER.length + '），使用静态脚本');
+        signalReady();
+      } else {
+        window.__lumaHotpatchJsApplied = true;
+        if (hotpatchRec.version) {
+          window.__lumaHotpatchVersion = hotpatchRec.version;
+          window.__lumaHotpatchCommit = hotpatchRec.commit || '';
+          window.__lumaHotpatchActive = true;
+        }
+        // module脚本异步执行（defer），等待执行完成后发信号让 main.js 初始化
+        setTimeout(function() {
+          signalReady();
+        }, 200);
       }
     } catch (e) {
-      console.error('[LUMA Hotpatch] ❌ CSS 注入异常:', e.message);
+      console.error('[LUMA Hotpatch] ❌ 热补丁注入异常:', e.message);
+      signalReady();
     }
   })();
 
@@ -229,6 +329,10 @@
   `;
   document.head.appendChild(styleEl);
 
+  // 立即创建 splash DOM 并插入文档（body 可能还没解析完，挂到 documentElement 上），
+  // 确保第一帧就有不透明遮罩盖住后续渲染的 APP 内容，杜绝启动闪一下主页的问题。
+  createSplashDOM();
+
   function createStars() {
     const c = document.createElement('div'); c.className = 'splash-stars';
     for (let i = 0; i < 25; i++) {
@@ -265,7 +369,7 @@
             <div class="splash-pen-tip" id="splashPenTip"></div>
           </div>
           <div class="splash-slogan-box" id="splashSloganBox">
-            <p class="splash-slogan-text">开启你的直播之旅</p>
+            <p class="splash-slogan-text" id="splashSloganText">开启你的直播之旅</p>
           </div>
         </div>
         <div class="splash-bottom-section">
@@ -275,7 +379,7 @@
             <span class="splash-footer-sub">AI Live Streaming Simulation Engine</span>
           </div>
         </div>`;
-      document.body.prepend(container);
+      (document.body || document.documentElement).prepend(container);
     }
     return container;
   }
@@ -284,6 +388,10 @@
 
   function runSplashScreenAnimation() {
     const container = createSplashDOM();
+    // 如果 splash 是在 head 阶段挂到 documentElement 上的，body 解析完后移回 body
+    if (container.parentElement !== document.body && document.body) {
+      document.body.prepend(container);
+    }
     isSplashExited = false;
     const logo = document.getElementById('splashLogoLetters');
     const penTip = document.getElementById('splashPenTip');
@@ -324,6 +432,46 @@
 
   window.playSplashScreen = runSplashScreenAnimation;
   window.exitSplashScreen = exitSplashScreen;
+
+  // ── 更新模式：点"版本更新"时直接显示启动画面，在画面上展示下载进度 ──
+  function showSplashForUpdate() {
+    const container = createSplashDOM();
+    if (container.parentElement !== document.body && document.body) {
+      document.body.prepend(container);
+    }
+    isSplashExited = false;
+    if (splashTimerId) { clearTimeout(splashTimerId); splashTimerId = null; }
+
+    const logo = document.getElementById('splashLogoLetters');
+    const penTip = document.getElementById('splashPenTip');
+    const ring = document.getElementById('splashRingCircle');
+    const slogan = document.getElementById('splashSloganBox');
+    const sloganText = document.getElementById('splashSloganText');
+    const progress = document.getElementById('splashProgressFill');
+
+    container.classList.remove('splash-exit');
+    container.style.display = 'flex';
+    container.onclick = null; // 更新过程中不允许点击跳过
+
+    // Logo 和光环直接显示完成态，不播书写动画
+    if (logo) { logo.classList.remove('writing'); logo.classList.add('bloom'); }
+    if (penTip) penTip.classList.remove('active');
+    if (ring) { ring.classList.remove('draw'); ring.classList.add('draw-done'); ring.style.strokeDashoffset = '0'; }
+    if (sloganText) sloganText.textContent = '正在更新中…';
+    if (slogan) slogan.classList.add('show');
+    if (progress) { progress.style.transition = 'width 0.3s ease'; progress.style.width = '0%'; }
+  }
+
+  function setSplashProgress(percent) {
+    const progress = document.getElementById('splashProgressFill');
+    if (progress) {
+      const p = Math.max(0, Math.min(100, Number(percent) || 0));
+      progress.style.width = p + '%';
+    }
+  }
+
+  window.showSplashForUpdate = showSplashForUpdate;
+  window.setSplashProgress = setSplashProgress;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', runSplashScreenAnimation, { once: true });

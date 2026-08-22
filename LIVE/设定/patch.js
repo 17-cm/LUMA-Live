@@ -23,12 +23,10 @@
     try {
       const hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
       if (!hotpatchRec || !hotpatchRec.files) {
-        console.log('[LUMA Hotpatch] 无热补丁数据，跳过 JS 注入');
         return;
       }
       const files = hotpatchRec.files;
       const fileCount = Object.keys(files).length;
-      console.log(`[LUMA Hotpatch] 检测到 ${fileCount} 个热补丁文件，开始应用...`);
       // 需要排除的文件：splash.js（已执行完，重执行会重播启动动画）
       // patch.js（正在执行，重执行会递归）
       // style.css（CSS 文件，已由 splash.js 注入）
@@ -72,7 +70,6 @@
           };
           document.head.appendChild(script);
           appliedCount++;
-          console.log(`[LUMA Hotpatch] ✅ ${filePath} 已注入 (${(fileContent.length / 1024).toFixed(1)}KB)`);
         } catch (evalErr) {
           console.error(`[LUMA Hotpatch] ❌ ${filePath} 注入失败: ${evalErr.message}`);
           failCount++;

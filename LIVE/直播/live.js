@@ -1510,8 +1510,8 @@ function getOrGenerateStreamerProfile(characterId, characterObj) {
     });
   }
   
-  const cover = characterObj?.cover || characterObj?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800';
-  const avatar = characterObj?.avatar || cover;
+  const cover = characterObj?.cover || '';
+  const avatar = characterObj?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
   const gallery = [cover, avatar, cover, avatar, cover, avatar];
   
   const profile = {
@@ -1571,7 +1571,7 @@ function incrementStreamerLiveShow(characterId) {
 }
 window.incrementStreamerLiveShow = incrementStreamerLiveShow;
 
-function openStreamerProfilePage(id) {
+async function openStreamerProfilePage(id) {
   let charObj = (window.allCharacters || []).find(c => c.id === id) || (window.liveList || []).find(s => s.characterId === id || s.id === id);
   if (!charObj && id) {
     charObj = { id, name: '主播', avatar: '' };
@@ -1580,7 +1580,15 @@ function openStreamerProfilePage(id) {
 
   const profile = getOrGenerateStreamerProfile(charObj.id || charObj.characterId || id, charObj);
   if (!profile) return;
-  
+
+  // 从本地数据库读取用户自定义封面
+  try {
+    const savedCover = await api.db.get('streamer_covers', profile.characterId).catch(() => null);
+    if (savedCover && savedCover.cover) {
+      profile.cover = savedCover.cover;
+    }
+  } catch (e) {}
+
   currentViewingProfile = profile;
   renderStreamerProfileToUI(profile);
 
@@ -1613,7 +1621,15 @@ window.closeStreamerSpace = closeStreamerProfilePage;
 function renderStreamerProfileToUI(p) {
   const coverEl = document.getElementById('spCoverImg');
   const avatarEl = document.getElementById('spAvatar');
-  if (coverEl) coverEl.src = p.cover;
+  if (coverEl) {
+    if (p.cover) {
+      coverEl.src = p.cover;
+      coverEl.style.display = 'block';
+    } else {
+      coverEl.removeAttribute('src');
+      coverEl.style.display = 'none';
+    }
+  }
   if (avatarEl) avatarEl.src = p.avatar;
 
   const nameEl = document.getElementById('spName');
@@ -1662,6 +1678,38 @@ function renderStreamerProfileToUI(p) {
 
   switchSpTab(activeSpTab);
 }
+
+// 本地上传个人主页封面
+function handleStreamerCoverUpload(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    if (api.ui?.toast) api.ui.toast('请选择图片文件');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const dataUrl = evt.target.result;
+    if (currentViewingProfile) {
+      currentViewingProfile.cover = dataUrl;
+      const coverEl = document.getElementById('spCoverImg');
+      if (coverEl) {
+        coverEl.src = dataUrl;
+        coverEl.style.display = 'block';
+      }
+      // 持久化到本地数据库
+      const charId = currentViewingProfile.characterId;
+      api.db.create('streamer_covers', { id: charId, cover: dataUrl, time: Date.now() }).catch(() => {
+        api.db.update('streamer_covers', charId, { cover: dataUrl, time: Date.now() }).catch(() => {});
+      });
+      if (api.ui?.toast) api.ui.toast('封面已更新');
+    }
+  };
+  reader.readAsDataURL(file);
+  // 清空 input，允许重复选同一张图
+  e.target.value = '';
+}
+window.handleStreamerCoverUpload = handleStreamerCoverUpload;
 
 function updateSpFollowBtnState() {
   if (!currentViewingProfile) return;
@@ -1829,7 +1877,7 @@ function renderSpGallery() {
   
   box.innerHTML = `
     <div class="gallery-grid-3">
-      ${p.gallery.map(img => `
+      ${p.gallery.filter(img => img).map(img => `
         <img src="${img}" onclick="api.ui.toast('已查看高清大图')" class="rounded-xl shadow-xs">
       `).join('')}
     </div>
@@ -2133,5 +2181,4 @@ if (window.PageStack) {
     animationType: 'slide-bottom',
     zIndex: 150,  // 直播间层级高一些
   });
-  console.log('[PageStack] 个人主页 + 直播间已注册');
 }

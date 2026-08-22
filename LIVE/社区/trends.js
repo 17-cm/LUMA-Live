@@ -161,5 +161,4 @@ if (window.PageStack) {
       animationType: 'slide-right',
     });
   });
-  console.log('[PageStack] 社区六大模块已注册');
 }

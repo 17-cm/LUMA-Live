@@ -687,7 +687,7 @@
 
         <button id="btnVersionUpdateCard" onclick="handleVersionUpdateClick()" class="luxe-card relative w-full py-3.5 text-center text-xs font-black text-rose-600 border-rose-200/60 active:bg-rose-50 transition">
           <span id="versionUpdateBtnText">版本更新</span>
-          <span id="versionUpdateBadge" class="absolute right-3 bottom-1.5 text-[9px] font-mono text-rose-400 font-normal">v3.4.0</span>
+          <span id="versionUpdateBadge" class="absolute right-3 bottom-1.5 text-[9px] font-mono text-rose-400 font-normal"></span>
         </button>
 
         <!-- 隐藏的文件导入控件 -->
@@ -1071,24 +1071,29 @@
 
   <!-- 微博风格：角色/主播个人主页大页面 -->
   <div id="streamerProfilePageView">
-    <!-- 顶部封面与浮动导航 -->
-    <div class="profile-cover-banner">
-      <img id="spCoverImg" src="" class="profile-cover-img" alt="Cover">
-      <div class="profile-cover-mask"></div>
-      <div class="profile-top-nav">
-        <button onclick="closeStreamerProfilePage()" class="profile-nav-btn" title="返回">
-          <svg class="w-5 h-5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <!-- 浮动导航（固定在顶部，不随内容滚动） -->
+    <div class="profile-top-nav">
+      <button onclick="closeStreamerProfilePage()" class="profile-nav-btn" title="返回">
+        <svg class="w-5 h-5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div class="flex items-center gap-2">
+        <button onclick="shareCurrentStreamerProfile()" class="profile-nav-btn" title="分享">
+          <svg class="w-4 h-4 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
         </button>
-        <div class="flex items-center gap-2">
-          <button onclick="shareCurrentStreamerProfile()" class="profile-nav-btn" title="分享">
-            <svg class="w-4 h-4 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-          </button>
-        </div>
       </div>
     </div>
 
     <!-- 滚动内容容器 -->
     <div class="profile-content-scroll">
+      <!-- 顶部封面（朋友圈风格，随内容滚动） -->
+      <div class="profile-cover-banner">
+        <img id="spCoverImg" src="" class="profile-cover-img" alt="Cover">
+        <div class="profile-cover-mask"></div>
+        <button class="profile-cover-upload-btn" onclick="document.getElementById('spCoverInput').click()" title="更换封面">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+        </button>
+        <input type="file" id="spCoverInput" accept="image/*" class="hidden" onchange="handleStreamerCoverUpload(event)">
+      </div>
       <!-- 头部档案资料区 -->
       <div class="px-4 pb-3 bg-white">
         <div class="flex items-end justify-between mb-3">
@@ -1591,6 +1596,49 @@
     </div>
   </div>
 
+
+  <!-- 关注列表页面 -->
+  <div id="followListPageView" class="full-page-view hidden bg-[#f1f4f9]">
+    <div class="page-nav-bar">
+      <button onclick="closeFollowListPageView()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div class="text-center">
+        <h3 class="text-xs font-black text-slate-900 leading-none">关注列表</h3>
+        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">FOLLOWING LIST</span>
+      </div>
+      <div class="w-8"></div>
+    </div>
+    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-2.5" id="followListContentContainer">
+    </div>
+  </div>
+
+  <!-- 钱包页面 -->
+  <div id="walletPageView" class="full-page-view hidden bg-[#f1f4f9]">
+    <div class="page-nav-bar">
+      <button onclick="closeWalletPageView()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div class="text-center">
+        <h3 class="text-xs font-black text-slate-900 leading-none">我的钱包</h3>
+        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">LUMA WALLET</span>
+      </div>
+      <div class="w-8"></div>
+    </div>
+    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-4">
+      <div class="luxe-card p-4 bg-gradient-to-br from-amber-500 to-rose-500 text-white">
+        <p class="text-[10px] opacity-80 font-bold">营收余额</p>
+        <p class="text-2xl font-black mt-1" id="pageRevenueBalance">0</p>
+        <p class="text-[9px] opacity-70 mt-1">LUMA 币</p>
+      </div>
+      <div>
+        <h4 class="text-xs font-black text-slate-700 mb-2 px-1">交易流水</h4>
+        <div class="space-y-2" id="transactionLedgerContainer">
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 全屏帖子详情页 (原生全屏推入二级页面) -->
   <div id="trendDetailModal" class="full-page-view hidden !z-[110]">
     <div class="page-nav-bar">
@@ -1717,71 +1765,5 @@
   <script src="LIVE/设定/main.js"></script>
   <script src="LIVE/设定/patch.js"></script>
   <script src="LIVE/设定/gift_system.js"></script>
-
-<!-- 测试按钮：验证 fetch + eval 在沙盒里是否可行 -->
-<div id="evalTestBtn" style="position:fixed;bottom:20px;right:20px;z-index:99999;background:#FF5722;color:white;padding:10px 16px;border-radius:20px;font-size:12px;font-weight:bold;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.3);">
-  🧪 测试eval
-</div>
-<div id="evalTestResult" style="position:fixed;bottom:70px;right:20px;z-index:99999;background:#333;color:white;padding:10px;border-radius:8px;font-size:11px;max-width:250px;display:none;word-break:break-all;"></div>
-<script>
-(function() {
-  const btn = document.getElementById('evalTestBtn');
-  const result = document.getElementById('evalTestResult');
-  
-  btn.addEventListener('click', async function() {
-    result.style.display = 'block';
-    result.textContent = '⏳ 正在从 GitHub 拉取测试文件...';
-    btn.textContent = '⏳ 测试中...';
-    
-    try {
-      const testUrl = 'https://raw.githubusercontent.com/17-cm/LUMA-Live/test/test_eval.js';
-      console.log('[eval测试] 开始 fetch:', testUrl);
-      
-      const response = await fetch(testUrl);
-      console.log('[eval测试] fetch 状态:', response.status, response.statusText);
-      
-      if (!response.ok) {
-        throw new Error('HTTP ' + response.status + ' ' + response.statusText);
-      }
-      
-      const code = await response.text();
-      console.log('[eval测试] 下载成功，代码长度:', code.length, '字符');
-      console.log('[eval测试] 代码前100字符:', code.substring(0, 100));
-      
-      result.textContent = '⏳ 下载成功，正在 eval 执行...';
-      
-      // 用 eval 执行
-      eval(code);
-      
-      console.log('[eval测试] eval 执行完成');
-      console.log('[eval测试] window.__evalTestSuccess:', window.__evalTestSuccess);
-      
-      if (window.__evalTestSuccess) {
-        result.style.background = '#4CAF50';
-        result.textContent = '✅ 测试成功！fetch + eval 在沙盒里可行！';
-        btn.textContent = '✅ 成功';
-        btn.style.background = '#4CAF50';
-      } else {
-        throw new Error('eval 执行了但是没有设置成功标记');
-      }
-      
-    } catch (err) {
-      console.error('[eval测试] 失败:', err);
-      result.style.background = '#f44336';
-      result.textContent = '❌ 测试失败：' + err.message + '\n\n详细错误请看控制台';
-      btn.textContent = '❌ 失败';
-      btn.style.background = '#f44336';
-    }
-    
-    // 5秒后恢复按钮
-    setTimeout(() => {
-      btn.textContent = '🧪 测试eval';
-      btn.style.background = '#FF5722';
-      result.style.display = 'none';
-    }, 8000);
-  });
-})();
-</script>
-
 </body>
 </html>

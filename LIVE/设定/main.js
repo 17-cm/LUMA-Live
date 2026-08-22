@@ -933,14 +933,14 @@ window.executeConfirmResetAppData = executeConfirmResetAppData;
 // =========================================================================
 // 10. 【版本更新与 Git 仓库直连系统】
 // =========================================================================
-const APP_CURRENT_VERSION = 'v3.4.1';
+const APP_CURRENT_VERSION = ''; // 启动时从宿主 manifest 读取，不硬编码
 const DEFAULT_GIT_REPO = '17-cm/LUMA-Live';
-const DEFAULT_GIT_BRANCH = 'test';
+const DEFAULT_GIT_BRANCH = 'moon';
 
 let gitUpdateState = {
   currentVersion: APP_CURRENT_VERSION,
   latestVersion: APP_CURRENT_VERSION,
-  localCommit: 'v3.4.1-test',
+  localCommit: '',
   remoteCommit: '',
   hasUpdate: false,
   updateLog: '',
@@ -985,147 +985,76 @@ function renderGitUpdateButton() {
     }
     if (badge) {
       badge.className = 'absolute right-3 bottom-1.5 text-[9px] font-mono text-rose-400 font-normal';
-      badge.textContent = gitUpdateState.currentVersion;
+      badge.textContent = gitUpdateState.currentVersion || '';
     }
   }
 }
 window.renderGitUpdateButton = renderGitUpdateButton;
 
 async function checkGitRepoUpdate(silent = false) {
-  if (gitUpdateState.isChecking) return;
   gitUpdateState.isChecking = true;
   renderGitUpdateButton();
 
   const repo = (gitUpdateState.repoUrl || DEFAULT_GIT_REPO).trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
   const branch = (gitUpdateState.branch || DEFAULT_GIT_BRANCH).trim();
-  
+
+  let remoteCommit = null;
+  let remoteVer = null;
+
   try {
-    let remoteVer = null;
-    let remoteCommit = null;
-    let updateMessage = '';
-    let fetchErrorReason = '';
-
-    const reqHeaders = {
-      'Accept': 'application/vnd.github.v3+json'
-    };
-
-    // 1. 尝试从 GitHub Commits 接口拉取指定 branch 的最新 Commit
-    try {
-      const comRes = await robustNetworkRequest({
-        url: `https://api.github.com/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=1`,
-        method: 'GET',
-        headers: reqHeaders
-      });
-      if (comRes && comRes.ok && comRes.json && Array.isArray(comRes.json) && comRes.json[0]) {
-        const c = comRes.json[0];
-        remoteCommit = c.sha ? c.sha.slice(0, 7) : null;
-        updateMessage = c.commit?.message || `最新提交代码更新`;
-      } else if (comRes && comRes.status === 404) {
-        fetchErrorReason = '404_private_or_not_found';
-      }
-    } catch (e) {}
-
-    // 2. 尝试从 GitHub Contents API 或 raw content 拉取指定 branch 的 manifest.json
-    try {
-      // 方式 A: GitHub Contents API
-      const contentRes = await robustNetworkRequest({
-        url: `https://api.github.com/repos/${repo}/contents/manifest.json?ref=${encodeURIComponent(branch)}`,
-        method: 'GET',
-        headers: { 'Accept': 'application/vnd.github.v3.raw' }
-      });
-      let mData = contentRes?.json;
-      if (!mData && contentRes?.text) {
-        try { mData = JSON.parse(contentRes.text); } catch (e) {}
-      }
-      
-      // 方式 B: raw content
-      if (!mData || !mData.version) {
-        const manifestRes = await robustNetworkRequest({
-          url: `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/manifest.json`,
-          method: 'GET'
-        });
-        mData = manifestRes?.json || (manifestRes?.text ? JSON.parse(manifestRes.text) : null);
-      }
-
-      if (mData && mData.version) {
-        const rawVer = String(mData.version).trim();
-        remoteVer = rawVer.startsWith('v') ? rawVer : `v${rawVer}`;
-        if (mData.description) {
-          updateMessage = mData.description;
-        }
-      }
-    } catch (e) {}
-
-    // 3. 备用：若未读取到则尝试从 metadata.json 解析
-    if (!remoteVer) {
-      try {
-        const metaRes = await robustNetworkRequest({
-          url: `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/metadata.json`,
-          method: 'GET'
-        });
-        const metaData = metaRes?.json || (metaRes?.text ? JSON.parse(metaRes.text) : null);
-        if (metaData && metaData.description) {
-          const match = String(metaData.description).match(/v\d+\.\d+\.\d+/i);
-          if (match) remoteVer = match[0];
-        }
-      } catch (e) {}
+    // 通道A：查最新 Commit SHA
+    const comRes = await robustNetworkRequest({
+      url: `https://api.github.com/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=1`,
+      method: 'GET',
+      headers: { 'Accept': 'application/vnd.github.v3+json' },
+      proxy: true
+    });
+    if (comRes && comRes.ok && comRes.json && Array.isArray(comRes.json) && comRes.json[0]) {
+      remoteCommit = comRes.json[0].sha ? comRes.json[0].sha.slice(0, 7) : null;
     }
 
-    // 4. 尝试从 Releases 接口拉取最新 Release
-    if (!remoteVer) {
-      try {
-        const relRes = await robustNetworkRequest({
-          url: `https://api.github.com/repos/${repo}/releases/latest`,
-          method: 'GET',
-          headers: reqHeaders
-        });
-        if (relRes && relRes.ok && relRes.json) {
-          remoteVer = relRes.json.tag_name || relRes.json.name;
-          if (!updateMessage) updateMessage = relRes.json.body || relRes.json.name || '';
-        }
-      } catch (e) {}
+    // 通道B：查 manifest.json 版本号
+    const manRes = await robustNetworkRequest({
+      url: `https://api.github.com/repos/${repo}/contents/manifest.json?ref=${encodeURIComponent(branch)}`,
+      method: 'GET',
+      headers: { 'Accept': 'application/vnd.github.v3.raw' },
+      proxy: true
+    });
+    let mData = manRes?.json;
+    if (!mData && manRes?.text) {
+      try { mData = JSON.parse(manRes.text); } catch (e) {}
+    }
+    if (mData && mData.version) {
+      const rawVer = String(mData.version).trim();
+      remoteVer = rawVer.startsWith('v') ? rawVer : `v${rawVer}`;
     }
 
-    const nowStr = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-    gitUpdateState.lastCheckTime = nowStr;
+    // 比对：Commit SHA 不同 或 版本号不同 → 有更新
+    const isNewCommit = remoteCommit && gitUpdateState.localCommit && !gitUpdateState.localCommit.includes(remoteCommit);
+    const isNewVer = remoteVer && gitUpdateState.currentVersion && remoteVer.trim() !== gitUpdateState.currentVersion;
+    gitUpdateState.hasUpdate = Boolean(isNewCommit || isNewVer);
 
-    if (remoteVer || remoteCommit) {
-      gitUpdateState.remoteCommit = remoteCommit ? `${remoteCommit} (${branch})` : (remoteVer ? `${remoteVer}-${branch}` : branch);
-      gitUpdateState.latestVersion = remoteVer || (remoteCommit ? `v3.4.${remoteCommit}` : APP_CURRENT_VERSION);
-      gitUpdateState.updateLog = updateMessage || '检测到更新。';
+    if (remoteCommit) {
+      gitUpdateState.remoteCommit = `${remoteCommit} (${branch})`;
+    }
+    if (remoteVer) {
+      gitUpdateState.latestVersion = remoteVer;
+    } else if (remoteCommit) {
+      gitUpdateState.latestVersion = `commit-${remoteCommit}`;
+    }
 
-      // 判定是否有新版本 (版本号不同 或 Commit 产生变化)
-      // 注意：用 gitUpdateState.currentVersion（实际运行的版本，从数据库读取），
-      // 而不是 APP_CURRENT_VERSION（硬编码的原始版本），否则热补丁更新后会一直显示有更新
-      const isNewVer = remoteVer && remoteVer.trim() !== gitUpdateState.currentVersion;
-      const isNewCommit = remoteCommit && gitUpdateState.localCommit && !gitUpdateState.localCommit.includes(remoteCommit);
-      
-      gitUpdateState.hasUpdate = Boolean(isNewVer || isNewCommit);
-
+    if (!silent && api.ui?.toast) {
       if (gitUpdateState.hasUpdate) {
-        if (!silent && api.ui?.toast) {
-          api.ui.toast(`🎉 发现新版本 ${gitUpdateState.latestVersion}！`);
-        }
+        api.ui.toast(`🎉 发现新版本 ${gitUpdateState.latestVersion}！`);
       } else {
-        if (!silent && api.ui?.toast) {
-          api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
-        }
-      }
-    } else {
-      gitUpdateState.latestVersion = APP_CURRENT_VERSION;
-      gitUpdateState.hasUpdate = false;
-      if (!silent && api.ui?.toast) {
-        if (fetchErrorReason === '404_private_or_not_found') {
-          api.ui.toast(`未找到仓库，若仓库为私有(Private)请设为公开(Public)`);
-        } else {
-          api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
-        }
+        api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
       }
     }
   } catch (err) {
     console.warn("检查 Git 更新异常:", err);
+    gitUpdateState.hasUpdate = false;
     if (!silent && api.ui?.toast) {
-      api.ui.toast("检测更新超时，请稍后重试");
+      api.ui.toast("检测更新失败，请稍后重试");
     }
   } finally {
     gitUpdateState.isChecking = false;
@@ -1140,7 +1069,8 @@ async function fetchSingleRepoFile(repo, branch, filePath) {
     const rawUrl = `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/${filePath}`;
     const rawRes = await robustNetworkRequest({
       url: rawUrl,
-      method: 'GET'
+      method: 'GET',
+      proxy: true
     });
     if (rawRes && rawRes.ok && rawRes.text) {
       return rawRes.text;
@@ -1153,7 +1083,8 @@ async function fetchSingleRepoFile(repo, branch, filePath) {
     const apiRes = await robustNetworkRequest({
       url: apiUrl,
       method: 'GET',
-      headers: { 'Accept': 'application/vnd.github.v3.raw' }
+      headers: { 'Accept': 'application/vnd.github.v3.raw' },
+      proxy: true
     });
     if (apiRes && apiRes.ok && apiRes.text) {
       return apiRes.text;
@@ -1168,6 +1099,7 @@ const HOTPATCH_FILES = [
   'manifest.json',
   'style.css',
   'LIVE/设定/page_stack.js',
+  'LIVE/设定/app_presets.js',
   'LIVE/core.js',
   'LIVE/数据/data_hub.js',
   'LIVE/数据/fans_manager.js',
@@ -1186,7 +1118,8 @@ const HOTPATCH_FILES = [
   'LIVE/直播/room_loading.js',
   'LIVE/直播/live.js',
   'LIVE/设定/main.js',
-  'LIVE/设定/patch.js'
+  'LIVE/设定/patch.js',
+  'LIVE/设定/gift_system.js'
 ];
 
 // 从 GitHub API 获取文件树（包含每个文件的 git SHA，用于增量更新对比）
@@ -1196,7 +1129,8 @@ async function fetchRepoFileTree(repo, branch) {
     const res = await robustNetworkRequest({
       url: apiUrl,
       method: 'GET',
-      headers: { 'Accept': 'application/vnd.github.v3+json' }
+      headers: { 'Accept': 'application/vnd.github.v3+json' },
+      proxy: true
     });
     if (res && res.ok && res.json && res.json.tree) {
       const fileMap = {};
@@ -1237,8 +1171,10 @@ async function handleVersionUpdateClick() {
   const repo = (gitUpdateState.repoUrl || DEFAULT_GIT_REPO).trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
   const branch = (gitUpdateState.branch || DEFAULT_GIT_BRANCH).trim();
   if (gitUpdateState.hasUpdate) {
-    if (api.ui?.toast) api.ui.toast(`🚀 正在从 GitHub (${repo}) 检查并下载更新...`);
-    
+    // 直接显示启动画面，在画面上展示下载进度
+    if (typeof window.showSplashForUpdate === 'function') window.showSplashForUpdate();
+
+    try {
     // 1. 获取本地热补丁记录（用于增量更新）
     let localHotpatch = null;
     try {
@@ -1262,7 +1198,6 @@ async function handleVersionUpdateClick() {
         const localContent = getLocalFileContent(localFiles, filePath);
         if (localContent) {
           unchangedFiles[filePath] = { content: localContent, hash: localHash };
-          console.log(`[LUMA Update] ⏭️ ${filePath} 未变化，复用本地 (${localHash.slice(0, 7)})`);
           continue;
         }
       }
@@ -1272,12 +1207,17 @@ async function handleVersionUpdateClick() {
     }
     
     console.log(`[LUMA Update] 📊 增量更新：共 ${HOTPATCH_FILES.length} 个文件，${filesToDownload.length} 个需要下载，${Object.keys(unchangedFiles).length} 个复用本地`);
-    
-    // 4. 下载变化的文件
+
+    // 4. 下载变化的文件（在启动画面上展示进度）
     const downloadedFiles = {};
     let successCount = 0;
     let failCount = 0;
-    
+    const totalFiles = HOTPATCH_FILES.length;
+    let completedFiles = Object.keys(unchangedFiles).length;
+    if (typeof window.setSplashProgress === 'function') {
+      window.setSplashProgress(Math.round((completedFiles / totalFiles) * 100));
+    }
+
     for (const filePath of filesToDownload) {
       try {
         const fileContent = await fetchSingleRepoFile(repo, branch, filePath);
@@ -1290,7 +1230,6 @@ async function handleVersionUpdateClick() {
             const remoteHash = remoteFileTree ? remoteFileTree[filePath] : '';
             downloadedFiles[filePath] = { content: fileContent, hash: remoteHash };
             successCount++;
-            console.log(`[LUMA Update] ✅ ${filePath} 下载成功 (${(fileContent.length / 1024).toFixed(1)}KB)${remoteHash ? ' [' + remoteHash.slice(0, 7) + ']' : ''}`);
           }
         } else {
           console.warn(`[LUMA Update] ⚠️ ${filePath} 内容为空，下载失败`);
@@ -1299,6 +1238,10 @@ async function handleVersionUpdateClick() {
       } catch (err) {
         console.error(`[LUMA Update] ❌ ${filePath} 下载异常:`, err.message);
         failCount++;
+      }
+      completedFiles++;
+      if (typeof window.setSplashProgress === 'function') {
+        window.setSplashProgress(Math.round((completedFiles / totalFiles) * 100));
       }
     }
     
@@ -1329,6 +1272,7 @@ async function handleVersionUpdateClick() {
         console.log(`[LUMA Update] 💾 热补丁已存入数据库，总大小: ${(totalSize / 1024).toFixed(1)}KB，文件数: ${totalSuccess}`);
       } catch (e) {
         console.error('[LUMA Update] ❌ 写入热更新缓存异常:', e.message);
+        if (typeof window.exitSplashScreen === 'function') window.exitSplashScreen();
         if (api.ui?.toast) api.ui.toast(`存储失败: ${e.message}`);
         return;
       }
@@ -1354,17 +1298,22 @@ async function handleVersionUpdateClick() {
         }).catch(() => {});
       });
       renderGitUpdateButton();
-      if (api.ui?.toast) api.ui.toast(`🎉 最新版本 (${gitUpdateState.currentVersion}) 下载成功！即将自动重启应用...`);
+      if (typeof window.setSplashProgress === 'function') window.setSplashProgress(100);
       // 刷新页面，splash.js 会从 api.db 读取热补丁并动态加载最新代码
       setTimeout(() => {
         window.location.reload();
-      }, 1000);
+      }, 800);
     } else {
+      if (typeof window.exitSplashScreen === 'function') window.exitSplashScreen();
       if (api.ui?.toast) api.ui.toast(`网络连接超时，下载代码失败，请稍后重试`);
+    }
+    } catch (err) {
+      console.error('[LUMA Update] ❌ 更新过程异常:', err);
+      if (typeof window.exitSplashScreen === 'function') window.exitSplashScreen();
+      if (api.ui?.toast) api.ui.toast(`更新失败：${err?.message || '网络异常'}`);
     }
   } else {
     if (api.ui?.toast) api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
-    checkGitRepoUpdate(true);
   }
 }
 window.handleVersionUpdateClick = handleVersionUpdateClick;
@@ -1375,7 +1324,7 @@ window.handleVersionUpdateClick = handleVersionUpdateClick;
 function exportAppDataFile() {
   try {
     const backupData = {
-      version: APP_CURRENT_VERSION,
+      version: gitUpdateState.currentVersion || '',
       exportTime: new Date().toISOString(),
       appParams: window.appParams || {},
       customApiConfig: window.customApiConfig || {},
@@ -1490,7 +1439,8 @@ window.closePlayerLiveView = closePlayerLiveView;
 // =========================================================================
 // 11. 全局启动加载生命周期
 // =========================================================================
-window.addEventListener('DOMContentLoaded', async () => {
+async function lumaInitApp(options) {
+  var isHotupdate = !!(options && options.hotupdate);
   if (typeof registerAiPhoneToolHandlers === 'function') {
     registerAiPhoneToolHandlers();
   }
@@ -1564,6 +1514,15 @@ window.addEventListener('DOMContentLoaded', async () => {
     const ledgerRec = await api.db.list("app_ledger") || [];
     if (ledgerRec.length > 0) window.transactionLedger = ledgerRec;
 
+    // 从宿主读取当前安装版本（最可靠的来源，不需要手动同步常量）
+    try {
+      const hostManifest = await api.app?.getManifest?.();
+      if (hostManifest?.version) {
+        const ver = String(hostManifest.version).trim();
+        window.gitUpdateState.currentVersion = ver.startsWith('v') ? ver : `v${ver}`;
+      }
+    } catch (e) {}
+
     const gitCfg = await api.db.get("app_settings", "git_repo_config");
     if (gitCfg) {
       if (gitCfg.repoUrl) window.gitUpdateState.repoUrl = gitCfg.repoUrl;
@@ -1571,6 +1530,22 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (gitCfg.installedVersion) window.gitUpdateState.currentVersion = gitCfg.installedVersion;
       if (gitCfg.installedCommit) window.gitUpdateState.localCommit = gitCfg.installedCommit;
     }
+
+    // 从热补丁数据里读取 manifest.json 版本号，确保显示版本和 manifest 同步
+    try {
+      const hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
+      if (hotpatchRec && hotpatchRec.files) {
+        const manifestRaw = hotpatchRec.files['manifest.json'];
+        const manifestContent = typeof manifestRaw === 'string' ? manifestRaw : (manifestRaw?.content || '');
+        if (manifestContent) {
+          const manifestData = JSON.parse(manifestContent);
+          if (manifestData.version) {
+            const ver = String(manifestData.version).trim();
+            window.gitUpdateState.currentVersion = ver.startsWith('v') ? ver : `v${ver}`;
+          }
+        }
+      }
+    } catch (e) {}
 
     const guestbookRec = await api.db.list("guestbook") || [];
     guestbookRec.forEach(item => {
@@ -1599,7 +1574,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (typeof loadTrendsFromDb === 'function') await loadTrendsFromDb();
 
   // 4. 同步直播列表并渲染赛道
-  if (typeof syncLiveSessions === 'function') await syncLiveSessions({ allowSpawn: true });
+  // 热更新模式下不生成新直播（allowSpawn:false），避免与旧数据重复
+  var spawnMode = isHotupdate ? false : true;
+  if (typeof syncLiveSessions === 'function') await syncLiveSessions({ allowSpawn: spawnMode });
 
   // 5. 渲染各模块初始状态
   if (typeof selectMainCategory === 'function') selectMainCategory('all');
@@ -1615,14 +1592,68 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (typeof checkDeepLinkParams === 'function') checkDeepLinkParams();
 
   // 7. 启动时后台静默检查 Git 仓库版本更新
-  setTimeout(() => {
-    checkGitRepoUpdate(true);
-  }, 1200);
+  if (!window.__lumaGitCheckTimer) {
+    window.__lumaGitCheckTimer = setTimeout(() => {
+      checkGitRepoUpdate(true);
+    }, 1200);
+  }
+
+  // 7b. 后台定时轮询（每30分钟检测一次更新）
+  if (!window.__lumaGitPollTimer) {
+    window.__lumaGitPollTimer = setInterval(() => {
+      checkGitRepoUpdate(true);
+    }, 30 * 60 * 1000);
+  }
+
+  // 7c. APP从后台切回前台时检测一次
+  if (!window.__lumaGitVisibilityBound) {
+    window.__lumaGitVisibilityBound = true;
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        checkGitRepoUpdate(true);
+      }
+    });
+  }
 
   // 8. 启动周期性作息推演定时器 (每 30 秒轮询)
-  setInterval(() => {
-    if (typeof syncLiveSessions === 'function') {
-      syncLiveSessions({ allowSpawn: true });
+  if (!window.__lumaLiveSyncInterval) {
+    window.__lumaLiveSyncInterval = setInterval(() => {
+      if (typeof syncLiveSessions === 'function') {
+        syncLiveSessions({ allowSpawn: true });
+      }
+    }, 30000);
+  }
+
+  console.log('[LUMA Live] ✅ 启动成功');
+}
+
+// 初始化逻辑：覆盖更新模式
+// - splash.js 同步设置 __lumaHotpatchLoading=true，注入完热补丁后设为 false
+// - main.js 等待标志变为 false 后自行调用 lumaInitApp（只一次）
+// - splash.js 未运行时（标志为 undefined）直接初始化
+function initWhenReady() {
+  if (window.__lumaInitStarted) {
+    return;
+  }
+  window.__lumaInitStarted = true;
+  if (window.__lumaHotpatchLoading === undefined) {
+    lumaInitApp();
+    return;
+  }
+  var attempts = 0;
+  (function wait() {
+    if (window.__lumaHotpatchLoading === false || attempts > 100) {
+      lumaInitApp();
+    } else {
+      attempts++;
+      setTimeout(wait, 50);
     }
-  }, 30000);
-});
+  })();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initWhenReady);
+} else {
+  initWhenReady();
+}
+window.lumaInitApp = lumaInitApp;

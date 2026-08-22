@@ -489,7 +489,6 @@ window.saveDbSetting = saveDbSetting;
 // 【调试回调与运营组专用通知系统】(正式运行已静默调试弹层)
 // =========================================================================
 function lumaOpsNotify(title, detail, type = 'info') {
-  console.log(`[LUMA 官方运营组] ${title}: ${detail}`);
 }
 window.lumaOpsNotify = lumaOpsNotify;
 
@@ -925,18 +924,24 @@ async function aiGenerateImage(params) {
 window.aiGenerateImage = aiGenerateImage;
 
 async function robustNetworkRequest(options) {
-  try {
-    const res = await api.network?.fetch({
-      url: options.url,
-      method: options.method || 'GET',
-      headers: options.headers || {},
-      body: options.body,
-      proxy: true,
-      timeoutMs: 20000
-    });
-    if (res && (res.ok || res.status)) return res;
-  } catch (e) {}
+  // 需要走宿主代理的请求（如 GitHub API，沙盒 iframe 直连会被 CORS 拦截）
+  if (options.proxy === true && api.network?.fetch) {
+    try {
+      const res = await api.network.fetch({
+        url: options.url,
+        method: options.method || 'GET',
+        headers: options.headers || {},
+        body: options.body,
+        proxy: true,
+        timeoutMs: options.timeoutMs || 20000
+      });
+      if (res && (res.ok || res.status)) return res;
+    } catch (e) {
+      console.warn('[robustNetworkRequest] 宿主代理请求失败，降级为浏览器直连:', e?.message || e);
+    }
+  }
 
+  // 浏览器直连（自定义大模型 API 等，目标接口通常允许 CORS）
   const rawRes = await fetch(options.url, {
     method: options.method || 'GET',
     headers: options.headers || {},
