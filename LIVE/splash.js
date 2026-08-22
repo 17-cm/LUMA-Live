@@ -7,58 +7,205 @@
   // 【热补丁启动注入】在所有业务脚本加载前，先应用 api.db 中的热补丁 CSS
   // 沙盒 iframe 无法访问 localStorage，必须用 api.db
   // =========================================================================
-  (async function applyHotpatchCssEarly() {
-    // 等待 api 对象可用（宿主注入可能需要一点时间）
-    let api = window.api || window.AiPhone || window.AiPhoneApp;
-    let waitCount = 0;
+  // =========================================================================
+  // 【热补丁启动注入】在所有业务脚本加载前，先应用 api.db 中的热补丁
+  // - CSS: 注入 <style> 标签
+  // - JS:  内联脚本注入（textContent），避免沙盒中动态 src 404 问题
+  // - 无热补丁/注入失败: 激活 index.html 中的 fallback 脚本
+  // - 版本校验: 热补丁版本低于本地基础版本时自动清除（解决换包缓存问题）
+  // =========================================================================
+  (async function applyHotpatchEarly() {
+    // JS 文件加载顺序（必须与 index.html 中顺序一致）
+    var JS_LOAD_ORDER = [
+      'LIVE/设定/app_presets.js',
+      'LIVE/core.js',
+      'LIVE/数据/data_hub.js',
+      'LIVE/数据/fans_manager.js',
+      'LIVE/数据/guard_manager.js',
+      'LIVE/数据/checkin_manager.js',
+      'LIVE/数据/titles_manager.js',
+      'LIVE/主页/profile.js',
+      'LIVE/社区/community_store.js',
+      'LIVE/社区/module_trends.js',
+      'LIVE/社区/module_supertopic.js',
+      'LIVE/社区/module_detail.js',
+      'LIVE/社区/module_ranking.js',
+      'LIVE/社区/module_forum.js',
+      'LIVE/社区/module_mytopic.js',
+      'LIVE/社区/trends.js',
+      'LIVE/直播/room_loading.js',
+      'LIVE/直播/live.js',
+      'LIVE/设定/main.js',
+      'LIVE/设定/patch.js',
+      'LIVE/设定/gift_system.js'
+    ];
+    // 本地基础版本（换包时此值更新，热补丁版本低于此值时自动清除）
+    var LUMA_BASE_VERSION = 'v3.4.1';
+
+    function parseVersion(v) {
+      var m = String(v).match(/(\d+)\.(\d+)\.(\d+)/);
+      if (!m) return [0, 0, 0];
+      return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)];
+    }
+    function compareVersion(a, b) {
+      var pa = parseVersion(a), pb = parseVersion(b);
+      for (var i = 0; i < 3; i++) {
+        if (pa[i] > pb[i]) return 1;
+        if (pa[i] < pb[i]) return -1;
+      }
+      return 0;
+    }
+    function getFileContent(files, path) {
+      if (!files) return null;
+      var d = files[path];
+      if (!d) return null;
+      if (typeof d === 'string') return d;
+      if (d && typeof d.content === 'string') return d.content;
+      return null;
+    }
+    function isValidJs(content) {
+      return content && typeof content === 'string' && content.trim()
+        && !content.trim().startsWith('<!DOCTYPE') && !content.trim().startsWith('<html');
+    }
+    // 激活 fallback 脚本（index.html 中 type="text/luma-fallback" 的脚本）
+    function activateFallbackScripts() {
+      var fallbacks = Array.prototype.slice.call(
+        document.querySelectorAll('script[type="text/luma-fallback"]')
+      );
+      if (!fallbacks.length) {
+        console.warn('[LUMA Hotpatch] ⚠️ 无 fallback 脚本可激活');
+        return;
+      }
+      console.log('[LUMA Hotpatch] 🔄 激活 fallback 脚本（' + fallbacks.length + '个）');
+      var idx = 0;
+      function loadNext() {
+        if (idx >= fallbacks.length) {
+          console.log('[LUMA Hotpatch] ✅ fallback 脚本全部加载完成');
+          ensureAppInitialized();
+          return;
+        }
+        var oldScript = fallbacks[idx++];
+        var s = document.createElement('script');
+        s.src = oldScript.src;
+        s.onload = function() { loadNext(); };
+        s.onerror = function() {
+          console.error('[LUMA Hotpatch] ❌ fallback 加载失败:', oldScript.src);
+          loadNext();
+        };
+        document.body.appendChild(s);
+      }
+      loadNext();
+    }
+    // 确保 APP 初始化（DOMContentLoaded 可能已在脚本注入前触发）
+    function ensureAppInitialized() {
+      if (document.readyState !== 'loading') {
+        if (typeof window.lumaInitApp === 'function') {
+          console.log('[LUMA Hotpatch] 🚀 手动触发 lumaInitApp（DOMContentLoaded 已触发）');
+          window.lumaInitApp();
+        } else {
+          console.warn('[LUMA Hotpatch] ⚠️ lumaInitApp 未定义，等待脚本执行');
+          setTimeout(ensureAppInitialized, 200);
+        }
+      }
+    }
+
+    // 等待 api 对象可用
+    var api = window.api || window.AiPhone || window.AiPhoneApp;
+    var waitCount = 0;
     while (!api && waitCount < 50) {
-      await new Promise(r => setTimeout(r, 50));
+      await new Promise(function(r) { setTimeout(r, 50); });
       api = window.api || window.AiPhone || window.AiPhoneApp;
       waitCount++;
     }
     if (!api || !api.db) {
-      console.warn('[LUMA Hotpatch] ⚠️ api.db 不可用，跳过热补丁注入');
+      console.warn('[LUMA Hotpatch] ⚠️ api.db 不可用，使用 fallback 脚本');
+      activateFallbackScripts();
       return;
     }
+
     try {
-      const hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
+      var hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(function() { return null; });
       if (!hotpatchRec || !hotpatchRec.files) {
-        console.log('[LUMA Hotpatch] 无热补丁数据，跳过 CSS 注入');
+        console.log('[LUMA Hotpatch] 无热补丁数据，使用 fallback 脚本');
+        activateFallbackScripts();
         return;
       }
-      const files = hotpatchRec.files;
-      // 注入热补丁 CSS（覆盖旧样式）
-      let cssContent = null;
-      const styleData = files['style.css'];
-      if (styleData) {
-        // 兼容两种格式：字符串 或 { content: "...", hash: "..." }
-        cssContent = typeof styleData === 'string' ? styleData : (styleData.content || null);
+
+      // 版本校验：热补丁版本低于本地基础版本时清除（解决换包缓存问题）
+      if (hotpatchRec.version && compareVersion(hotpatchRec.version, LUMA_BASE_VERSION) < 0) {
+        console.warn('[LUMA Hotpatch] 🗑️ 热补丁版本', hotpatchRec.version,
+          '低于基础版本', LUMA_BASE_VERSION, '，清除旧缓存');
+        await api.db.remove('app_hotpatch', 'current_hotpatch').catch(function() {});
+        activateFallbackScripts();
+        return;
       }
+
+      var files = hotpatchRec.files;
+
+      // ---- 注入热补丁 CSS ----
+      var cssContent = getFileContent(files, 'style.css');
       if (cssContent && typeof cssContent === 'string' && cssContent.trim()) {
-        // 检查是否下载到了 HTML 错误页面
         if (cssContent.trim().startsWith('<!DOCTYPE') || cssContent.trim().startsWith('<html')) {
           console.error('[LUMA Hotpatch] ❌ style.css 是 HTML 错误页面，跳过');
         } else {
-          const style = document.createElement('style');
+          var style = document.createElement('style');
           style.id = 'luma-hotpatch-style';
           style.setAttribute('data-hotpatch', 'true');
           style.textContent = cssContent;
           document.head.appendChild(style);
           window.__lumaHotpatchCssApplied = true;
-          console.log(`[LUMA Hotpatch] ✅ style.css 已注入 (${(cssContent.length / 1024).toFixed(1)}KB)`);
+          console.log('[LUMA Hotpatch] ✅ style.css 已注入 (' + (cssContent.length / 1024).toFixed(1) + 'KB)');
         }
       } else {
         console.warn('[LUMA Hotpatch] ⚠️ style.css 不存在或内容为空');
       }
+
+      // ---- 注入热补丁 JS（内联脚本，避免沙盒动态 src 404）----
+      var jsInjected = 0;
+      var jsFailed = false;
+      for (var i = 0; i < JS_LOAD_ORDER.length; i++) {
+        var filePath = JS_LOAD_ORDER[i];
+        var jsContent = getFileContent(files, filePath);
+        if (!isValidJs(jsContent)) {
+          console.error('[LUMA Hotpatch] ❌ JS 文件缺失或无效:', filePath);
+          jsFailed = true;
+          break;
+        }
+        try {
+          var s = document.createElement('script');
+          s.textContent = jsContent;
+          s.setAttribute('data-hotpatch', 'true');
+          s.setAttribute('data-src', filePath);
+          document.body.appendChild(s);
+          jsInjected++;
+        } catch (e) {
+          console.error('[LUMA Hotpatch] ❌ JS 注入异常:', filePath, e.message);
+          jsFailed = true;
+          break;
+        }
+      }
+
+      if (jsFailed) {
+        console.error('[LUMA Hotpatch] ❌ JS 热补丁注入失败（' + jsInjected + '/' + JS_LOAD_ORDER.length + '），回退到本地脚本');
+        activateFallbackScripts();
+      } else {
+        console.log('[LUMA Hotpatch] ✅ 全部 ' + jsInjected + ' 个 JS 文件内联注入成功');
+        window.__lumaHotpatchJsApplied = true;
+        // 内联脚本同步执行完毕后，确保 APP 初始化
+        setTimeout(ensureAppInitialized, 0);
+      }
+
       // 记录热补丁版本信息
       if (hotpatchRec.version) {
         window.__lumaHotpatchVersion = hotpatchRec.version;
         window.__lumaHotpatchCommit = hotpatchRec.commit || '';
         window.__lumaHotpatchActive = true;
-        console.log(`[LUMA Hotpatch] 📌 当前热补丁版本: ${hotpatchRec.version} ${hotpatchRec.commit ? '(' + hotpatchRec.commit + ')' : ''}`);
+        console.log('[LUMA Hotpatch] 📌 当前热补丁版本: ' + hotpatchRec.version
+          + (hotpatchRec.commit ? ' (' + hotpatchRec.commit + ')' : ''));
       }
     } catch (e) {
-      console.error('[LUMA Hotpatch] ❌ CSS 注入异常:', e.message);
+      console.error('[LUMA Hotpatch] ❌ 热补丁注入异常:', e.message);
+      activateFallbackScripts();
     }
   })();
 

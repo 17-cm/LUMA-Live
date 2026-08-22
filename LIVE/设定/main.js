@@ -1492,7 +1492,7 @@ window.closePlayerLiveView = closePlayerLiveView;
 // =========================================================================
 // 11. 全局启动加载生命周期
 // =========================================================================
-window.addEventListener('DOMContentLoaded', async () => {
+async function lumaInitApp() {
   if (typeof registerAiPhoneToolHandlers === 'function') {
     registerAiPhoneToolHandlers();
   }
@@ -1627,4 +1627,12 @@ window.addEventListener('DOMContentLoaded', async () => {
       syncLiveSessions({ allowSpawn: true });
     }
   }, 30000);
-});
+}
+
+// DOMContentLoaded 可能在脚本注入前已触发，需手动判断
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', lumaInitApp);
+} else {
+  lumaInitApp();
+}
+window.lumaInitApp = lumaInitApp;
