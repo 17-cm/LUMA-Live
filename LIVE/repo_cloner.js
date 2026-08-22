@@ -11,6 +11,13 @@
   const GITHUB_REPO = 'LUMA-Live';
   const GITHUB_BRANCH = 'test';
 
+  // 安全获取 api 对象
+  function getApi() {
+    if (window.api) return window.api;
+    if (typeof api !== 'undefined') return api;
+    return null;
+  }
+
   // 获取 GitHub API 基础 URL
   function getGithubApiBase() {
     return `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}`;
@@ -179,9 +186,9 @@
       
       // 先尝试创建，失败则更新
       try {
-        await api.db.create('app_files', fileData);
+        await getApi().db.create('app_files', fileData);
       } catch (e) {
-        await api.db.update('app_files', filepath, {
+        await getApi().db.update('app_files', filepath, {
           content: content,
           commit_hash: commitHash,
           updated_at: new Date().toISOString()
@@ -204,9 +211,9 @@
       };
       
       try {
-        await api.db.create('app_version', versionData);
+        await getApi().db.create('app_version', versionData);
       } catch (e) {
-        await api.db.update('app_version', 'current', versionData);
+        await getApi().db.update('app_version', 'current', versionData);
       }
     } catch (err) {
       console.error('[RepoCloner] 保存版本信息失败:', err);
@@ -216,7 +223,7 @@
   // 获取当前版本信息
   async function getCurrentVersion() {
     try {
-      const version = await api.db.get('app_version', 'current');
+      const version = await getApi().db.get('app_version', 'current');
       return version;
     } catch (err) {
       console.log('[RepoCloner] 获取当前版本失败（可能是第一次启动）:', err);
@@ -257,7 +264,7 @@
   // 从 api.db 读取文件内容
   async function getFileFromDb(filepath) {
     try {
-      const file = await api.db.get('app_files', filepath);
+      const file = await getApi().db.get('app_files', filepath);
       return file ? file.content : null;
     } catch (err) {
       console.error('[RepoCloner] 从 db 读取文件失败:', filepath, err);
@@ -268,7 +275,7 @@
   // 列出 api.db 里的所有文件
   async function listAllFiles() {
     try {
-      const files = await api.db.list('app_files');
+      const files = await getApi().db.list('app_files');
       return files || [];
     } catch (err) {
       console.error('[RepoCloner] 列出文件失败:', err);

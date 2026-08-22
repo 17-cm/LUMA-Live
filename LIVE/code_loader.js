@@ -145,6 +145,19 @@
         throw new Error('RepoCloner 加载失败');
       }
       
+      // 等待宿主 api 初始化完成
+      waitCount = 0;
+      while (!window.api && waitCount < 100) {
+        await new Promise(r => setTimeout(r, 100));
+        waitCount++;
+      }
+      
+      if (!window.api) {
+        console.warn('[CodeLoader] 警告：window.api 未找到，尝试使用全局 api');
+      } else {
+        console.log('[CodeLoader] 宿主 api 已初始化');
+      }
+      
       // 检查当前版本
       showLoadingScreen('正在检查版本...', 5);
       const currentVersion = await window.RepoCloner.getCurrentVersion();
