@@ -34,7 +34,7 @@
     "network.fetch"
   ],
   "network": {
-    "allowedDomains": ["*"],
+    "allowedDomains": ["api.github.com", "raw.githubusercontent.com"],
     "mode": "proxy"
   },
   "extensions": {

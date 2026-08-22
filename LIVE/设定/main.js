@@ -1006,7 +1006,8 @@ async function checkGitRepoUpdate(silent = false) {
     const comRes = await robustNetworkRequest({
       url: `https://api.github.com/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=1`,
       method: 'GET',
-      headers: { 'Accept': 'application/vnd.github.v3+json' }
+      headers: { 'Accept': 'application/vnd.github.v3+json' },
+      proxy: true
     });
     if (comRes && comRes.ok && comRes.json && Array.isArray(comRes.json) && comRes.json[0]) {
       remoteCommit = comRes.json[0].sha ? comRes.json[0].sha.slice(0, 7) : null;
@@ -1016,7 +1017,8 @@ async function checkGitRepoUpdate(silent = false) {
     const manRes = await robustNetworkRequest({
       url: `https://api.github.com/repos/${repo}/contents/manifest.json?ref=${encodeURIComponent(branch)}`,
       method: 'GET',
-      headers: { 'Accept': 'application/vnd.github.v3.raw' }
+      headers: { 'Accept': 'application/vnd.github.v3.raw' },
+      proxy: true
     });
     let mData = manRes?.json;
     if (!mData && manRes?.text) {
@@ -1067,7 +1069,8 @@ async function fetchSingleRepoFile(repo, branch, filePath) {
     const rawUrl = `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/${filePath}`;
     const rawRes = await robustNetworkRequest({
       url: rawUrl,
-      method: 'GET'
+      method: 'GET',
+      proxy: true
     });
     if (rawRes && rawRes.ok && rawRes.text) {
       return rawRes.text;
@@ -1080,7 +1083,8 @@ async function fetchSingleRepoFile(repo, branch, filePath) {
     const apiRes = await robustNetworkRequest({
       url: apiUrl,
       method: 'GET',
-      headers: { 'Accept': 'application/vnd.github.v3.raw' }
+      headers: { 'Accept': 'application/vnd.github.v3.raw' },
+      proxy: true
     });
     if (apiRes && apiRes.ok && apiRes.text) {
       return apiRes.text;
@@ -1125,7 +1129,8 @@ async function fetchRepoFileTree(repo, branch) {
     const res = await robustNetworkRequest({
       url: apiUrl,
       method: 'GET',
-      headers: { 'Accept': 'application/vnd.github.v3+json' }
+      headers: { 'Accept': 'application/vnd.github.v3+json' },
+      proxy: true
     });
     if (res && res.ok && res.json && res.json.tree) {
       const fileMap = {};
