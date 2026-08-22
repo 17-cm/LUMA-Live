@@ -231,13 +231,30 @@ window.getApiRequestIntervalMinutes = getApiRequestIntervalMinutes;
 // 直播间打包预设（代码只定义返回格式，具体生成数量和内容风格在预设里配置）
 // =========================================================================
 function getLivePackagePrompt() {
-  // 从预设里读取直播间打包 prompt，如果没有就用默认基础模板
-  // 预设里可以配置：生成多少条弹幕、多少条台词、内容风格、话题等
+  // 优先级1：用户手动设置的直播间打包预设（最高优先）
   const params = window.appParams || {};
   if (params.livePackagePrompt && params.livePackagePrompt.trim()) {
     return params.livePackagePrompt;
   }
-  // 默认基础模板：只定义返回格式，不写死具体数量（数量在预设里调整）
+  // 优先级2：从 APP 内部预设（appPresets）读取弹幕生态预设 + 主播互动预设
+  // 用户在"设置 → 预设提示词"里编辑的内容会在这里生效
+  const p = window.appPresets || {};
+  const danmakuEntries = p['danmaku']?.entries || [];
+  const hostEntries = p['host']?.entries || [];
+  const danmakuContent = danmakuEntries.map(e => e.content).filter(Boolean).join('\n\n');
+  const hostContent = hostEntries.map(e => e.content).filter(Boolean).join('\n\n');
+  if (danmakuContent || hostContent) {
+    let prompt = '';
+    if (danmakuContent) {
+      prompt += `## 弹幕生成规则（来自预设）\n${danmakuContent}\n\n`;
+    }
+    if (hostContent) {
+      prompt += `## 主播台词规则（来自预设）\n${hostContent}\n\n`;
+    }
+    prompt += `## 输出格式要求\n请生成观众弹幕（danmakus数组）和主播互动台词（hostSpeeches数组，每条包含speech和action字段）。严格返回JSON格式，不要输出JSON之外的任何文字。`;
+    return prompt;
+  }
+  // 优先级3：默认基础模板（预设全为空时才用）
   return `请生成观众弹幕（danmakus数组）和主播互动台词（hostSpeeches数组，每条包含speech和action字段）。返回JSON格式。`;
 }
 window.getLivePackagePrompt = getLivePackagePrompt;
