@@ -1365,17 +1365,12 @@ input:checked + .switch-slider:before {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  background: #ffffff;
 }
 .profile-content-scroll::-webkit-scrollbar {
   display: none;
 }
 
-.profile-content-scroll > :first-child {
-  position: relative;
-  z-index: 2;
-  margin-top: -38px;
-  border-radius: 16px 16px 0 0;
-}
 .profile-avatar-wrapper {
   position: relative;
   width: 76px;
