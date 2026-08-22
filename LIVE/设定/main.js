@@ -1492,7 +1492,9 @@ window.closePlayerLiveView = closePlayerLiveView;
 // =========================================================================
 // 11. 全局启动加载生命周期
 // =========================================================================
-async function lumaInitApp() {
+async function lumaInitApp(options) {
+  var isHotupdate = !!(options && options.hotupdate);
+  if (isHotupdate) console.log('[LUMA Init] 🔄 热更新模式：保留已有直播数据，不重新生成');
   if (typeof registerAiPhoneToolHandlers === 'function') {
     registerAiPhoneToolHandlers();
   }
@@ -1601,7 +1603,9 @@ async function lumaInitApp() {
   if (typeof loadTrendsFromDb === 'function') await loadTrendsFromDb();
 
   // 4. 同步直播列表并渲染赛道
-  if (typeof syncLiveSessions === 'function') await syncLiveSessions({ allowSpawn: true });
+  // 热更新模式下不生成新直播（allowSpawn:false），避免与旧数据重复
+  var spawnMode = isHotupdate ? false : true;
+  if (typeof syncLiveSessions === 'function') await syncLiveSessions({ allowSpawn: spawnMode });
 
   // 5. 渲染各模块初始状态
   if (typeof selectMainCategory === 'function') selectMainCategory('all');
@@ -1617,16 +1621,20 @@ async function lumaInitApp() {
   if (typeof checkDeepLinkParams === 'function') checkDeepLinkParams();
 
   // 7. 启动时后台静默检查 Git 仓库版本更新
-  setTimeout(() => {
-    checkGitRepoUpdate(true);
-  }, 1200);
+  if (!window.__lumaGitCheckTimer) {
+    window.__lumaGitCheckTimer = setTimeout(() => {
+      checkGitRepoUpdate(true);
+    }, 1200);
+  }
 
   // 8. 启动周期性作息推演定时器 (每 30 秒轮询)
-  setInterval(() => {
-    if (typeof syncLiveSessions === 'function') {
-      syncLiveSessions({ allowSpawn: true });
-    }
-  }, 30000);
+  if (!window.__lumaLiveSyncInterval) {
+    window.__lumaLiveSyncInterval = setInterval(() => {
+      if (typeof syncLiveSessions === 'function') {
+        syncLiveSessions({ allowSpawn: true });
+      }
+    }, 30000);
+  }
 }
 
 // 初始化逻辑：

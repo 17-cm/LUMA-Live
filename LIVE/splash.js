@@ -66,14 +66,14 @@
       return content && typeof content === 'string' && content.trim()
         && !content.trim().startsWith('<!DOCTYPE') && !content.trim().startsWith('<html');
     }
-    function finishInit() {
+    function finishInit(isHotupdate) {
       window.__lumaHotpatchPending = false;
       if (typeof window.lumaInitApp === 'function') {
-        console.log('[LUMA Hotpatch] 🚀 调用 lumaInitApp 初始化');
-        window.lumaInitApp();
+        console.log('[LUMA Hotpatch] 🚀 调用 lumaInitApp 初始化' + (isHotupdate ? '（热更新模式，保留已有数据不重新生成）' : ''));
+        window.lumaInitApp({ hotupdate: !!isHotupdate });
       } else {
         console.warn('[LUMA Hotpatch] ⚠️ lumaInitApp 未定义，延迟重试');
-        setTimeout(finishInit, 200);
+        setTimeout(function() { finishInit(isHotupdate); }, 200);
       }
     }
 
@@ -168,7 +168,7 @@
         function waitAndInit() {
           initAttempts++;
           if (initAttempts >= 10 || typeof window.lumaInitApp === 'function') {
-            finishInit();
+            finishInit(true);
           } else {
             setTimeout(waitAndInit, 50);
           }
