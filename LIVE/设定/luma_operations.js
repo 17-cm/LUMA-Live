@@ -271,21 +271,44 @@ async function syncLiveSessions(options = {}) {
   const minRestMins = params.minRestDuration || 10;
   const allChars = window.allCharacters || [];
 
+  // ── 轮询日志初始化 ──
+  const cycleLog = {
+    time: new Date().toLocaleTimeString(),
+    params: { baseSpawnRate, baseStopRate, maxLiveMins, maxRestMins, minRestMins },
+    decisions: [],
+    summary: { totalChars: allChars.length, streaming: 0, started: 0, stopped: 0 }
+  };
+
   // ── 下播决策：遍历直播中的角色 ──
   for (const s of sessions) {
-    const liveMins = (now - (s.startTime || now)) / 60000;
-    let stopWill;
+    const charName = s.name || s.characterId || '未知';
+    const liveMins = Math.round((now - (s.startTime || now)) / 60000);
+    let stopWill, reason;
 
     // 安全区判定：达到直播时长上限 → 必然下播
     if (liveMins >= maxLiveMins) {
       stopWill = 100;
+      reason = '达到上限必然下播';
     } else {
-      // 安全区内：基础下播意愿 + 比例式增长（最高50%）
-      stopWill = baseStopRate + (liveMins / maxLiveMins) * 50;
+      stopWill = Math.round(baseStopRate + (liveMins / maxLiveMins) * 50);
+      reason = '安全区比例增长';
     }
 
-    // 掷骰子：AI决定是否下播
-    if (Math.random() * 100 < stopWill) {
+    const dice = Math.round(Math.random() * 100);
+    const willStop = dice < stopWill;
+
+    cycleLog.decisions.push({
+      char: charName,
+      state: '直播中',
+      liveMins: liveMins,
+      stopWill: stopWill,
+      dice: dice,
+      reason: reason,
+      result: willStop ? '下播' : '继续播'
+    });
+
+    if (willStop) {
+      cycleLog.summary.stopped++;
       if (window.lumaOpsGateway) {
         await window.lumaOpsGateway.requestStopLive({
           characterId: s.characterId,
@@ -299,34 +322,65 @@ async function syncLiveSessions(options = {}) {
   // 下播后刷新会话列表
   sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
   const streamingIds = new Set(sessions.map(s => s.characterId));
+  cycleLog.summary.streaming = sessions.length;
 
   // ── 开播决策：遍历休息中的角色 ──
-  // 维护模式：charSpawnRate=0 时跳过所有开播决策
   if (baseSpawnRate > 0) {
     for (const c of allChars) {
+      const charName = c.name || c.id || '未知';
+
       // 已在直播中 → 跳过
       if (streamingIds.has(c.id)) continue;
 
-      // 读取上次下播时间（从没播过的角色视为休息了很久）
+      // 读取上次下播时间
       let lastEndTime = null;
       const sched = window.charSchedulesMap ? window.charSchedulesMap[c.id] : null;
       if (sched && sched.lastEndTime) lastEndTime = sched.lastEndTime;
-      const restMins = lastEndTime ? (now - lastEndTime) / 60000 : Infinity;
 
-      // 强制休息期：房管会驳回，跳过
-      if (restMins < minRestMins) continue;
+      const hasStreamedBefore = !!lastEndTime;
+      const restMins = hasStreamedBefore ? Math.round((now - lastEndTime) / 60000) : null;
 
-      let spawnWill;
-      // 安全区判定：达到休息时长上限 → 必然开播
-      if (restMins >= maxRestMins) {
-        spawnWill = 100;
-      } else {
-        // 安全区内：基础开播意愿 + 比例式增长（最高50%）
-        spawnWill = baseSpawnRate + (restMins / maxRestMins) * 50;
+      let spawnWill, reason, skipReason = null;
+
+      // 强制休息期：只对播过的角色生效
+      if (hasStreamedBefore && restMins < minRestMins) {
+        skipReason = `强制休息期(${restMins}/${minRestMins}分钟)`;
+        cycleLog.decisions.push({
+          char: charName, state: '休息中', restMins: restMins,
+          spawnWill: 0, dice: '-', reason: skipReason, result: '跳过'
+        });
+        continue;
       }
 
-      // 掷骰子：AI决定是否开播
-      if (Math.random() * 100 < spawnWill) {
+      if (!hasStreamedBefore) {
+        // 从没播过的角色：只用基础意愿，无增长加成
+        spawnWill = baseSpawnRate;
+        reason = '首次开播(仅基础意愿)';
+      } else if (restMins >= maxRestMins) {
+        // 安全区外：达到休息时长上限 → 必然开播
+        spawnWill = 100;
+        reason = '达到上限必然开播';
+      } else {
+        // 安全区内：基础开播意愿 + 比例式增长
+        spawnWill = Math.round(baseSpawnRate + (restMins / maxRestMins) * 50);
+        reason = '安全区比例增长';
+      }
+
+      const dice = Math.round(Math.random() * 100);
+      const willSpawn = dice < spawnWill;
+
+      cycleLog.decisions.push({
+        char: charName,
+        state: '休息中',
+        restMins: restMins === null ? '首次' : restMins,
+        spawnWill: spawnWill,
+        dice: dice,
+        reason: reason,
+        result: willSpawn ? '开播' : '不播'
+      });
+
+      if (willSpawn) {
+        cycleLog.summary.started++;
         if (window.lumaOpsGateway) {
           await window.lumaOpsGateway.requestStartLive({
             characterId: c.id,
@@ -335,13 +389,21 @@ async function syncLiveSessions(options = {}) {
         }
       }
     }
+  } else {
+    cycleLog.decisions.push({ char: '(全服维护)', state: '-', restMins: '-', spawnWill: 0, dice: '-', reason: 'charSpawnRate=0', result: '跳过全部' });
   }
 
   // 最终刷新并渲染
   sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
-  liveList = sessions;
-  window.liveList = liveList;
+  window.liveList = sessions;
   renderLiveGrid();
+
+  // ── 写入轮询日志 ──
+  cycleLog.summary.streaming = sessions.length;
+  if (!window.lumaOpsLog) window.lumaOpsLog = [];
+  window.lumaOpsLog.unshift(cycleLog);
+  if (window.lumaOpsLog.length > 50) window.lumaOpsLog.pop();
+  console.log(`[LUMA官方运营组] ${cycleLog.time} | 在播${cycleLog.summary.streaming} | 开播${cycleLog.summary.started} 下播${cycleLog.summary.stopped}`, cycleLog);
 }
 window.syncLiveSessions = syncLiveSessions;
 window.lumaOpsPoll = syncLiveSessions;
