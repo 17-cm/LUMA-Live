@@ -88,17 +88,8 @@ function computeSecureSha256(text) {
   return result;
 }
 
-// 预设二次元与高质头像库
-const FORUM_PRESET_AVATARS = [
-  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200",
-  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200",
-  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200",
-  "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200",
-  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200",
-  "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200",
-  "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200",
-  "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200"
-];
+// 论坛注册预设头像：本地程序化生成 8 个随机 emoji 头像（统一头像资源站）
+const FORUM_PRESET_AVATARS = Array.from({ length: 8 }, () => getAvatar(null, 'emoji'));
 
 // 官方论坛初始置顶官方公告（纯官方公告，不塞任何假用户帖子）
 const INITIAL_FORUM_POSTS = [
@@ -107,7 +98,7 @@ const INITIAL_FORUM_POSTS = [
     author: {
       uid: "LUMA_OFFICIAL_001",
       name: "LUMA 官方运营组",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200",
+      avatar: getAvatar('LUMA 官方运营组', 'first'),
       role: "owner",
       roleTitle: "👑 官方主理人",
       isOfficial: true
@@ -125,7 +116,7 @@ const INITIAL_FORUM_POSTS = [
     author: {
       uid: "LUMA_OFFICIAL_001",
       name: "LUMA 官方运营组",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200",
+      avatar: getAvatar('LUMA 官方运营组', 'first'),
       role: "owner",
       roleTitle: "👑 官方主理人",
       isOfficial: true
@@ -623,7 +614,7 @@ function executeDirectLoginSubmit() {
     userObj = {
       uid: 'LUMA_OFFICIAL_OWNER',
       name: 'LUMA 官方运营组',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      avatar: getAvatar('LUMA 官方运营组', 'first'),
       role: 'owner',
       roleTitle: '👑 官方主理人',
       isOwner: true,
@@ -742,7 +733,7 @@ function renderOfficialWeiboForum(activeTab = 'official') {
           <div class="flex items-end justify-between mb-2">
             <div class="relative">
               <div class="w-16 h-16 rounded-full p-[2px] bg-gradient-to-tr from-amber-400 via-rose-500 to-purple-600 shadow-md">
-                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200" class="w-full h-full rounded-full object-cover border-2 border-white">
+                <img src="${getAvatar(null, 'emoji')}" class="w-full h-full rounded-full object-cover border-2 border-white">
               </div>
               <span class="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-gradient-to-tr from-amber-400 to-amber-500 rounded-full border border-white flex items-center justify-center text-[10px] font-black text-slate-950 shadow">V</span>
             </div>

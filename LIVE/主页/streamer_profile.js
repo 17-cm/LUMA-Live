@@ -125,7 +125,7 @@ function getOrGenerateStreamerProfile(characterId, characterObj) {
   }
   
   const cover = characterObj?.cover || '';
-  const avatar = characterObj?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+  const avatar = characterObj?.avatar || getAvatar((characterObj && (characterObj.name || characterObj.id)) || null, 'first');
   const gallery = [cover, avatar, cover, avatar, cover, avatar];
   
   const profile = {

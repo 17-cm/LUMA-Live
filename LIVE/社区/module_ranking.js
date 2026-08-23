@@ -31,7 +31,7 @@ function renderCommunityRanking(tabType = 'fans') {
   const chars = window.getAvailableCharsList();
   const uProfile = window.userProfileData || {};
   const uName = (window.currentUser && window.currentUser.name) || '玩家';
-  const uAvatar = (window.currentUser && window.currentUser.avatar) || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200';
+  const uAvatar = (window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first');
   const uWallet = window.currentWalletBalance || 18800;
 
   let rankedItems = [];

@@ -10,11 +10,9 @@
   const DEFAULT_SEEDS = [
     {
       fromId: 'char_1',
-      fromName: '傲娇同桌',
-      fromAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      fromName: '傲娇同桌', fromAvatar: getAvatar('傲娇同桌', 'first'),
       toId: 'user',
-      toName: '玩家',
-      toAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200',
+      toName: '玩家', toAvatar: getAvatar('玩家', 'first'),
       totalAmount: 9990,
       giftCount: 9,
       lastTime: '10分钟前',
@@ -22,11 +20,9 @@
     },
     {
       fromId: 'char_2',
-      fromName: '赛博歌姬 · 露娜',
-      fromAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200',
+      fromName: '赛博歌姬 · 露娜', fromAvatar: getAvatar('赛博歌姬 · 露娜', 'first'),
       toId: 'user',
-      toName: '玩家',
-      toAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200',
+      toName: '玩家', toAvatar: getAvatar('玩家', 'first'),
       totalAmount: 5200,
       giftCount: 6,
       lastTime: '25分钟前',
@@ -34,11 +30,9 @@
     },
     {
       fromId: 'char_4',
-      fromName: '次元猫娘 · 桃桃',
-      fromAvatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200',
+      fromName: '次元猫娘 · 桃桃', fromAvatar: getAvatar('次元猫娘 · 桃桃', 'first'),
       toId: 'user',
-      toName: '玩家',
-      toAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200',
+      toName: '玩家', toAvatar: getAvatar('玩家', 'first'),
       totalAmount: 2330,
       giftCount: 4,
       lastTime: '1小时前',
@@ -62,9 +56,9 @@
       const key = getMatrixKey(fId, tId);
 
       const fName = fromName || (fId === 'user' ? ((window.currentUser && window.currentUser.name) || '玩家') : '主播');
-      const fAvatar = fromAvatar || (fId === 'user' ? ((window.currentUser && window.currentUser.avatar) || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200') : '');
+      const fAvatar = fromAvatar || (fId === 'user' ? ((window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first')) : '');
       const tName = toName || (tId === 'user' ? ((window.currentUser && window.currentUser.name) || '玩家') : '主播');
-      const tAvatar = toAvatar || (tId === 'user' ? ((window.currentUser && window.currentUser.avatar) || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200') : '');
+      const tAvatar = toAvatar || (tId === 'user' ? ((window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first')) : '');
 
       if (!matrix[key]) {
         matrix[key] = {
@@ -261,7 +255,7 @@
 
       // 玩家的总体贡献排位
       const uName = (window.currentUser && window.currentUser.name) || '玩家';
-      const uAvatar = (window.currentUser && window.currentUser.avatar) || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200';
+      const uAvatar = (window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first');
       const totalUserSpent = this.getEntitySpentTotal('user');
       const baseUserScore = 15000 + totalUserSpent * 2;
 
@@ -286,7 +280,7 @@
       const lives = window.liveList || [];
       const fLive = lives.find(l => l.id === id || l.characterId === id);
       if (fLive && (fLive.avatar || fLive.cover)) return fLive.avatar || fLive.cover;
-      return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+      return getAvatar(null, 'emoji');
     },
 
     syncRankings() {

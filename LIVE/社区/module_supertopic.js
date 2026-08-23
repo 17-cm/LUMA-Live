@@ -257,15 +257,15 @@ function renderSuperTopicContributeTab(char) {
   if (!container) return;
 
   const uName = (window.currentUser && window.currentUser.name) || '玩家';
-  const uAvatar = (window.currentUser && window.currentUser.avatar) || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200';
+  const uAvatar = (window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first');
   const userExtraContribute = window.getCharContributionScore(char.id); // 玩家给该 Char 消费打榜的真实积分
 
   const baseFans = [
-    { name: '星空拾荒者', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', score: 38200, badge: '至尊盟主' },
-    { name: '喵喵守护大队长', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', score: 26500, badge: '超级铁粉' },
-    { name: '不吃香菜的猫', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100', score: 18400, badge: '忠实舰长' },
-    { name: '月亮邮局', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', score: 9800, badge: '守护天使' },
-    { name: '塞博浪人', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100', score: 6200, badge: '真爱粉' }
+    { name: '星空拾荒者', avatar: getAvatar('星空拾荒者', 'first'), score: 38200, badge: '至尊盟主' },
+    { name: '喵喵守护大队长', avatar: getAvatar('喵喵守护大队长', 'first'), score: 26500, badge: '超级铁粉' },
+    { name: '不吃香菜的猫', avatar: getAvatar('不吃香菜的猫', 'first'), score: 18400, badge: '忠实舰长' },
+    { name: '月亮邮局', avatar: getAvatar('月亮邮局', 'first'), score: 9800, badge: '守护天使' },
+    { name: '塞博浪人', avatar: getAvatar('塞博浪人', 'first'), score: 6200, badge: '真爱粉' }
   ];
 
   const userTotalScore = 12000 + userExtraContribute;
@@ -374,16 +374,16 @@ function renderSuperTopicCheckinTab(char) {
   if (!container) return;
 
   const uName = (window.currentUser && window.currentUser.name) || '玩家';
-  const uAvatar = (window.currentUser && window.currentUser.avatar) || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200';
+  const uAvatar = (window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first');
   const checkIn = window.getSuperTopicCheckInInfo(char.id);
 
   const checkinRankList = (window.LumaCheckinManager && typeof window.LumaCheckinManager.getTopicCheckInRankList === 'function')
     ? window.LumaCheckinManager.getTopicCheckInRankList(char.id)
     : [
-        { name: '苏小喵全球后援会', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', days: 128, total: 38400, badge: '开山元老' },
-        { name: '每日必吸猫', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', days: 95, total: 28500, badge: '连续满勤' },
-        { name: '星奈今天直播了吗', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100', days: 64, total: 19200, badge: '超话达人' },
-        { name: '早起看重播', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', days: 42, total: 12600, badge: '活跃打卡' },
+        { name: '苏小喵全球后援会', avatar: getAvatar('苏小喵全球后援会', 'first'), days: 128, total: 38400, badge: '开山元老' },
+        { name: '每日必吸猫', avatar: getAvatar('每日必吸猫', 'first'), days: 95, total: 28500, badge: '连续满勤' },
+        { name: '星奈今天直播了吗', avatar: getAvatar('星奈今天直播了吗', 'first'), days: 64, total: 19200, badge: '超话达人' },
+        { name: '早起看重播', avatar: getAvatar('早起看重播', 'first'), days: 42, total: 12600, badge: '活跃打卡' },
         {
           name: `${uName} (你)`,
           avatar: uAvatar,

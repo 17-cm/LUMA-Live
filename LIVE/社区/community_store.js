@@ -15,7 +15,7 @@ window.weiboPosts = window.weiboPosts || [
     id: 'post_1',
     author: {
       name: '星芒吃瓜周刊',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      avatar: getAvatar('星芒吃瓜周刊', 'first'),
       badge: '独家狗仔',
       verified: true
     },
@@ -36,7 +36,7 @@ window.weiboPosts = window.weiboPosts || [
       {
         id: 'c1',
         user: '吃瓜第一线',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+        avatar: getAvatar(null, 'emoji'),
         ip: '塞博空间',
         time: '12分钟前',
         text: '昨晚看直播的我笑得想死，主播当场破防把摄像头都晃歪了哈哈哈哈！',
@@ -46,7 +46,7 @@ window.weiboPosts = window.weiboPosts || [
           {
             id: 'r1',
             user: '苏小喵',
-            avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
+            avatar: getAvatar(null, 'emoji'),
             isAuthor: true,
             replyTo: '吃瓜第一线',
             ip: '星环港',
@@ -62,7 +62,7 @@ window.weiboPosts = window.weiboPosts || [
     id: 'post_2',
     author: {
       name: '电竞前线大队长',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
+      avatar: getAvatar('电竞前线大队长', 'first'),
       badge: '赛事解说',
       verified: true
     },
@@ -83,7 +83,7 @@ window.weiboPosts = window.weiboPosts || [
       {
         id: 'c2',
         user: '柠檬树下柠檬精',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+        avatar: getAvatar(null, 'emoji'),
         ip: '上海',
         time: '20分钟前',
         text: '有钱人的世界真的太震撼了，这才是真正的榜一大哥！',
@@ -129,7 +129,7 @@ window.getAvailableCharsList = function() {
       id: id,
       characterId: c.characterId || c.id,
       name: c.name || '主播',
-      avatar: c.avatar || c.cover || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      avatar: c.avatar || c.cover || getAvatar((c && (c.name || c.id)) || null, 'first'),
       category: c.category || '随性杂谈',
       fans: c.heat ? Math.floor(c.heat * 1.5) : (c.followers || 12800),
       isLive: true,
@@ -144,7 +144,7 @@ window.getAvailableCharsList = function() {
         id: id,
         characterId: c.characterId || c.id,
         name: c.name || '主播',
-        avatar: c.avatar || c.cover || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200',
+        avatar: c.avatar || c.cover || getAvatar((c && (c.name || c.id)) || null, 'first'),
         category: c.category || '次元才艺',
         fans: c.followers || 8600,
         isLive: false,
@@ -157,7 +157,7 @@ window.getAvailableCharsList = function() {
     map.set('default_1', {
       id: 'default_1',
       name: '苏小喵',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      avatar: getAvatar('苏小喵', 'first'),
       category: '次元才艺',
       fans: 24600,
       isLive: true,

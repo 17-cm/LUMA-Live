@@ -7,7 +7,7 @@ var api = window.api || {};
 
 let currentUser = {
   name: '玩家',
-  avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200'
+  avatar: getAvatar('玩家', 'first')
 };
 window.currentUser = currentUser;
 
@@ -44,7 +44,7 @@ async function syncUserProfile() {
     const u = await api.user.getProfile();
     if (u) {
       currentUser.name = u.name || '玩家';
-      currentUser.avatar = u.avatar || u.avatarUrl || u.icon || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200';
+      currentUser.avatar = u.avatar || u.avatarUrl || u.icon || getAvatar((u && u.name) || currentUser.name || null, 'first');
       const nameEl = document.getElementById('userName');
       const avatarBox = document.getElementById('userAvatarBox');
       if (nameEl) nameEl.textContent = currentUser.name;
@@ -158,7 +158,7 @@ function openFollowListPageView() {
     return {
       id: id,
       name: `主播_${String(id).slice(-4)}`,
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      avatar: getAvatar(null, 'emoji'),
       tags: ['签约主播']
     };
   });

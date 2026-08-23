@@ -562,7 +562,7 @@
     overlay.classList.remove('hidden', 'fade-out');
 
     // 填充头像与背景
-    const avatarUrl = session.avatar || (session.cover || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500');
+    const avatarUrl = session.avatar || (session.cover || getAvatar((session && (session.name || session.characterId)) || null, 'first'));
     const nameStr = session.name || '主播';
     const viewersCount = (typeof window.getLiveSessionViewers === 'function') ? window.getLiveSessionViewers(session) : 1200;
     const viewersStr = viewersCount > 10000 ? (viewersCount / 10000).toFixed(1) + 'w 在看' : `${viewersCount} 在看`;
@@ -720,7 +720,7 @@
     const overlay = getTransitionOverlay();
     overlay.classList.remove('hidden', 'fade-out');
 
-    const avatarUrl = s.avatar || (s.cover || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500');
+    const avatarUrl = s.avatar || (s.cover || getAvatar((s && (s.name || s.characterId)) || null, 'first'));
     const gaussianBg = document.getElementById('transGaussianBg');
     const gaussianUnderlay = document.getElementById('transGaussianUnderlay');
     const topAvatar = document.getElementById('transTopAvatar');

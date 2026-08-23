@@ -25,17 +25,6 @@ let currentWalletBalance = 0;
 let guestbookData = {};
 window.guestbookData = guestbookData;
 
-const NPC_AVATAR_POOL = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200',
-  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200',
-  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200',
-  'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=200'
-];
-
 const SUB_CATEGORIES = {
   'all': ['全部推荐', '热门精选', '新人出道', '高光时刻', '连麦互动'],
   '电竞竞技': ['王者荣耀', '原神 / 星铁', '无畏契约', '和平精英', '我的世界'],
@@ -63,7 +52,7 @@ window.getLiveSessionViewers = getLiveSessionViewers;
 function getCurrentUserLiveInfo() {
   const uProfile = window.userProfileData || {};
   const uName = (window.currentUser && window.currentUser.name) || '玩家';
-  const uAvatar = (window.currentUser && window.currentUser.avatar) || document.getElementById('userAvatarBox')?.src || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200';
+  const uAvatar = (window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first');
   const uTag = uProfile.tag || '新人主播';
   const uUID = uProfile.uid || '88291048';
   return {
@@ -92,7 +81,7 @@ function getSenderLiveInfo(sender, type = 'normal') {
   if (foundChar) {
     return {
       name: foundChar.name,
-      avatar: foundChar.avatar || foundChar.cover || NPC_AVATAR_POOL[0],
+      avatar: foundChar.avatar || foundChar.cover || getAvatar((foundChar && (foundChar.name || foundChar.id)) || null, 'first'),
       tag: (foundChar.tags && foundChar.tags[0]) || '特邀嘉宾',
       tagColor: 'bg-purple-500/25 text-purple-200 border-purple-400/40',
       vip: 'VIP 8',
@@ -102,7 +91,7 @@ function getSenderLiveInfo(sender, type = 'normal') {
 
   let hash = 0;
   for (let i = 0; i < strSender.length; i++) hash = (hash * 31 + strSender.charCodeAt(i)) % 100000;
-  const avatar = NPC_AVATAR_POOL[Math.abs(hash) % NPC_AVATAR_POOL.length];
+  const avatar = getAvatar(strSender, 'emoji');
   
   // 随机弹幕观众称号系统：仅约 25% 概率获得随机称号，其余 75% 无称号
   const hasTitle = (Math.abs(hash * 13) % 100) < 25;
@@ -651,7 +640,7 @@ function pushDanmakuToScreen(sender, text, type = 'normal', customInfo = null) {
 
   div.innerHTML = `
     <div class="danmaku-avatar-wrap">
-      <img src="${info.avatar}" class="danmaku-avatar-img" onerror="this.src='https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200'">
+      <img src="${info.avatar}" class="danmaku-avatar-img" onerror="this.src=getAvatar(null,'emoji')">
     </div>
     ${tagHtml}
     <span class="danmaku-sender-name">${escapeHtml(info.name)}:</span>
@@ -1017,7 +1006,7 @@ function showGrandGiftBanner(senderInfo, giftName, count = 1, isComboUpdate = fa
   banner.innerHTML = `
     <div class="flex items-center gap-2 min-w-0">
       <div class="w-8 h-8 rounded-full p-[1.5px] ${borderGrad} flex-shrink-0 shadow">
-        <img src="${senderInfo.avatar}" class="w-full h-full rounded-full object-cover border border-white/80" onerror="this.src='https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200'">
+        <img src="${senderInfo.avatar}" class="w-full h-full rounded-full object-cover border border-white/80" onerror="this.src=getAvatar(null,'emoji')">
       </div>
       <div class="min-w-0">
         <div class="flex items-center gap-1.5 leading-none">
@@ -1495,8 +1484,8 @@ async function syncLiveSessions(options = {}) {
       const newSession = await api.db.create("live_sessions", {
         characterId: c.id,
         name: c.name,
-        avatar: c.avatar || NPC_AVATAR_POOL[0],
-        cover: c.cover || c.avatar || NPC_AVATAR_POOL[0],
+        avatar: c.avatar || getAvatar((c && (c.name || c.id)) || null, 'first'),
+        cover: c.cover || c.avatar || getAvatar((c && (c.name || c.id)) || null, 'first'),
         category: cat,
         subTag: subTag,
         topic: `【${c.name}】的${subTag}直播`,

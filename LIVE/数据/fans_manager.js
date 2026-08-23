@@ -114,7 +114,7 @@
         list.push({
           id: id,
           name: c.name || '主播',
-          avatar: c.avatar || c.cover || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+          avatar: c.avatar || c.cover || getAvatar((c && (c.name || c.id)) || null, 'first'),
           tag: (c.tags && c.tags[0]) || c.tag || c.category || '人气主播',
           category: c.category || '随性杂谈',
           fans: fans,
@@ -125,7 +125,7 @@
 
       // 加入玩家 User
       const uName = (window.currentUser && window.currentUser.name) || '玩家';
-      const uAvatar = (window.currentUser && window.currentUser.avatar) || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200';
+      const uAvatar = (window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first');
       const uProfile = window.userProfileData || {};
       const uFans = this.getFans('user');
 

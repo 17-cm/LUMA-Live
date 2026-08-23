@@ -279,7 +279,7 @@
     banner.innerHTML = `
       <div class="flex items-center gap-2 min-w-0">
         <div class="w-8 h-8 rounded-full p-[1.5px] bg-gradient-to-tr from-amber-400 via-rose-500 to-purple-600 flex-shrink-0 shadow">
-          <img src="${senderInfo.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200'}" class="w-full h-full rounded-full object-cover border border-white/80" onerror="this.src='https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200'">
+          <img src="${senderInfo.avatar || getAvatar((senderInfo && senderInfo.name) || null, 'first')}" class="w-full h-full rounded-full object-cover border border-white/80" onerror="this.src=getAvatar(null,'emoji')">
         </div>
         <div class="min-w-0">
           <div class="flex items-center gap-1.5 leading-none">
