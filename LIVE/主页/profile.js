@@ -371,6 +371,7 @@ async function refreshHostBalanceDisplay() {
  * - 图标：全部线性 SVG，无 emoji
  * - 眼睛：灰色，无外圈
  * - 流水：无"全部"按钮，用真实 transactionLedger 数据
+ * - 提现弹窗：复用全局 center-modal-backdrop，居中缩放弹出，和充值弹窗一致
  */
 function renderWalletUI() {
   const container = document.getElementById('walletPageView');
@@ -518,49 +519,9 @@ function renderWalletUI() {
       .wl-empty-icon svg { width: 24px; height: 24px; stroke: #c8ccd4; stroke-width: 1.5; fill: none; }
       .wl-empty-text { font-size: 13px; font-weight: 600; color: #8b909b; }
       .wl-empty-sub { font-size: 11px; color: #c0c4cc; margin-top: 4px; }
-      /* ── 提现弹窗（底部 sheet）── */
-      .wl-modal-mask {
-        position: fixed; inset: 0; background: rgba(26,29,35,.45);
-        z-index: 200; display: flex; align-items: flex-end; justify-content: center;
-        backdrop-filter: blur(6px);
-      }
-      .wl-modal {
-        width: 100%; max-width: 420px;
-        background: #fff; border-radius: 22px 22px 0 0;
-        padding: 10px 18px 36px;
-        animation: wlSlideUp .3s cubic-bezier(.16,1,.3,1);
-      }
-      @keyframes wlSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-      .wl-modal-handle { width: 34px; height: 4px; border-radius: 2px; background: #e0e2e8; margin: 0 auto 16px; }
-      .wl-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-      .wl-modal-title { font-size: 15px; font-weight: 700; color: #1a1d23; }
-      .wl-modal-sub { font-size: 10px; color: #8b909b; margin-top: 2px; font-weight: 500; }
-      .wl-modal-close { width: 28px; height: 28px; border-radius: 50%; background: #f3f4f7; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid #e8eaef; }
-      .wl-modal-close svg { width: 13px; height: 13px; stroke: #8b909b; stroke-width: 2.2; fill: none; }
-      .wl-modal-bal-row {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 13px 15px; border-radius: 12px; background: #f6f7f9; margin-bottom: 14px; border: 1px solid #eef0f4;
-      }
-      .wl-modal-bal-label { font-size: 12px; color: #6b7280; font-weight: 600; }
-      .wl-modal-bal-val { font-size: 17px; font-weight: 800; color: #1a1d23; }
-      .wl-modal-input-zone { background: #f6f7f9; border-radius: 14px; padding: 16px; text-align: center; margin-bottom: 14px; border: 1px solid #eef0f4; }
-      .wl-modal-input-lbl { font-size: 10px; font-weight: 500; color: #8b909b; letter-spacing: .5px; }
-      .wl-modal-input-row { display: flex; align-items: baseline; justify-content: center; gap: 3px; margin-top: 8px; }
+      /* ── 提现弹窗输入框（复用全局 center-modal-backdrop / center-modal-card）── */
       .wl-modal-input { width: 140px; font-size: 30px; font-weight: 800; text-align: center; background: none; border: 0; outline: none; color: #1a1d23; letter-spacing: -.02em; }
       .wl-modal-input::placeholder { color: #d0d4dc; font-weight: 500; }
-      .wl-modal-avail { font-size: 10px; color: #8b909b; margin-top: 8px; font-weight: 500; }
-      .wl-modal-avail b { color: #4a4f5a; font-weight: 600; }
-      .wl-modal-rate { text-align: center; font-size: 10px; color: #8b909b; margin-bottom: 14px; padding: 7px; background: rgba(212,185,140,.07); border-radius: 8px; }
-      .wl-modal-rate b { color: #d4a24e; font-weight: 700; }
-      .wl-modal-btn {
-        width: 100%; height: 46px; border-radius: 13px; font-size: 14px; font-weight: 700;
-        border: none; cursor: pointer; transition: transform .15s, opacity .2s;
-        display: flex; align-items: center; justify-content: center;
-      }
-      .wl-modal-btn:active { transform: scale(.98); }
-      .wl-modal-btn.confirm { background: #1a1d23; color: #d4b98c; box-shadow: 0 4px 12px rgba(0,0,0,.15); }
-      .wl-modal-btn:disabled { opacity: .4; }
-      .wl-modal-hint { font-size: 10px; color: #b8bcc6; text-align: center; margin-top: 12px; line-height: 1.7; font-weight: 500; }
     </style>
     <!-- 安全区装饰线 -->
     <div class="wl-safe-line"></div>
@@ -637,33 +598,32 @@ function renderWalletUI() {
       </div>
       <div class="wl-ledger" id="transactionLedgerContainer"></div>
     </div>
-    <!-- ══ 提现弹窗 ══ -->
-    <div id="withdrawModal" class="wl-modal-mask hidden" onclick="if(event.target===this)closeWithdrawModal()">
-      <div class="wl-modal">
-        <div class="wl-modal-handle"></div>
-        <div class="wl-modal-head">
+    <!-- ══ 提现弹窗（复用全局 center-modal-backdrop，居中缩放弹出，和充值弹窗一致）══ -->
+    <div id="withdrawModal" class="hidden center-modal-backdrop" onclick="if(event.target===this)closeWithdrawModal()">
+      <div class="center-modal-card p-5" style="max-width:380px;">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
           <div>
-            <div class="wl-modal-title">提现到余额</div>
-            <div class="wl-modal-sub">LUMA 币兑换宿主余额</div>
+            <div class="text-base font-black text-slate-900">提现到余额</div>
+            <div class="text-[10px] text-slate-400 mt-0.5 font-medium">LUMA 币兑换宿主余额</div>
           </div>
-          <div class="wl-modal-close" onclick="closeWithdrawModal()">
-            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <div class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center cursor-pointer" onclick="closeWithdrawModal()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </div>
         </div>
-        <div class="wl-modal-bal-row">
-          <span class="wl-modal-bal-label">当前 LUMA 币</span>
-          <span class="wl-modal-bal-val" id="withdrawLumaBal">0</span>
+        <div class="flex items-center justify-between bg-slate-50 rounded-xl p-3 mb-3 border border-slate-100">
+          <span class="text-xs text-slate-500 font-semibold">当前 LUMA 币</span>
+          <span class="text-lg font-black text-slate-900" id="withdrawLumaBal">0</span>
         </div>
-        <div class="wl-modal-input-zone">
-          <div class="wl-modal-input-lbl">提现数量</div>
-          <div class="wl-modal-input-row">
+        <div class="bg-slate-50 rounded-xl p-4 text-center mb-3 border border-slate-100">
+          <div class="text-[10px] text-slate-400 font-medium tracking-wide">提现数量</div>
+          <div class="flex items-baseline justify-center gap-1 mt-2">
             <input type="number" class="wl-modal-input" id="withdrawAmountInput" placeholder="0" min="100" step="1">
           </div>
-          <div class="wl-modal-avail">可提现 <b id="withdrawAvail">0 LUMA 币</b> · 最低 100 币</div>
+          <div class="text-[10px] text-slate-400 mt-2 font-medium">可提现 <b id="withdrawAvail" class="text-slate-600 font-semibold">0 LUMA 币</b> · 最低 100 币</div>
         </div>
-        <div class="wl-modal-rate">汇率：10 LUMA 币 = 1 元 · 实际到账 <b id="withdrawPreview">0.00</b> 元</div>
-        <button class="wl-modal-btn confirm" id="withdrawConfirmBtn" onclick="confirmWithdraw()">确认提现</button>
-        <div class="wl-modal-hint">提现将扣除 LUMA 币并增加宿主余额，操作不可撤销<br>预计 2 小时内到账 · 提现免手续费</div>
+        <div class="text-center text-[10px] text-slate-400 mb-4 py-2 bg-amber-50/60 rounded-lg">汇率：10 LUMA 币 = 1 元 · 实际到账 <b id="withdrawPreview" class="text-amber-600 font-bold">0.00</b> 元</div>
+        <button class="w-full h-11 rounded-xl text-sm font-bold bg-slate-900 text-amber-400 border-0 cursor-pointer transition active:scale-95 disabled:opacity-40" id="withdrawConfirmBtn" onclick="confirmWithdraw()">确认提现</button>
+        <div class="text-[10px] text-slate-300 text-center mt-3 leading-relaxed">提现将扣除 LUMA 币并增加宿主余额，操作不可撤销<br>预计 2 小时内到账 · 提现免手续费</div>
       </div>
     </div>
   `;
