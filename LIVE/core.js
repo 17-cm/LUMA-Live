@@ -441,6 +441,8 @@ window.charSchedulesMap = window.charSchedulesMap || {};
 
 // 9 大沙盒核心参数
 window.appParams = window.appParams || {
+  charSpawnRate: 25,
+  baseStopRate: 10,
   maxLiveDuration: 120,
   maxRestDuration: 360,
   minRestDuration: 10,

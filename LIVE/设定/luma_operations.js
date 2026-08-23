@@ -16,47 +16,6 @@ function lumaOpsNotify(title, detail, type = 'info') {
 window.lumaOpsNotify = lumaOpsNotify;
 
 // =========================================================================
-// 【角色意愿值读取】开播/下播意愿由 AI 聊天互动驱动，存于宿主角色状态值
-// 宿主状态值解析器自动提取 AI 输出的 [开播意愿:X][下播意愿:X] 标签
-// 轮询前调用 refreshCharWillingness() 从 readRelations 刷新最新值
-// =========================================================================
-const DEFAULT_START_WILL = 25;  // 未聊天过的角色默认开播意愿
-const DEFAULT_STOP_WILL = 10;   // 未聊天过的角色默认下播意愿
-
-function getCharWill(characterId, type) {
-  const allChars = window.allCharacters || [];
-  const c = allChars.find(x => x.id === characterId);
-  if (c && c.lumaState) {
-    const key = type === 'start' ? '开播意愿' : '下播意愿';
-    if (c.lumaState[key] !== undefined && c.lumaState[key] !== null) {
-      return Math.max(0, Math.min(50, Math.round(c.lumaState[key])));
-    }
-  }
-  return type === 'start' ? DEFAULT_START_WILL : DEFAULT_STOP_WILL;
-}
-
-async function refreshCharWillingness() {
-  try {
-    if (!api.characters?.readRelations) return;
-    const rel = await api.characters.readRelations({});
-    if (rel && rel.characters) {
-      const stateMap = {};
-      rel.characters.forEach(r => {
-        if (r.stateValues && Array.isArray(r.stateValues)) {
-          const sv = {};
-          r.stateValues.forEach(s => { sv[s.name] = s.value; });
-          stateMap[r.id] = sv;
-        }
-      });
-      const allChars = window.allCharacters || [];
-      allChars.forEach(c => { if (stateMap[c.id]) c.lumaState = stateMap[c.id]; });
-    }
-  } catch (e) {
-    console.warn("[LUMA运营组] 刷新角色意愿值失败:", e);
-  }
-}
-
-// =========================================================================
 // 【房管】：直播间开关权限管理 + 审核裁决网关（防多开、防分身、维护模式拦截）
 // 官方运营组（定时器轮询）做概率决策后通知房管，房管审核通过才开关直播间
 // =========================================================================
@@ -71,6 +30,12 @@ const lumaOpsGateway = {
     const character = allChars.find(c => c.id === characterId) || await api.characters.get(characterId).catch(() => null);
     const charName = character?.name || "主播";
     const now = Date.now();
+
+    const params = window.appParams || {};
+    if (params.charSpawnRate === 0) {
+      lumaOpsNotify("开播驳回", `【${charName}】申请开播，全服正处于停机维护中`, "reject");
+      return { success: false, reason: `【LUMA官方运营组通告】抱歉【${charName}】，平台全服正在停机维护升级中，暂不开放推流权限。` };
+    }
 
     let sched = window.charSchedulesMap[characterId];
     if (!sched) {
@@ -139,14 +104,9 @@ const lumaOpsGateway = {
         await api.characters.writeState({
           characterId: characterId,
           stateValues: [
-            { name: "状态", value: `${charName}直播中` },
-            { name: "开播意愿", value: 0 }
+            { name: "状态", value: `${charName}直播中` }
           ]
         });
-        // 同步本地缓存
-        const allChars = window.allCharacters || [];
-        const c = allChars.find(x => x.id === characterId);
-        if (c) { if (!c.lumaState) c.lumaState = {}; c.lumaState['开播意愿'] = 0; }
       }
     } catch (err) {}
 
@@ -197,14 +157,9 @@ const lumaOpsGateway = {
         await api.characters.writeState({
           characterId: characterId,
           stateValues: [
-            { name: "状态", value: `${charName}已下播` },
-            { name: "下播意愿", value: 0 }
+            { name: "状态", value: `${charName}已下播` }
           ]
         });
-        // 同步本地缓存
-        const allChars = window.allCharacters || [];
-        const c = allChars.find(x => x.id === characterId);
-        if (c) { if (!c.lumaState) c.lumaState = {}; c.lumaState['下播意愿'] = 0; }
       }
     } catch (err) {}
 
@@ -312,14 +267,13 @@ async function syncLiveSessions(options = {}) {
 
   const now = Date.now();
   const params = window.appParams || {};
+  const baseSpawnRate = params.charSpawnRate !== undefined ? params.charSpawnRate : 25;
+  const baseStopRate = params.baseStopRate !== undefined ? params.baseStopRate : 10;
   const maxLiveMins = params.maxLiveDuration || 120;
   const maxRestMins = params.maxRestDuration || 360;
   const minRestMins = params.minRestDuration || 10;
   const allChars = window.allCharacters || [];
   if (!window.charSchedulesMap) window.charSchedulesMap = {};
-
-  // 轮询前刷新角色意愿值（AI 聊天互动驱动的开播/下播意愿）
-  await refreshCharWillingness();
 
   // ── 轮次计数：持久化 + 每天0点重置 ──
   const today = new Date().toDateString();
@@ -431,7 +385,7 @@ async function syncLiveSessions(options = {}) {
   const cycleLog = {
     time: new Date().toLocaleTimeString(),
     cycle: cycle,
-    params: { maxLiveMins, maxRestMins, minRestMins, willSource: 'AI聊天驱动' },
+    params: { baseSpawnRate, baseStopRate, maxLiveMins, maxRestMins, minRestMins },
     decisions: [],
     summary: { totalChars: allChars.length, streaming: sessions.length, started: 0, stopped: 0, evaluated: toEvaluate.length }
   };
@@ -441,17 +395,16 @@ async function syncLiveSessions(options = {}) {
     if (item.type === 'stop') {
       const liveMins = Math.round(item.liveMins);
       const isUrgent = liveMins >= maxLiveMins;
-      const baseStopWill = getCharWill(item.charId, 'stop');
       let stopWill, reason;
       if (isUrgent) { stopWill = 100; reason = '达到上限必然下播'; }
-      else { stopWill = Math.round(baseStopWill + (liveMins / maxLiveMins) * 50); reason = '安全区比例增长'; }
+      else { stopWill = Math.round(baseStopRate + (liveMins / maxLiveMins) * 50); reason = '安全区比例增长'; }
 
       const dice = Math.round(Math.random() * 100);
       const willStop = dice < stopWill;
 
       cycleLog.decisions.push({
         char: item.charName, state: '直播中',
-        liveMins: liveMins, baseWill: baseStopWill, stopWill: stopWill, dice: dice, reason: reason,
+        liveMins: liveMins, stopWill: stopWill, dice: dice, reason: reason,
         result: willStop ? '下播' : '继续播'
       });
 
@@ -468,17 +421,16 @@ async function syncLiveSessions(options = {}) {
     } else {
       const restMins = Math.round(item.restMins);
       const isUrgent = restMins >= maxRestMins;
-      const baseStartWill = getCharWill(item.charId, 'start');
       let spawnWill, reason;
       if (isUrgent) { spawnWill = 100; reason = '达到上限必然开播'; }
-      else { spawnWill = Math.round(baseStartWill + (restMins / maxRestMins) * 50); reason = '安全区比例增长'; }
+      else { spawnWill = Math.round(baseSpawnRate + (restMins / maxRestMins) * 50); reason = '安全区比例增长'; }
 
       const dice = Math.round(Math.random() * 100);
       const willSpawn = dice < spawnWill;
 
       cycleLog.decisions.push({
         char: item.charName, state: '休息中',
-        restMins: restMins, baseWill: baseStartWill, spawnWill: spawnWill, dice: dice, reason: reason,
+        restMins: restMins, spawnWill: spawnWill, dice: dice, reason: reason,
         result: willSpawn ? '开播' : '不播'
       });
 
