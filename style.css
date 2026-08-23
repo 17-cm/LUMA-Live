@@ -1331,10 +1331,8 @@ input:checked + .switch-slider:before {
   display: block;
 }
 .profile-cover-mask {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.08) 100%);
-  pointer-events: none;
+  /* 遮罩层已移除：整体纯白无缝，封面图显示原图，不再叠加阴影渐变 */
+  display: none;
 }
 
 /* 封面右下角更换封面相机按钮（朋友圈样式） */
