@@ -1038,36 +1038,23 @@ async function checkGitRepoUpdate(silent = false) {
       // manifest 读取失败不影响更新检测，commit 才是关键
     }
 
-    // ── 判断是否有更新（优先级：commit SHA > commit 时间 > 版本号）──
-    let updateReason = null;
+    // ── 判断是否有更新：只看 commit SHA ──
+    // 简单逻辑：SHA 不同 = 有更新（绿），相同 = 常态（红）
 
-    // 标准化 localCommit：去掉分支后缀，只保留短 SHA
     const localSha = gitUpdateState.localCommit
       ? gitUpdateState.localCommit.replace(/\s*\(.*\)$/, '').trim()
       : null;
 
-    // 1. Commit SHA 不同 → 肯定有新代码
     if (remoteCommit && localSha && remoteCommit !== localSha) {
-      updateReason = 'commit';
+      // SHA 不同 → 有新代码
+      gitUpdateState.hasUpdate = true;
+    } else if (remoteCommit && !localSha) {
+      // 首次检测，无本地记录
+      gitUpdateState.hasUpdate = true;
+    } else {
+      // SHA 相同或无法判断 → 无更新
+      gitUpdateState.hasUpdate = false;
     }
-    // 2. 首次检测或本地无 commit 记录 → 需要更新
-    else if (remoteCommit && !localSha) {
-      updateReason = 'first';
-    }
-    // 3. commit 时间比上次检测时间新 → 有 push
-    else if (remoteCommitTime && gitUpdateState.lastCheckTime) {
-      const lastCheck = new Date(gitUpdateState.lastCheckTime).getTime();
-      const commitTime = new Date(remoteCommitTime).getTime();
-      if (commitTime > lastCheck) {
-        updateReason = 'time';
-      }
-    }
-    // 4. 兜底：版本号不同（只有手动改了版本号才触发）
-    else if (remoteVer && gitUpdateState.currentVersion && remoteVer.trim() !== gitUpdateState.currentVersion) {
-      updateReason = 'version';
-    }
-
-    gitUpdateState.hasUpdate = !!updateReason;
 
     if (remoteCommit) {
       gitUpdateState.remoteCommit = `${remoteCommit} (${branch})`;
