@@ -11,6 +11,31 @@ var api = window.api || {};
 
 // 1. 基础预置帖子数据
 window.weiboPosts = window.weiboPosts || [
+  // ⚠️ 样板帖子（临时展示用，确认框架后删除）
+  {
+    id: 'post_sample_framework',
+    author: {
+      name: '希尔维娅的超话前线',
+      avatar: '',
+      badge: '独家爆料',
+      verified: true
+    },
+    time: '刚刚',
+    tag: '#希尔维娅直播间空间错位#',
+    mention: '@希尔维娅',
+    linkText: '网页链接 🔗',
+    clipText: '直播间切片',
+    content: '希尔维娅在直播国风宅舞时，因实验室通风系统异常导致重心偏移，她下意识动用S级空间异能修正姿态，结果导致直播间全息投影瞬间发生折叠，背景中的实验架直接被"折叠"到了天花板上。面对满屏惊叹，教授冷静地关掉舞蹈伴奏，对着镜头开始分析此次空间介质紊乱的力学原理，直播画风从"才艺秀"瞬间秒变"空间物理公开课"。',
+    image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800',
+    stats: {
+      reposts: 814,
+      comments: 4,
+      likes: 3066,
+      isLiked: false,
+      isDownloaded: false
+    },
+    commentTree: []
+  },
   {
     id: 'post_1',
     author: {
