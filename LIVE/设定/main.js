@@ -300,8 +300,8 @@ function renderOpsLog() {
     const s = cycle.summary;
     return `<div class="bg-slate-50 rounded-xl p-2.5">
       <div class="flex justify-between items-center mb-1.5">
-        <span class="font-bold text-slate-700">第${log.length - idx}轮 ${cycle.time}</span>
-        <span class="text-[10px] text-slate-500">在播${s.streaming} 开播${s.started} 下播${s.stopped}</span>
+        <span class="font-bold text-slate-700">第${cycle.cycle || (log.length - idx)}轮 ${cycle.time}</span>
+        <span class="text-[10px] text-slate-500">在播${s.streaming} 开播${s.started} 下播${s.stopped} 冷却跳过${s.cooldownSkip || 0}</span>
       </div>
       <div class="text-[9px] text-slate-400 mb-1.5">参数: 开播${p.baseSpawnRate}% 下播${p.baseStopRate}% 直播上限${p.maxLiveMins}分 休息上限${p.maxRestMins}分</div>
       <div class="space-y-0.5">${decisions}</div>
