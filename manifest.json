@@ -11,6 +11,7 @@
     "app.data.read",
     "app.data.write",
     "characters.read",
+    "characters.relations.read",
     "characters.state.write",
     "user.profile.read",
     "ai.generate",

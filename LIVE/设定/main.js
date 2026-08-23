@@ -1237,6 +1237,17 @@ async function lumaInitApp() {
       const chars = await api.characters.list();
       if (chars && chars.length > 0) {
         window.allCharacters = chars;
+        // characters.list() 不含 tags，需通过 readRelations() 补充赛道标签
+        try {
+          const rel = await api.characters.readRelations({});
+          if (rel && rel.characters) {
+            const tagMap = {};
+            rel.characters.forEach(r => { tagMap[r.id] = r.tags || []; });
+            window.allCharacters.forEach(c => { if (tagMap[c.id]) c.tags = tagMap[c.id]; });
+          }
+        } catch (e2) {
+          console.warn("读取角色赛道标签异常:", e2);
+        }
       }
     } catch (e) {
       console.warn("读取角色列表异常:", e);
