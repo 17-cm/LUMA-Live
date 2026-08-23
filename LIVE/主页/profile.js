@@ -363,10 +363,14 @@ function openWalletPageView() {
     const page = document.getElementById('walletPageView');
     if (page) page.classList.remove('hidden');
   }
+  // ── 安全区定位线（调试用，确认 safe-top / safe-bottom 实际位置）──
+  showSafeAreaGuides('walletPageView');
 }
 window.openWalletPageView = openWalletPageView;
 
 function closeWalletPageView() {
+  // 关闭时清除定位线
+  hideSafeAreaGuides();
   if (window.PageStack) {
     window.PageStack.back();
   } else {
@@ -554,3 +558,59 @@ if (window.PageStack) {
     animationType: 'slide-right',
   });
 }
+
+
+// =========================================================================
+// 安全区定位线（调试工具）
+// =========================================================================
+function showSafeAreaGuides(containerId) {
+  hideSafeAreaGuides();
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const style = getComputedStyle(document.documentElement);
+  const safeTop = style.getPropertyValue('--ai-phone-app-safe-top').trim() || '88px';
+  const safeBottom = style.getPropertyValue('--ai-phone-app-safe-bottom').trim() || '24px';
+
+  // 顶部安全区线（水平黑线 + 标签）
+  const topLine = document.createElement('div');
+  topLine.id = '__safe_guide_top';
+  topLine.style.cssText = `position:absolute;top:${safeTop};left:0;right:0;height:1px;background:#000;z-index:9999;pointer-events:none`;
+  const topLabel = document.createElement('span');
+  topLabel.style.cssText = `position:absolute;top:calc(${safeTop} - 14px);right:8px;font-size:9px;color:#000;background:rgba(255,255,0,0.85);padding:1px 4px;border-radius:2px;font-family:monospace;white-space:nowrap;z-index:9999;pointer-events:none`;
+  topLabel.textContent = `safe-top: ${safeTop}`;
+
+  // 底部安全区线（水平黑线 + 标签）
+  const bottomLine = document.createElement('div');
+  bottomLine.id = '__safe_guide_bottom';
+  bottomLine.style.cssText = `position:absolute;bottom:${safeBottom};left:0;right:0;height:1px;background:#000;z-index:9999;pointer-events:none`;
+  const bottomLabel = document.createElement('span');
+  bottomLabel.style.cssText = `position:absolute;bottom:calc(${safeBottom} - 14px);right:8px;font-size:9px;color:#000;background:rgba(255,255,0,0.85);padding:1px 4px;border-radius:2px;font-family:monospace;white-space:nowrap;z-index:9999;pointer-events:none`;
+  bottomLabel.textContent = `safe-bottom: ${safeBottom}`;
+
+  // 容器需要 relative 定位才能让 absolute 生效
+  if (getComputedStyle(container).position === 'static') {
+    container.style.position = 'relative';
+    container.dataset.__safeOldPos = 'static';
+  }
+
+  container.appendChild(topLine);
+  container.appendChild(topLabel);
+  container.appendChild(bottomLine);
+  container.appendChild(bottomLabel);
+
+  console.log(`[SafeArea] safe-top=${safeTop}, safe-bottom=${safeBottom}`);
+}
+
+function hideSafeAreaGuides() {
+  document.querySelectorAll('[id^="__safe_guide_"]').forEach(el => el.remove());
+  document.querySelectorAll('span').forEach(s => {
+    if (s.textContent?.includes('safe-top:') || s.textContent?.includes('safe-bottom:')) s.remove();
+  });
+  document.querySelectorAll('[data-__safe-old-pos]').forEach(el => {
+    el.style.position = '';
+    delete el.dataset.__safeOldPos;
+  });
+}
+window.showSafeAreaGuides = showSafeAreaGuides;
+window.hideSafeAreaGuides = hideSafeAreaGuides;
