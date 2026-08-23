@@ -44,7 +44,7 @@ window.weiboPosts = window.weiboPosts || [
       badge: '独家狗仔',
       verified: true
     },
-    time: `10分钟前 · 来自 ${window.getFloatClientTag(true)}`,
+    time: '10分钟前',
     tag: '#主播连麦当场破防#',
     mention: '@苏小喵',
     linkText: '网页链接 🔗 直播间回放',
@@ -91,7 +91,7 @@ window.weiboPosts = window.weiboPosts || [
       badge: '赛事解说',
       verified: true
     },
-    time: `25分钟前 · 来自 ${window.getFloatClientTag(false)}`,
+    time: '25分钟前',
     tag: '#神秘神豪空降直播间#',
     mention: '@星奈',
     linkText: '网页链接 🔗 榜单战报',
