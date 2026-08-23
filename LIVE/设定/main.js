@@ -167,8 +167,10 @@ function syncParamDisplays() {
   const pollVal = p.opsPollInterval || 3;
   const pollInput = document.getElementById('paramOpsPollInterval');
   const pollText = document.getElementById('valOpsPollInterval');
+  const pollTag = document.getElementById('tagOpsPollInterval');
   if (pollInput) pollInput.value = pollVal;
   if (pollText) pollText.textContent = `${pollVal} 分钟`;
+  if (pollTag) pollTag.textContent = `${pollVal} 分钟`;
 
   const fxSwitch = document.getElementById('paramGiftFullScreenEffect');
   if (fxSwitch) {
@@ -218,6 +220,8 @@ function updateOpsPollIntervalDisplay(value) {
   const minutes = Number(value) || 3;
   const valEl = document.getElementById('valOpsPollInterval');
   if (valEl) valEl.textContent = `${minutes} 分钟`;
+  const tagEl = document.getElementById('tagOpsPollInterval');
+  if (tagEl) tagEl.textContent = `${minutes} 分钟`;
   if (!window.appParams) window.appParams = {};
   window.appParams.opsPollInterval = minutes;
 }
@@ -288,12 +292,13 @@ function renderOpsLog() {
     const p = cycle.params;
     const decisions = (cycle.decisions || []).map(d => {
       const willColor = d.result === '开播' || d.result === '下播' ? 'text-rose-600' : d.result === '跳过' ? 'text-slate-400' : 'text-slate-500';
+      const pickBadge = d.pickType ? `<span class="text-[8px] text-purple-500 bg-purple-50 px-1 rounded">${d.pickType}</span>` : '';
       const detail = d.state === '直播中'
         ? `已播${d.liveMins}分 下播意愿${d.stopWill}% 骰${d.dice}`
         : `休息${d.restMins}分 开播意愿${d.spawnWill}% 骰${d.dice}`;
-      return `<div class="flex justify-between py-0.5 border-b border-slate-50">
-        <span class="text-slate-600">${d.char}</span>
-        <span class="text-slate-400">${detail}</span>
+      return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50 gap-1">
+        <span class="text-slate-600 flex items-center gap-1">${pickBadge}${d.char}</span>
+        <span class="text-slate-400 text-[10px]">${detail}</span>
         <span class="${willColor} font-bold">${d.result}</span>
       </div>`;
     }).join('');
@@ -301,7 +306,7 @@ function renderOpsLog() {
     return `<div class="bg-slate-50 rounded-xl p-2.5">
       <div class="flex justify-between items-center mb-1.5">
         <span class="font-bold text-slate-700">第${cycle.cycle || (log.length - idx)}轮 ${cycle.time}</span>
-        <span class="text-[10px] text-slate-500">在播${s.streaming} 开播${s.started} 下播${s.stopped} 冷却跳过${s.cooldownSkip || 0}</span>
+        <span class="text-[10px] text-slate-500">在播${s.streaming} 评估${s.evaluated || 0}人 开播${s.started} 下播${s.stopped}</span>
       </div>
       <div class="text-[9px] text-slate-400 mb-1.5">参数: 开播${p.baseSpawnRate}% 下播${p.baseStopRate}% 直播上限${p.maxLiveMins}分 休息上限${p.maxRestMins}分</div>
       <div class="space-y-0.5">${decisions}</div>
