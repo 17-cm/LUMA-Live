@@ -2383,15 +2383,17 @@ input:checked + .switch-slider:before {
 /* 分类chip边框 */
 #communityTrendsView .cat-chip{
   border:1px solid #E8E8E8 !important;
-  background:#FAFAFA !important;
+  background:#FFFFFF !important;
 }
 #communityTrendsView .cat-chip.on{
-  background:#1A1A2E !important;
-  border-color:#1A1A2E !important;
+  background:transparent !important;
+  border:1px solid #1A1A2E !important;
+  color:#1A1A2E !important;
 }
 /* 分类横滑上移衔接 */
 #communityTrendsView .cat-rail{
   top:calc(var(--safe-top) + 66px) !important;
+  background:#FFFFFF !important;
 }
 /* flow 占满剩余空间 */
 #communityTrendsView #flow{
