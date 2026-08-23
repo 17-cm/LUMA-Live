@@ -1213,8 +1213,12 @@ function getLocalFileContent(localFiles, filePath) {
 async function handleVersionUpdateClick() {
   const repo = (gitUpdateState.repoUrl || DEFAULT_GIT_REPO).trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
   const branch = (gitUpdateState.branch || DEFAULT_GIT_BRANCH).trim();
-  if (gitUpdateState.hasUpdate) {
-    // 直接显示启动画面，在画面上展示下载进度
+
+  // 不再依赖 hasUpdate 状态判断，直接尝试更新
+  // 增量对比会自动判断是否有文件需要下载，没有就提示最新版
+  console.log(`[LUMA Update] 🔄 用户点击更新，开始检查...`);
+
+  // 直接显示启动画面，在画面上展示下载进度
     if (typeof window.showSplashForUpdate === 'function') window.showSplashForUpdate();
 
     try {
@@ -1224,18 +1228,18 @@ async function handleVersionUpdateClick() {
       localHotpatch = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
     } catch (e) {}
     const localFiles = localHotpatch ? localHotpatch.files : null;
-    
+
     // 2. 获取远程文件树（包含每个文件的 git SHA）
     const remoteFileTree = await fetchRepoFileTree(repo, branch);
-    
+
     // 3. 对比本地和远程的文件 hash，确定需要下载的文件
     const filesToDownload = [];
     const unchangedFiles = {};
-    
+
     for (const filePath of HOTPATCH_FILES) {
       const remoteHash = remoteFileTree ? remoteFileTree[filePath] : null;
       const localHash = getLocalFileHash(localFiles, filePath);
-      
+
       if (remoteHash && localHash && remoteHash === localHash) {
         // 文件没变化，从本地复制
         const localContent = getLocalFileContent(localFiles, filePath);
@@ -1244,12 +1248,22 @@ async function handleVersionUpdateClick() {
           continue;
         }
       }
-      
+
       // 文件变化了或本地没有，需要下载
       filesToDownload.push(filePath);
     }
-    
+
     console.log(`[LUMA Update] 📊 增量更新：共 ${HOTPATCH_FILES.length} 个文件，${filesToDownload.length} 个需要下载，${Object.keys(unchangedFiles).length} 个复用本地`);
+
+    // 3.5 如果没有需要下载的文件，直接提示最新版并退出
+    if (filesToDownload.length === 0) {
+      if (typeof window.exitSplashScreen === 'function') window.exitSplashScreen();
+      if (api.ui?.toast) api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion || gitUpdateState.localCommit || '未知'})`);
+      // 确保按钮状态正确
+      gitUpdateState.hasUpdate = false;
+      renderGitUpdateButton();
+      return;
+    }
 
     // 4. 下载变化的文件（在启动画面上展示进度）
     const downloadedFiles = {};
@@ -1364,9 +1378,6 @@ async function handleVersionUpdateClick() {
       if (typeof window.exitSplashScreen === 'function') window.exitSplashScreen();
       if (api.ui?.toast) api.ui.toast(`更新失败：${err?.message || '网络异常'}`);
     }
-  } else {
-    if (api.ui?.toast) api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
-  }
 }
 window.handleVersionUpdateClick = handleVersionUpdateClick;
 
