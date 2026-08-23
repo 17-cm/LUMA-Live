@@ -10,9 +10,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Playfair+Display:ital,wght@1,600;1,800&family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="style.css">
-  <!-- 独立启动页模块 (Plan A) -->
+  <!-- splash.js 必须在 head 中阻塞加载：第一帧即创建开屏遮罩，杜绝启动时闪现主页内容 -->
   <script src="LIVE/splash.js"></script>
-  <script src="LIVE/设定/page_stack.js"></script>
 </head>
 <body class="h-screen w-screen flex flex-col relative select-none">
 
@@ -228,7 +227,7 @@
               <div class="new-key-text">
                 <span class="new-key-name">官方论坛</span>
                 <svg class="new-key-hook" viewBox="0 0 80 14"><path d="M 2 8 C 20 2 50 2 72 8 C 78 11 74 14 70 12"/></svg>
-                <span class="new-key-sub">版本更新 · 反馈信箱</span>
+                <span class="new-key-sub">反馈信箱</span>
               </div>
               <div class="new-key-arrow"><span>›</span></div>
             </div>
@@ -707,11 +706,6 @@
 
         <button onclick="openResetConfirmModal()" class="luxe-card w-full py-3.5 text-center text-xs font-black text-rose-600 border-rose-200/60 active:bg-rose-50 transition">
           清除缓存
-        </button>
-
-        <button id="btnVersionUpdateCard" onclick="handleVersionUpdateClick()" class="luxe-card relative w-full py-3.5 text-center text-xs font-black text-rose-600 border-rose-200/60 active:bg-rose-50 transition">
-          <span id="versionUpdateBtnText">版本更新</span>
-          <span id="versionUpdateBadge" class="absolute right-3 bottom-1.5 text-[9px] font-mono text-rose-400 font-normal"></span>
         </button>
 
         <!-- 隐藏的文件导入控件 -->
@@ -1826,17 +1820,23 @@
   </div>
 
 
-  <!-- 模块化脚本引用 -->
+  <!-- ===================================================================
+       应用脚本加载顺序（严格按依赖链排列，均为静态标签一次性加载）
+       1. 基础类与预设 → 2. 核心引擎 → 3. 数据层 → 4. 业务模块 → 5. 主入口
+       =================================================================== -->
+  <!-- 1. 基础类与预设 -->
+  <script src="LIVE/设定/page_stack.js"></script>
   <script src="LIVE/设定/app_presets.js"></script>
+  <!-- 2. 核心引擎 -->
   <script src="LIVE/core.js"></script>
-  <!-- 统一数据中心体系 -->
+  <!-- 3. 数据层 -->
   <script src="LIVE/数据/data_hub.js"></script>
   <script src="LIVE/数据/fans_manager.js"></script>
   <script src="LIVE/数据/guard_manager.js"></script>
   <script src="LIVE/数据/checkin_manager.js"></script>
   <script src="LIVE/数据/titles_manager.js"></script>
   <script src="LIVE/主页/profile.js"></script>
-  <!-- 社区 7 模块化架构系统 -->
+  <!-- 4. 业务模块（社区/直播/主播页） -->
   <script src="LIVE/社区/community_store.js"></script>
   <script src="LIVE/社区/module_trends.js"></script>
   <script src="LIVE/社区/module_supertopic.js"></script>
@@ -1848,8 +1848,8 @@
   <script src="LIVE/直播/room_loading.js"></script>
   <script src="LIVE/直播/live.js"></script>
   <script src="LIVE/主页/streamer_profile.js"></script>
+  <!-- 5. 主入口（初始化生命周期）与礼物系统 -->
   <script src="LIVE/设定/main.js"></script>
-  <script src="LIVE/设定/patch.js"></script>
   <script src="LIVE/设定/gift_system.js"></script>
 </body>
 </html>
