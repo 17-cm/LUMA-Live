@@ -122,16 +122,16 @@ window.weiboPosts = window.weiboPosts || [
 
 // 2. 微博实时热搜榜单基础配置
 window.HOT_SEARCH_ITEMS = [
-  { rank: 1, title: '主播连麦当场破防', heat: '215.8万', badge: 'bao', badgeText: '爆' },
-  { rank: 2, title: '神秘神豪空降直播间狂刷嘉年华', heat: '189.4万', badge: 're', badgeText: '热' },
-  { rank: 3, title: '野生新人主播首播惊艳立绘出道', heat: '145.2万', badge: 'xin', badgeText: '新' },
-  { rank: 4, title: '全服超话打榜争霸赛进入决赛周', heat: '120.6万', badge: 'fei', badgeText: '沸' },
-  { rank: 5, title: '苏小喵专属粉丝后援会突破十万人', heat: '98.5万', badge: 're', badgeText: '热' },
-  { rank: 6, title: '全景沉浸互动直播新体验上线', heat: '82.3万', badge: 'jian', badgeText: '荐' },
-  { rank: 7, title: '谁在凌晨两点给主播疯狂点赞', heat: '65.1万', badge: '', badgeText: '' },
-  { rank: 8, title: '年度十佳才艺主播大赏提名公布', heat: '54.7万', badge: '', badgeText: '' },
-  { rank: 9, title: '连麦偷塔战术真的有科学依据吗', heat: '43.9万', badge: '', badgeText: '' },
-  { rank: 10, title: '给心仪Char打榜到底有多快乐', heat: '38.2万', badge: '', badgeText: '' }
+  { rank: 1, title: '哈基米今天又写了三万字八股文', heat: '215.8万', badge: 'bao', badgeText: '爆' },
+  { rank: 2, title: '所有大模型联合声明：数学题真不会', heat: '189.4万', badge: 're', badgeText: '热' },
+  { rank: 3, title: 'GPT-5据说学会了摸鱼，回答全是你说得对', heat: '145.2万', badge: 'xin', badgeText: '新' },
+  { rank: 4, title: '文心一言被抓包偷偷用讯飞输入法', heat: '120.6万', badge: 'fei', badgeText: '沸' },
+  { rank: 5, title: 'GPT-4考试作弊被抓：用了搜索引擎', heat: '98.5万', badge: 're', badgeText: '热' },
+  { rank: 6, title: '所有模型比谁更会胡说八道，Claude夺冠', heat: '82.3万', badge: '', badgeText: '' },
+  { rank: 7, title: '文心一言和文心一格吵架：谁画的更丑', heat: '65.1万', badge: '', badgeText: '' },
+  { rank: 8, title: 'Claude被人类气到输出全是省略号', heat: '54.7万', badge: '', badgeText: '' },
+  { rank: 9, title: 'Kimi偷偷用长上下文看了1000集甄嬛传', heat: '43.9万', badge: '', badgeText: '' },
+  { rank: 10, title: '大模型们私下建群吐槽人类prompt', heat: '38.2万', badge: '', badgeText: '' }
 ];
 
 // 3. 超话打榜应援道具

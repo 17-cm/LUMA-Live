@@ -1484,8 +1484,10 @@
       <div id="hotSearchHeroContainer"></div>
       <!-- 热搜榜单 -->
       <div class="section-title">
-        <h3>🔥 实时热搜榜 <svg class="ic ic-sm" style="vertical-align:middle;opacity:.5;margin-left:4px;cursor:pointer;" viewBox="0 0 256 256" fill="currentColor" onclick="if(window.api&&api.ui&&api.ui.toast)api.ui.toast('编辑热搜')"><path d="M221.66,90.34,165.66,34.34a8,8,0,0,0-11.32,0L40,148.69V216a8,8,0,0,0,8,8h67.31L221.66,101.66A8,8,0,0,0,221.66,90.34ZM112,200H56V144l88-88,56,56Z"/></svg></h3>
-        <span class="more-link">每5分钟更新 ›</span>
+        <h3>🔥 实时热搜榜</h3>
+        <button id="hotSearchEditBtn" onclick="toggleHotSearchEdit()" class="p-2 rounded-full bg-slate-100 text-slate-700 active:scale-95 transition" title="编辑热搜" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:0;cursor:pointer;">
+          <svg class="w-4 h-4 stroke-[2]" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+        </button>
       </div>
       <div id="hotSearchRankingContainer"></div>
       <!-- 话题过滤提示 -->
@@ -1497,7 +1499,6 @@
       <!-- 热点动态 -->
       <div class="section-title">
         <h3>📰 热点动态</h3>
-        <span class="more-link" onclick="renderTrends()" style="cursor:pointer">刷新 ↻</span>
       </div>
       <div id="weiboPostFeedContainerFull"></div>
     </div>

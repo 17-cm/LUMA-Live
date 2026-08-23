@@ -23,6 +23,9 @@ function switchHotTrendTab(tabType) {
 window.switchHotTrendTab = switchHotTrendTab;
 
 // 渲染热搜 TOP 榜（样板结构：.hero-hot 大图 + .hot-list）
+// 热搜编辑模式状态
+let hotSearchEditMode = false;
+
 function renderHotSearchRanking() {
   const heroBox = document.getElementById('hotSearchHeroContainer');
   const listBox = document.getElementById('hotSearchRankingContainer');
@@ -32,7 +35,7 @@ function renderHotSearchRanking() {
   // 置顶焦点热搜（大图）
   if (heroBox) {
     heroBox.innerHTML = '\
-      <div class="hero-hot" data-old-onclick="removed(\'#主播连麦当场破防#\')">\
+      <div class="hero-hot" style="cursor:default;">\
         <img src="https://images.unsplash.com/photo-1598550476439-6847785fcea6?w=800&q=80" alt="">\
         <div class="scrim"></div>\
         <div class="content">\
@@ -51,18 +54,64 @@ function renderHotSearchRanking() {
     items.map((item, idx) => {
       const rankClass = idx === 0 ? 'r1' : idx === 1 ? 'r2' : idx === 2 ? 'r3' : 'rn';
       const badgeHtml = item.badge ? '<span class="hot-badge ' + item.badge + '">' + item.badgeText + '</span>' : '';
+      // 编辑模式下标题变成可编辑input
+      const titleHtml = hotSearchEditMode
+        ? '<input class="hot-edit-input" data-idx="' + idx + '" value="' + item.title.replace(/"/g, '&quot;') + '" style="width:100%;border:1px solid #3B82F6;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:600;background:#EFF6FF;outline:none;">'
+        : '<span>' + item.title + '</span> ' + badgeHtml;
       return '\
-      <div class="hot-item" data-old-onclick="removed(\'#' + item.title + '#\')">\
+      <div class="hot-item" style="cursor:default;">\
         <span class="hot-rank ' + rankClass + '">' + item.rank + '</span>\
         <div class="hot-info">\
-          <div class="title">' + item.title + ' ' + badgeHtml + '</div>\
+          <div class="title">' + titleHtml + '</div>\
           <div class="heat">' + item.heat + ' 讨论</div>\
         </div>\
       </div>';
     }).join('') +
     '</div>';
+
+  // 编辑模式下绑定input事件
+  if (hotSearchEditMode) {
+    setTimeout(() => {
+      document.querySelectorAll('.hot-edit-input').forEach(input => {
+        input.addEventListener('blur', function() {
+          const idx = parseInt(this.dataset.idx);
+          if (window.HOT_SEARCH_ITEMS && window.HOT_SEARCH_ITEMS[idx]) {
+            window.HOT_SEARCH_ITEMS[idx].title = this.value;
+          }
+        });
+        input.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') this.blur();
+        });
+      });
+    }, 10);
+  }
 }
 window.renderHotSearchRanking = renderHotSearchRanking;
+
+// 切换热搜编辑模式
+function toggleHotSearchEdit() {
+  hotSearchEditMode = !hotSearchEditMode;
+  renderHotSearchRanking();
+  // 铅笔图标样式切换
+  const btn = document.getElementById('hotSearchEditBtn');
+  if (btn) {
+    if (hotSearchEditMode) {
+      btn.style.opacity = '1';
+      btn.style.color = '#3B82F6';
+      btn.style.transform = 'rotate(-15deg)';
+    } else {
+      btn.style.opacity = '.5';
+      btn.style.color = 'inherit';
+      btn.style.transform = 'rotate(0)';
+    }
+  }
+  if (window.api && api.ui && api.ui.toast) {
+    api.ui.toast(hotSearchEditMode ? '编辑模式：点击词条可修改' : '热搜已保存');
+  }
+}
+window.toggleHotSearchEdit = toggleHotSearchEdit;
+
+// （铅笔按钮点击事件通过HTML onclick绑定，无需动态绑定）
 
 // 筛选词条
 function filterHotSearchTopic(topicTag) {

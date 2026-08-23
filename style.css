@@ -2358,7 +2358,7 @@ input:checked + .switch-slider:before {
   align-items:center !important;
   gap:10px !important;
   padding:calc(var(--safe-top) + 16px) 16px 12px !important;
-  background:var(--bg) !important;
+  background:#FFFFFF !important;
   z-index:50 !important;
   box-sizing:border-box !important;
 }
@@ -2368,6 +2368,9 @@ input:checked + .switch-slider:before {
   min-width:0 !important;
   display:flex !important;
   align-items:center !important;
+  background:#FAFAFA !important;
+  border:1px solid #E8E8E8 !important;
+  box-shadow:none !important;
 }
 #communityTrendsView .search-box input{
   flex:1 !important;
@@ -2377,15 +2380,24 @@ input:checked + .switch-slider:before {
 #communityTrendsView .icon-btn{
   flex-shrink:0 !important;
 }
+/* 分类chip边框 */
+#communityTrendsView .cat-chip{
+  border:1px solid #E8E8E8 !important;
+  background:#FAFAFA !important;
+}
+#communityTrendsView .cat-chip.on{
+  background:#1A1A2E !important;
+  border-color:#1A1A2E !important;
+}
 /* 分类横滑上移衔接 */
 #communityTrendsView .cat-rail{
-  top:calc(var(--safe-top) + 62px) !important;
+  top:calc(var(--safe-top) + 66px) !important;
 }
 /* flow 占满剩余空间 */
 #communityTrendsView #flow{
   flex:1 1 auto !important;
   min-height:0 !important;
-  padding:calc(var(--safe-top) + 128px) 16px calc(var(--safe-bottom) + 24px) !important;
+  padding:calc(var(--safe-top) + 132px) 16px calc(var(--safe-bottom) + 24px) !important;
 }
 /* 帖子卡片不透明背景 */
 #communityTrendsView .post-card{
