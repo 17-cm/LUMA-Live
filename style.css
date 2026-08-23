@@ -2329,43 +2329,9 @@ input:checked + .switch-slider:before {
 .new-key-5 { --key-color: #a5b4fc; --key-glow: rgba(165,180,252,0.5); }
 .new-key-6 { --key-color: #f9a8d4; --key-glow: rgba(249,168,212,0.45); }
 
-/* 修复：热搜界面样板变量定义（原封不动） */
-#communityTrendsView{
-  --bg:#F5F4F2;
-  --surface:#FFFFFF;
-  --ink:#1A1A2E;
-  --ink-2:#5A5A72;
-  --dim:#9E9EB2;
-  --line:#EEEDF0;
-  --hot:#FF5A36;
-  --hot-soft:#FFF1EC;
-  --blue:#3B82F6;
-  --rose:#F43F5E;
-  --r-card:16px;
-  --r-pill:999px;
-}
-/* 修复：安全区改用项目变量，内容再下移20px */
-#communityTrendsView .topbar{
-  padding:calc(var(--safe-top) + 20px) 16px 12px;
-}
-#communityTrendsView .cat-rail{
-  top:calc(var(--safe-top) + 84px);
-}
-#communityTrendsView #flow{
-  padding:calc(var(--safe-top) + 150px) 16px calc(var(--safe-bottom) + 24px);
-}
-/* 修复：帖子卡片不透明背景 */
-#communityTrendsView .post-card{
-  background:#FFFFFF !important;
-  border:1px solid #EEEDF0;
-  box-shadow:0 1px 3px rgba(26,26,46,.04);
-}
-#communityTrendsView .hot-list{
-  background:#FFFFFF !important;
-  border:1px solid #EEEDF0;
-}
 
-/* 修复：热搜界面样板变量定义（原封不动） */
+/* ===== 热搜界面修复样式（干净版） ===== */
+/* 变量定义 */
 #communityTrendsView{
   --bg:#F5F4F2;
   --surface:#FFFFFF;
@@ -2380,30 +2346,58 @@ input:checked + .switch-slider:before {
   --r-card:16px;
   --r-pill:999px;
 }
-/* 修复：图标基础尺寸 */
-.ic{width:18px;height:18px;flex-shrink:0}
-.ic-sm{width:14px;height:14px}
-/* 修复：flow 在 flex 容器中占满剩余空间 */
-#flow{flex:1;min-height:0}
-/* 修复：话题过滤条默认隐藏 */
-#activeTopicBanner.hidden{display:none !important}
-/* 修复：安全区改用项目变量，内容再下移20px */
+/* 修复：topbar 强制宽度和横向布局，防止按键乱序 */
 #communityTrendsView .topbar{
-  padding:calc(var(--safe-top) + 20px) 16px 12px;
+  position:absolute !important;
+  top:0 !important;
+  left:0 !important;
+  right:0 !important;
+  width:100% !important;
+  display:flex !important;
+  flex-direction:row !important;
+  align-items:center !important;
+  gap:10px !important;
+  padding:calc(var(--safe-top) + 16px) 16px 12px !important;
+  background:var(--bg) !important;
+  z-index:50 !important;
+  box-sizing:border-box !important;
 }
+/* 搜索框强制占满剩余空间 */
+#communityTrendsView .search-box{
+  flex:1 1 auto !important;
+  min-width:0 !important;
+  display:flex !important;
+  align-items:center !important;
+}
+#communityTrendsView .search-box input{
+  flex:1 !important;
+  min-width:0 !important;
+}
+/* 图标按钮不收缩 */
+#communityTrendsView .icon-btn{
+  flex-shrink:0 !important;
+}
+/* 分类横滑上移衔接 */
 #communityTrendsView .cat-rail{
-  top:calc(var(--safe-top) + 66px);
+  top:calc(var(--safe-top) + 62px) !important;
 }
+/* flow 占满剩余空间 */
 #communityTrendsView #flow{
-  padding:calc(var(--safe-top) + 132px) 16px calc(var(--safe-bottom) + 24px);
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  padding:calc(var(--safe-top) + 128px) 16px calc(var(--safe-bottom) + 24px) !important;
 }
-/* 修复：帖子卡片不透明背景 */
+/* 帖子卡片不透明背景 */
 #communityTrendsView .post-card{
   background:#FFFFFF !important;
-  border:1px solid #EEEDF0;
-  box-shadow:0 1px 3px rgba(26,26,46,.04);
+  border:1px solid #EEEDF0 !important;
+  box-shadow:0 1px 3px rgba(26,26,46,.04) !important;
 }
 #communityTrendsView .hot-list{
   background:#FFFFFF !important;
-  border:1px solid #EEEDF0;
+  border:1px solid #EEEDF0 !important;
+}
+/* 话题过滤条默认隐藏 */
+#communityTrendsView #activeTopicBanner.hidden{
+  display:none !important;
 }
