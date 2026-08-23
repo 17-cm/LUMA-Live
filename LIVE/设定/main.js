@@ -1041,12 +1041,17 @@ async function checkGitRepoUpdate(silent = false) {
     // ── 判断是否有更新（优先级：commit SHA > commit 时间 > 版本号）──
     let updateReason = null;
 
+    // 标准化 localCommit：去掉分支后缀，只保留短 SHA
+    const localSha = gitUpdateState.localCommit
+      ? gitUpdateState.localCommit.replace(/\s*\(.*\)$/, '').trim()
+      : null;
+
     // 1. Commit SHA 不同 → 肯定有新代码
-    if (remoteCommit && gitUpdateState.localCommit && remoteCommit !== gitUpdateState.localCommit) {
+    if (remoteCommit && localSha && remoteCommit !== localSha) {
       updateReason = 'commit';
     }
-    // 2. 首次检测或本地无记录 → 用 commit 时间对比
-    else if (remoteCommit && (!gitUpdateState.localCommit || !gitUpdateState.lastCheckTime)) {
+    // 2. 首次检测或本地无 commit 记录 → 需要更新
+    else if (remoteCommit && !localSha) {
       updateReason = 'first';
     }
     // 3. commit 时间比上次检测时间新 → 有 push
@@ -1138,6 +1143,7 @@ const HOTPATCH_FILES = [
   'LIVE/数据/checkin_manager.js',
   'LIVE/数据/titles_manager.js',
   'LIVE/主页/profile.js',
+  'LIVE/主页/streamer_profile.js',
   'LIVE/社区/community_store.js',
   'LIVE/社区/module_trends.js',
   'LIVE/社区/module_supertopic.js',
