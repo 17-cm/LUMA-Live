@@ -145,86 +145,110 @@
 
         <div class="grid grid-cols-2 gap-3 pt-0.5">
           <!-- 按键 1: 今日热搜 -->
-          <div onclick="openCommunitySubPage('trends')" class="community-action-card">
-            <div class="flex items-start justify-between">
-              <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-rose-500 to-amber-500 flex items-center justify-center text-white shadow-md">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          <div onclick="openCommunitySubPage('trends')" class="new-key new-key-1">
+            <div class="new-key-corner-tl"></div>
+            <div class="new-key-corner-br"></div>
+            <div class="new-key-scanlines"></div>
+            <div class="new-key-beam"></div>
+            <div class="new-key-glow-bottom"></div>
+            <div class="new-key-content">
+              <div class="new-key-mark"><div class="new-key-mark-inner"></div></div>
+              <div class="new-key-text">
+                <span class="new-key-name">今日热搜</span>
+                <svg class="new-key-hook" viewBox="0 0 80 14"><path d="M 2 8 C 20 2 50 2 72 8 C 78 11 74 14 70 12"/></svg>
+                <span class="new-key-sub">全网实时沸点 & 动态流</span>
               </div>
-              <span class="text-[8px] bg-rose-50 text-rose-600 font-extrabold px-1.5 py-0.2 rounded border border-rose-200">TOP 10</span>
-            </div>
-            <div class="mt-2">
-              <h4 class="text-xs font-black text-slate-900 leading-tight">今日热搜</h4>
-              <p class="text-[9px] text-slate-400 mt-0.5 truncate">全网实时沸点 & 动态流</p>
+              <div class="new-key-arrow"><span>›</span></div>
             </div>
           </div>
 
           <!-- 按键 2: 超话专区 -->
-          <div onclick="openCommunitySubPage('super_topic')" class="community-action-card">
-            <div class="flex items-start justify-between">
-              <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-md">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"></circle><path d="M3.6 9h16.8"></path><path d="M3.6 15h16.8"></path><path d="M11.5 3a17 17 0 0 0 0 18"></path><path d="M12.5 3a17 17 0 0 1 0 18"></path></svg>
+          <div onclick="openCommunitySubPage('super_topic')" class="new-key new-key-2">
+            <div class="new-key-corner-tl"></div>
+            <div class="new-key-corner-br"></div>
+            <div class="new-key-scanlines"></div>
+            <div class="new-key-beam"></div>
+            <div class="new-key-glow-bottom"></div>
+            <div class="new-key-content">
+              <div class="new-key-mark"><div class="new-key-mark-inner"></div></div>
+              <div class="new-key-text">
+                <span class="new-key-name">超话专区</span>
+                <svg class="new-key-hook" viewBox="0 0 80 14"><path d="M 2 8 C 20 2 50 2 72 8 C 78 11 74 14 70 12"/></svg>
+                <span class="new-key-sub">主播粉丝根据地 · 签到</span>
               </div>
-              <span class="text-[8px] bg-purple-50 text-purple-700 font-extrabold px-1.5 py-0.2 rounded border border-purple-200">抽屉选人</span>
-            </div>
-            <div class="mt-2">
-              <h4 class="text-xs font-black text-slate-900 leading-tight">超话专区</h4>
-              <p class="text-[9px] text-slate-400 mt-0.5 truncate">主播粉丝根据地 · 签到</p>
+              <div class="new-key-arrow"><span>›</span></div>
             </div>
           </div>
 
           <!-- 按键 3: 排行榜 -->
-          <div onclick="openCommunitySubPage('ranking')" class="community-action-card">
-            <div class="flex items-start justify-between">
-              <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-md">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.45 1-1 1H7v2h10v-2h-2c-.55 0-1-.45-1-1v-2.34"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"></path></svg>
+          <div onclick="openCommunitySubPage('ranking')" class="new-key new-key-3">
+            <div class="new-key-corner-tl"></div>
+            <div class="new-key-corner-br"></div>
+            <div class="new-key-scanlines"></div>
+            <div class="new-key-beam"></div>
+            <div class="new-key-glow-bottom"></div>
+            <div class="new-key-content">
+              <div class="new-key-mark"><div class="new-key-mark-inner"></div></div>
+              <div class="new-key-text">
+                <span class="new-key-name">排行榜</span>
+                <svg class="new-key-hook" viewBox="0 0 80 14"><path d="M 2 8 C 20 2 50 2 72 8 C 78 11 74 14 70 12"/></svg>
+                <span class="new-key-sub">人气榜 · 守护榜 · 勤奋榜</span>
               </div>
-              <span class="text-[8px] bg-amber-50 text-amber-700 font-extrabold px-1.5 py-0.2 rounded border border-amber-200">全服实时</span>
-            </div>
-            <div class="mt-2">
-              <h4 class="text-xs font-black text-slate-900 leading-tight">排行榜</h4>
-              <p class="text-[9px] text-slate-400 mt-0.5 truncate">人气榜 · 守护榜 · 勤奋榜</p>
+              <div class="new-key-arrow"><span>›</span></div>
             </div>
           </div>
 
           <!-- 按键 4: 直播设置 -->
-          <div onclick="openCommunitySubPage('live_settings')" class="community-action-card">
-            <div class="flex items-start justify-between">
-              <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-md">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+          <div onclick="openCommunitySubPage('live_settings')" class="new-key new-key-4">
+            <div class="new-key-corner-tl"></div>
+            <div class="new-key-corner-br"></div>
+            <div class="new-key-scanlines"></div>
+            <div class="new-key-beam"></div>
+            <div class="new-key-glow-bottom"></div>
+            <div class="new-key-content">
+              <div class="new-key-mark"><div class="new-key-mark-inner"></div></div>
+              <div class="new-key-text">
+                <span class="new-key-name">直播设置</span>
+                <svg class="new-key-hook" viewBox="0 0 80 14"><path d="M 2 8 C 20 2 50 2 72 8 C 78 11 74 14 70 12"/></svg>
+                <span class="new-key-sub">开播偏好 · 筹备中</span>
               </div>
-              <span class="text-[8px] bg-cyan-50 text-cyan-700 font-extrabold px-1.5 py-0.2 rounded border border-cyan-200">前瞻</span>
-            </div>
-            <div class="mt-2">
-              <h4 class="text-xs font-black text-slate-900 leading-tight">直播设置</h4>
-              <p class="text-[9px] text-slate-400 mt-0.5 truncate">开播偏好 · 筹备中</p>
+              <div class="new-key-arrow"><span>›</span></div>
             </div>
           </div>
 
           <!-- 按键 5: 官方论坛 -->
-          <div onclick="openCommunitySubPage('forum')" class="community-action-card">
-            <div class="flex items-start justify-between">
-              <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          <div onclick="openCommunitySubPage('forum')" class="new-key new-key-5">
+            <div class="new-key-corner-tl"></div>
+            <div class="new-key-corner-br"></div>
+            <div class="new-key-scanlines"></div>
+            <div class="new-key-beam"></div>
+            <div class="new-key-glow-bottom"></div>
+            <div class="new-key-content">
+              <div class="new-key-mark"><div class="new-key-mark-inner"></div></div>
+              <div class="new-key-text">
+                <span class="new-key-name">官方论坛</span>
+                <svg class="new-key-hook" viewBox="0 0 80 14"><path d="M 2 8 C 20 2 50 2 72 8 C 78 11 74 14 70 12"/></svg>
+                <span class="new-key-sub">版本更新 · 反馈信箱</span>
               </div>
-              <span class="text-[8px] bg-emerald-50 text-emerald-700 font-extrabold px-1.5 py-0.2 rounded border border-emerald-200">LUMA官方</span>
-            </div>
-            <div class="mt-2">
-              <h4 class="text-xs font-black text-slate-900 leading-tight">官方论坛</h4>
-              <p class="text-[9px] text-slate-400 mt-0.5 truncate">版本更新 · 反馈信箱</p>
+              <div class="new-key-arrow"><span>›</span></div>
             </div>
           </div>
 
           <!-- 按键 6: 我的超话 -->
-          <div onclick="openCommunitySubPage('my_topic')" class="community-action-card">
-            <div class="flex items-start justify-between">
-              <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center text-white shadow-md">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+          <div onclick="openCommunitySubPage('my_topic')" class="new-key new-key-6">
+            <div class="new-key-corner-tl"></div>
+            <div class="new-key-corner-br"></div>
+            <div class="new-key-scanlines"></div>
+            <div class="new-key-beam"></div>
+            <div class="new-key-glow-bottom"></div>
+            <div class="new-key-content">
+              <div class="new-key-mark"><div class="new-key-mark-inner"></div></div>
+              <div class="new-key-text">
+                <span class="new-key-name">我的超话</span>
+                <svg class="new-key-hook" viewBox="0 0 80 14"><path d="M 2 8 C 20 2 50 2 72 8 C 78 11 74 14 70 12"/></svg>
+                <span class="new-key-sub">玩家专属应援地 · 打卡</span>
               </div>
-              <span class="text-[8px] bg-pink-50 text-pink-700 font-extrabold px-1.5 py-0.2 rounded border border-pink-200">VIP专属</span>
-            </div>
-            <div class="mt-2">
-              <h4 class="text-xs font-black text-slate-900 leading-tight">我的超话</h4>
-              <p class="text-[9px] text-slate-400 mt-0.5 truncate">玩家专属应援地 · 打卡</p>
+              <div class="new-key-arrow"><span>›</span></div>
             </div>
           </div>
         </div>
