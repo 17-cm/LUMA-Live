@@ -2,15 +2,12 @@
 // 【模块三·个人信息与资产】LIVE/profile.js
 // 包含：个人资料同步与编辑、关注列表管理、双列守护排行榜、钱包流水、充值中心
 // =========================================================================
-
 var api = window.api || {};
-
 let currentUser = {
   name: '玩家',
   avatar: getAvatar('玩家', 'first')
 };
 window.currentUser = currentUser;
-
 let userProfileData = {
   uid: '88291048',
   ip: 'LUMA',
@@ -21,14 +18,11 @@ let userProfileData = {
   medals: 3
 };
 window.userProfileData = userProfileData;
-
 let revenueBalance = 0;
 let transactionLedger = [];
 let currentRankTab = 'fans';
-
 let selectedRechargeAmount = 600;
 let selectedRechargePrice = 6;
-
 // 1. 同步个人资料与关注统计 (仅统计已关注的主播/用户，超话频道不计入人物关注列表)
 function syncFollowCountDisplay() {
   const followed = Array.isArray(window.followedHosts) ? window.followedHosts : [];
@@ -38,7 +32,6 @@ function syncFollowCountDisplay() {
   if (statEl) statEl.textContent = String(count);
 }
 window.syncFollowCountDisplay = syncFollowCountDisplay;
-
 async function syncUserProfile() {
   try {
     const u = await api.user.getProfile();
@@ -51,7 +44,6 @@ async function syncUserProfile() {
       if (avatarBox && currentUser.avatar) avatarBox.src = currentUser.avatar;
     }
   } catch (e) {}
-
   // 1. 同步个人粉丝数量
   const myFans = window.LumaFansManager ? window.LumaFansManager.getFans('user') : (userProfileData.fans || 128);
   userProfileData.fans = myFans;
@@ -59,14 +51,11 @@ async function syncUserProfile() {
   if (statFanEl) {
     statFanEl.textContent = window.LumaDataHub ? window.LumaDataHub.formatNumber(myFans) : myFans;
   }
-
   // 2. 同步点赞与勋章数
   const statLikeEl = document.getElementById('statLikeCount');
   if (statLikeEl) statLikeEl.textContent = (userProfileData.likes || 1240).toLocaleString();
-
   const statMedalEl = document.getElementById('statMedalCount');
   if (statMedalEl) statMedalEl.textContent = userProfileData.medals || 3;
-
   // 3. 同步佩戴头衔/称号
   if (window.LumaTitlesManager) {
     const activeTitle = window.LumaTitlesManager.getActiveTitle('user');
@@ -76,53 +65,43 @@ async function syncUserProfile() {
       if (tagEl) tagEl.textContent = activeTitle.name;
     }
   }
-
   syncFollowCountDisplay();
   renderDualRankList();
 }
 window.syncUserProfile = syncUserProfile;
-
 // 2. 个人资料编辑弹窗
 function openEditProfileModal() {
   const uidInput = document.getElementById('editInputUID');
   const ipInput = document.getElementById('editInputIP');
   const tagInput = document.getElementById('editInputTag');
   const bioInput = document.getElementById('editInputBio');
-
   if (uidInput) uidInput.value = userProfileData.uid || '88291048';
   if (ipInput) ipInput.value = userProfileData.ip || 'LUMA';
   if (tagInput) tagInput.value = userProfileData.tag || '新人主播';
   if (bioInput) bioInput.value = userProfileData.bio || '';
-
   const modal = document.getElementById('editProfileModal');
   if (modal) modal.classList.remove('hidden');
 }
 window.openEditProfileModal = openEditProfileModal;
-
 function closeEditProfileModal() {
   const modal = document.getElementById('editProfileModal');
   if (modal) modal.classList.add('hidden');
 }
 window.closeEditProfileModal = closeEditProfileModal;
-
 async function saveUserProfileEdits() {
   userProfileData.uid = document.getElementById('editInputUID')?.value.trim() || '88291048';
   userProfileData.ip = document.getElementById('editInputIP')?.value.trim() || 'LUMA';
   userProfileData.tag = document.getElementById('editInputTag')?.value.trim() || '新人主播';
   userProfileData.bio = document.getElementById('editInputBio')?.value.trim() || '';
-
   const uidEl = document.getElementById('displayUserUID');
   const ipEl = document.getElementById('displayUserIP');
   const tagEl = document.getElementById('displayUserTag');
   const bioEl = document.getElementById('userBioText');
-
   if (uidEl) uidEl.textContent = userProfileData.uid;
   if (ipEl) ipEl.textContent = userProfileData.ip;
   if (tagEl) tagEl.textContent = userProfileData.tag;
   if (bioEl) bioEl.textContent = `“${userProfileData.bio}”`;
-
   closeEditProfileModal();
-
   try {
     await api.db.create("app_profile", { id: "user_profile", ...userProfileData });
   } catch (e) {
@@ -131,7 +110,6 @@ async function saveUserProfileEdits() {
   api.ui.toast("个人资料已保存！");
 }
 window.saveUserProfileEdits = saveUserProfileEdits;
-
 // 3. 关注列表页面
 function openFollowListPageView() {
   const container = document.getElementById('followListContentContainer');
@@ -162,7 +140,6 @@ function openFollowListPageView() {
       tags: ['签约主播']
     };
   });
-
   let html = `
     <div class="luxe-card p-3.5 flex items-center justify-between bg-white">
       <div class="flex items-center gap-3">
@@ -177,7 +154,6 @@ function openFollowListPageView() {
       <span class="text-[10px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-bold">已关注</span>
     </div>
   `;
-
   if (follows.length === 0) {
     html += `
       <div class="py-10 text-center text-slate-400 text-xs">
@@ -207,7 +183,6 @@ function openFollowListPageView() {
       `;
     }).join('');
   }
-
   container.innerHTML = html;
   if (window.PageStack) {
     window.PageStack.open('followListPageView');
@@ -217,7 +192,6 @@ function openFollowListPageView() {
   }
 }
 window.openFollowListPageView = openFollowListPageView;
-
 function closeFollowListPageView() {
   if (window.PageStack) {
     window.PageStack.back();
@@ -227,7 +201,6 @@ function closeFollowListPageView() {
   }
 }
 window.closeFollowListPageView = closeFollowListPageView;
-
 async function toggleFollowRoomHostById(charId) {
   if (window.followedHosts.includes(charId)) {
     window.followedHosts = window.followedHosts.filter(id => id !== charId);
@@ -237,19 +210,16 @@ async function toggleFollowRoomHostById(charId) {
     
     const statEl = document.getElementById('statFollowCount');
     if (statEl) statEl.textContent = window.followedHosts.length + 1;
-
     if (typeof checkFollowState === 'function') checkFollowState();
     if (typeof updateLiveRoomHostFansDisplay === 'function') updateLiveRoomHostFansDisplay();
   }
 }
 window.toggleFollowRoomHostById = toggleFollowRoomHostById;
-
 // 4. 双列排行榜
 function switchRankTab(type) {
   currentRankTab = type;
   const btnFans = document.getElementById('btnRankFans');
   const btnMy = document.getElementById('btnRankMy');
-
   if (type === 'fans') {
     if (btnFans) btnFans.className = 'text-xs font-black text-rose-600 border-b-2 border-rose-600 pb-1';
     if (btnMy) btnMy.className = 'text-xs font-bold text-slate-400 pb-1';
@@ -260,13 +230,10 @@ function switchRankTab(type) {
   renderDualRankList();
 }
 window.switchRankTab = switchRankTab;
-
 function renderDualRankList() {
   const box = document.getElementById('dualRankListContainer');
   if (!box) return;
-
   let aggregatedList = [];
-
   if (window.LumaGuardManager) {
     if (currentRankTab === 'fans') {
       // 粉丝榜：只计算 Char 谁为我消费得最多
@@ -290,7 +257,6 @@ function renderDualRankList() {
       }));
     }
   }
-
   if (aggregatedList.length === 0) {
     box.innerHTML = `
       <div class="py-8 text-center text-slate-400 text-xs">
@@ -303,30 +269,25 @@ function renderDualRankList() {
     `;
     return;
   }
-
   const medals = [
     { label: '金牌守护', color: 'text-amber-500', bg: 'border-amber-200/80 bg-gradient-to-r from-amber-50/60 to-white', badge: 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black', rankTag: 'Top 1 · 榜一' },
     { label: '银牌守护', color: 'text-slate-500', bg: 'border-slate-200/80 bg-gradient-to-r from-slate-50/60 to-white', badge: 'bg-gradient-to-r from-slate-300 to-slate-400 text-slate-900 font-bold', rankTag: 'Top 2 · 榜二' },
     { label: '铜牌守护', color: 'text-amber-700', bg: 'border-orange-200/80 bg-gradient-to-r from-orange-50/60 to-white', badge: 'bg-gradient-to-r from-amber-600 to-amber-700 text-white font-bold', rankTag: 'Top 3 · 榜三' }
   ];
-
   box.innerHTML = aggregatedList.map((item, idx) => {
     const isTop3 = idx < 3;
     const m = isTop3 ? medals[idx] : null;
     const rankNum = idx + 1;
-
     return `
       <div class="luxe-card p-3 flex items-center justify-between ${m ? m.bg : 'bg-white'} border transition-all duration-200 hover:shadow-md">
         <div class="flex items-center gap-3">
           <div class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs shadow-sm ${m ? m.badge : 'bg-slate-100 text-slate-600 font-bold'}">
             ${rankNum}
           </div>
-
           <div class="relative flex-shrink-0">
             <img src="${item.avatar}" class="w-10 h-10 rounded-full object-cover border-2 ${idx===0 ? 'border-amber-400 shadow-sm shadow-amber-200' : idx===1 ? 'border-slate-300' : idx===2 ? 'border-amber-600' : 'border-slate-200'}">
             ${idx === 0 ? '<span class="absolute -top-1.5 -right-1 text-xs">👑</span>' : ''}
           </div>
-
           <div>
             <div class="flex items-center gap-1.5">
               <h5 class="text-xs font-black text-slate-900">${item.targetName}</h5>
@@ -339,7 +300,6 @@ function renderDualRankList() {
             </p>
           </div>
         </div>
-
         <div class="text-right flex-shrink-0">
           <span class="text-[10px] ${m ? m.color + ' font-black' : 'text-slate-400 font-bold'} block">
             ${m ? m.label : `No.${rankNum}`}
@@ -351,7 +311,6 @@ function renderDualRankList() {
   }).join('');
 }
 window.renderDualRankList = renderDualRankList;
-
 // =========================================================================
 // 【5. 钱包与流水 · 全面重设计】
 //
@@ -365,15 +324,13 @@ window.renderDualRankList = renderDualRankList;
 //   LUMA 币 = APP 内部货币（window.currentWalletBalance，存 api.db）
 //   宿主余额 = 小手机系统货币（api.wallet.get() → accounts[0].balance）
 //   汇率：1 宿主货币 = 10 LUMA 币
-//   提现 = LUMA 币 → 宿主余额（LUMA 减少，宿主增加，通过 wallet.pay 传负数）
+//   提现 = LUMA 币 → 宿主余额（LUMA 减少，宿主增加）
 //   充值 = 宿主余额 → LUMA 币（api.wallet.pay 扣款，LUMA 增加）
 // =========================================================================
-
 // ── 宿主余额缓存（避免频繁调 SDK）──
 let _cachedHostBalance = null;
 let _cachedHostBalanceTime = 0;
 const HOST_BALANCE_CACHE_MS = 10000; // 10秒缓存
-
 /**
  * 获取宿主钱包余额（真实调用 api.wallet.get()）
  * @returns {Promise<number>} 宿主货币余额
@@ -395,7 +352,6 @@ async function getHostWalletBalance() {
     return _cachedHostBalance ?? 0;
   }
 }
-
 /**
  * 刷新宿主余额显示（强制重新拉取）
  */
@@ -405,27 +361,24 @@ async function refreshHostBalanceDisplay() {
   const el = document.getElementById('wlHostBalance');
   if (el) el.textContent = bal.toFixed(2);
 }
-
 /**
  * 渲染完整的钱包页面 DOM（注入到 #walletPageView 容器内）
  * 不修改 index.html，所有 HTML 由 JS 动态生成
  *
- * 设计：第二版成熟克制整体样式 + 第一版黑金余额卡配色
+ * 设计：第二版成熟克制整体样式 + 主页收益金库黑金余额卡配色
  * - 整体浅白基调，低饱和色彩
- * - 余额卡：黑金渐变 + 金色文字
+ * - 余额卡：主页 black-card 同款黑金渐变 + 琥珀色边框
  * - 图标：全部线性 SVG，无 emoji
- * - 眼睛：无外圈
+ * - 眼睛：灰色，无外圈
  * - 流水：无"全部"按钮，用真实 transactionLedger 数据
  */
 function renderWalletUI() {
   const container = document.getElementById('walletPageView');
   if (!container) return;
-
   // ── 读取安全区 CSS 变量值 ──
   const style = getComputedStyle(document.documentElement);
   const safeTopVal = style.getPropertyValue('--ai-phone-app-safe-top').trim() || '88px';
   const safeLineTop = `calc(${safeTopVal} + 6px)`;
-
   container.innerHTML = `
     <style>
       /* ═══════ LUMA 钱包 · 成熟克制版 ═══════ */
@@ -435,11 +388,11 @@ function renderWalletUI() {
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
       }
-      /* 安全区装饰线 */
+      /* 安全区装饰线（特淡浅灰） */
       .wl-safe-line {
         position: absolute; left: 0; right: 0;
         top: ${safeLineTop}; height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(180,180,190,0.35), transparent);
+        background: linear-gradient(90deg, transparent, rgba(200,200,210,0.12), transparent);
         z-index: 20; pointer-events: none;
       }
       /* ── 顶部导航 ── */
@@ -465,17 +418,17 @@ function renderWalletUI() {
       .wl-nav-right svg { width: 18px; height: 18px; stroke: #8b909b; stroke-width: 1.8; fill: none; }
       /* ── 内容区 ── */
       .wl-body { padding: 6px 16px 100px; }
-      /* ═══════ 黑金总资产卡（第一版配色 + 第二版结构）═══════ */
+      /* ═══════ 黑金总资产卡（主页收益金库同款配色）═══════ */
       .wl-asset-card {
         position: relative; border-radius: 20px; overflow: hidden;
-        background: linear-gradient(145deg, #1a1a26 0%, #12121c 50%, #0c0c14 100%);
-        border: 1px solid rgba(212,185,140,.2);
-        box-shadow: 0 8px 32px rgba(0,0,0,.22), inset 0 1px 1px rgba(255,255,255,.06);
+        background: linear-gradient(135deg, #18181b 0%, #09090b 100%);
+        border: 1px solid rgba(245, 158, 11, 0.25);
+        box-shadow: 0 16px 36px -6px rgba(0,0,0,.4), inset 0 1px 1px rgba(255,255,255,.2);
         padding: 20px;
       }
       .wl-asset-card::before {
         content:''; position:absolute; top:0; left:0; right:0; height:2px;
-        background: linear-gradient(90deg, rgba(212,185,140,.5), rgba(232,213,168,.8), rgba(212,185,140,.5));
+        background: linear-gradient(90deg, rgba(245,158,11,.3), rgba(245,158,11,.6), rgba(245,158,11,.3));
       }
       .wl-asset-card::after {
         content:''; position:absolute; top:-25%; right:-8%; width:150px; height:150px;
@@ -486,12 +439,12 @@ function renderWalletUI() {
       .wl-ac-label { display: flex; align-items: center; gap: 7px; }
       .wl-ac-label .dot { width: 5px; height: 5px; border-radius: 50%; background: #d4b98c; }
       .wl-ac-label span { font-size: 11px; font-weight: 600; color: rgba(212,185,140,.75); letter-spacing: .5px; }
-      /* 眼睛无圈 */
+      /* 眼睛（灰色，无圈） */
       .wl-ac-eye {
         width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
-        color: rgba(255,255,255,.45); cursor: pointer; transition: color .2s; background: none; border: none;
+        color: #8b909b; cursor: pointer; transition: color .2s; background: none; border: none;
       }
-      .wl-ac-eye:active { color: rgba(255,255,255,.7); }
+      .wl-ac-eye:active { color: #b0b4bc; }
       .wl-ac-eye svg { width: 16px; height: 16px; stroke-width: 1.8; fill: none; }
       .wl-ac-amount { margin-top: 14px; position: relative; z-index: 2; }
       .wl-ac-k { font-size: 10px; font-weight: 500; color: rgba(255,255,255,.35); letter-spacing: .5px; }
@@ -519,7 +472,7 @@ function renderWalletUI() {
       }
       .wl-quick-item:active { transform: scale(.95); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
       .wl-qi-ic { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; }
-      .wl-qi-ic svg { width: 19px; height: 19px; stroke-width: 1.8; fill: none; }
+      .wl-qi-ic svg { width: 19px; height: 19px; stroke-width: 1.8; fill: none; stroke: currentColor; }
       .wl-qi-ic.rose { background: #fdf0f3; color: #e85a7a; }
       .wl-qi-ic.amber { background: #fdf6e9; color: #d4a24e; }
       .wl-qi-ic.violet { background: #f3f0fb; color: #8b7bc9; }
@@ -685,7 +638,7 @@ function renderWalletUI() {
       <div class="wl-ledger" id="transactionLedgerContainer"></div>
     </div>
     <!-- ══ 提现弹窗 ══ -->
-    <div id="withdrawModal" class="wl-modal-mask" style="display:none" onclick="if(event.target===this)closeWithdrawModal()">
+    <div id="withdrawModal" class="wl-modal-mask hidden" onclick="if(event.target===this)closeWithdrawModal()">
       <div class="wl-modal">
         <div class="wl-modal-handle"></div>
         <div class="wl-modal-head">
@@ -714,7 +667,6 @@ function renderWalletUI() {
       </div>
     </div>
   `;
-
   // ── 余额显示/隐藏切换 ──
   const eyeBtn = document.getElementById('toggleWalletEye');
   const eyeIcon = document.getElementById('walletEyeIcon');
@@ -730,7 +682,6 @@ function renderWalletUI() {
     };
   }
 }
-
 /**
  * 打开钱包页面
  * 先渲染 UI，再更新数据，最后显示页面 + 安全区定位线
@@ -738,27 +689,22 @@ function renderWalletUI() {
 async function openWalletPageView() {
   // 1. 渲染钱包界面 DOM
   renderWalletUI();
-
   // 2. 更新 LUMA 币余额
   const lumaBal = window.currentWalletBalance || revenueBalance || 0;
   const pageRev = document.getElementById('pageRevenueBalance');
   if (pageRev) pageRev.textContent = lumaBal.toLocaleString();
   const lumaEl = document.getElementById('wlLumaBalance');
   if (lumaEl) lumaEl.textContent = lumaBal.toLocaleString();
-
   // 3. 异步获取宿主余额并显示
   refreshHostBalanceDisplay();
-
   // 3.5 更新累计收益（预留变量 window.lumaEarnedRevenue，暂为0）
   const revEl = document.getElementById('wlRevenueTotal');
   if (revEl) {
     const earned = window.lumaEarnedRevenue || 0;
     revEl.innerHTML = earned.toLocaleString() + '<span class="s"> 币</span>';
   }
-
   // 4. 渲染流水
   renderTransactionLedger();
-
   // 5. 显示页面
   if (window.PageStack) {
     window.PageStack.open('walletPageView');
@@ -766,12 +712,10 @@ async function openWalletPageView() {
     const page = document.getElementById('walletPageView');
     if (page) page.classList.remove('hidden');
   }
-
-  // 6. 安全区定位线（调试用，纯黑线无黄标）
+  // 6. 安全区定位线（调试用，特淡浅灰）
   showSafeAreaGuides('walletPageView');
 }
 window.openWalletPageView = openWalletPageView;
-
 function closeWalletPageView() {
   hideSafeAreaGuides();
   if (window.PageStack) {
@@ -782,7 +726,6 @@ function closeWalletPageView() {
   }
 }
 window.closeWalletPageView = closeWalletPageView;
-
 /**
  * 渲染交易流水列表（新版样式）
  * 读取真实 transactionLedger 数组，不注入假数据
@@ -790,7 +733,6 @@ window.closeWalletPageView = closeWalletPageView;
 function renderTransactionLedger() {
   const box = document.getElementById('transactionLedgerContainer');
   if (!box) return;
-
   if (!transactionLedger || transactionLedger.length === 0) {
     box.innerHTML = `
       <div class="wl-empty">
@@ -805,14 +747,12 @@ function renderTransactionLedger() {
     if (badge) badge.textContent = '0 笔记录';
     return;
   }
-
   const iconMap = {
     income:  '<svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
     recharge: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
     cashout: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
     expense: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>'
   };
-
   box.innerHTML = transactionLedger.map(item => {
     const type = item.type || 'expense';
     const isPos = (type === 'income' || type === 'recharge');
@@ -831,33 +771,26 @@ function renderTransactionLedger() {
       </div>
     `;
   }).join('');
-
   const badge = document.getElementById('wlTxCount');
   if (badge) badge.textContent = `${transactionLedger.length} 笔记录`;
 }
-
 // ═══════════ 提现功能 ═══════════
-
 function openWithdrawModal() {
   const modal = document.getElementById('withdrawModal');
   if (!modal) return;
-
   // 更新弹窗里的 LUMA 币余额显示
   const balEl = document.getElementById('withdrawLumaBal');
   if (balEl) balEl.textContent = (window.currentWalletBalance || 0).toLocaleString();
-
   // 更新可提现数量
   const availEl = document.getElementById('withdrawAvail');
   if (availEl) availEl.textContent = (window.currentWalletBalance || 0).toLocaleString() + ' LUMA 币';
-
   // 清空输入
   const input = document.getElementById('withdrawAmountInput');
   if (input) input.value = '';
   const preview = document.getElementById('withdrawPreview');
   if (preview) preview.textContent = '0.00';
-
-  modal.style.display = 'flex';
-
+  // 和充值弹窗一致的呼出方式：classList 控制
+  modal.classList.remove('hidden');
   // 监听输入实时计算到账金额
   if (input) {
     input.oninput = function() {
@@ -871,35 +804,28 @@ function openWithdrawModal() {
   }
 }
 window.openWithdrawModal = openWithdrawModal;
-
 function closeWithdrawModal() {
   const modal = document.getElementById('withdrawModal');
-  if (modal) modal.style.display = 'none';
+  if (modal) modal.classList.add('hidden');
 }
 window.closeWithdrawModal = closeWithdrawModal;
-
 async function confirmWithdraw() {
   const input = document.getElementById('withdrawAmountInput');
   const amount = parseInt(input?.value) || 0;
-
   if (amount < 100) {
     api.ui.toast("最低提现 100 LUMA 币");
     return;
   }
-
   const currentLuma = window.currentWalletBalance || 0;
   if (amount > currentLuma) {
     api.ui.toast("LUMA 币余额不足");
     return;
   }
-
   // 计算到账金额（10:1）
   const hostAmount = amount / 10;
-
   // 按钮 loading 状态
   const btn = document.getElementById('withdrawConfirmBtn');
   if (btn) { btn.textContent = '处理中...'; btn.disabled = true; }
-
   // 扣除 LUMA 币
   window.currentWalletBalance = currentLuma - amount;
   try {
@@ -907,14 +833,13 @@ async function confirmWithdraw() {
   } catch (e) {
     await api.db.update("app_wallet", "vault_data", { balance: window.currentWalletBalance }).catch(() => {});
   }
-
-  // 增加宿主余额（通过 wallet.pay 传负数实现加钱）
+  // 增加宿主余额（wallet.pay 传正数，按用户要求测试）
   try {
     const wallet = await api.wallet.get();
     const accountId = wallet?.accounts?.[0]?.id;
     if (accountId) {
       await api.wallet.pay({
-        amount: -hostAmount,
+        amount: hostAmount,
         accountId: accountId,
         title: 'LUMA 提现',
         detail: `提现 ${amount.toLocaleString()} LUMA 币`,
@@ -926,36 +851,27 @@ async function confirmWithdraw() {
   } catch (e) {
     console.warn('[Wallet] 宿主余额增加失败:', e.message);
   }
-
   // 记录流水
   if (typeof recordTransaction === 'function') {
     await recordTransaction(`提现 ${amount.toLocaleString()} LUMA 币`, "cashout", amount, "余额");
   }
-
   // 关闭弹窗
   closeWithdrawModal();
-
   // 刷新钱包界面数据
   const lumaEl = document.getElementById('pageRevenueBalance');
   if (lumaEl) lumaEl.textContent = window.currentWalletBalance.toLocaleString();
   const lumaBalEl = document.getElementById('wlLumaBalance');
   if (lumaBalEl) lumaBalEl.textContent = window.currentWalletBalance.toLocaleString();
-
   // 刷新宿主余额显示
   refreshHostBalanceDisplay();
-
   // 同步其他余额显示
   if (typeof window.syncWalletDisplays === 'function') window.syncWalletDisplays();
-
   // 恢复按钮状态
   if (btn) { btn.textContent = '确认提现'; btn.disabled = false; }
-
   api.ui.toast(`成功提现 ${amount.toLocaleString()} LUMA 币 → ${hostAmount.toFixed(2)} 元`);
 }
 window.confirmWithdraw = confirmWithdraw;
-
 // ═══════════ 旧版提现（兼容保留） ═══════════
-
 async function handleCashOutAll() {
   // 直接打开提现弹窗，默认填全部余额
   openWithdrawModal();
@@ -966,7 +882,6 @@ async function handleCashOutAll() {
   }
 }
 window.handleCashOutAll = handleCashOutAll;
-
 // 6. 充值中心模态窗
 function openRechargeModal() {
   const modal = document.getElementById('rechargeModal');
@@ -975,13 +890,11 @@ function openRechargeModal() {
   selectRechargeTier(600, 6);
 }
 window.openRechargeModal = openRechargeModal;
-
 function closeRechargeModal() {
   const modal = document.getElementById('rechargeModal');
   if (modal) modal.classList.add('hidden');
 }
 window.closeRechargeModal = closeRechargeModal;
-
 function selectRechargeTier(amount, price) {
   selectedRechargeAmount = amount;
   selectedRechargePrice = price;
@@ -989,14 +902,11 @@ function selectRechargeTier(amount, price) {
   document.querySelectorAll('.recharge-tier-card').forEach(c => c.classList.remove('active'));
   const targetCard = document.getElementById(`rechargeTier_${amount}`);
   if (targetCard) targetCard.classList.add('active');
-
   const customInput = document.getElementById('inputCustomRechargeAmount');
   if (customInput) customInput.value = '';
-
   updateRechargeButtonText();
 }
 window.selectRechargeTier = selectRechargeTier;
-
 function handleCustomRechargeInput(val) {
   const num = parseInt(val) || 0;
   if (num > 0) {
@@ -1007,7 +917,6 @@ function handleCustomRechargeInput(val) {
   }
 }
 window.handleCustomRechargeInput = handleCustomRechargeInput;
-
 function applyCustomRechargeTier() {
   const input = document.getElementById('inputCustomRechargeAmount');
   if (input && input.value) {
@@ -1015,25 +924,21 @@ function applyCustomRechargeTier() {
   }
 }
 window.applyCustomRechargeTier = applyCustomRechargeTier;
-
 function updateRechargeButtonText() {
   const btn = document.getElementById('btnSubmitRecharge');
   if (btn) {
     btn.innerHTML = `<span>确认充值 ${selectedRechargeAmount.toLocaleString()} 币 (¥${selectedRechargePrice})</span>`;
   }
 }
-
 async function submitExecuteRecharge() {
   if (selectedRechargeAmount <= 0) {
     api.ui.toast("请输入有效的充值金额");
     return;
   }
-
   const addCoins = selectedRechargeAmount;
   // 充值 = 宿主余额扣款 → LUMA 币增加
   // 汇率：1 宿主货币 = 10 LUMA 币
   const hostCost = addCoins / 10;
-
   // 1. 先调用宿主钱包扣款
   try {
     const wallet = await api.wallet.get();
@@ -1059,7 +964,6 @@ async function submitExecuteRecharge() {
     api.ui.toast("充值失败：" + e.message);
     return;
   }
-
   // 2. 扣款成功，增加 LUMA 币
   window.currentWalletBalance = (window.currentWalletBalance || 0) + addCoins;
   try {
@@ -1067,16 +971,13 @@ async function submitExecuteRecharge() {
   } catch (e) {
     await api.db.update("app_wallet", "vault_data", { balance: window.currentWalletBalance }).catch(() => {});
   }
-
   // 3. 记录流水
   if (typeof recordTransaction === 'function') {
     await recordTransaction(`充值 ${addCoins.toLocaleString()} LUMA 币`, "recharge", addCoins, "LUMA 充值中心");
   }
-
   // 4. 刷新界面
   syncWalletDisplays();
   closeRechargeModal();
-
   // 5. 刷新钱包页面数据（如果钱包页面打开着）
   const walletPage = document.getElementById('walletPageView');
   if (walletPage && !walletPage.classList.contains('hidden')) {
@@ -1087,11 +988,9 @@ async function submitExecuteRecharge() {
     refreshHostBalanceDisplay();
     renderTransactionLedger();
   }
-
   api.ui.toast(`充值成功！-${hostCost.toFixed(2)} 余额 → +${addCoins.toLocaleString()} LUMA 币`);
 }
 window.submitExecuteRecharge = submitExecuteRecharge;
-
 function syncWalletDisplays() {
   const bal = window.currentWalletBalance || 0;
   const giftBal = document.getElementById('giftWalletBalance');
@@ -1099,7 +998,6 @@ function syncWalletDisplays() {
   
   const pageBal = document.getElementById('pageRevenueBalance');
   if (pageBal) pageBal.textContent = bal.toLocaleString();
-
   const revEl = document.getElementById('liveRevenueAmount');
   if (revEl) revEl.textContent = bal.toLocaleString();
   
@@ -1107,8 +1005,6 @@ function syncWalletDisplays() {
   if (modalBal) modalBal.textContent = bal.toLocaleString();
 }
 window.syncWalletDisplays = syncWalletDisplays;
-
-
 // =========================================================================
 // 【统一页面栈注册】关注列表 + 钱包
 // =========================================================================
@@ -1120,43 +1016,28 @@ if (window.PageStack) {
     animationType: 'slide-right',
   });
 }
-
-
 // =========================================================================
 // 安全区定位线（调试工具）
-// 只显示纯色细线，无标签文字
+// 只显示特淡浅灰细线，无标签文字，无底部线
 // =========================================================================
 function showSafeAreaGuides(containerId) {
   hideSafeAreaGuides();
   const container = document.getElementById(containerId);
   if (!container) return;
-
   const style = getComputedStyle(document.documentElement);
   const safeTop = style.getPropertyValue('--ai-phone-app-safe-top').trim() || '88px';
-  const safeBottom = style.getPropertyValue('--ai-phone-app-safe-bottom').trim() || '24px';
-
-  // 顶部安全区线（纯黑色细线，无标签）
+  // 顶部安全区线（特淡浅灰，无标签）
   const topLine = document.createElement('div');
   topLine.id = '__safe_guide_top';
-  topLine.style.cssText = `position:absolute;top:${safeTop};left:0;right:0;height:1px;background:#000;z-index:9999;pointer-events:none`;
-
-  // 底部安全区线（纯黑色细线，无标签）
-  const bottomLine = document.createElement('div');
-  bottomLine.id = '__safe_guide_bottom';
-  bottomLine.style.cssText = `position:absolute;bottom:${safeBottom};left:0;right:0;height:1px;background:#000;z-index:9999;pointer-events:none`;
-
+  topLine.style.cssText = `position:absolute;top:${safeTop};left:0;right:0;height:1px;background:rgba(200,200,210,0.12);z-index:9999;pointer-events:none`;
   // 容器需要 relative 定位才能让 absolute 生效
   if (getComputedStyle(container).position === 'static') {
     container.style.position = 'relative';
     container.dataset.__safeOldPos = 'static';
   }
-
   container.appendChild(topLine);
-  container.appendChild(bottomLine);
-
-  console.log(`[SafeArea] safe-top=${safeTop}, safe-bottom=${safeBottom}`);
+  console.log(`[SafeArea] safe-top=${safeTop}`);
 }
-
 function hideSafeAreaGuides() {
   document.querySelectorAll('[id^="__safe_guide_"]').forEach(el => el.remove());
   document.querySelectorAll('span').forEach(s => {
