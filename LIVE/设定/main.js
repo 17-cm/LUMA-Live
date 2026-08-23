@@ -995,14 +995,18 @@ async function checkGitRepoUpdate(silent = false) {
   gitUpdateState.isChecking = true;
   renderGitUpdateButton();
 
-  // 防御：如果 localCommit 还没从数据库加载，先读一次
-  if (!gitUpdateState.localCommit && api.db?.get) {
+  // 防御：如果 localCommit 还没从数据库加载，先读一次（db → sessionStorage 兜底）
+  if (!gitUpdateState.localCommit) {
     try {
       const cfg = await api.db.get("app_settings", "git_repo_config");
       if (cfg?.installedCommit) {
         gitUpdateState.localCommit = cfg.installedCommit;
       }
     } catch (e) {}
+    // db 没读到，试 sessionStorage
+    if (!gitUpdateState.localCommit) {
+      try { gitUpdateState.localCommit = sessionStorage.getItem('luma_local_commit') || ''; } catch(e) {}
+    }
   }
 
   const repo = (gitUpdateState.repoUrl || DEFAULT_GIT_REPO).trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
@@ -1320,22 +1324,31 @@ async function handleVersionUpdateClick() {
         gitUpdateState.localCommit = gitUpdateState.remoteCommit;
       }
       gitUpdateState.hasUpdate = false;
-      await api.db.create("app_settings", {
-        id: "git_repo_config",
-        repoUrl: gitUpdateState.repoUrl,
-        branch: gitUpdateState.branch,
-        installedVersion: gitUpdateState.currentVersion,
-        installedCommit: gitUpdateState.localCommit,
-        lastUpdated: Date.now()
-      }).catch(() => {
-        api.db.update("app_settings", "git_repo_config", {
+
+      // 持久化 localCommit：db + sessionStorage 双写确保不丢
+      try {
+        await api.db.create("app_settings", {
+          id: "git_repo_config",
           repoUrl: gitUpdateState.repoUrl,
           branch: gitUpdateState.branch,
           installedVersion: gitUpdateState.currentVersion,
           installedCommit: gitUpdateState.localCommit,
           lastUpdated: Date.now()
-        }).catch(() => {});
-      });
+        }).catch(() => {
+          return api.db.update("app_settings", "git_repo_config", {
+            repoUrl: gitUpdateState.repoUrl,
+            branch: gitUpdateState.branch,
+            installedVersion: gitUpdateState.currentVersion,
+            installedCommit: gitUpdateState.localCommit,
+            lastUpdated: Date.now()
+          });
+        });
+        console.log(`[LUMA Update] 💾 已保存 localCommit="${gitUpdateState.localCommit}" 到数据库`);
+      } catch (e) {
+        console.warn('[LUMA Update] ⚠️ 数据库保存失败:', e.message);
+      }
+      // 兜底：sessionStorage 在 reload 后立即可用
+      try { sessionStorage.setItem('luma_local_commit', gitUpdateState.localCommit || ''); } catch(e) {}
       renderGitUpdateButton();
       if (typeof window.setSplashProgress === 'function') window.setSplashProgress(100);
       // 刷新页面，splash.js 会从 api.db 读取热补丁并动态加载最新代码
