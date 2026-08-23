@@ -2090,3 +2090,39 @@ input:checked + .switch-slider:before {
 .new-key-4 { --key-color: #5eead4; --key-glow: rgba(94,234,212,0.5); }
 .new-key-5 { --key-color: #a5b4fc; --key-glow: rgba(165,180,252,0.5); }
 .new-key-6 { --key-color: #f9a8d4; --key-glow: rgba(249,168,212,0.45); }
+
+/* 修复：热搜界面样板变量定义（原封不动） */
+#communityTrendsView{
+  --bg:#F5F4F2;
+  --surface:#FFFFFF;
+  --ink:#1A1A2E;
+  --ink-2:#5A5A72;
+  --dim:#9E9EB2;
+  --line:#EEEDF0;
+  --hot:#FF5A36;
+  --hot-soft:#FFF1EC;
+  --blue:#3B82F6;
+  --rose:#F43F5E;
+  --r-card:16px;
+  --r-pill:999px;
+}
+/* 修复：安全区改用项目变量，内容再下移20px */
+#communityTrendsView .topbar{
+  padding:calc(var(--safe-top) + 20px) 16px 12px;
+}
+#communityTrendsView .cat-rail{
+  top:calc(var(--safe-top) + 84px);
+}
+#communityTrendsView #flow{
+  padding:calc(var(--safe-top) + 150px) 16px calc(var(--safe-bottom) + 24px);
+}
+/* 修复：帖子卡片不透明背景 */
+#communityTrendsView .post-card{
+  background:#FFFFFF !important;
+  border:1px solid #EEEDF0;
+  box-shadow:0 1px 3px rgba(26,26,46,.04);
+}
+#communityTrendsView .hot-list{
+  background:#FFFFFF !important;
+  border:1px solid #EEEDF0;
+}
