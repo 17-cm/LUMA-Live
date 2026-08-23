@@ -352,24 +352,449 @@ function renderDualRankList() {
 }
 window.renderDualRankList = renderDualRankList;
 
-// 5. 钱包与流水
+// =========================================================================
+// 【5. 钱包与流水 · 黑金卡风格重设计】
+//
+// ⚠️ 安全区合规说明：
+//   本页面所有可见内容均位于 --ai-phone-app-safe-top (默认88px) 之下。
+//   顶部仅保留一根浅灰色装饰线（safe-line），线上方无任何 UI 元素。
+//   底部内容预留 safe-bottom (默认24px) 的滚动空间。
+//   设计原则：安全线 = 装饰性分隔，实际内容再往下偏移约 8px。
+// =========================================================================
+
+/**
+ * 渲染完整的钱包页面 DOM（注入到 #walletPageView 容器内）
+ * 不修改 index.html，所有 HTML 由 JS 动态生成
+ */
+function renderWalletUI() {
+  const container = document.getElementById('walletPageView');
+  if (!container) return;
+
+  // ── 读取安全区 CSS 变量值 ──
+  const style = getComputedStyle(document.documentElement);
+  const safeTopVal = style.getPropertyValue('--ai-phone-app-safe-top').trim() || '88px';
+  const safeBottomVal = style.getPropertyValue('--ai-phone-app-safe-bottom').trim() || '24px';
+
+  // 安全线位置：比实际 safe-top 再往下偏一点作为装饰
+  const safeLineTop = `calc(${safeTopVal} + 6px)`;
+
+  container.innerHTML = `
+    <!-- ═══ 钱包页面容器（白底）═══ -->
+    <style>
+      /* ---- 钱包专属样式（scoped via ID prefix）---- */
+      #walletPageView {
+        background: #ffffff !important;
+        position: relative;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* 安全区装饰线 */
+      .wl-safe-line {
+        position: absolute;
+        left: 0; right: 0;
+        top: ${safeLineTop};
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(180,180,190,0.5), transparent);
+        z-index: 20;
+        pointer-events: none;
+      }
+
+      /* 顶部导航区（返回键 + 标题，在安全线下方） */
+      .wl-nav-area {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px 10px;
+        padding-top: calc(${safeLineTop} + 14px);
+        z-index: 15;
+      }
+
+      .wl-back-btn {
+        width: 34px; height: 34px;
+        border-radius: 50%;
+        background: #f7f8fa;
+        border: 1px solid #e8eaef;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+      }
+      .wl-back-btn:active { transform: scale(0.9); background: #eeeef2; }
+
+      .wl-title-group { text-align: center; flex: 1; }
+      .wl-title-main { font-size: 14px; font-weight: 900; color: #1a1a2e; letter-spacing: 0.5px; line-height: 1.2; }
+      .wl-title-sub { font-size: 9px; color: #b0b4c0; font-weight: 700; letter-spacing: 2px; margin-top: 2px; }
+
+      /* ===== 黑金银行卡（LUMA 币余额）===== */
+      .wl-gold-card-wrap { padding: 0 16px; margin-top: 6px; }
+
+      .wl-gold-card {
+        position: relative;
+        border-radius: 18px;
+        overflow: hidden;
+        min-height: 160px;
+        /* 暗金属底色 — 借鉴拟态玻璃素材的 bar-metal-base 手法 */
+        background:
+          linear-gradient(135deg, #1c1c24 0%, #12121a 40%, #0a0a10 100%);
+        box-shadow:
+          0 4px 12px rgba(0,0,0,0.35),
+          0 12px 32px rgba(0,0,0,0.25),
+          inset 0 1px 1px rgba(255,255,255,0.06);
+      }
+
+      /* 卡片顶部高光渐变 */
+      .wl-gold-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 6%; right: 6%;
+        height: 55%;
+        border-radius: 18px 18px 50% 50% / 18px 18px 30% 30%;
+        background: linear-gradient(180deg, rgba(212,185,140,0.12) 0%, rgba(212,185,140,0.02) 100%);
+        pointer-events: none;
+      }
+
+      /* 金色细边框流动效果 — 借鉴素材 border-line-outer 的 mask 技巧 */
+      .wl-card-border {
+        position: absolute;
+        inset: 1px;
+        border-radius: 17px;
+        padding: 1px;
+        background: linear-gradient(
+          120deg,
+          rgba(200,175,120,0) 0%,
+          rgba(218,195,150,0.45) 20%,
+          rgba(235,210,165,0.65) 40%,
+          rgba(245,225,185,0.75) 55%,
+          rgba(235,210,165,0.65) 70%,
+          rgba(218,195,150,0.45) 85%,
+          rgba(200,175,120,0) 100%
+        );
+        background-size: 220% 100%;
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        animation: wlFlowBorder 7s ease-in-out infinite;
+        pointer-events: none;
+      }
+
+      @keyframes wlFlowBorder {
+        0% { background-position: 220% 0; }
+        100% { background-position: -220% 0; }
+      }
+
+      /* 内部玻璃质感层 */
+      .wl-card-inner {
+        position: relative;
+        z-index: 3;
+        padding: 22px 20px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .wl-card-header { display: flex; align-items: center; justify-content: space-between; }
+      .wl-card-label { font-size: 11px; color: rgba(212,185,140,0.85); font-weight: 700; letter-spacing: 1px; }
+      .wl-card-chip-icon {
+        width: 36px; height: 26px;
+        border-radius: 4px;
+        background: linear-gradient(135deg, rgba(212,185,140,0.25), rgba(212,185,140,0.08));
+        border: 1px solid rgba(212,185,140,0.2);
+        display: flex; align-items: center; justify-content: center;
+      }
+      .wl-card-chip-icon svg { width: 22px; height: 16px; opacity: 0.6; fill: none; stroke: #d4b98c; stroke-width: 1.3; }
+
+      .wl-balance-row { margin-top: 4px; }
+      .wl-balance-amount {
+        font-size: 38px;
+        font-weight: 900;
+        color: #ffffff;
+        letter-spacing: -1px;
+        line-height: 1.05;
+        text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      }
+      .wl-balance-unit { font-size: 13px; color: rgba(212,185,140,0.75); font-weight: 600; margin-left: 6px; }
+
+      .wl-card-footer {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        margin-top: auto;
+        padding-top: 8px;
+      }
+      .wl-card-type {
+        font-size: 17px;
+        font-weight: 800;
+        color: rgba(212,185,140,0.7);
+        letter-spacing: 3px;
+        text-transform: uppercase;
+      }
+      .wl-card-no { font-size: 10px; color: rgba(255,255,255,0.25); font-family: monospace; letter-spacing: 2px; }
+
+      /* ===== 余额信息条（宿主虚拟货币）===== */
+      .wl-host-balance-bar {
+        margin: 14px 16px 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #fafbfd 0%, #f4f5f8 100%);
+        border: 1px solid #eaecef;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      }
+      .wl-host-info { display: flex; align-items: center; gap: 10px; }
+      .wl-host-icon {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #e8ecf2, #dce0e8);
+        display: flex; align-items: center; justify-content: center;
+      }
+      .wl-host-icon svg { width: 20px; height: 20px; stroke: #6b7280; stroke-width: 1.8; fill: none; }
+      .wl-host-labels .name { font-size: 13px; font-weight: 800; color: #374151; }
+      .wl-host-labels .sub { font-size: 10px; color: #9ca3af; font-weight: 500; margin-top: 1px; }
+      .wl-host-amount { text-align: right; }
+      .wl-host-val { font-size: 18px; font-weight: 900; color: #1f2937; }
+      .wl-hint { font-size: 9px; color: #9ca3af; margin-top: 2px; }
+
+      /* ===== 操作按钮行（提现 / 充值）===== */
+      .wl-action-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin: 16px 16px 0;
+      }
+      .wl-action-btn {
+        position: relative;
+        border-radius: 14px;
+        padding: 16px 12px;
+        text-align: center;
+        cursor: pointer;
+        overflow: hidden;
+        transition: all 0.25s ease;
+        border: none;
+      }
+      .wl-action-btn:active { transform: scale(0.97); }
+
+      /* 提现按钮 — 深色调 */
+      .wl-btn-cashout {
+        background: linear-gradient(145deg, #1e1e28, #14141c);
+        box-shadow: 0 4px 14px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.06);
+      }
+      .wl-btn-cashout:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+
+      /* 充值按钮 — 金色调 */
+      .wl-btn-recharge {
+        background: linear-gradient(145deg, #2a2420, #1e1a16);
+        box-shadow: 0 4px 14px rgba(180,150,90,0.15), inset 0 1px 1px rgba(255,255,255,0.07);
+      }
+      .wl-btn-recharge:hover { box-shadow: 0 6px 20px rgba(180,150,90,0.25); }
+
+      .wl-action-icon { width: 32px; height: 32px; margin: 0 auto 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+      .wl-btn-cashout .wl-action-icon { background: rgba(255,255,255,0.08); }
+      .wl-btn-recharge .wl-action-icon { background: rgba(212,185,140,0.12); }
+      .wl-action-icon svg { width: 18px; height: 18px; stroke-width: 1.8; fill: none; }
+      .wl-btn-cashout .wl-action-icon svg { stroke: #d4b98c; }
+      .wl-btn-recharge .wl-action-icon svg { stroke: #e8d5a8; }
+
+      .wl-action-name { font-size: 13px; font-weight: 800; color: #fff; letter-spacing: 0.5px; }
+      .wl-action-desc { font-size: 9px; color: rgba(255,255,255,0.4); margin-top: 4px; font-weight: 500; }
+
+      /* ===== 流水区域 ===== */
+      .wl-section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 16px 10px;
+      }
+      .wl-section-title { font-size: 14px; font-weight: 900; color: #1a1a2e; }
+      .wl-section-badge {
+        font-size: 9px;
+        color: #9ca3af;
+        background: #f3f4f6;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-weight: 600;
+      }
+
+      .wl-ledger-list { padding: 0 16px 80px; display: flex; flex-direction: column; gap: 8px; }
+
+      /* 流水单条 */
+      .wl-tx-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: #fafbfd;
+        border: 1px solid #f0f1f3;
+        transition: all 0.2s ease;
+      }
+      .wl-tx-item:active { background: #f5f6f8; }
+
+      .wl-tx-left { display: flex; align-items: center; gap: 12px; }
+      .wl-tx-icon {
+        width: 38px; height: 38px;
+        border-radius: 11px;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+      }
+      .wl-tx-icon.income { background: linear-gradient(135deg, #ecfdf5, #d1fae5); }
+      .wl-tx-icon.cashout { background: linear-gradient(135deg, #fffbeb, #fef3c7); }
+      .wl-tx-icon.recharge { background: linear-gradient(135deg, #eff6ff, #dbeafe); }
+      .wl-tx-icon.expense { background: linear-gradient(135deg, #fef2f2, #fee2e2); }
+      .wl-tx-icon svg { width: 18px; height: 18px; stroke-width: 2; fill: none; }
+      .wl-tx-icon.income svg { stroke: #059669; }
+      .wl-tx-icon.cashout svg { stroke: #d97706; }
+      .wl-tx-icon.recharge svg { stroke: #2563eb; }
+      .wl-tx-icon.expense svg { stroke: #dc2626; }
+
+      .wl-tx-text .title { font-size: 13px; font-weight: 800; color: #1f2937; }
+      .wl-tx-text .meta { font-size: 10px; color: #9ca3af; margin-top: 2px; font-weight: 500; }
+
+      .wl-tx-amount { font-size: 14px; font-weight: 900; flex-shrink: 0; }
+      .wl-tx-amount.positive { color: #059669; }
+      .wl-tx-amount.negative { color: #dc2626; }
+      .wl-tx-amount.warning { color: #d97706; }
+
+      /* 空状态 */
+      .wl-empty-state {
+        text-align: center;
+        padding: 40px 20px 60px;
+      }
+      .wl-empty-icon {
+        width: 56px; height: 56px;
+        margin: 0 auto 12px;
+        border-radius: 50%;
+        background: #f3f4f6;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .wl-empty-icon svg { width: 26px; height: 26px; stroke: #d1d5db; stroke-width: 1.5; fill: none; }
+      .wl-empty-text { font-size: 13px; font-weight: 700; color: #9ca3af; }
+      .wl-empty-sub { font-size: 11px; color: #d1d5db; margin-top: 4px; }
+    </style>
+
+    <!-- 安全区装饰线 -->
+    <div class="wl-safe-line"></div>
+
+    <!-- 导航栏 -->
+    <div class="wl-nav-area">
+      <div class="wl-back-btn" onclick="closeWalletPageView()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </div>
+      <div class="wl-title-group">
+        <div class="wl-title-main">我的钱包</div>
+        <div class="wl-title-sub">LUMA WALLET</div>
+      </div>
+      <div style="width:34px"></div>
+    </div>
+
+    <!-- 黑金卡 — LUMA 币余额 -->
+    <div class="wl-gold-card-wrap">
+      <div class="wl-gold-card">
+        <div class="wl-card-border"></div>
+        <div class="wl-card-inner">
+          <div class="wl-card-header">
+            <span class="wl-card-label">LUMA 币资产</span>
+            <div class="wl-card-chip-icon">
+              <svg viewBox="0 0 24 16"><rect x="2" y="3" width="20" height="10" rx="2"/><line x1="6" y1="7" x2="18" y2="7"/><line x1="6" y1="10" x2="12" y2="10"/></svg>
+            </div>
+          </div>
+          <div class="wl-balance-row">
+            <span class="wl-balance-amount" id="pageRevenueBalance">0</span>
+            <span class="wl-balance-unit">LUMA 币</span>
+          </div>
+          <div class="wl-card-footer">
+            <span class="wl-card-type">GOLD CARD</span>
+            <span class="wl-card-no">**** **** **** LUMA</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 宿主虚拟货币余额 -->
+    <div class="wl-host-balance-bar">
+      <div class="wl-host-info">
+        <div class="wl-host-icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10h6M9 14h6"/></svg>
+        </div>
+        <div class="wl-host-labels">
+          <div class="name">余额</div>
+          <div class="sub">宿主虚拟货币</div>
+        </div>
+      </div>
+      <div class="wl-host-amount">
+        <div class="wl-host-val" id="wlHostBalance">0.00</div>
+        <div class="wl-hint">1 : 10 LUMA</div>
+      </div>
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="wl-action-row">
+      <div class="wl-action-btn wl-btn-cashout" onclick="handleCashOutAll()">
+        <div class="wl-action-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </div>
+        <div class="wl-action-name">提现</div>
+        <div class="wl-action-desc">LUMA → 余额</div>
+      </div>
+      <div class="wl-action-btn wl-btn-recharge" onclick="openRechargeModal()">
+        <div class="wl-action-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+        </div>
+        <div class="wl-action-name">充值</div>
+        <div class="wl-action-desc">余额 → LUMA</div>
+      </div>
+    </div>
+
+    <!-- 流水标题 -->
+    <div class="wl-section-header">
+      <span class="wl-section-title">交易流水</span>
+      <span class="wl-section-badge" id="wlTxCount">0 笔记录</span>
+    </div>
+
+    <!-- 流水列表容器 -->
+    <div class="wl-ledger-list" id="transactionLedgerContainer"></div>
+  `;
+}
+
+/**
+ * 打开钱包页面
+ * 先渲染 UI，再更新数据，最后显示页面 + 安全区定位线
+ */
 function openWalletPageView() {
+  // 1. 渲染钱包界面 DOM
+  renderWalletUI();
+
+  // 2. 更新数据
   const pageRev = document.getElementById('pageRevenueBalance');
-  if (pageRev) pageRev.textContent = revenueBalance.toLocaleString();
+  if (pageRev) pageRev.textContent = (window.currentWalletBalance || revenueBalance || 0).toLocaleString();
+
+  // 计算并显示宿主虚拟货币余额（LUMA币 ÷ 10）
+  const lumaBal = window.currentWalletBalance || revenueBalance || 0;
+  const hostBalEl = document.getElementById('wlHostBalance');
+  if (hostBalEl) hostBalEl.textContent = (lumaBal / 10).toFixed(2);
+
+  // 3. 渲染流水
   renderTransactionLedger();
+
+  // 4. 显示页面
   if (window.PageStack) {
     window.PageStack.open('walletPageView');
   } else {
     const page = document.getElementById('walletPageView');
     if (page) page.classList.remove('hidden');
   }
-  // ── 安全区定位线（调试用，确认 safe-top / safe-bottom 实际位置）──
+
+  // 5. 安全区定位线（调试用，纯黑线无黄标）
   showSafeAreaGuides('walletPageView');
 }
 window.openWalletPageView = openWalletPageView;
 
 function closeWalletPageView() {
-  // 关闭时清除定位线
   hideSafeAreaGuides();
   if (window.PageStack) {
     window.PageStack.back();
@@ -380,26 +805,61 @@ function closeWalletPageView() {
 }
 window.closeWalletPageView = closeWalletPageView;
 
+/**
+ * 渲染交易流水列表（新版样式）
+ */
 function renderTransactionLedger() {
   const box = document.getElementById('transactionLedgerContainer');
   if (!box) return;
 
-  if (transactionLedger.length === 0) {
-    box.innerHTML = `<p class="text-xs text-slate-400 py-6 text-center">暂无流水记录</p>`;
+  if (!transactionLedger || transactionLedger.length === 0) {
+    box.innerHTML = `
+      <div class="wl-empty-state">
+        <div class="wl-empty-icon">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="13" y2="13"/></svg>
+        </div>
+        <div class="wl-empty-text">暂无流水记录</div>
+        <div class="wl-empty-sub">充值或提现后记录将显示在这里</div>
+      </div>
+    `;
+    // 更新计数 badge
+    const badge = document.getElementById('wlTxCount');
+    if (badge) badge.textContent = '0 笔记录';
     return;
   }
 
-  box.innerHTML = transactionLedger.map(item => `
-    <div class="luxe-card p-3 flex items-center justify-between bg-white">
-      <div>
-        <h5 class="text-xs font-black text-slate-900">${item.title}</h5>
-        <p class="text-[9px] text-slate-400 mt-0.5">${item.time} · 对方: ${item.targetName}</p>
+  // 图标映射
+  const iconMap = {
+    income:  '<svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+    recharge: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
+    cashout: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
+    expense: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>'
+  };
+
+  box.innerHTML = transactionLedger.map(item => {
+    const type = item.type || 'expense';
+    const isPositive = (type === 'income' || type === 'recharge');
+    const amountClass = isPositive ? 'positive' : (type === 'cashout' ? 'warning' : 'negative');
+    const sign = isPositive ? '+' : '-';
+    return `
+      <div class="wl-tx-item">
+        <div class="wl-tx-left">
+          <div class="wl-tx-icon ${type}">
+            ${iconMap[type] || iconMap.expense}
+          </div>
+          <div class="wl-tx-text">
+            <div class="title">${item.title || '未知交易'}</div>
+            <div class="meta">${item.time || ''} ${item.targetName ? '· ' + item.targetName : ''}</div>
+          </div>
+        </div>
+        <div class="wl-tx-amount ${amountClass}">${sign}${(item.amount || 0).toLocaleString()} LUMA</div>
       </div>
-      <span class="text-xs font-black ${item.type === 'income' || item.type === 'recharge' ? 'text-emerald-600' : item.type === 'cashout' ? 'text-amber-600' : 'text-rose-600'}">
-        ${item.type === 'income' || item.type === 'recharge' ? '+' : '-'}${item.amount.toLocaleString()} LUMA 币
-      </span>
-    </div>
-  `).join('');
+    `;
+  }).join('');
+
+  // 更新计数 badge
+  const badge = document.getElementById('wlTxCount');
+  if (badge) badge.textContent = `${transactionLedger.length} 笔记录`;
 }
 
 async function recordTransaction(title, type, amount, targetName, targetAvatar, targetTag) {
@@ -562,6 +1022,7 @@ if (window.PageStack) {
 
 // =========================================================================
 // 安全区定位线（调试工具）
+// 只显示纯色细线，无标签文字
 // =========================================================================
 function showSafeAreaGuides(containerId) {
   hideSafeAreaGuides();
@@ -572,21 +1033,15 @@ function showSafeAreaGuides(containerId) {
   const safeTop = style.getPropertyValue('--ai-phone-app-safe-top').trim() || '88px';
   const safeBottom = style.getPropertyValue('--ai-phone-app-safe-bottom').trim() || '24px';
 
-  // 顶部安全区线（水平黑线 + 标签）
+  // 顶部安全区线（纯黑色细线，无标签）
   const topLine = document.createElement('div');
   topLine.id = '__safe_guide_top';
   topLine.style.cssText = `position:absolute;top:${safeTop};left:0;right:0;height:1px;background:#000;z-index:9999;pointer-events:none`;
-  const topLabel = document.createElement('span');
-  topLabel.style.cssText = `position:absolute;top:calc(${safeTop} - 14px);right:8px;font-size:9px;color:#000;background:rgba(255,255,0,0.85);padding:1px 4px;border-radius:2px;font-family:monospace;white-space:nowrap;z-index:9999;pointer-events:none`;
-  topLabel.textContent = `safe-top: ${safeTop}`;
 
-  // 底部安全区线（水平黑线 + 标签）
+  // 底部安全区线（纯黑色细线，无标签）
   const bottomLine = document.createElement('div');
   bottomLine.id = '__safe_guide_bottom';
   bottomLine.style.cssText = `position:absolute;bottom:${safeBottom};left:0;right:0;height:1px;background:#000;z-index:9999;pointer-events:none`;
-  const bottomLabel = document.createElement('span');
-  bottomLabel.style.cssText = `position:absolute;bottom:calc(${safeBottom} - 14px);right:8px;font-size:9px;color:#000;background:rgba(255,255,0,0.85);padding:1px 4px;border-radius:2px;font-family:monospace;white-space:nowrap;z-index:9999;pointer-events:none`;
-  bottomLabel.textContent = `safe-bottom: ${safeBottom}`;
 
   // 容器需要 relative 定位才能让 absolute 生效
   if (getComputedStyle(container).position === 'static') {
@@ -595,9 +1050,7 @@ function showSafeAreaGuides(containerId) {
   }
 
   container.appendChild(topLine);
-  container.appendChild(topLabel);
   container.appendChild(bottomLine);
-  container.appendChild(bottomLabel);
 
   console.log(`[SafeArea] safe-top=${safeTop}, safe-bottom=${safeBottom}`);
 }
