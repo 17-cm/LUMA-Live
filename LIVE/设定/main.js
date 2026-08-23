@@ -256,6 +256,60 @@ async function saveOpsPollInterval() {
 }
 window.saveOpsPollInterval = saveOpsPollInterval;
 
+// 轮询日志查看器
+function openOpsLogViewer() {
+  const modal = document.getElementById('opsLogModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    renderOpsLog();
+  }
+}
+window.openOpsLogViewer = openOpsLogViewer;
+
+function closeOpsLogViewer() {
+  const modal = document.getElementById('opsLogModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
+window.closeOpsLogViewer = closeOpsLogViewer;
+
+function renderOpsLog() {
+  const container = document.getElementById('opsLogContent');
+  if (!container) return;
+  const log = window.lumaOpsLog || [];
+  if (log.length === 0) {
+    container.innerHTML = '<div class="text-center text-slate-400 py-8">暂无日志，等待下一轮轮询...</div>';
+    return;
+  }
+  container.innerHTML = log.map((cycle, idx) => {
+    const p = cycle.params;
+    const decisions = (cycle.decisions || []).map(d => {
+      const willColor = d.result === '开播' || d.result === '下播' ? 'text-rose-600' : d.result === '跳过' ? 'text-slate-400' : 'text-slate-500';
+      const detail = d.state === '直播中'
+        ? `已播${d.liveMins}分 下播意愿${d.stopWill}% 骰${d.dice}`
+        : `休息${d.restMins}分 开播意愿${d.spawnWill}% 骰${d.dice}`;
+      return `<div class="flex justify-between py-0.5 border-b border-slate-50">
+        <span class="text-slate-600">${d.char}</span>
+        <span class="text-slate-400">${detail}</span>
+        <span class="${willColor} font-bold">${d.result}</span>
+      </div>`;
+    }).join('');
+    const s = cycle.summary;
+    return `<div class="bg-slate-50 rounded-xl p-2.5">
+      <div class="flex justify-between items-center mb-1.5">
+        <span class="font-bold text-slate-700">第${log.length - idx}轮 ${cycle.time}</span>
+        <span class="text-[10px] text-slate-500">在播${s.streaming} 开播${s.started} 下播${s.stopped}</span>
+      </div>
+      <div class="text-[9px] text-slate-400 mb-1.5">参数: 开播${p.baseSpawnRate}% 下播${p.baseStopRate}% 直播上限${p.maxLiveMins}分 休息上限${p.maxRestMins}分</div>
+      <div class="space-y-0.5">${decisions}</div>
+    </div>`;
+  }).join('');
+}
+window.renderOpsLog = renderOpsLog;
+
 async function saveApiIntervalSetting() {
   try {
     if (!window.appParams) window.appParams = {};

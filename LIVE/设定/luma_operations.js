@@ -332,18 +332,26 @@ async function syncLiveSessions(options = {}) {
       // 已在直播中 → 跳过
       if (streamingIds.has(c.id)) continue;
 
-      // 读取上次下播时间
+      // 读取上次下播时间（新角色随机分配已休息时长，纳入正常判定）
       let lastEndTime = null;
-      const sched = window.charSchedulesMap ? window.charSchedulesMap[c.id] : null;
-      if (sched && sched.lastEndTime) lastEndTime = sched.lastEndTime;
+      if (!window.charSchedulesMap) window.charSchedulesMap = {};
+      const sched = window.charSchedulesMap[c.id];
+      if (sched && sched.lastEndTime) {
+        lastEndTime = sched.lastEndTime;
+      } else {
+        // 新角色：随机分配一个安全区内的已休息时长并保存，之后正常累计
+        const initRestMins = Math.floor(Math.random() * (maxRestMins - minRestMins) + minRestMins);
+        lastEndTime = now - initRestMins * 60000;
+        window.charSchedulesMap[c.id] = { lastEndTime: lastEndTime, isNew: true };
+        try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch(e) {}
+      }
 
-      const hasStreamedBefore = !!lastEndTime;
-      const restMins = hasStreamedBefore ? Math.round((now - lastEndTime) / 60000) : null;
+      const restMins = Math.round((now - lastEndTime) / 60000);
 
       let spawnWill, reason, skipReason = null;
 
-      // 强制休息期：只对播过的角色生效
-      if (hasStreamedBefore && restMins < minRestMins) {
+      // 强制休息期
+      if (restMins < minRestMins) {
         skipReason = `强制休息期(${restMins}/${minRestMins}分钟)`;
         cycleLog.decisions.push({
           char: charName, state: '休息中', restMins: restMins,
@@ -352,16 +360,11 @@ async function syncLiveSessions(options = {}) {
         continue;
       }
 
-      if (!hasStreamedBefore) {
-        // 从没播过的角色：只用基础意愿，无增长加成
-        spawnWill = baseSpawnRate;
-        reason = '首次开播(仅基础意愿)';
-      } else if (restMins >= maxRestMins) {
-        // 安全区外：达到休息时长上限 → 必然开播
+      // 安全区判定
+      if (restMins >= maxRestMins) {
         spawnWill = 100;
         reason = '达到上限必然开播';
       } else {
-        // 安全区内：基础开播意愿 + 比例式增长
         spawnWill = Math.round(baseSpawnRate + (restMins / maxRestMins) * 50);
         reason = '安全区比例增长';
       }
@@ -372,7 +375,7 @@ async function syncLiveSessions(options = {}) {
       cycleLog.decisions.push({
         char: charName,
         state: '休息中',
-        restMins: restMins === null ? '首次' : restMins,
+        restMins: restMins,
         spawnWill: spawnWill,
         dice: dice,
         reason: reason,
