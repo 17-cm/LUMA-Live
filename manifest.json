@@ -11,30 +11,26 @@
     "app.data.read",
     "app.data.write",
     "characters.read",
-    "characters.state.read",
     "characters.state.write",
     "user.profile.read",
     "ai.generate",
     "ai.generateImage",
     "voice.tts",
-    "voice.readProfiles",
     "wallet.read",
     "wallet.pay",
-    "chat.read",
-    "chat.read.background",
     "chat.sendMessage",
     "chat.tools",
     "world.read",
     "ui.toast",
-    "ui.notification",
-    "notifications.read",
     "notifications.write",
     "memory.write",
-    "tasks.schedule",
     "network.fetch"
   ],
   "network": {
-    "allowedDomains": ["api.github.com", "raw.githubusercontent.com"],
+    "allowedDomains": [
+      "api.github.com",
+      "raw.githubusercontent.com"
+    ],
     "mode": "proxy"
   },
   "extensions": {
@@ -82,8 +78,14 @@
     ]
   },
   "resources": {
-    "presets": ["presets.json"],
-    "regexes": ["regex.json"],
-    "worlds": ["world.json"]
+    "presets": [
+      "presets.json"
+    ],
+    "regexes": [
+      "regex.json"
+    ],
+    "worlds": [
+      "world.json"
+    ]
   }
 }

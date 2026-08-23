@@ -427,7 +427,6 @@ function closeStreamerProfilePage() {
   }
 }
 window.closeStreamerProfilePage = closeStreamerProfilePage;
-window.closeStreamerSpace = closeStreamerProfilePage;
 
 function renderStreamerProfileToUI(p) {
   const coverEl = document.getElementById('spCoverImg');

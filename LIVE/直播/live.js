@@ -179,7 +179,6 @@ function renderSubCategories() {
   }).join('');
 }
 window.renderSubCategories = renderSubCategories;
-window.renderSubCategoryBar = renderSubCategories;
 
 function normalizeCategory(cat) {
   if (!cat) return '随性杂谈';
@@ -390,7 +389,6 @@ function enterLiveRoom(sessionId) {
   }
 }
 window.enterLiveRoom = enterLiveRoom;
-window.openLiveRoom = enterLiveRoom;
 
 function closeLiveRoom() {
   clearInterval(liveDurationInterval);
@@ -413,17 +411,6 @@ function closeLiveRoom() {
 }
 window.closeLiveRoom = closeLiveRoom;
 
-function enterLiveRoomByRoomId(targetRoomId) {
-  if (!targetRoomId) return false;
-  const match = (window.liveList || liveList || []).find(s => String(s.roomId) === String(targetRoomId) || String(s.id) === String(targetRoomId));
-  if (match) {
-    enterLiveRoom(match.id);
-    return true;
-  }
-  return false;
-}
-window.enterLiveRoomByRoomId = enterLiveRoomByRoomId;
-window.openLiveByRoomId = enterLiveRoomByRoomId;
 
 // checkDeepLinkParams 增强版本定义在文件末尾，这里只保留 load 事件监听
 window.addEventListener('load', () => {

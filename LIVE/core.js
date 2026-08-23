@@ -365,10 +365,6 @@
     }
   };
 
-  window.getAiPhoneApi = function() {
-    return window.AiPhone || window.AiPhoneApp || window.api || polyfill;
-  };
-
   window.api = Object.assign(polyfill, hostApi || {});
 })();
 
@@ -490,12 +486,6 @@ async function saveDbSetting(settingKey, data) {
     }
     return true;
   } catch (e) {
-    try {
-      if (typeof api.db.set === 'function') {
-        await api.db.set("app_settings", settingKey, data);
-        return true;
-      }
-    } catch (err) {}
     console.warn(`[LUMA DB] 保存 ${settingKey} 异常:`, e);
     return false;
   }
