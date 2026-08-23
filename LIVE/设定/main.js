@@ -95,6 +95,9 @@ function updateParam(key, val) {
     const tagEl = document.getElementById('tagCharRate');
     if (el) el.textContent = `${num}%`;
     if (tagEl) tagEl.textContent = `${num}% 概率开播`;
+  } else if (key === 'baseStopRate') {
+    const el = document.getElementById('valBaseStopRate');
+    if (el) el.textContent = `${num}%`;
   } else if (key === 'maxLiveDuration') {
     const el = document.getElementById('valMaxLiveDuration');
     if (el) el.textContent = `${num}分钟`;
@@ -138,8 +141,9 @@ function syncParamDisplays() {
     if (text && val !== undefined) text.textContent = `${val}${suffix}`;
   };
 
-  const spawnVal = p.charSpawnRate !== undefined ? p.charSpawnRate : 45;
+  const spawnVal = p.charSpawnRate !== undefined ? p.charSpawnRate : 25;
   setVal('paramCharSpawnRate', spawnVal, 'valCharSpawnRate', '%');
+  setVal('paramBaseStopRate', p.baseStopRate !== undefined ? p.baseStopRate : 10, 'valBaseStopRate', '%');
   const tagEl = document.getElementById('tagCharRate');
   if (tagEl) tagEl.textContent = `${spawnVal}% 概率开播`;
 
@@ -158,6 +162,13 @@ function syncParamDisplays() {
   setVal('paramGiftFrequency', p.giftFrequency || 30, 'valGiftFrequency', '');
   setVal('paramEnterPlayerLiveRate', p.enterPlayerLiveRate || 60, 'valEnterPlayerLiveRate', '%');
   setVal('paramGuestbookRate', p.guestbookRate || 75, 'valGuestbookRate', '%');
+
+  // 后台轮询间隔显示
+  const pollVal = p.opsPollInterval || 3;
+  const pollInput = document.getElementById('paramOpsPollInterval');
+  const pollText = document.getElementById('valOpsPollInterval');
+  if (pollInput) pollInput.value = pollVal;
+  if (pollText) pollText.textContent = `${pollVal} 分钟`;
 
   const fxSwitch = document.getElementById('paramGiftFullScreenEffect');
   if (fxSwitch) {
@@ -201,6 +212,49 @@ function updateApiIntervalDisplay(value) {
   window.appParams.apiRequestInterval = minutes;
 }
 window.updateApiIntervalDisplay = updateApiIntervalDisplay;
+
+// 后台轮询间隔显示更新
+function updateOpsPollIntervalDisplay(value) {
+  const minutes = Number(value) || 3;
+  const valEl = document.getElementById('valOpsPollInterval');
+  if (valEl) valEl.textContent = `${minutes} 分钟`;
+  if (!window.appParams) window.appParams = {};
+  window.appParams.opsPollInterval = minutes;
+}
+window.updateOpsPollIntervalDisplay = updateOpsPollIntervalDisplay;
+
+// 重启 LUMA官方运营组定时器
+function resetLumaOpsTimer() {
+  if (window.__lumaLiveSyncInterval) {
+    clearInterval(window.__lumaLiveSyncInterval);
+    window.__lumaLiveSyncInterval = null;
+  }
+  const pollMins = (window.appParams && window.appParams.opsPollInterval) || 3;
+  window.__lumaLiveSyncInterval = setInterval(() => {
+    syncLiveSessions({ allowSpawn: true });
+  }, pollMins * 60 * 1000);
+  console.log(`[LUMA官方运营组] 定时器已重启，间隔 ${pollMins} 分钟`);
+}
+window.resetLumaOpsTimer = resetLumaOpsTimer;
+
+// 保存后台轮询间隔：落盘 + 重播开屏 + 重启定时器
+async function saveOpsPollInterval() {
+  try {
+    if (!window.appParams) window.appParams = {};
+    await dbUpsert("app_settings", "global_params", window.appParams);
+    api.ui.toast("已保存，正在重启APP触发！");
+    // 重播开屏动画
+    if (typeof window.replaySplash === 'function') {
+      window.replaySplash();
+    }
+    // 重启定时器（从头开始计算轮询时间）
+    resetLumaOpsTimer();
+  } catch (e) {
+    api.ui.toast("保存成功");
+    resetLumaOpsTimer();
+  }
+}
+window.saveOpsPollInterval = saveOpsPollInterval;
 
 async function saveApiIntervalSetting() {
   try {
@@ -1146,11 +1200,12 @@ async function lumaInitApp() {
   // 6. 检查分享直达参数 (Deep link)
   checkDeepLinkParams();
 
-  // 7. 启动周期性作息推演定时器 (每 30 秒轮询)
+  // 7. 启动 LUMA官方运营组·定时器轮询
   if (!window.__lumaLiveSyncInterval) {
+    const pollMins = (window.appParams && window.appParams.opsPollInterval) || 3;
     window.__lumaLiveSyncInterval = setInterval(() => {
       syncLiveSessions({ allowSpawn: true });
-    }, 30000);
+    }, pollMins * 60 * 1000);
   }
 
   console.log('[LUMA Live] ✅ 启动成功');

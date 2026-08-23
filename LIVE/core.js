@@ -441,9 +441,12 @@ window.charSchedulesMap = window.charSchedulesMap || {};
 
 // 9 大沙盒核心参数
 window.appParams = window.appParams || {
-  charSpawnRate: 45,
+  charSpawnRate: 25,
+  baseStopRate: 10,
   maxLiveDuration: 120,
   maxRestDuration: 360,
+  minRestDuration: 10,
+  opsPollInterval: 3,
   replyRandomDanmakuRate: 25,
   mentionUserRate: 30,
   enterOtherLiveRate: 35,
@@ -500,7 +503,8 @@ function lumaOpsNotify(title, detail, type = 'info') {
 window.lumaOpsNotify = lumaOpsNotify;
 
 // =========================================================================
-// 【LUMA 直播官方运营组】：唯一权威审核裁决网关（Single Source of Truth）
+// 【房管】：直播间开关权限管理 + 审核裁决网关（防多开、防分身、维护模式拦截）
+// 官方运营组（定时器轮询）做概率决策后通知房管，房管审核通过才开关直播间
 // =========================================================================
 const lumaOpsGateway = {
   async requestStartLive({ characterId, category, topic, durationMins, source = 'system' }) {

@@ -272,6 +272,7 @@
     if (container) { container.classList.add('splash-exit'); setTimeout(() => { container.style.display='none'; }, 750); }
   }
 
+  window.replaySplash = runSplashScreenAnimation;
   window.exitSplashScreen = exitSplashScreen;
 
   if (document.readyState === 'loading') {
