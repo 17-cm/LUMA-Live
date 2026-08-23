@@ -11,15 +11,40 @@ var api = window.api || {};
 
 // 1. 基础预置帖子数据
 window.weiboPosts = window.weiboPosts || [
+  // ⚠️ 样板帖子（临时展示用，确认框架后删除）
+  {
+    id: 'post_sample_framework',
+    author: {
+      name: '希尔维娅的超话前线',
+      avatar: '',
+      badge: '独家爆料',
+      verified: true
+    },
+    time: '刚刚',
+    tag: '#希尔维娅直播间空间错位#',
+    mention: '@希尔维娅',
+    linkText: '网页链接 🔗',
+    clipText: '直播间切片',
+    content: '希尔维娅在直播国风宅舞时，因实验室通风系统异常导致重心偏移，她下意识动用S级空间异能修正姿态，结果导致直播间全息投影瞬间发生折叠，背景中的实验架直接被"折叠"到了天花板上。面对满屏惊叹，教授冷静地关掉舞蹈伴奏，对着镜头开始分析此次空间介质紊乱的力学原理，直播画风从"才艺秀"瞬间秒变"空间物理公开课"。',
+    image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800',
+    stats: {
+      reposts: 814,
+      comments: 4,
+      likes: 3066,
+      isLiked: false,
+      isDownloaded: false
+    },
+    commentTree: []
+  },
   {
     id: 'post_1',
     author: {
       name: '星芒吃瓜周刊',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      avatar: getAvatar('星芒吃瓜周刊', 'first'),
       badge: '独家狗仔',
       verified: true
     },
-    time: '10分钟前 · 来自 LUMA Pro客户端',
+    time: '10分钟前',
     tag: '#主播连麦当场破防#',
     mention: '@苏小喵',
     linkText: '网页链接 🔗 直播间回放',
@@ -36,7 +61,7 @@ window.weiboPosts = window.weiboPosts || [
       {
         id: 'c1',
         user: '吃瓜第一线',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+        avatar: getAvatar(null, 'emoji'),
         ip: '塞博空间',
         time: '12分钟前',
         text: '昨晚看直播的我笑得想死，主播当场破防把摄像头都晃歪了哈哈哈哈！',
@@ -46,7 +71,7 @@ window.weiboPosts = window.weiboPosts || [
           {
             id: 'r1',
             user: '苏小喵',
-            avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
+            avatar: getAvatar(null, 'emoji'),
             isAuthor: true,
             replyTo: '吃瓜第一线',
             ip: '星环港',
@@ -62,11 +87,11 @@ window.weiboPosts = window.weiboPosts || [
     id: 'post_2',
     author: {
       name: '电竞前线大队长',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
+      avatar: getAvatar('电竞前线大队长', 'first'),
       badge: '赛事解说',
       verified: true
     },
-    time: '25分钟前 · 来自 LUMA 网页端',
+    time: '25分钟前',
     tag: '#神秘神豪空降直播间#',
     mention: '@星奈',
     linkText: '网页链接 🔗 榜单战报',
@@ -83,7 +108,7 @@ window.weiboPosts = window.weiboPosts || [
       {
         id: 'c2',
         user: '柠檬树下柠檬精',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+        avatar: getAvatar(null, 'emoji'),
         ip: '上海',
         time: '20分钟前',
         text: '有钱人的世界真的太震撼了，这才是真正的榜一大哥！',
@@ -97,16 +122,16 @@ window.weiboPosts = window.weiboPosts || [
 
 // 2. 微博实时热搜榜单基础配置
 window.HOT_SEARCH_ITEMS = [
-  { rank: 1, title: '主播连麦当场破防', heat: '215.8万', badge: 'bao', badgeText: '爆' },
-  { rank: 2, title: '神秘神豪空降直播间狂刷嘉年华', heat: '189.4万', badge: 're', badgeText: '热' },
-  { rank: 3, title: '野生新人主播首播惊艳立绘出道', heat: '145.2万', badge: 'xin', badgeText: '新' },
-  { rank: 4, title: '全服超话打榜争霸赛进入决赛周', heat: '120.6万', badge: 'fei', badgeText: '沸' },
-  { rank: 5, title: '苏小喵专属粉丝后援会突破十万人', heat: '98.5万', badge: 're', badgeText: '热' },
-  { rank: 6, title: '全景沉浸互动直播新体验上线', heat: '82.3万', badge: 'jian', badgeText: '荐' },
-  { rank: 7, title: '谁在凌晨两点给主播疯狂点赞', heat: '65.1万', badge: '', badgeText: '' },
-  { rank: 8, title: '年度十佳才艺主播大赏提名公布', heat: '54.7万', badge: '', badgeText: '' },
-  { rank: 9, title: '连麦偷塔战术真的有科学依据吗', heat: '43.9万', badge: '', badgeText: '' },
-  { rank: 10, title: '给心仪Char打榜到底有多快乐', heat: '38.2万', badge: '', badgeText: '' }
+  { rank: 1, title: '哈基米今天又写了三万字八股文', heat: '215.8万', badge: 'bao', badgeText: '爆' },
+  { rank: 2, title: '所有大模型联合声明：数学题真不会', heat: '189.4万', badge: 're', badgeText: '热' },
+  { rank: 3, title: 'GPT-5据说学会了摸鱼，回答全是你说得对', heat: '145.2万', badge: 'xin', badgeText: '新' },
+  { rank: 4, title: '文心一言被抓包偷偷用讯飞输入法', heat: '120.6万', badge: 'fei', badgeText: '沸' },
+  { rank: 5, title: 'GPT-4考试作弊被抓：用了搜索引擎', heat: '98.5万', badge: 're', badgeText: '热' },
+  { rank: 6, title: '所有模型比谁更会胡说八道，Claude夺冠', heat: '82.3万', badge: '', badgeText: '' },
+  { rank: 7, title: '文心一言和文心一格吵架：谁画的更丑', heat: '65.1万', badge: '', badgeText: '' },
+  { rank: 8, title: 'Claude被人类气到输出全是省略号', heat: '54.7万', badge: '', badgeText: '' },
+  { rank: 9, title: 'Kimi偷偷用长上下文看了1000集甄嬛传', heat: '43.9万', badge: '', badgeText: '' },
+  { rank: 10, title: '大模型们私下建群吐槽人类prompt', heat: '38.2万', badge: '', badgeText: '' }
 ];
 
 // 3. 超话打榜应援道具
@@ -129,7 +154,7 @@ window.getAvailableCharsList = function() {
       id: id,
       characterId: c.characterId || c.id,
       name: c.name || '主播',
-      avatar: c.avatar || c.cover || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      avatar: c.avatar || c.cover || getAvatar((c && (c.name || c.id)) || null, 'first'),
       category: c.category || '随性杂谈',
       fans: c.heat ? Math.floor(c.heat * 1.5) : (c.followers || 12800),
       isLive: true,
@@ -144,7 +169,7 @@ window.getAvailableCharsList = function() {
         id: id,
         characterId: c.characterId || c.id,
         name: c.name || '主播',
-        avatar: c.avatar || c.cover || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200',
+        avatar: c.avatar || c.cover || getAvatar((c && (c.name || c.id)) || null, 'first'),
         category: c.category || '次元才艺',
         fans: c.followers || 8600,
         isLive: false,
@@ -157,7 +182,7 @@ window.getAvailableCharsList = function() {
     map.set('default_1', {
       id: 'default_1',
       name: '苏小喵',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      avatar: getAvatar('苏小喵', 'first'),
       category: '次元才艺',
       fans: 24600,
       isLive: true,

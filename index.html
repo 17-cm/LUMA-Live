@@ -145,86 +145,110 @@
 
         <div class="grid grid-cols-2 gap-3 pt-0.5">
           <!-- 按键 1: 今日热搜 -->
-          <div onclick="openCommunitySubPage('trends')" class="community-action-card">
-            <div class="flex items-start justify-between">
-              <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-rose-500 to-amber-500 flex items-center justify-center text-white shadow-md">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          <div onclick="openCommunitySubPage('trends')" class="new-key new-key-1">
+            <div class="new-key-corner-tl"></div>
+            <div class="new-key-corner-br"></div>
+            <div class="new-key-scanlines"></div>
+            <div class="new-key-beam"></div>
+            <div class="new-key-glow-bottom"></div>
+            <div class="new-key-content">
+              <div class="new-key-mark"><div class="new-key-mark-inner"></div></div>
+              <div class="new-key-text">
+                <span class="new-key-name">今日热搜</span>
+                <svg class="new-key-hook" viewBox="0 0 80 14"><path d="M 2 8 C 20 2 50 2 72 8 C 78 11 74 14 70 12"/></svg>
+                <span class="new-key-sub">全网实时沸点 & 动态流</span>
               </div>
-              <span class="text-[8px] bg-rose-50 text-rose-600 font-extrabold px-1.5 py-0.2 rounded border border-rose-200">TOP 10</span>
-            </div>
-            <div class="mt-2">
-              <h4 class="text-xs font-black text-slate-900 leading-tight">今日热搜</h4>
-              <p class="text-[9px] text-slate-400 mt-0.5 truncate">全网实时沸点 & 动态流</p>
+              <div class="new-key-arrow"><span>›</span></div>
             </div>
           </div>
 
           <!-- 按键 2: 超话专区 -->
-          <div onclick="openCommunitySubPage('super_topic')" class="community-action-card">
-            <div class="flex items-start justify-between">
-              <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-md">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"></circle><path d="M3.6 9h16.8"></path><path d="M3.6 15h16.8"></path><path d="M11.5 3a17 17 0 0 0 0 18"></path><path d="M12.5 3a17 17 0 0 1 0 18"></path></svg>
+          <div onclick="openCommunitySubPage('super_topic')" class="new-key new-key-2">
+            <div class="new-key-corner-tl"></div>
+            <div class="new-key-corner-br"></div>
+            <div class="new-key-scanlines"></div>
+            <div class="new-key-beam"></div>
+            <div class="new-key-glow-bottom"></div>
+            <div class="new-key-content">
+              <div class="new-key-mark"><div class="new-key-mark-inner"></div></div>
+              <div class="new-key-text">
+                <span class="new-key-name">超话专区</span>
+                <svg class="new-key-hook" viewBox="0 0 80 14"><path d="M 2 8 C 20 2 50 2 72 8 C 78 11 74 14 70 12"/></svg>
+                <span class="new-key-sub">主播粉丝根据地 · 签到</span>
               </div>
-              <span class="text-[8px] bg-purple-50 text-purple-700 font-extrabold px-1.5 py-0.2 rounded border border-purple-200">抽屉选人</span>
-            </div>
-            <div class="mt-2">
-              <h4 class="text-xs font-black text-slate-900 leading-tight">超话专区</h4>
-              <p class="text-[9px] text-slate-400 mt-0.5 truncate">主播粉丝根据地 · 签到</p>
+              <div class="new-key-arrow"><span>›</span></div>
             </div>
           </div>
 
           <!-- 按键 3: 排行榜 -->
-          <div onclick="openCommunitySubPage('ranking')" class="community-action-card">
-            <div class="flex items-start justify-between">
-              <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-md">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.45 1-1 1H7v2h10v-2h-2c-.55 0-1-.45-1-1v-2.34"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"></path></svg>
+          <div onclick="openCommunitySubPage('ranking')" class="new-key new-key-3">
+            <div class="new-key-corner-tl"></div>
+            <div class="new-key-corner-br"></div>
+            <div class="new-key-scanlines"></div>
+            <div class="new-key-beam"></div>
+            <div class="new-key-glow-bottom"></div>
+            <div class="new-key-content">
+              <div class="new-key-mark"><div class="new-key-mark-inner"></div></div>
+              <div class="new-key-text">
+                <span class="new-key-name">排行榜</span>
+                <svg class="new-key-hook" viewBox="0 0 80 14"><path d="M 2 8 C 20 2 50 2 72 8 C 78 11 74 14 70 12"/></svg>
+                <span class="new-key-sub">人气榜 · 守护榜 · 勤奋榜</span>
               </div>
-              <span class="text-[8px] bg-amber-50 text-amber-700 font-extrabold px-1.5 py-0.2 rounded border border-amber-200">全服实时</span>
-            </div>
-            <div class="mt-2">
-              <h4 class="text-xs font-black text-slate-900 leading-tight">排行榜</h4>
-              <p class="text-[9px] text-slate-400 mt-0.5 truncate">人气榜 · 守护榜 · 勤奋榜</p>
+              <div class="new-key-arrow"><span>›</span></div>
             </div>
           </div>
 
           <!-- 按键 4: 直播设置 -->
-          <div onclick="openCommunitySubPage('live_settings')" class="community-action-card">
-            <div class="flex items-start justify-between">
-              <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-md">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+          <div onclick="openCommunitySubPage('live_settings')" class="new-key new-key-4">
+            <div class="new-key-corner-tl"></div>
+            <div class="new-key-corner-br"></div>
+            <div class="new-key-scanlines"></div>
+            <div class="new-key-beam"></div>
+            <div class="new-key-glow-bottom"></div>
+            <div class="new-key-content">
+              <div class="new-key-mark"><div class="new-key-mark-inner"></div></div>
+              <div class="new-key-text">
+                <span class="new-key-name">直播设置</span>
+                <svg class="new-key-hook" viewBox="0 0 80 14"><path d="M 2 8 C 20 2 50 2 72 8 C 78 11 74 14 70 12"/></svg>
+                <span class="new-key-sub">开播偏好 · 筹备中</span>
               </div>
-              <span class="text-[8px] bg-cyan-50 text-cyan-700 font-extrabold px-1.5 py-0.2 rounded border border-cyan-200">前瞻</span>
-            </div>
-            <div class="mt-2">
-              <h4 class="text-xs font-black text-slate-900 leading-tight">直播设置</h4>
-              <p class="text-[9px] text-slate-400 mt-0.5 truncate">开播偏好 · 筹备中</p>
+              <div class="new-key-arrow"><span>›</span></div>
             </div>
           </div>
 
           <!-- 按键 5: 官方论坛 -->
-          <div onclick="openCommunitySubPage('forum')" class="community-action-card">
-            <div class="flex items-start justify-between">
-              <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          <div onclick="openCommunitySubPage('forum')" class="new-key new-key-5">
+            <div class="new-key-corner-tl"></div>
+            <div class="new-key-corner-br"></div>
+            <div class="new-key-scanlines"></div>
+            <div class="new-key-beam"></div>
+            <div class="new-key-glow-bottom"></div>
+            <div class="new-key-content">
+              <div class="new-key-mark"><div class="new-key-mark-inner"></div></div>
+              <div class="new-key-text">
+                <span class="new-key-name">官方论坛</span>
+                <svg class="new-key-hook" viewBox="0 0 80 14"><path d="M 2 8 C 20 2 50 2 72 8 C 78 11 74 14 70 12"/></svg>
+                <span class="new-key-sub">版本更新 · 反馈信箱</span>
               </div>
-              <span class="text-[8px] bg-emerald-50 text-emerald-700 font-extrabold px-1.5 py-0.2 rounded border border-emerald-200">LUMA官方</span>
-            </div>
-            <div class="mt-2">
-              <h4 class="text-xs font-black text-slate-900 leading-tight">官方论坛</h4>
-              <p class="text-[9px] text-slate-400 mt-0.5 truncate">版本更新 · 反馈信箱</p>
+              <div class="new-key-arrow"><span>›</span></div>
             </div>
           </div>
 
           <!-- 按键 6: 我的超话 -->
-          <div onclick="openCommunitySubPage('my_topic')" class="community-action-card">
-            <div class="flex items-start justify-between">
-              <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center text-white shadow-md">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+          <div onclick="openCommunitySubPage('my_topic')" class="new-key new-key-6">
+            <div class="new-key-corner-tl"></div>
+            <div class="new-key-corner-br"></div>
+            <div class="new-key-scanlines"></div>
+            <div class="new-key-beam"></div>
+            <div class="new-key-glow-bottom"></div>
+            <div class="new-key-content">
+              <div class="new-key-mark"><div class="new-key-mark-inner"></div></div>
+              <div class="new-key-text">
+                <span class="new-key-name">我的超话</span>
+                <svg class="new-key-hook" viewBox="0 0 80 14"><path d="M 2 8 C 20 2 50 2 72 8 C 78 11 74 14 70 12"/></svg>
+                <span class="new-key-sub">玩家专属应援地 · 打卡</span>
               </div>
-              <span class="text-[8px] bg-pink-50 text-pink-700 font-extrabold px-1.5 py-0.2 rounded border border-pink-200">VIP专属</span>
-            </div>
-            <div class="mt-2">
-              <h4 class="text-xs font-black text-slate-900 leading-tight">我的超话</h4>
-              <p class="text-[9px] text-slate-400 mt-0.5 truncate">玩家专属应援地 · 打卡</p>
+              <div class="new-key-arrow"><span>›</span></div>
             </div>
           </div>
         </div>
@@ -302,7 +326,7 @@
           <div class="flex gap-3.5">
             <div class="relative">
               <div id="userAvatarContainer" class="w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 via-rose-500 to-purple-600 shadow-md">
-                <img id="userAvatarBox" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200" class="w-full h-full rounded-full object-cover border-2 border-white">
+                <img id="userAvatarBox" src="" class="w-full h-full rounded-full object-cover border-2 border-white">
               </div>
               <span class="absolute -bottom-1 -right-1 bg-slate-900 text-amber-300 text-[8px] font-black px-1.5 py-0.2 rounded-full border border-amber-400/40">VIP 9</span>
             </div>
@@ -1076,11 +1100,6 @@
       <button onclick="closeStreamerProfilePage()" class="profile-nav-btn" title="返回">
         <svg class="w-5 h-5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </button>
-      <div class="flex items-center gap-2">
-        <button onclick="shareCurrentStreamerProfile()" class="profile-nav-btn" title="分享">
-          <svg class="w-4 h-4 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-        </button>
-      </div>
     </div>
 
     <!-- 滚动内容容器 -->
@@ -1119,9 +1138,9 @@
               <span id="spFollowBtnText">关注</span>
             </button>
 
-            <!-- 发私信/互动 -->
-            <button onclick="spOpenPrivateChat()" class="p-2 rounded-full bg-slate-100 text-slate-700 active:scale-95 transition" title="发私信">
-              <svg class="w-4 h-4 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            <!-- 铅笔：编辑主播档案 -->
+            <button onclick="spOpenProfileEdit()" class="p-2 rounded-full bg-slate-100 text-slate-700 active:scale-95 transition" title="编辑档案">
+              <svg class="w-4 h-4 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
             </button>
           </div>
         </div>
@@ -1183,7 +1202,7 @@
         </div>
       </div>
 
-      <!-- 微博 4 大专属 Tab 导航条 (粘性定位) -->
+      <!-- 微博 Tab 导航条 (粘性定位；动态 Tab 保留，随机内容已清空，等社区真实功能) -->
       <div class="sticky top-0 z-20 bg-white/95 backdrop-blur border-y border-slate-100 flex items-center justify-around px-2 shadow-xs">
         <div onclick="switchSpTab('posts')" id="spTabPosts" class="weibo-tab-item active">动态</div>
         <div onclick="switchSpTab('shows')" id="spTabShows" class="weibo-tab-item">直播场次</div>
@@ -1191,13 +1210,13 @@
         <div onclick="switchSpTab('guestbook')" id="spTabGuestbook" class="weibo-tab-item">留言墙</div>
       </div>
 
-      <!-- Tab 1: 动态微博列表 -->
+      <!-- Tab 1: 动态微博列表（随机内容已清空，显示空态） -->
       <div id="spPanelPosts" class="p-3 space-y-3"></div>
 
       <!-- Tab 2: 直播场次与回放记录 -->
       <div id="spPanelShows" class="hidden p-3 space-y-3"></div>
 
-      <!-- Tab 3: 相册影集 -->
+      <!-- Tab 2: 相册影集 -->
       <div id="spPanelGallery" class="hidden p-3"></div>
 
       <!-- Tab 4: 留言墙与守护榜 -->
@@ -1215,6 +1234,49 @@
         </div>
         <div id="spaceGuestbookList" class="space-y-2.5"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- 编辑主播档案弹窗（铅笔入口） -->
+  <div id="profileEditModal" class="hidden center-modal-backdrop">
+    <div class="center-modal-card p-5 space-y-3 max-h-[85vh] overflow-y-auto no-scrollbar">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-black text-slate-900">编辑主播档案</h3>
+        <button onclick="closeProfileEditModal()" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center active:scale-90 transition" title="关闭">
+          <svg class="w-3.5 h-3.5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">个人认证</label>
+        <input id="peVerifyTitle" class="input-ins w-full mt-1" placeholder="如：LUMA 年度认证大V主播 · 音乐主唱">
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">个性签名</label>
+        <input id="peBio" class="input-ins w-full mt-1" placeholder="一句话介绍自己">
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">IP属地</label>
+        <input id="peIpLocation" class="input-ins w-full mt-1" placeholder="如：广东 / 赛博星云-新京都">
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">粉丝团（只能修改前缀，"粉丝团"三个字固定）</label>
+        <div class="flex items-center gap-2 mt-1">
+          <input id="peFanClubPrefix" class="input-ins flex-1" placeholder="粉丝团前缀">
+          <span class="text-xs font-black text-rose-600 bg-rose-50 px-3 py-2.5 rounded-xl border border-rose-100 flex-shrink-0">粉丝团</span>
+        </div>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">四个标签（带 #）</label>
+        <div class="space-y-2 mt-1">
+          <input id="peTag1" class="input-ins w-full" placeholder="#标签一">
+          <input id="peTag2" class="input-ins w-full" placeholder="#标签二">
+          <input id="peTag3" class="input-ins w-full" placeholder="#标签三">
+          <input id="peTag4" class="input-ins w-full" placeholder="#标签四">
+        </div>
+      </div>
+
+      <button onclick="spSaveProfileEdit()" class="btn-brand w-full py-3">保存</button>
     </div>
   </div>
 
@@ -1390,48 +1452,55 @@
 
   <!-- 子页面 1: 今日热搜 全屏子页 (仿微博热搜榜 & 热点广场) -->
   <div id="communityTrendsView" class="full-page-view hidden">
-    <div class="page-nav-bar">
-      <button onclick="closeCommunitySubPage()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <!-- 顶部导航：返回 + 搜索 + 加号(发布) + 刷新 -->
+    <div class="topbar">
+      <button class="icon-btn" onclick="closeCommunitySubPage()" aria-label="返回">
+        <svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H115.31l34.35,34.34a8,8,0,0,1-11.32,11.32l-48-48a8,8,0,0,1,0-11.32l48-48a8,8,0,0,1,11.32,11.32L115.31,120H216A8,8,0,0,1,224,128Z"/></svg>
       </button>
-      <div class="text-center">
-        <h3 class="text-xs font-black text-slate-900 leading-none">微博热搜 · 实时榜</h3>
-        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">HOT SEARCH & PLAZA</span>
+      <div class="search-box">
+        <svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></svg>
+        <input type="text" placeholder="搜索热搜、用户、话题">
       </div>
-      <div class="flex items-center gap-1.5">
-        <button onclick="handleGenerateNewTrend()" class="btn-brand text-[10px] !py-1 !px-2.5 shadow-sm">
-          <span>刷新</span>
-        </button>
-        <button onclick="openCreatePostModal('#微博热搜#')" class="w-7 h-7 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-bold shadow-sm active:scale-90 transition">
-          +
-        </button>
-      </div>
+      <!-- 加号 = 发布帖子入口 -->
+      <button class="icon-btn" onclick="openCreatePostModal('#微博热搜#')">
+        <svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></svg>
+      </button>
+      <button class="icon-btn" onclick="renderHotSearchRanking();renderTrends();if(window.api&&api.ui&&api.ui.toast)api.ui.toast('已刷新')" aria-label="刷新">
+        <svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M224,48v48a8,8,0,0,1-8,8H168a8,8,0,0,1,0-16h21.74A79.54,79.54,0,0,0,128,40a80,80,0,1,0,78.36,97.78,8,8,0,0,1,15.68,3.17A96,96,0,1,1,128,24a95.6,95.6,0,0,1,67.6,28.14V48a8,8,0,0,1,8-8A8,8,0,0,1,224,48Z"/></svg>
+      </button>
     </div>
-
-    <!-- 热搜双 Tab 切换 (实时热搜榜 / 热点广场流) -->
-    <div class="px-4 pb-2">
-      <div class="bg-white/90 p-1 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
-        <button onclick="switchHotTrendTab('ranking')" id="btnHotTabRanking" class="flex-1 py-1.5 text-center text-xs font-bold rounded-xl transition bg-slate-900 text-white shadow-xs">
-          🔥 实时热搜榜 TOP 50
-        </button>
-        <button onclick="switchHotTrendTab('feed')" id="btnHotTabFeed" class="flex-1 py-1.5 text-center text-xs font-bold rounded-xl transition text-slate-600 hover:text-slate-900">
-          📰 热点广场动态
-        </button>
-      </div>
+    <!-- 分类横滑 -->
+    <div class="cat-rail" id="hotCatRail">
+      <button class="cat-chip on">实时</button>
+      <button class="cat-chip">娱乐</button>
+      <button class="cat-chip">科技</button>
+      <button class="cat-chip">体育</button>
+      <button class="cat-chip">游戏</button>
+      <button class="cat-chip">音乐</button>
+      <button class="cat-chip">影视</button>
     </div>
-
-    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-3" id="communityTrendsScrollArea">
-      <!-- 视图 1: 实时热搜榜单 -->
-      <div id="hotSearchRankingContainer" class="space-y-2"></div>
-      <!-- 视图 2: 广场动态流 (默认可按热搜话题过滤) -->
-      <div id="hotSearchFeedContainer" class="hidden space-y-3.5">
-        <div id="activeTopicBanner" class="hidden luxe-card p-2.5 bg-rose-50/80 border border-rose-200 flex items-center justify-between text-xs text-rose-700">
-          <span id="activeTopicTagText" class="font-bold truncate">当前话题: #xxx#</span>
-          <span id="activeTopicTipText" class="text-[9px] text-rose-500 truncate px-1"></span>
-          <button onclick="clearHotSearchFilter()" class="text-[10px] font-bold text-rose-600 bg-white px-2 py-0.5 rounded-full border border-rose-200 flex-shrink-0">查看全部</button>
-        </div>
-        <div id="weiboPostFeedContainerFull" class="space-y-3.5"></div>
+    <div id="flow">
+      <!-- 置顶焦点热搜（JS 渲染 .hero-hot 结构） -->
+      <div id="hotSearchHeroContainer"></div>
+      <!-- 热搜榜单 -->
+      <div class="section-title">
+        <h3>🔥 实时热搜榜</h3>
+        <button id="hotSearchEditBtn" onclick="toggleHotSearchEdit()" class="p-2 rounded-full bg-slate-100 text-slate-700 active:scale-95 transition" title="编辑热搜" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:0;cursor:pointer;">
+          <svg class="w-4 h-4 stroke-[2]" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+        </button>
       </div>
+      <div id="hotSearchRankingContainer"></div>
+      <!-- 话题过滤提示 -->
+      <div id="activeTopicBanner" class="hidden" style="background:#fff;border-radius:16px;padding:10px 14px;margin:10px 0;display:flex;align-items:center;gap:8px;border:1px solid #EEEDF0;">
+        <span id="activeTopicTagText" class="font-bold truncate" style="font-size:12px;color:#1A1A2E;">当前话题: #xxx#</span>
+        <span id="activeTopicTipText" class="text-[9px] truncate px-1" style="font-size:10px;color:#9E9EB2;"></span>
+        <button onclick="clearHotSearchFilter()" style="margin-left:auto;font-size:11px;color:#3B82F6;font-weight:600;background:none;border:0;cursor:pointer;">查看全部</button>
+      </div>
+      <!-- 热点动态 -->
+      <div class="section-title">
+        <h3>📰 热点动态</h3>
+      </div>
+      <div id="weiboPostFeedContainerFull"></div>
     </div>
   </div>
 
@@ -1445,9 +1514,25 @@
         <h3 class="text-xs font-black text-slate-900 leading-none" id="superTopicHeaderTitle">主播超话专区</h3>
         <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">SUPER TOPICS · 粉丝主场</span>
       </div>
-      <button onclick="toggleSuperTopicDrawer(true)" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
-        <svg class="w-4 h-4 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-      </button>
+      <div class="relative">
+        <button onclick="toggleSuperTopicMenu()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
+        </button>
+        <div id="superTopicMenuPopup" class="hidden absolute right-0 top-10 w-40 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50 overflow-hidden">
+          <button onclick="toggleSuperTopicDrawer(true);toggleSuperTopicMenu()" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition">
+            <svg class="w-4 h-4 text-purple-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+            切换超话
+          </button>
+          <button onclick="toggleSuperTopicMenu()" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition">
+            <svg class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            超话规则
+          </button>
+          <button onclick="toggleSuperTopicMenu()" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition">
+            <svg class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
+            举报超话
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-3" id="communitySuperTopicContent">
@@ -1762,6 +1847,7 @@
   <script src="LIVE/社区/trends.js"></script>
   <script src="LIVE/直播/room_loading.js"></script>
   <script src="LIVE/直播/live.js"></script>
+  <script src="LIVE/主页/streamer_profile.js"></script>
   <script src="LIVE/设定/main.js"></script>
   <script src="LIVE/设定/patch.js"></script>
   <script src="LIVE/设定/gift_system.js"></script>

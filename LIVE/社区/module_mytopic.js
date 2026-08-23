@@ -14,7 +14,7 @@ function renderMyTopicView() {
   if (!container) return;
 
   const uName = (window.currentUser && window.currentUser.name) || '玩家';
-  const uAvatar = (window.currentUser && window.currentUser.avatar) || document.getElementById('userAvatarBox')?.src || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200';
+  const uAvatar = (window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first');
   const uProfile = window.userProfileData || {};
   const checkIn = window.getSuperTopicCheckInInfo('player_user_self');
 
@@ -130,7 +130,7 @@ async function handlePublishNewPost() {
   }
 
   const uName = (window.currentUser && window.currentUser.name) || '玩家';
-  const uAvatar = (window.currentUser && window.currentUser.avatar) || document.getElementById('userAvatarBox')?.src || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200';
+  const uAvatar = (window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first');
 
   const newPost = {
     id: `post_${Date.now()}`,
@@ -140,7 +140,7 @@ async function handlePublishNewPost() {
       badge: '社区达人',
       verified: true
     },
-    time: '刚刚 · 来自 LUMA Pro客户端',
+    time: `刚刚 · 来自 ${window.getFloatClientTag(true)}`,
     tag: tagInput ? tagInput.value.trim() : '#社区热点#',
     mention: mentionInput ? mentionInput.value.trim() : '',
     linkText: '网页链接 🔗 动态详情',
@@ -200,11 +200,11 @@ async function handleGenerateNewTrend() {
     id: `post_${Date.now()}`,
     author: {
       name: `${host.name}超话前线`,
-      avatar: host.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      avatar: host.avatar || getAvatar((host && host.name) || null, 'first'),
       badge: '独家爆料',
       verified: true
     },
-    time: '刚刚 · 来自 LUMA Pro客户端',
+    time: `刚刚 · 来自 ${window.getFloatClientTag(true)}`,
     tag: parsed.tag,
     mention: `@${host.name}`,
     linkText: '网页链接 🔗 直播间切片',
@@ -220,7 +220,7 @@ async function handleGenerateNewTrend() {
     commentTree: (parsed.comments || []).map((c, i) => ({
       id: `c_${Date.now()}_${i}`,
       user: c.user || '吃瓜群众',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+      avatar: getAvatar(null, 'emoji'),
       ip: '星云节点',
       time: '1分钟前',
       text: c.text || '前排围观！',

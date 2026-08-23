@@ -7,7 +7,9 @@
   // 这样就不会和原始脚本的全局 const/let 变量冲突，避免 "Identifier already declared" 错误
   // =========================================================================
   async function applyHotpatchJs() {
-    if (window.__lumaHotpatchJsApplied) return;
+    // 始终执行热补丁覆盖：即使 splash.js 已用 module 脚本注入过
+    // 原因：module 脚本有独立作用域，index.html 的静态 <script> 会在之后
+    //       用旧代码覆盖全局函数，所以 patch.js 必须做最终覆盖（IIFE 方式）
     // 等待 api 对象可用
     let api = window.api || window.AiPhone || window.AiPhoneApp;
     let waitCount = 0;

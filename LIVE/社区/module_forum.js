@@ -88,17 +88,8 @@ function computeSecureSha256(text) {
   return result;
 }
 
-// 预设二次元与高质头像库
-const FORUM_PRESET_AVATARS = [
-  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200",
-  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200",
-  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200",
-  "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200",
-  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200",
-  "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200",
-  "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200",
-  "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200"
-];
+// 论坛注册预设头像：本地程序化生成 8 个随机 emoji 头像（统一头像资源站）
+const FORUM_PRESET_AVATARS = Array.from({ length: 8 }, () => getAvatar(null, 'emoji'));
 
 // 官方论坛初始置顶官方公告（纯官方公告，不塞任何假用户帖子）
 const INITIAL_FORUM_POSTS = [
@@ -107,14 +98,14 @@ const INITIAL_FORUM_POSTS = [
     author: {
       uid: "LUMA_OFFICIAL_001",
       name: "LUMA 官方运营组",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200",
+      avatar: getAvatar('LUMA 官方运营组', 'first'),
       role: "owner",
       roleTitle: "👑 官方主理人",
       isOfficial: true
     },
     tag: "#官方公告#",
     isPinned: true,
-    time: "置顶动态 · 来自 LUMA 官方中枢",
+    time: "置顶动态 · 来自 Float 官方中枢",
     content: "✨ 欢迎来到 LUMA 官方云端论坛！\n\n这里是连接所有创作者与玩家的官方实时交流阵地。\n在这里，你可以第一时间获取版本更新公告、与官方主理人直接沟通，也可以在广场发布你在小手机沙盒中的创意脑洞、Bug反馈或日常心得。\n\n🔒 隐私安全说明：\n本论坛仅同步此处设置的公开名片与公开发言，您在本地小手机沙盒的所有私密对话、API Key 与角色记忆绝不上云，敬请放心畅聊！",
     likes: 0,
     isLiked: false,
@@ -125,14 +116,14 @@ const INITIAL_FORUM_POSTS = [
     author: {
       uid: "LUMA_OFFICIAL_001",
       name: "LUMA 官方运营组",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200",
+      avatar: getAvatar('LUMA 官方运营组', 'first'),
       role: "owner",
       roleTitle: "👑 官方主理人",
       isOfficial: true
     },
     tag: "#版本更新#",
     isPinned: false,
-    time: "置顶动态 · 来自 LUMA 官方中枢",
+    time: "置顶动态 · 来自 Float 官方中枢",
     content: "📢 【版本更新公告 · v3.6.0 全新启航】\n\n1. 官方云端论坛正式上线，支持跨部署/跨链接无缝交流。\n2. 引入专属凭证 ID 机制，免绑定账号密码，换设备凭 ID 秒找回。\n3. 统一数据管理中枢接入完成，全服粉丝榜、打赏榜与超话签到实时联动。\n4. 角色主页与空间专区全新改版，交互流畅度与动画质感大幅跃升！",
     likes: 0,
     isLiked: false,
@@ -623,7 +614,7 @@ function executeDirectLoginSubmit() {
     userObj = {
       uid: 'LUMA_OFFICIAL_OWNER',
       name: 'LUMA 官方运营组',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      avatar: getAvatar('LUMA 官方运营组', 'first'),
       role: 'owner',
       roleTitle: '👑 官方主理人',
       isOwner: true,
@@ -742,7 +733,7 @@ function renderOfficialWeiboForum(activeTab = 'official') {
           <div class="flex items-end justify-between mb-2">
             <div class="relative">
               <div class="w-16 h-16 rounded-full p-[2px] bg-gradient-to-tr from-amber-400 via-rose-500 to-purple-600 shadow-md">
-                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200" class="w-full h-full rounded-full object-cover border-2 border-white">
+                <img src="${getAvatar(null, 'emoji')}" class="w-full h-full rounded-full object-cover border-2 border-white">
               </div>
               <span class="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-gradient-to-tr from-amber-400 to-amber-500 rounded-full border border-white flex items-center justify-center text-[10px] font-black text-slate-950 shadow">V</span>
             </div>
@@ -1018,7 +1009,7 @@ function submitNewForumPost() {
     },
     tag: currentSelectedPublishTag || (isOwner ? '#官方公告#' : '#日常互动#'),
     isPinned: isPinned,
-    time: '刚刚 · 来自 LUMA 云端',
+    time: `刚刚 · 来自 ${window.getFloatClientTag(false)}`,
     content: textarea.value.trim(),
     likes: 0,
     isLiked: false,

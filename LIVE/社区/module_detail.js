@@ -236,7 +236,7 @@ async function submitTrendComment() {
   if (!post) return;
 
   const uName = (window.currentUser && window.currentUser.name) || '玩家';
-  const uAvatar = (window.currentUser && window.currentUser.avatar) || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100';
+  const uAvatar = (window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first');
   const uIp = (window.userProfileData && window.userProfileData.ip) || 'LUMA';
 
   if (currentReplyTarget) {

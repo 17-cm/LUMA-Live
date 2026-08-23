@@ -35,6 +35,7 @@
       'LIVE/社区/trends.js',
       'LIVE/直播/room_loading.js',
       'LIVE/直播/live.js',
+      'LIVE/主页/streamer_profile.js',
       'LIVE/设定/main.js',
       'LIVE/设定/patch.js',
       'LIVE/设定/gift_system.js'

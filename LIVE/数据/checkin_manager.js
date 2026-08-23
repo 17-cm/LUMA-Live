@@ -180,7 +180,7 @@ hub.saveCheckinsMap(map);
       const map = hub.getCheckinsMap();
       const allChars = window.allCharacters || [];
       const uName = (window.currentUser && window.currentUser.name) || '玩家';
-      const uAvatar = (window.currentUser && window.currentUser.avatar) || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200';
+      const uAvatar = (window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first');
 
       const userCheckIn = this.getCheckinInfo('user', tId);
       const list = [];
@@ -204,7 +204,7 @@ hub.saveCheckinsMap(map);
         list.push({
           id: cId,
           name: c.name,
-          avatar: c.avatar || c.cover || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
+          avatar: c.avatar || c.cover || getAvatar((c && (c.name || c.id)) || null, 'first'),
           days: cInfo.streakDays,
           total: cInfo.totalExp,
           badge: `Lv.${cInfo.level} 活跃打卡`,
@@ -215,8 +215,8 @@ hub.saveCheckinsMap(map);
 
       // 补充超话后援会专属预设打卡榜成员
       const seedMembers = [
-        { id: 'fan_group_1', name: '全服元老粉丝团', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', days: 128, total: 38400, badge: '开山元老', level: 16, isUser: false },
-        { id: 'fan_group_2', name: '每日必打卡协会', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', days: 95, total: 28500, badge: '连续满勤', level: 14, isUser: false }
+        { id: 'fan_group_1', name: '全服元老粉丝团', avatar: getAvatar('全服元老粉丝团', 'first'), days: 128, total: 38400, badge: '开山元老', level: 16, isUser: false },
+        { id: 'fan_group_2', name: '每日必打卡协会', avatar: getAvatar('每日必打卡协会', 'first'), days: 95, total: 28500, badge: '连续满勤', level: 14, isUser: false }
       ];
 
       seedMembers.forEach(s => list.push(s));

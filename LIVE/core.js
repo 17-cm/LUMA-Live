@@ -14,35 +14,35 @@
     {
       id: "char_1",
       name: "傲娇同桌",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400",
+      avatar: getAvatar('傲娇同桌', 'first'),
       description: "班级里的傲娇学霸，私底下是游戏高能主播",
       tags: ["电竞竞技", "无畏契约"]
     },
     {
       id: "char_2",
       name: "赛博歌姬 · 露娜",
-      avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400",
+      avatar: getAvatar('赛博歌姬 · 露娜', 'first'),
       description: "来自赛博空间的虚拟歌姬，深夜治愈点唱中",
       tags: ["声动音律", "深夜电台"]
     },
     {
       id: "char_3",
       name: "绝地枪神 · 凯文",
-      avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400",
+      avatar: getAvatar('绝地枪神 · 凯文', 'first'),
       description: "前职业电竞选手，硬核压枪教学",
       tags: ["电竞竞技", "王者荣耀"]
     },
     {
       id: "char_4",
       name: "次元猫娘 · 桃桃",
-      avatar: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400",
+      avatar: getAvatar('次元猫娘 · 桃桃', 'first'),
       description: "萌系全能宅舞与即兴声优主播",
       tags: ["次元才艺", "虚拟歌姬"]
     },
     {
       id: "char_5",
       name: "极客阿峰",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400",
+      avatar: getAvatar('极客阿峰', 'first'),
       description: "硬核数码与新奇数码潮玩开箱测评",
       tags: ["探索开箱", "硬核数码"]
     }
@@ -53,7 +53,7 @@
       id: "sess_1",
       characterId: "char_1",
       name: "傲娇同桌",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400",
+      avatar: getAvatar('傲娇同桌', 'first'),
       cover: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800",
       category: "电竞竞技",
       subTag: "无畏契约",
@@ -68,7 +68,7 @@
       id: "sess_2",
       characterId: "char_2",
       name: "赛博歌姬 · 露娜",
-      avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400",
+      avatar: getAvatar('赛博歌姬 · 露娜', 'first'),
       cover: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800",
       category: "声动音律",
       subTag: "深夜电台",
@@ -83,7 +83,7 @@
       id: "sess_3",
       characterId: "char_4",
       name: "次元猫娘 · 桃桃",
-      avatar: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400",
+      avatar: getAvatar('次元猫娘 · 桃桃', 'first'),
       cover: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800",
       category: "次元才艺",
       subTag: "虚拟歌姬",
@@ -98,7 +98,7 @@
       id: "sess_4",
       characterId: "char_5",
       name: "极客阿峰",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400",
+      avatar: getAvatar('极客阿峰', 'first'),
       cover: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800",
       category: "探索开箱",
       subTag: "硬核数码",
@@ -241,7 +241,7 @@
       async getProfile() {
         return {
           name: "玩家",
-          avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200",
+          avatar: getAvatar('玩家', 'first'),
           uid: "88291048",
           ip: "LUMA"
         };
@@ -965,3 +965,73 @@ function extractJsonFromText(text) {
   }
 }
 window.extractJsonFromText = extractJsonFromText;
+
+// =========================================================================
+// 【Float 品牌设备标识】所有"来源/设备/客户端"显示统一品牌
+// 品牌固定为 Float，型号随机（17 Pro / 17 Pro Max / 17 Ultra / 17 mini / 17）
+// =========================================================================
+window.FLOAT_BRAND = 'Float';
+window.FLOAT_MODEL_POOL = ['17 Pro', '17 Pro Max', '17 Ultra', '17 mini', '17'];
+function getFloatClientTag(useModel) {
+  const brand = window.FLOAT_BRAND || 'Float';
+  if (useModel) {
+    const pool = window.FLOAT_MODEL_POOL || ['17 Pro'];
+    const model = pool[Math.floor(Math.random() * pool.length)];
+    return `${brand} ${model}`;
+  }
+  return `${brand} 客户端`;
+}
+window.getFloatClientTag = getFloatClientTag;
+
+// =========================================================================
+// 【统一头像资源站】getAvatar(name, style)
+// 所有需要随机头像的地方统一引用本标签，不再写死外部图片 URL
+// 方案二选一（调用方自选）：
+//   'emoji'：随机 emoji + 全色域随机背景色
+//   'first'：名字首字/首字母 + 全色域随机背景色
+// 传名字时同一角色头像稳定（内存缓存）；不传名字则每次真随机
+// 未来新增方案（如 AI 生图/本地素材）在本函数内扩展分支即可，引用方式不变
+// =========================================================================
+window.AVATAR_EMOJI_POOL = [
+  '😀','😎','🤖','👾','🎮','🎤','🎧','🚀','🪐','⚡','🔥','💫','🌸','🌙','⭐',
+  '🎨','🎹','🎸','🦊','🐱','🐼','🦄','🍩','🧋','📱','💿','🎪','🃏','🛸','🌊',
+  '🍀','🎲','🎯','🏆','💎','🧊','☄️','🌈','🍕','🐰','🦁','🎬','📡','🛰️','🌌'
+];
+var _avatarCache = null;
+function getAvatar(name, style) {
+  if (!_avatarCache) _avatarCache = new Map();
+  const key = (style || 'emoji') + ':' + (name || '');
+  if (name && _avatarCache.has(key)) return _avatarCache.get(key);
+  const size = 200;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  // 全色域随机背景（对角渐变）
+  const h1 = Math.floor(Math.random() * 360);
+  const h2 = (h1 + 40 + Math.floor(Math.random() * 140)) % 360;
+  const grad = ctx.createLinearGradient(0, 0, size, size);
+  grad.addColorStop(0, `hsl(${h1}, 68%, 56%)`);
+  grad.addColorStop(1, `hsl(${h2}, 72%, 44%)`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (style === 'first') {
+    const n = String(name || '?').trim();
+    const first = n ? Array.from(n)[0] : '?';
+    const ch = /[a-zA-Z]/.test(first) ? first.toUpperCase() : first;
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.font = '900 92px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+    ctx.fillText(ch, size / 2, size / 2 + 6);
+  } else {
+    const pool = window.AVATAR_EMOJI_POOL || ['🎉'];
+    const emoji = pool[Math.floor(Math.random() * pool.length)];
+    ctx.font = '92px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    ctx.fillText(emoji, size / 2, size / 2 + 6);
+  }
+  const dataUrl = canvas.toDataURL('image/png');
+  if (name) _avatarCache.set(key, dataUrl);
+  return dataUrl;
+}
+window.getAvatar = getAvatar;
