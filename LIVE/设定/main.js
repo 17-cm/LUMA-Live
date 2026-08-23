@@ -995,6 +995,16 @@ async function checkGitRepoUpdate(silent = false) {
   gitUpdateState.isChecking = true;
   renderGitUpdateButton();
 
+  // 防御：如果 localCommit 还没从数据库加载，先读一次
+  if (!gitUpdateState.localCommit && api.db?.get) {
+    try {
+      const cfg = await api.db.get("app_settings", "git_repo_config");
+      if (cfg?.installedCommit) {
+        gitUpdateState.localCommit = cfg.installedCommit;
+      }
+    } catch (e) {}
+  }
+
   const repo = (gitUpdateState.repoUrl || DEFAULT_GIT_REPO).trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
   const branch = (gitUpdateState.branch || DEFAULT_GIT_BRANCH).trim();
 
@@ -1045,15 +1055,20 @@ async function checkGitRepoUpdate(silent = false) {
       ? gitUpdateState.localCommit.replace(/\s*\(.*\)$/, '').trim()
       : null;
 
+    console.log(`[LUMA Update] 🔍 检测对比: remote=${remoteCommit}, localRaw="${gitUpdateState.localCommit}", localSha=${localSha}`);
+
     if (remoteCommit && localSha && remoteCommit !== localSha) {
       // SHA 不同 → 有新代码
       gitUpdateState.hasUpdate = true;
+      console.log(`[LUMA Update] ✅ 结果: 有更新 (SHA不同)`);
     } else if (remoteCommit && !localSha) {
       // 首次检测，无本地记录
       gitUpdateState.hasUpdate = true;
+      console.log(`[LUMA Update] ✅ 结果: 有更新 (无本地记录)`);
     } else {
       // SHA 相同或无法判断 → 无更新
       gitUpdateState.hasUpdate = false;
+      console.log(`[LUMA Update] ✅ 结果: 无更新 (常态)`);
     }
 
     if (remoteCommit) {
