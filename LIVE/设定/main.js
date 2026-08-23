@@ -291,13 +291,20 @@ function renderOpsLog() {
   container.innerHTML = log.map((cycle, idx) => {
     const p = cycle.params;
     const decisions = (cycle.decisions || []).map(d => {
+      // 未被评估的角色：只显示状态，不投骰
+      if (d.result === '持续直播中…' || d.result === '持续休息中…') {
+        return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50">
+          <span class="text-slate-400">${d.char}</span>
+          <span class="text-slate-300 text-[10px]">${d.state}</span>
+          <span class="text-slate-400">${d.result}</span>
+        </div>`;
+      }
       const willColor = d.result === '开播' || d.result === '下播' ? 'text-rose-600' : d.result === '跳过' ? 'text-slate-400' : 'text-slate-500';
-      const pickBadge = d.pickType ? `<span class="text-[8px] text-purple-500 bg-purple-50 px-1 rounded">${d.pickType}</span>` : '';
       const detail = d.state === '直播中'
         ? `已播${d.liveMins}分 下播意愿${d.stopWill}% 骰${d.dice}`
         : `休息${d.restMins}分 开播意愿${d.spawnWill}% 骰${d.dice}`;
-      return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50 gap-1">
-        <span class="text-slate-600 flex items-center gap-1">${pickBadge}${d.char}</span>
+      return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50">
+        <span class="text-slate-600">${d.char}</span>
         <span class="text-slate-400 text-[10px]">${detail}</span>
         <span class="${willColor} font-bold">${d.result}</span>
       </div>`;

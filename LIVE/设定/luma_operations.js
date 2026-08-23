@@ -358,7 +358,7 @@ async function syncLiveSessions(options = {}) {
   // 1. 开播时间最长的
   if (streamingPool.length > 0) {
     const pick = streamingPool[0];
-    toEvaluate.push({ type: 'stop', ...pick, pickType: '最久开播' });
+    toEvaluate.push({ type: 'stop', ...pick });
     selectedIds.add(pick.charId);
   }
 
@@ -366,14 +366,14 @@ async function syncLiveSessions(options = {}) {
   const restingAvail = restingPool.filter(x => !selectedIds.has(x.charId));
   if (restingAvail.length > 0) {
     const pick = restingAvail[0];
-    toEvaluate.push({ type: 'start', ...pick, pickType: '最久休息' });
+    toEvaluate.push({ type: 'start', ...pick });
     selectedIds.add(pick.charId);
   }
 
   // 3. 随机一个（排除已选，从开播中和休息中剩余角色里选）
   const randomPool = [
-    ...streamingPool.filter(s => !selectedIds.has(s.charId)).map(s => ({ type: 'stop', ...s, pickType: '随机' })),
-    ...restingPool.filter(x => !selectedIds.has(x.charId)).map(x => ({ type: 'start', ...x, pickType: '随机' })),
+    ...streamingPool.filter(s => !selectedIds.has(s.charId)).map(s => ({ type: 'stop', ...s })),
+    ...restingPool.filter(x => !selectedIds.has(x.charId)).map(x => ({ type: 'start', ...x })),
   ];
   if (randomPool.length > 0) {
     const pick = randomPool[Math.floor(Math.random() * randomPool.length)];
@@ -403,7 +403,7 @@ async function syncLiveSessions(options = {}) {
       const willStop = dice < stopWill;
 
       cycleLog.decisions.push({
-        char: item.charName, pickType: item.pickType, state: '直播中',
+        char: item.charName, state: '直播中',
         liveMins: liveMins, stopWill: stopWill, dice: dice, reason: reason,
         result: willStop ? '下播' : '继续播'
       });
@@ -429,7 +429,7 @@ async function syncLiveSessions(options = {}) {
       const willSpawn = dice < spawnWill;
 
       cycleLog.decisions.push({
-        char: item.charName, pickType: item.pickType, state: '休息中',
+        char: item.charName, state: '休息中',
         restMins: restMins, spawnWill: spawnWill, dice: dice, reason: reason,
         result: willSpawn ? '开播' : '不播'
       });
@@ -446,6 +446,18 @@ async function syncLiveSessions(options = {}) {
     }
   }
 
+  // 未被评估的角色：只标注当前状态，不投骰不判定
+  const evaluatedIds = new Set(toEvaluate.map(e => e.charId));
+  for (const c of allChars) {
+    if (evaluatedIds.has(c.id)) continue;
+    const isStreaming = streamingIds.has(c.id);
+    cycleLog.decisions.push({
+      char: c.name || c.id,
+      state: isStreaming ? '直播中' : '休息中',
+      result: isStreaming ? '持续直播中…' : '持续休息中…'
+    });
+  }
+
   // 最终刷新并渲染
   sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
   window.liveList = sessions;
@@ -455,7 +467,7 @@ async function syncLiveSessions(options = {}) {
   cycleLog.summary.streaming = sessions.length;
   if (!window.lumaOpsLog) window.lumaOpsLog = [];
   window.lumaOpsLog.unshift(cycleLog);
-  if (window.lumaOpsLog.length > 50) window.lumaOpsLog.pop();
+  if (window.lumaOpsLog.length > 3) window.lumaOpsLog.pop();
   console.log(`[LUMA官方运营组] 第${cycle}轮 ${cycleLog.time} | 在播${cycleLog.summary.streaming} | 评估${cycleLog.summary.evaluated}人 开播${cycleLog.summary.started} 下播${cycleLog.summary.stopped}`, cycleLog);
 }
 window.syncLiveSessions = syncLiveSessions;
