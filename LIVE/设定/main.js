@@ -90,15 +90,7 @@ function updateParam(key, val) {
   if (!window.appParams) window.appParams = {};
   window.appParams[key] = num;
 
-  if (key === 'charSpawnRate') {
-    const el = document.getElementById('valCharSpawnRate');
-    const tagEl = document.getElementById('tagCharRate');
-    if (el) el.textContent = `${num}%`;
-    if (tagEl) tagEl.textContent = `${num}% 概率开播`;
-  } else if (key === 'baseStopRate') {
-    const el = document.getElementById('valBaseStopRate');
-    if (el) el.textContent = `${num}%`;
-  } else if (key === 'maxLiveDuration') {
+  if (key === 'maxLiveDuration') {
     const el = document.getElementById('valMaxLiveDuration');
     if (el) el.textContent = `${num}分钟`;
   } else if (key === 'maxRestDuration') {
@@ -140,12 +132,6 @@ function syncParamDisplays() {
     if (input && val !== undefined) input.value = val;
     if (text && val !== undefined) text.textContent = `${val}${suffix}`;
   };
-
-  const spawnVal = p.charSpawnRate !== undefined ? p.charSpawnRate : 25;
-  setVal('paramCharSpawnRate', spawnVal, 'valCharSpawnRate', '%');
-  setVal('paramBaseStopRate', p.baseStopRate !== undefined ? p.baseStopRate : 10, 'valBaseStopRate', '%');
-  const tagEl = document.getElementById('tagCharRate');
-  if (tagEl) tagEl.textContent = `${spawnVal}% 概率开播`;
 
   setVal('paramMaxLiveDuration', p.maxLiveDuration || 120, 'valMaxLiveDuration', '分钟');
   setVal('paramMaxRestDuration', p.maxRestDuration || 360, 'valMaxRestDuration', '分钟');
@@ -301,8 +287,8 @@ function renderOpsLog() {
       }
       const willColor = d.result === '开播' || d.result === '下播' ? 'text-rose-600' : d.result === '跳过' ? 'text-slate-400' : 'text-slate-500';
       const detail = d.state === '直播中'
-        ? `已播${d.liveMins}分 下播意愿${d.stopWill}% 骰${d.dice}`
-        : `休息${d.restMins}分 开播意愿${d.spawnWill}% 骰${d.dice}`;
+        ? `已播${d.liveMins}分 基础${d.baseWill}%→${d.stopWill}% 骰${d.dice}`
+        : `休息${d.restMins}分 基础${d.baseWill}%→${d.spawnWill}% 骰${d.dice}`;
       return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50">
         <span class="text-slate-600">${d.char}</span>
         <span class="text-slate-400 text-[10px]">${detail}</span>
@@ -315,7 +301,7 @@ function renderOpsLog() {
         <span class="font-bold text-slate-700">第${cycle.cycle || (log.length - idx)}轮 ${cycle.time}</span>
         <span class="text-[10px] text-slate-500">在播${s.streaming} 评估${s.evaluated || 0}人 开播${s.started} 下播${s.stopped}</span>
       </div>
-      <div class="text-[9px] text-slate-400 mb-1.5">参数: 开播${p.baseSpawnRate}% 下播${p.baseStopRate}% 直播上限${p.maxLiveMins}分 休息上限${p.maxRestMins}分</div>
+      <div class="text-[9px] text-slate-400 mb-1.5">意愿来源:${p.willSource} 直播上限${p.maxLiveMins}分 休息上限${p.maxRestMins}分 强制休息${p.minRestMins}分</div>
       <div class="space-y-0.5">${decisions}</div>
     </div>`;
   }).join('');
@@ -1237,16 +1223,27 @@ async function lumaInitApp() {
       const chars = await api.characters.list();
       if (chars && chars.length > 0) {
         window.allCharacters = chars;
-        // characters.list() 不含 tags，需通过 readRelations() 补充赛道标签
+        // characters.list() 不含 tags 和 stateValues，需通过 readRelations() 补充赛道标签与开播/下播意愿值
         try {
           const rel = await api.characters.readRelations({});
           if (rel && rel.characters) {
             const tagMap = {};
-            rel.characters.forEach(r => { tagMap[r.id] = r.tags || []; });
-            window.allCharacters.forEach(c => { if (tagMap[c.id]) c.tags = tagMap[c.id]; });
+            const stateMap = {};
+            rel.characters.forEach(r => {
+              tagMap[r.id] = r.tags || [];
+              if (r.stateValues && Array.isArray(r.stateValues)) {
+                const sv = {};
+                r.stateValues.forEach(s => { sv[s.name] = s.value; });
+                stateMap[r.id] = sv;
+              }
+            });
+            window.allCharacters.forEach(c => {
+              if (tagMap[c.id]) c.tags = tagMap[c.id];
+              if (stateMap[c.id]) c.lumaState = stateMap[c.id];
+            });
           }
         } catch (e2) {
-          console.warn("读取角色赛道标签异常:", e2);
+          console.warn("读取角色赛道标签与意愿值异常:", e2);
         }
       }
     } catch (e) {
