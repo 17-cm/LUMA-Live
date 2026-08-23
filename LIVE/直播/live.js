@@ -1099,11 +1099,7 @@ async function handleComboCircleClick() {
 
   // 扣款与记录
   window.currentWalletBalance = Math.max(0, curBal - totalCost);
-  try {
-    await api.db.create("app_wallet", { id: "vault_data", balance: window.currentWalletBalance });
-  } catch (e) {
-    await api.db.update("app_wallet", "vault_data", { balance: window.currentWalletBalance }).catch(() => {});
-  }
+  await dbUpsert("app_wallet", "vault_data", { balance: window.currentWalletBalance });
   if (typeof syncWalletDisplays === 'function') syncWalletDisplays();
 
   // 记录消费与打榜贡献
@@ -1158,11 +1154,7 @@ async function sendGift(name, cost) {
     }
 
     window.currentWalletBalance = Math.max(0, curBal - totalCost);
-    try {
-      await api.db.create("app_wallet", { id: "vault_data", balance: window.currentWalletBalance });
-    } catch (e) {
-      await api.db.update("app_wallet", "vault_data", { balance: window.currentWalletBalance }).catch(() => {});
-    }
+    await dbUpsert("app_wallet", "vault_data", { balance: window.currentWalletBalance });
 
     if (typeof syncWalletDisplays === 'function') syncWalletDisplays();
     toggleGiftTray();
@@ -1370,7 +1362,7 @@ window.signCurrentNPC = signCurrentNPC;
 // 8. 周期性作息推演与同步服务
 // =========================================================================
 async function syncLiveSessions(options = {}) {
-  let sessions = await api.db.list("live_sessions") || [];
+  let sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
   const now = Date.now();
   const params = window.appParams || {};
   const spawnRate = params.charSpawnRate !== undefined ? params.charSpawnRate : 45;
@@ -1392,7 +1384,7 @@ async function syncLiveSessions(options = {}) {
     }
   }
 
-  sessions = await api.db.list("live_sessions") || [];
+  sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
 
   const allChars = window.allCharacters || [];
 
@@ -1402,7 +1394,7 @@ async function syncLiveSessions(options = {}) {
     
     if (!isEggTriggered && sessions.length === 0 && allChars.length > 0) {
       const chosen = allChars[Math.floor(Math.random() * allChars.length)];
-      await api.db.create("app_settings", { id: "maint_egg_triggered", value: true }).catch(() => {});
+      await dbUpsert("app_settings", "maint_egg_triggered", { value: true });
       if (window.lumaOpsGateway) {
         await window.lumaOpsGateway.requestStartLive({
           characterId: chosen.id,
@@ -1412,7 +1404,7 @@ async function syncLiveSessions(options = {}) {
           source: "egg_force"
         });
       }
-      sessions = await api.db.list("live_sessions") || [];
+      sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
     }
 
     liveList = sessions;

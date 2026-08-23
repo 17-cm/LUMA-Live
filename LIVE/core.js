@@ -374,6 +374,23 @@
 
 var api = window.api;
 
+/**
+ * 安全 upsert：宿主 db.create 对重复 ID 不报错（直接 prepend），
+ * 所以 create().catch(()=>update()) 模式会产生重复记录。
+ * 正确做法：先 update（找到则合并返回，找不到返回 null），再 create。
+ */
+async function dbUpsert(collection, id, data) {
+  if (!api || !api.db) return null;
+  try {
+    const updated = await api.db.update(collection, id, data);
+    if (updated) return updated;
+    return await api.db.create(collection, { id, ...data });
+  } catch (e) {
+    return null;
+  }
+}
+window.dbUpsert = dbUpsert;
+
 // 清除小手机桌面 APP 图标上的未读红色标记与通知角标 (类似微信未读红点)
 async function clearAppIconNotificationBadges() {
   try {
@@ -388,7 +405,7 @@ async function clearAppIconNotificationBadges() {
   } catch (e) {}
 
   try {
-    const targetApi = window.api || window.AiPhone || window.AiPhoneApp;
+    const targetApi = window.api;
     if (targetApi && targetApi.notifications) {
       if (typeof targetApi.notifications.clear === 'function') {
         await targetApi.notifications.clear().catch(() => {});
@@ -532,7 +549,7 @@ const lumaOpsGateway = {
       };
     }
 
-    const activeSessions = await api.db.list("live_sessions") || [];
+    const activeSessions = await api.db.list("live_sessions", { limit: 500 }) || [];
     const existing = activeSessions.find(s => s.characterId === characterId);
     if (existing) {
       lumaOpsNotify("开播拒绝", `【${charName}】已在直播中 (房号:${existing.roomId})`, "reject");
@@ -607,7 +624,7 @@ const lumaOpsGateway = {
   async requestStopLive({ characterId, reason = "正常下播", source = "system" }) {
     if (!characterId) return { success: false, reason: "未指定有效主播身份" };
 
-    const activeSessions = await api.db.list("live_sessions") || [];
+    const activeSessions = await api.db.list("live_sessions", { limit: 500 }) || [];
     const session = activeSessions.find(s => s.characterId === characterId || s.id === characterId);
     
     const allChars = window.allCharacters || [];
@@ -693,7 +710,7 @@ window.lumaOpsGateway = lumaOpsGateway;
 
 // 注册小手机宿主工具箱 Handlers
 function registerAiPhoneToolHandlers() {
-  const targetApi = window.api || window.AiPhone || window.AiPhoneApp;
+  const targetApi = window.api;
   if (targetApi && targetApi.tools && typeof targetApi.tools.handle === 'function') {
     targetApi.tools.handle("handleRequestStartLive", async (args, context) => {
       const charId = (context && (context.characterId || context.charId)) || 

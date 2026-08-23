@@ -45,7 +45,7 @@ function switchTab(tabId) {
     if (headerIcon) {
       headerIcon.innerHTML = `<circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path>`;
     }
-    if (typeof renderTrends === 'function') renderTrends();
+    renderTrends();
   } else if (tabId === 'profile') {
     if (headerTitle) headerTitle.textContent = '个人中心';
     if (headerSubtitle) headerSubtitle.textContent = 'My Profile & Vault';
@@ -53,9 +53,9 @@ function switchTab(tabId) {
     if (headerIcon) {
       headerIcon.innerHTML = `<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>`;
     }
-    if (typeof renderDualRankList === 'function') renderDualRankList();
-    if (typeof syncWalletDisplays === 'function') syncWalletDisplays();
-    if (typeof syncFollowCountDisplay === 'function') syncFollowCountDisplay();
+    renderDualRankList();
+    syncWalletDisplays();
+    syncFollowCountDisplay();
   } else if (tabId === 'settings') {
     if (headerTitle) headerTitle.textContent = '系统设定';
     if (headerSubtitle) headerSubtitle.textContent = 'Sandbox Configuration';
@@ -180,9 +180,7 @@ window.syncParamDisplays = syncParamDisplays;
 
 async function saveAllParamsExplicitly() {
   try {
-    await api.db.create("app_settings", { id: "global_params", ...window.appParams }).catch(() => {
-      api.db.update("app_settings", "global_params", window.appParams).catch(() => {});
-    });
+    await dbUpsert("app_settings", "global_params", window.appParams);
     api.ui.toast("系统运行参数已保存并落盘！");
   } catch (e) {
     api.ui.toast("保存成功");
@@ -208,9 +206,7 @@ async function saveApiIntervalSetting() {
   try {
     if (!window.appParams) window.appParams = {};
     const minutes = window.appParams.apiRequestInterval || 5;
-    await api.db.create("app_settings", { id: "global_params", ...window.appParams }).catch(() => {
-      api.db.update("app_settings", "global_params", window.appParams).catch(() => {});
-    });
+    await dbUpsert("app_settings", "global_params", window.appParams);
     api.ui.toast(`API请求间隔已保存为 ${minutes} 分钟`);
   } catch (e) {
     api.ui.toast("保存成功");
@@ -247,9 +243,7 @@ async function saveLivePackagePrompt(promptText) {
   try {
     if (!window.appParams) window.appParams = {};
     window.appParams.livePackagePrompt = promptText;
-    await api.db.create("app_settings", { id: "global_params", ...window.appParams }).catch(() => {
-      api.db.update("app_settings", "global_params", window.appParams).catch(() => {});
-    });
+    await dbUpsert("app_settings", "global_params", window.appParams);
     api.ui.toast("直播间打包预设已保存");
   } catch (e) {
     api.ui.toast("保存成功");
@@ -433,9 +427,7 @@ async function saveCustomApiSettingsModal() {
     await saveDbSetting("custom_api_config", window.customApiConfig);
   } else {
     try {
-      await api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {
-        api.db.update("app_settings", "custom_api_config", window.customApiConfig).catch(() => {});
-      });
+      await dbUpsert("app_settings", "custom_api_config", window.customApiConfig);
     } catch (e) {}
   }
 
@@ -641,9 +633,7 @@ async function saveCustomImageApiSettingsModal() {
     await saveDbSetting("custom_api_config", window.customApiConfig);
   } else {
     try {
-      await api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {
-        api.db.update("app_settings", "custom_api_config", window.customApiConfig).catch(() => {});
-      });
+      await dbUpsert("app_settings", "custom_api_config", window.customApiConfig);
     } catch (e) {}
   }
 
@@ -659,9 +649,7 @@ async function toggleGlobalModelSwitch(checked) {
   if (typeof saveDbSetting === 'function') {
     await saveDbSetting("custom_api_config", window.customApiConfig);
   } else {
-    api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {
-      api.db.update("app_settings", "custom_api_config", window.customApiConfig).catch(() => {});
-    });
+    dbUpsert("app_settings", "custom_api_config", window.customApiConfig);
   }
   syncCustomApiModalFields();
   api.ui.toast(checked ? "已实时启用全局文本大模型" : "已实时切换为自定义文本API");
@@ -674,9 +662,7 @@ async function toggleGlobalImageModelSwitch(checked) {
   if (typeof saveDbSetting === 'function') {
     await saveDbSetting("custom_api_config", window.customApiConfig);
   } else {
-    api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {
-      api.db.update("app_settings", "custom_api_config", window.customApiConfig).catch(() => {});
-    });
+    dbUpsert("app_settings", "custom_api_config", window.customApiConfig);
   }
   syncCustomApiModalFields();
   api.ui.toast(checked ? "已实时启用全局生图大模型" : "已实时切换为自定义生图API");
@@ -784,9 +770,7 @@ window.removeImagePromptEntry = removeImagePromptEntry;
 
 async function saveImageSettingsExplicitly() {
   try {
-    await api.db.create("app_settings", { id: "image_settings", ...window.imageSettings }).catch(() => {
-      api.db.update("app_settings", "image_settings", window.imageSettings).catch(() => {});
-    });
+    await dbUpsert("app_settings", "image_settings", window.imageSettings);
     api.ui.toast("生图参数与提示词已保存！");
   } catch (e) {
     api.ui.toast("生图参数已保存");
@@ -892,9 +876,7 @@ window.removeCurrentCategoryEntry = removeCurrentCategoryEntry;
 
 async function saveCurrentCategoryPresets() {
   try {
-    await api.db.create("app_settings", { id: "app_presets", data: window.appPresets }).catch(() => {
-      api.db.update("app_settings", "app_presets", { data: window.appPresets }).catch(() => {});
-    });
+    await dbUpsert("app_settings", "app_presets", { data: window.appPresets });
     api.ui.toast("当前分类提示词已保存！");
   } catch (e) {
     api.ui.toast("提示词已更新");
@@ -975,19 +957,19 @@ async function handleFileImportData(e) {
     const data = JSON.parse(text);
     if (data.appParams) {
       window.appParams = data.appParams;
-      await api.db.create("app_settings", { id: "global_params", ...data.appParams }).catch(() => {});
+      await dbUpsert("app_settings", "global_params", data.appParams);
     }
     if (data.appPresets) {
       window.appPresets = data.appPresets;
-      await api.db.create("app_settings", { id: "app_presets", data: data.appPresets }).catch(() => {});
+      await dbUpsert("app_settings", "app_presets", { data: data.appPresets });
     }
     if (data.customApiConfig) {
       window.customApiConfig = data.customApiConfig;
-      await api.db.create("app_settings", { id: "custom_api_config", ...data.customApiConfig }).catch(() => {});
+      await dbUpsert("app_settings", "custom_api_config", data.customApiConfig);
     }
     if (data.imageSettings) {
       window.imageSettings = data.imageSettings;
-      await api.db.create("app_settings", { id: "image_settings", ...data.imageSettings }).catch(() => {});
+      await dbUpsert("app_settings", "image_settings", data.imageSettings);
     }
     if (api.ui?.toast) api.ui.toast("数据导入成功！正在重载...");
     setTimeout(() => window.location.reload(), 600);
@@ -1025,7 +1007,7 @@ async function handleFileImportPresets(e) {
     const text = await file.text();
     const data = JSON.parse(text);
     window.appPresets = data;
-    await api.db.create("app_settings", { id: "app_presets", data: data }).catch(() => {});
+    await dbUpsert("app_settings", "app_presets", { data: data });
     renderPresetCategories();
     if (api.ui?.toast) api.ui.toast("提示词预设导入成功！");
   } catch (err) {
@@ -1052,9 +1034,7 @@ window.closePlayerLiveView = closePlayerLiveView;
 // 11. 全局启动加载生命周期
 // =========================================================================
 async function lumaInitApp() {
-  if (typeof registerAiPhoneToolHandlers === 'function') {
-    registerAiPhoneToolHandlers();
-  }
+  registerAiPhoneToolHandlers();
 
   // 1. 初始化数据库及本地持久化
   try {
@@ -1070,9 +1050,9 @@ async function lumaInitApp() {
     const catsRec = await api.db.get("app_settings", "app_presets");
     if (catsRec?.data) window.appPresets = catsRec.data;
 
-    const followsRec = await api.db.list("follows") || [];
+    const followsRec = await api.db.list("follows", { limit: 500 }) || [];
     window.followedHosts = followsRec.map(f => f.id);
-    if (typeof syncFollowCountDisplay === 'function') syncFollowCountDisplay();
+    syncFollowCountDisplay();
 
     // 加载超话关注列表
     try {
@@ -1091,7 +1071,7 @@ async function lumaInitApp() {
       let checkinDbRecs = [];
       // 优先从 api.db 读取
       try {
-        checkinDbRecs = await api.db.list("luma_checkin_records") || [];
+        checkinDbRecs = await api.db.list("luma_checkin_records", { limit: 500 }) || [];
       } catch (e) {}
       // 兜底从 localStorage 同步备份读取
       if (checkinDbRecs.length === 0) {
@@ -1122,10 +1102,10 @@ async function lumaInitApp() {
     const profileRec = await api.db.get("app_profile", "user_profile");
     if (profileRec) Object.assign(window.userProfileData, profileRec);
 
-    const ledgerRec = await api.db.list("app_ledger") || [];
+    const ledgerRec = await api.db.list("app_ledger", { limit: 500 }) || [];
     if (ledgerRec.length > 0) window.transactionLedger = ledgerRec;
 
-    const guestbookRec = await api.db.list("guestbook") || [];
+    const guestbookRec = await api.db.list("guestbook", { limit: 500 }) || [];
     guestbookRec.forEach(item => {
       if (item.hostId) {
         if (!window.guestbookData[item.hostId]) window.guestbookData[item.hostId] = [];
@@ -1146,32 +1126,30 @@ async function lumaInitApp() {
   }
 
   // 2. 同步个人资料
-  if (typeof syncUserProfile === 'function') await syncUserProfile();
+  await syncUserProfile();
 
   // 3. 加载社区动态
-  if (typeof loadTrendsFromDb === 'function') await loadTrendsFromDb();
+  await loadTrendsFromDb();
 
   // 4. 同步直播列表并渲染赛道
-  if (typeof syncLiveSessions === 'function') await syncLiveSessions({ allowSpawn: true });
+  await syncLiveSessions({ allowSpawn: true });
 
   // 5. 渲染各模块初始状态
-  if (typeof selectMainCategory === 'function') selectMainCategory('all');
-  if (typeof renderDualRankList === 'function') renderDualRankList();
-  if (typeof renderTrends === 'function') renderTrends();
-  if (typeof syncWalletDisplays === 'function') syncWalletDisplays();
+  selectMainCategory('all');
+  renderDualRankList();
+  renderTrends();
+  syncWalletDisplays();
   syncParamDisplays();
   renderPresetCategories();
   renderImagePromptEntries();
 
   // 6. 检查分享直达参数 (Deep link)
-  if (typeof checkDeepLinkParams === 'function') checkDeepLinkParams();
+  checkDeepLinkParams();
 
   // 7. 启动周期性作息推演定时器 (每 30 秒轮询)
   if (!window.__lumaLiveSyncInterval) {
     window.__lumaLiveSyncInterval = setInterval(() => {
-      if (typeof syncLiveSessions === 'function') {
-        syncLiveSessions({ allowSpawn: true });
-      }
+      syncLiveSessions({ allowSpawn: true });
     }, 30000);
   }
 

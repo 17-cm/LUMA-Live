@@ -97,11 +97,7 @@ async function saveUserProfileEdits() {
   if (tagEl) tagEl.textContent = userProfileData.tag;
   if (bioEl) bioEl.textContent = `“${userProfileData.bio}”`;
   closeEditProfileModal();
-  try {
-    await api.db.create("app_profile", { id: "user_profile", ...userProfileData });
-  } catch (e) {
-    await api.db.update("app_profile", "user_profile", userProfileData).catch(() => {});
-  }
+  await dbUpsert("app_profile", "user_profile", userProfileData);
   api.ui.toast("个人资料已保存！");
 }
 window.saveUserProfileEdits = saveUserProfileEdits;
@@ -635,11 +631,7 @@ async function confirmWithdraw() {
   const btn = document.getElementById('withdrawConfirmBtn');
   if (btn) { btn.textContent = '处理中...'; btn.disabled = true; }
   window.currentWalletBalance = currentLuma - amount;
-  try {
-    await api.db.create("app_wallet", { id: "vault_data", balance: window.currentWalletBalance });
-  } catch (e) {
-    await api.db.update("app_wallet", "vault_data", { balance: window.currentWalletBalance }).catch(() => {});
-  }
+  await dbUpsert("app_wallet", "vault_data", { balance: window.currentWalletBalance });
   try {
     const wallet = await api.wallet.get();
     const accountId = wallet?.accounts?.[0]?.id;
@@ -754,11 +746,7 @@ async function submitExecuteRecharge() {
     return;
   }
   window.currentWalletBalance = (window.currentWalletBalance || 0) + addCoins;
-  try {
-    await api.db.create("app_wallet", { id: "vault_data", balance: window.currentWalletBalance });
-  } catch (e) {
-    await api.db.update("app_wallet", "vault_data", { balance: window.currentWalletBalance }).catch(() => {});
-  }
+  await dbUpsert("app_wallet", "vault_data", { balance: window.currentWalletBalance });
   if (typeof recordTransaction === 'function') {
     await recordTransaction(`充值 ${addCoins.toLocaleString()} LUMA 币`, "recharge", addCoins, "LUMA 充值中心");
   }

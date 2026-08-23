@@ -394,7 +394,7 @@ async function openStreamerProfilePage(id) {
         const settings = await generateProfileLocalSettings(profile.characterId);
         if (settings) {
           applyProfileSettings(profile, settings);
-          api.db.create('streamer_profile_local', { id: profile.characterId, settings, time: Date.now() }).catch(() => {});
+          dbUpsert('streamer_profile_local', profile.characterId, { settings, time: Date.now() });
         }
       }
     }
@@ -510,9 +510,7 @@ function handleStreamerCoverUpload(e) {
       }
       // 持久化到本地数据库
       const charId = window.currentViewingProfile.characterId;
-      api.db.create('streamer_covers', { id: charId, cover: dataUrl, time: Date.now() }).catch(() => {
-        api.db.update('streamer_covers', charId, { cover: dataUrl, time: Date.now() }).catch(() => {});
-      });
+      dbUpsert('streamer_covers', charId, { cover: dataUrl, time: Date.now() });
       if (api.ui?.toast) api.ui.toast('封面已更新');
     }
   };
@@ -782,11 +780,7 @@ async function spSaveProfileEdit() {
 
   // 持久化到本地数据库（编辑存档优先于 AI/随机初始值）
   const record = { id: p.characterId, verifyTitle, bio, ipLocation, fanClubName, tags, time: Date.now() };
-  try {
-    await api.db.create('streamer_profile_edits', record);
-  } catch (e) {
-    try { await api.db.update('streamer_profile_edits', p.characterId, record); } catch (e2) {}
-  }
+  await dbUpsert('streamer_profile_edits', p.characterId, record);
 
   renderStreamerProfileToUI(p);
   closeProfileEditModal();

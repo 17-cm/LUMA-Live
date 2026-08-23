@@ -120,14 +120,7 @@ hub.saveCheckinsMap(map);
 
       // 同步到 api.db 持久层 (沙盒真实落盘)
       try {
-        const api = window.api || {};
-        if (api.db && typeof api.db.create === 'function') {
-          api.db.create("luma_checkin_records", { id: key, ...map[key] }).catch(() => {
-            if (typeof api.db.update === 'function') {
-              api.db.update("luma_checkin_records", key, map[key]).catch(() => {});
-            }
-          });
-        }
+        dbUpsert("luma_checkin_records", key, map[key]);
       } catch (e) {}
 
       // 兼容历史 LocalStorage 格式

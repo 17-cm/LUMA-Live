@@ -754,14 +754,7 @@
     // 确保 followedHosts 是数组
     if (!Array.isArray(window.followedHosts)) window.followedHosts = [];
     const isFollowed = window.followedHosts.includes(charId);
-    // 等待 api 对象可用
-    let api = window.api || window.AiPhone || window.AiPhoneApp;
-    let waitCount = 0;
-    while (!api && waitCount < 30) {
-      await new Promise(r => setTimeout(r, 50));
-      api = window.api || window.AiPhone || window.AiPhoneApp;
-      waitCount++;
-    }
+    const api = window.api;
     if (isFollowed) {
       window.followedHosts = window.followedHosts.filter(id => id !== charId);
       if (api && api.db) await api.db.delete("follows", charId).catch(() => {});

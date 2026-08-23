@@ -12,7 +12,7 @@ let currentActiveCommunityPage = 'trends'; // 'trends' | 'super_topic' | 'rankin
 // 1. 社区全量数据初始化与异步载入
 async function loadTrendsFromDb() {
   try {
-    const savedPosts = await api.db.list("app_posts") || [];
+    const savedPosts = await api.db.list("app_posts", { limit: 500 }) || [];
     if (savedPosts && savedPosts.length > 0) {
       window.weiboPosts = savedPosts;
     }
