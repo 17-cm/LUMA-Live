@@ -594,6 +594,9 @@ function updateWithdrawPreview(amount) {
   const btn = document.getElementById('withdrawConfirmBtn');
   if (btn) btn.disabled = (amount <= 0);
 }
+window.selectWithdrawTier = selectWithdrawTier;
+window.onWithdrawCustomInput = onWithdrawCustomInput;
+window.updateWithdrawPreview = updateWithdrawPreview;
 function openWithdrawModal() {
   const modal = document.getElementById('withdrawModal');
   if (!modal) return;
