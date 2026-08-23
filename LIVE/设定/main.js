@@ -999,10 +999,12 @@ async function checkGitRepoUpdate(silent = false) {
   const branch = (gitUpdateState.branch || DEFAULT_GIT_BRANCH).trim();
 
   let remoteCommit = null;
+  let remoteCommitTime = null;
   let remoteVer = null;
 
   try {
-    // 通道A：查最新 Commit SHA
+    // ── 通道A（核心）：查最新 Commit SHA + 时间 ──
+    // 只要 commit 变了就说明你 push 了新代码，不需要手动改版本号
     const comRes = await robustNetworkRequest({
       url: `https://api.github.com/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=1`,
       method: 'GET',
@@ -1010,29 +1012,57 @@ async function checkGitRepoUpdate(silent = false) {
       proxy: true
     });
     if (comRes && comRes.ok && comRes.json && Array.isArray(comRes.json) && comRes.json[0]) {
-      remoteCommit = comRes.json[0].sha ? comRes.json[0].sha.slice(0, 7) : null;
+      const commitData = comRes.json[0];
+      remoteCommit = commitData.sha ? commitData.sha.slice(0, 7) : null;
+      remoteCommitTime = commitData.commit?.author?.date || commitData.commit?.committer?.date || null;
     }
 
-    // 通道B：查 manifest.json 版本号
-    const manRes = await robustNetworkRequest({
-      url: `https://api.github.com/repos/${repo}/contents/manifest.json?ref=${encodeURIComponent(branch)}`,
-      method: 'GET',
-      headers: { 'Accept': 'application/vnd.github.v3.raw' },
-      proxy: true
-    });
-    let mData = manRes?.json;
-    if (!mData && manRes?.text) {
-      try { mData = JSON.parse(manRes.text); } catch (e) {}
-    }
-    if (mData && mData.version) {
-      const rawVer = String(mData.version).trim();
-      remoteVer = rawVer.startsWith('v') ? rawVer : `v${rawVer}`;
+    // ── 通道B（辅助）：查 manifest.json 版本号 ──
+    // 仅用于显示，不作为判断更新的主要依据
+    try {
+      const manRes = await robustNetworkRequest({
+        url: `https://api.github.com/repos/${repo}/contents/manifest.json?ref=${encodeURIComponent(branch)}`,
+        method: 'GET',
+        headers: { 'Accept': 'application/vnd.github.v3.raw' },
+        proxy: true
+      });
+      let mData = manRes?.json;
+      if (!mData && manRes?.text) {
+        try { mData = JSON.parse(manRes.text); } catch (e) {}
+      }
+      if (mData && mData.version) {
+        const rawVer = String(mData.version).trim();
+        remoteVer = rawVer.startsWith('v') ? rawVer : `v${rawVer}`;
+      }
+    } catch (e) {
+      // manifest 读取失败不影响更新检测，commit 才是关键
     }
 
-    // 比对：Commit SHA 不同 或 版本号不同 → 有更新
-    const isNewCommit = remoteCommit && gitUpdateState.localCommit && !gitUpdateState.localCommit.includes(remoteCommit);
-    const isNewVer = remoteVer && gitUpdateState.currentVersion && remoteVer.trim() !== gitUpdateState.currentVersion;
-    gitUpdateState.hasUpdate = Boolean(isNewCommit || isNewVer);
+    // ── 判断是否有更新（优先级：commit SHA > commit 时间 > 版本号）──
+    let updateReason = null;
+
+    // 1. Commit SHA 不同 → 肯定有新代码
+    if (remoteCommit && gitUpdateState.localCommit && remoteCommit !== gitUpdateState.localCommit) {
+      updateReason = 'commit';
+    }
+    // 2. 首次检测或本地无记录 → 用 commit 时间对比
+    else if (remoteCommit && (!gitUpdateState.localCommit || !gitUpdateState.lastCheckTime)) {
+      updateReason = 'first';
+    }
+    // 3. commit 时间比上次检测时间新 → 有 push
+    else if (remoteCommitTime && gitUpdateState.lastCheckTime) {
+      const lastCheck = new Date(gitUpdateState.lastCheckTime).getTime();
+      const commitTime = new Date(remoteCommitTime).getTime();
+      if (commitTime > lastCheck) {
+        updateReason = 'time';
+      }
+    }
+    // 4. 兜底：版本号不同（只有手动改了版本号才触发）
+    else if (remoteVer && gitUpdateState.currentVersion && remoteVer.trim() !== gitUpdateState.currentVersion) {
+      updateReason = 'version';
+    }
+
+    gitUpdateState.hasUpdate = !!updateReason;
 
     if (remoteCommit) {
       gitUpdateState.remoteCommit = `${remoteCommit} (${branch})`;
@@ -1040,14 +1070,14 @@ async function checkGitRepoUpdate(silent = false) {
     if (remoteVer) {
       gitUpdateState.latestVersion = remoteVer;
     } else if (remoteCommit) {
-      gitUpdateState.latestVersion = `commit-${remoteCommit}`;
+      gitUpdateState.latestVersion = `${remoteCommit}`;
     }
 
     if (!silent && api.ui?.toast) {
       if (gitUpdateState.hasUpdate) {
-        api.ui.toast(`🎉 发现新版本 ${gitUpdateState.latestVersion}！`);
+        api.ui.toast(`🎉 发现新提交 ${gitUpdateState.latestVersion}！`);
       } else {
-        api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion})`);
+        api.ui.toast(`当前已是最新 (${gitUpdateState.currentVersion || gitUpdateState.localCommit || '未知'})`);
       }
     }
   } catch (err) {
@@ -1058,6 +1088,7 @@ async function checkGitRepoUpdate(silent = false) {
     }
   } finally {
     gitUpdateState.isChecking = false;
+    gitUpdateState.lastCheckTime = new Date().toISOString();
     renderGitUpdateButton();
   }
 }
