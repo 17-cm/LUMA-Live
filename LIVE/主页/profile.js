@@ -26,7 +26,6 @@ let selectedRechargePrice = 6;
 // 1. 同步个人资料与关注统计 (仅统计已关注的主播/用户，超话频道不计入人物关注列表)
 function syncFollowCountDisplay() {
   const followed = Array.isArray(window.followedHosts) ? window.followedHosts : [];
-  // LUMA 官方运营组固定占 1 个关注项，其余均来自真实关注记录
   const count = followed.length + 1;
   const statEl = document.getElementById('statFollowCount');
   if (statEl) statEl.textContent = String(count);
@@ -44,19 +43,16 @@ async function syncUserProfile() {
       if (avatarBox && currentUser.avatar) avatarBox.src = currentUser.avatar;
     }
   } catch (e) {}
-  // 1. 同步个人粉丝数量
   const myFans = window.LumaFansManager ? window.LumaFansManager.getFans('user') : (userProfileData.fans || 128);
   userProfileData.fans = myFans;
   const statFanEl = document.getElementById('statFanCount');
   if (statFanEl) {
     statFanEl.textContent = window.LumaDataHub ? window.LumaDataHub.formatNumber(myFans) : myFans;
   }
-  // 2. 同步点赞与勋章数
   const statLikeEl = document.getElementById('statLikeCount');
   if (statLikeEl) statLikeEl.textContent = (userProfileData.likes || 1240).toLocaleString();
   const statMedalEl = document.getElementById('statMedalCount');
   if (statMedalEl) statMedalEl.textContent = userProfileData.medals || 3;
-  // 3. 同步佩戴头衔/称号
   if (window.LumaTitlesManager) {
     const activeTitle = window.LumaTitlesManager.getActiveTitle('user');
     if (activeTitle) {
@@ -69,7 +65,6 @@ async function syncUserProfile() {
   renderDualRankList();
 }
 window.syncUserProfile = syncUserProfile;
-// 2. 个人资料编辑弹窗
 function openEditProfileModal() {
   const uidInput = document.getElementById('editInputUID');
   const ipInput = document.getElementById('editInputIP');
@@ -110,21 +105,15 @@ async function saveUserProfileEdits() {
   api.ui.toast("个人资料已保存！");
 }
 window.saveUserProfileEdits = saveUserProfileEdits;
-// 3. 关注列表页面
 function openFollowListPageView() {
   const container = document.getElementById('followListContentContainer');
   if (!container) return;
-  
   const followedIds = window.followedHosts || [];
   const chars = window.allCharacters || [];
   const lives = window.liveList || [];
-  
-  // 查找已关注的所有主播信息（包含当前在线和下播的主播）
   const follows = followedIds.map(id => {
-    // 优先从角色库找
     const fromChars = chars.find(c => c.id === id || c.characterId === id);
     if (fromChars) return fromChars;
-    // 其次从直播列表中找
     const fromLives = lives.find(l => l.characterId === id || l.id === id);
     if (fromLives) return {
       id: fromLives.characterId || fromLives.id,
@@ -132,7 +121,6 @@ function openFollowListPageView() {
       avatar: fromLives.avatar || fromLives.cover,
       tags: [fromLives.category, fromLives.subTag].filter(Boolean)
     };
-    // 兜底虚拟信息
     return {
       id: id,
       name: `主播_${String(id).slice(-4)}`,
@@ -207,7 +195,6 @@ async function toggleFollowRoomHostById(charId) {
     await api.db.delete("follows", charId).catch(() => {});
     api.ui.toast("已取消关注");
     openFollowListPageView();
-    
     const statEl = document.getElementById('statFollowCount');
     if (statEl) statEl.textContent = window.followedHosts.length + 1;
     if (typeof checkFollowState === 'function') checkFollowState();
@@ -215,7 +202,6 @@ async function toggleFollowRoomHostById(charId) {
   }
 }
 window.toggleFollowRoomHostById = toggleFollowRoomHostById;
-// 4. 双列排行榜
 function switchRankTab(type) {
   currentRankTab = type;
   const btnFans = document.getElementById('btnRankFans');
@@ -236,7 +222,6 @@ function renderDualRankList() {
   let aggregatedList = [];
   if (window.LumaGuardManager) {
     if (currentRankTab === 'fans') {
-      // 粉丝榜：只计算 Char 谁为我消费得最多
       aggregatedList = window.LumaGuardManager.getTopFansSpentOnMe().map(item => ({
         targetName: item.fromName || '主播',
         avatar: item.fromAvatar || window.LumaGuardManager.getAvatarById(item.fromId),
@@ -246,7 +231,6 @@ function renderDualRankList() {
         lastTime: item.lastTime || '活跃'
       }));
     } else {
-      // 我的守护榜：我为谁消费得最多
       aggregatedList = window.LumaGuardManager.getTopCharsISpentOn().map(item => ({
         targetName: item.toName || '主播',
         avatar: item.toAvatar || window.LumaGuardManager.getAvatarById(item.toId),
@@ -313,36 +297,18 @@ function renderDualRankList() {
 window.renderDualRankList = renderDualRankList;
 // =========================================================================
 // 【5. 钱包与流水 · 全面重设计】
-//
-// ⚠️ 安全区合规说明：
-//   本页面所有可见内容均位于 --ai-phone-app-safe-top (默认88px) 之下。
-//   顶部仅保留一根浅灰色装饰线（safe-line），线上方无任何 UI 元素。
-//   底部内容预留 safe-bottom (默认24px) 的滚动空间。
-//   设计原则：安全线 = 装饰性分隔，实际内容再往下偏移约 8px。
-//
-// 💰 货币体系：
-//   LUMA 币 = APP 内部货币（window.currentWalletBalance，存 api.db）
-//   宿主余额 = 小手机系统货币（api.wallet.get() → accounts[0].balance）
-//   汇率：1 宿主货币 = 10 LUMA 币
-//   提现 = LUMA 币 → 宿主余额（LUMA 减少，宿主扣款）
-//   充值 = 宿主余额 → LUMA 币（api.wallet.pay 扣款，LUMA 增加）
+// 货币体系：LUMA币(内部) / 宿主余额(系统) / 汇率1:10
+// 提现 = LUMA币减少 + 宿主扣款(正数) / 充值 = 宿主扣款 + LUMA币增加
 // =========================================================================
-// ── 宿主余额缓存（避免频繁调 SDK）──
 let _cachedHostBalance = null;
 let _cachedHostBalanceTime = 0;
-const HOST_BALANCE_CACHE_MS = 10000; // 10秒缓存
-/**
- * 获取宿主钱包余额（真实调用 api.wallet.get()）
- * @returns {Promise<number>} 宿主货币余额
- */
+const HOST_BALANCE_CACHE_MS = 10000;
 async function getHostWalletBalance() {
-  // 缓存有效直接返回
   if (_cachedHostBalance !== null && (Date.now() - _cachedHostBalanceTime) < HOST_BALANCE_CACHE_MS) {
     return _cachedHostBalance;
   }
   try {
     const wallet = await api.wallet.get();
-    // wallet.accounts 是数组，取第一个账户的 balance
     const bal = wallet?.accounts?.[0]?.balance ?? 0;
     _cachedHostBalance = typeof bal === 'number' ? bal : parseFloat(bal) || 0;
     _cachedHostBalanceTime = Date.now();
@@ -352,65 +318,24 @@ async function getHostWalletBalance() {
     return _cachedHostBalance ?? 0;
   }
 }
-/**
- * 刷新宿主余额显示（强制重新拉取）
- */
 async function refreshHostBalanceDisplay() {
-  _cachedHostBalance = null; // 清除缓存
+  _cachedHostBalance = null;
   const bal = await getHostWalletBalance();
   const el = document.getElementById('wlHostBalance');
   if (el) el.textContent = bal.toFixed(2);
 }
-/**
- * 渲染完整的钱包页面 DOM（注入到 #walletPageView 容器内）
- * 不修改 index.html，所有 HTML 由 JS 动态生成
- *
- * 设计：第二版成熟克制整体样式 + 主页收益金库黑金余额卡配色
- * - 整体浅白基调，低饱和色彩
- * - 余额卡：主页 black-card 同款黑金渐变 + 琥珀色边框
- * - 图标：全部线性 SVG，无 emoji
- * - 眼睛：灰色，无外圈
- * - 流水：无"全部"按钮，用真实 transactionLedger 数据
- * - 提现弹窗：复用全局 center-modal-backdrop，居中缩放弹出，和充值弹窗一致
- * - 提现快捷金额：100/500/1000/5000 币 + 自定义输入
- */
 function renderWalletUI() {
   const container = document.getElementById('walletPageView');
   if (!container) return;
-  // ── 读取安全区 CSS 变量值 ──
   const style = getComputedStyle(document.documentElement);
   const safeTopVal = style.getPropertyValue('--ai-phone-app-safe-top').trim() || '88px';
   const safeLineTop = `calc(${safeTopVal} + 6px)`;
   container.innerHTML = `
     <style>
-      /* ═══════ LUMA 钱包 · 成熟克制版 ═══════ */
-      #walletPageView {
-        background: #f6f7f9 !important;
-        position: relative;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-      }
-      /* 安全区装饰线（特淡浅灰） */
-      .wl-safe-line {
-        position: absolute; left: 0; right: 0;
-        top: ${safeLineTop}; height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(200,200,210,0.12), transparent);
-        z-index: 20; pointer-events: none;
-      }
-      /* ── 顶部导航 ── */
-      .wl-nav {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 12px 18px 8px;
-        padding-top: calc(${safeLineTop} + 12px);
-        position: relative; z-index: 15;
-      }
-      .wl-back {
-        width: 36px; height: 36px; border-radius: 50%;
-        background: #fff; border: 1px solid #e8eaef;
-        display: flex; align-items: center; justify-content: center;
-        cursor: pointer; transition: all .2s;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-      }
+      #walletPageView { background: #f6f7f9 !important; position: relative; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+      .wl-safe-line { position: absolute; left: 0; right: 0; top: ${safeLineTop}; height: 1px; background: linear-gradient(90deg, transparent, rgba(200,200,210,0.12), transparent); z-index: 20; pointer-events: none; }
+      .wl-nav { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px 8px; padding-top: calc(${safeLineTop} + 12px); position: relative; z-index: 15; }
+      .wl-back { width: 36px; height: 36px; border-radius: 50%; background: #fff; border: 1px solid #e8eaef; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .2s; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
       .wl-back:active { transform: scale(0.88); background: #f0f2f5; }
       .wl-back svg { width: 18px; height: 18px; stroke: #4a4f5a; stroke-width: 2; fill: none; }
       .wl-nav-title { text-align: center; flex: 1; }
@@ -418,34 +343,15 @@ function renderWalletUI() {
       .wl-nav-title span { font-size: 9px; color: #8b909b; font-weight: 500; letter-spacing: 2px; display: block; margin-top: 2px; }
       .wl-nav-right { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
       .wl-nav-right svg { width: 18px; height: 18px; stroke: #8b909b; stroke-width: 1.8; fill: none; }
-      /* ── 内容区 ── */
       .wl-body { padding: 6px 16px 100px; }
-      /* ═══════ 黑金总资产卡（主页收益金库同款配色）═══════ */
-      .wl-asset-card {
-        position: relative; border-radius: 20px; overflow: hidden;
-        background: linear-gradient(135deg, #18181b 0%, #09090b 100%);
-        border: 1px solid rgba(245, 158, 11, 0.25);
-        box-shadow: 0 16px 36px -6px rgba(0,0,0,.4), inset 0 1px 1px rgba(255,255,255,.2);
-        padding: 20px;
-      }
-      .wl-asset-card::before {
-        content:''; position:absolute; top:0; left:0; right:0; height:2px;
-        background: linear-gradient(90deg, rgba(245,158,11,.3), rgba(245,158,11,.6), rgba(245,158,11,.3));
-      }
-      .wl-asset-card::after {
-        content:''; position:absolute; top:-25%; right:-8%; width:150px; height:150px;
-        background: radial-gradient(circle, rgba(212,185,140,.14), transparent 65%);
-        pointer-events: none;
-      }
+      .wl-asset-card { position: relative; border-radius: 20px; overflow: hidden; background: linear-gradient(135deg, #18181b 0%, #09090b 100%); border: 1px solid rgba(245, 158, 11, 0.25); box-shadow: 0 16px 36px -6px rgba(0,0,0,.4), inset 0 1px 1px rgba(255,255,255,.2); padding: 20px; }
+      .wl-asset-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background: linear-gradient(90deg, rgba(245,158,11,.3), rgba(245,158,11,.6), rgba(245,158,11,.3)); }
+      .wl-asset-card::after { content:''; position:absolute; top:-25%; right:-8%; width:150px; height:150px; background: radial-gradient(circle, rgba(212,185,140,.14), transparent 65%); pointer-events: none; }
       .wl-ac-head { display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 2; }
       .wl-ac-label { display: flex; align-items: center; gap: 7px; }
       .wl-ac-label .dot { width: 5px; height: 5px; border-radius: 50%; background: #d4b98c; }
       .wl-ac-label span { font-size: 11px; font-weight: 600; color: rgba(212,185,140,.75); letter-spacing: .5px; }
-      /* 眼睛（灰色，无圈） */
-      .wl-ac-eye {
-        width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
-        color: #8b909b; cursor: pointer; transition: color .2s; background: none; border: none;
-      }
+      .wl-ac-eye { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: #8b909b; cursor: pointer; transition: color .2s; background: none; border: none; }
       .wl-ac-eye:active { color: #b0b4bc; }
       .wl-ac-eye svg { width: 16px; height: 16px; stroke-width: 1.8; fill: none; }
       .wl-ac-amount { margin-top: 14px; position: relative; z-index: 2; }
@@ -465,13 +371,8 @@ function renderWalletUI() {
       .wl-ac-stat-v.amber { color: #d4b98c; }
       .wl-ac-stat-v.rose { color: #e8a0b0; }
       .wl-ac-stat-sub { font-size: 9px; color: rgba(255,255,255,.25); margin-top: 2px; font-weight: 500; }
-      /* ── 快捷操作 ── */
       .wl-quick { display: flex; gap: 10px; margin-top: 14px; }
-      .wl-quick-item {
-        flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px;
-        padding: 14px 4px; border-radius: 16px; background: #fff; border: 1px solid #e8eaef;
-        cursor: pointer; transition: transform .15s, box-shadow .2s;
-      }
+      .wl-quick-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 14px 4px; border-radius: 16px; background: #fff; border: 1px solid #e8eaef; cursor: pointer; transition: transform .15s, box-shadow .2s; }
       .wl-quick-item:active { transform: scale(.95); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
       .wl-qi-ic { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; }
       .wl-qi-ic svg { width: 19px; height: 19px; stroke-width: 1.8; fill: none; stroke: currentColor; }
@@ -480,23 +381,14 @@ function renderWalletUI() {
       .wl-qi-ic.violet { background: #f3f0fb; color: #8b7bc9; }
       .wl-qi-ic.green { background: #eef7f2; color: #5ba88a; }
       .wl-qi-label { font-size: 12px; font-weight: 600; color: #4a4f5a; }
-      /* ── 区块标题（无"全部"按钮）── */
       .wl-sec-head { display: flex; align-items: center; justify-content: space-between; margin: 22px 2px 10px; }
       .wl-sec-title { font-size: 14px; font-weight: 700; color: #1a1d23; }
       .wl-sec-badge { font-size: 10px; color: #8b909b; background: rgba(0,0,0,.04); padding: 3px 10px; border-radius: 20px; font-weight: 600; }
-      /* ── 流水列表（样式骨架，数据由 renderTransactionLedger 填充）── */
       .wl-ledger { display: flex; flex-direction: column; gap: 8px; }
-      .wl-tx {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 13px 15px; border-radius: 14px; background: #fff; border: 1px solid #eef0f4;
-        transition: background .15s;
-      }
+      .wl-tx { display: flex; align-items: center; justify-content: space-between; padding: 13px 15px; border-radius: 14px; background: #fff; border: 1px solid #eef0f4; transition: background .15s; }
       .wl-tx:active { background: #f8f9fb; }
       .wl-tx-left { display: flex; align-items: center; gap: 11px; }
-      .wl-tx-icon {
-        width: 36px; height: 36px; border-radius: 11px;
-        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      }
+      .wl-tx-icon { width: 36px; height: 36px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
       .wl-tx-icon svg { width: 17px; height: 17px; stroke-width: 1.8; fill: none; }
       .wl-tx-icon.income { background: #eef7f2; }
       .wl-tx-icon.income svg { stroke: #5ba88a; }
@@ -513,147 +405,71 @@ function renderWalletUI() {
       .wl-tx-amount.neg { color: #1a1d23; }
       .wl-tx-amount.warn { color: #8b7bc9; }
       .wl-empty { text-align: center; padding: 40px 20px 50px; }
-      .wl-empty-icon {
-        width: 52px; height: 52px; margin: 0 auto 12px; border-radius: 50%;
-        background: rgba(0,0,0,.03); display: flex; align-items: center; justify-content: center;
-      }
+      .wl-empty-icon { width: 52px; height: 52px; margin: 0 auto 12px; border-radius: 50%; background: rgba(0,0,0,.03); display: flex; align-items: center; justify-content: center; }
       .wl-empty-icon svg { width: 24px; height: 24px; stroke: #c8ccd4; stroke-width: 1.5; fill: none; }
       .wl-empty-text { font-size: 13px; font-weight: 600; color: #8b909b; }
       .wl-empty-sub { font-size: 11px; color: #c0c4cc; margin-top: 4px; }
-      /* ── 提现弹窗输入框（复用全局 center-modal-backdrop / center-modal-card）── */
       .wl-modal-input { width: 140px; font-size: 30px; font-weight: 800; text-align: center; background: none; border: 0; outline: none; color: #1a1d23; letter-spacing: -.02em; }
       .wl-modal-input::placeholder { color: #d0d4dc; font-weight: 500; }
-      /* ── 提现快捷金额选中态 ── */
       .wl-wd-tier.active { border-color: #18181b !important; background: #18181b !important; box-shadow: 0 4px 12px rgba(0,0,0,.15); }
       .wl-wd-tier.active > div:first-child { color: #d4b98c !important; }
       .wl-wd-tier.active > div:last-child { color: rgba(212,185,140,.6) !important; }
     </style>
-    <!-- 安全区装饰线 -->
     <div class="wl-safe-line"></div>
-    <!-- 顶部导航 -->
     <div class="wl-nav">
-      <div class="wl-back" onclick="closeWalletPageView()">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-      </div>
-      <div class="wl-nav-title">
-        <h3>我的钱包</h3>
-        <span>LUMA WALLET</span>
-      </div>
-      <div class="wl-nav-right">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      </div>
+      <div class="wl-back" onclick="closeWalletPageView()"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></div>
+      <div class="wl-nav-title"><h3>我的钱包</h3><span>LUMA WALLET</span></div>
+      <div class="wl-nav-right"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
     </div>
     <div class="wl-body">
-      <!-- ══ 黑金总资产卡 ══ -->
       <div class="wl-asset-card">
         <div class="wl-ac-head">
-          <div class="wl-ac-label">
-            <span class="dot"></span>
-            <span>总资产 (元)</span>
-          </div>
-          <button class="wl-ac-eye" id="toggleWalletEye" aria-label="显示/隐藏">
-            <svg id="walletEyeIcon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          </button>
+          <div class="wl-ac-label"><span class="dot"></span><span>总资产 (元)</span></div>
+          <button class="wl-ac-eye" id="toggleWalletEye" aria-label="显示/隐藏"><svg id="walletEyeIcon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
         <div class="wl-ac-amount">
           <div class="wl-ac-k">账户余额</div>
-          <div class="wl-ac-row">
-            <span class="wl-ac-cur">¥</span>
-            <span class="wl-ac-val" id="wlHostBalance">0.00</span>
-            <span class="wl-ac-unit">CNY</span>
-          </div>
+          <div class="wl-ac-row"><span class="wl-ac-cur">¥</span><span class="wl-ac-val" id="wlHostBalance">0.00</span><span class="wl-ac-unit">CNY</span></div>
         </div>
         <div class="wl-ac-divider"></div>
         <div class="wl-ac-stats">
-          <div class="wl-ac-stat">
-            <div class="wl-ac-stat-k">可提现余额</div>
-            <div class="wl-ac-stat-v amber" id="pageRevenueBalance">0<span class="s"> 币</span></div>
-            <div class="wl-ac-stat-sub">LUMA 币</div>
-          </div>
-          <div class="wl-ac-stat">
-            <div class="wl-ac-stat-k">累计收益</div>
-            <div class="wl-ac-stat-v rose" id="wlRevenueTotal">0<span class="s"> 币</span></div>
-            <div class="wl-ac-stat-sub">直播收益</div>
-          </div>
+          <div class="wl-ac-stat"><div class="wl-ac-stat-k">可提现余额</div><div class="wl-ac-stat-v amber" id="pageRevenueBalance">0<span class="s"> 币</span></div><div class="wl-ac-stat-sub">LUMA 币</div></div>
+          <div class="wl-ac-stat"><div class="wl-ac-stat-k">累计收益</div><div class="wl-ac-stat-v rose" id="wlRevenueTotal">0<span class="s"> 币</span></div><div class="wl-ac-stat-sub">直播收益</div></div>
         </div>
       </div>
-      <!-- ══ 快捷操作 ══ -->
       <div class="wl-quick">
-        <div class="wl-quick-item" onclick="openRechargeModal()">
-          <div class="wl-qi-ic rose"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
-          <span class="wl-qi-label">充值</span>
-        </div>
-        <div class="wl-quick-item" onclick="openWithdrawModal()">
-          <div class="wl-qi-ic amber"><svg viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></div>
-          <span class="wl-qi-label">提现</span>
-        </div>
-        <div class="wl-quick-item" onclick="api.ui.toast && api.ui.toast('转账功能开发中')">
-          <div class="wl-qi-ic violet"><svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>
-          <span class="wl-qi-label">转账</span>
-        </div>
-        <div class="wl-quick-item" onclick="api.ui.toast && api.ui.toast('我的银行卡')">
-          <div class="wl-qi-ic green"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
-          <span class="wl-qi-label">银行卡</span>
-        </div>
+        <div class="wl-quick-item" onclick="openRechargeModal()"><div class="wl-qi-ic rose"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div><span class="wl-qi-label">充值</span></div>
+        <div class="wl-quick-item" onclick="openWithdrawModal()"><div class="wl-qi-ic amber"><svg viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></div><span class="wl-qi-label">提现</span></div>
+        <div class="wl-quick-item" onclick="api.ui.toast && api.ui.toast('转账功能开发中')"><div class="wl-qi-ic violet"><svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div><span class="wl-qi-label">转账</span></div>
+        <div class="wl-quick-item" onclick="api.ui.toast && api.ui.toast('我的银行卡')"><div class="wl-qi-ic green"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div><span class="wl-qi-label">银行卡</span></div>
       </div>
-      <!-- ══ 交易流水 ══ -->
-      <div class="wl-sec-head">
-        <span class="wl-sec-title">交易流水</span>
-        <span class="wl-sec-badge" id="wlTxCount">0 笔记录</span>
-      </div>
+      <div class="wl-sec-head"><span class="wl-sec-title">交易流水</span><span class="wl-sec-badge" id="wlTxCount">0 笔记录</span></div>
       <div class="wl-ledger" id="transactionLedgerContainer"></div>
     </div>
-    <!-- ══ 提现弹窗（复用全局 center-modal-backdrop，居中缩放弹出，和充值弹窗一致）══ -->
     <div id="withdrawModal" class="hidden center-modal-backdrop" onclick="if(event.target===this)closeWithdrawModal()">
       <div class="center-modal-card p-5" style="max-width:380px;">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-          <div>
-            <div class="text-base font-black text-slate-900">提现到余额</div>
-            <div class="text-[10px] text-slate-400 mt-0.5 font-medium">LUMA 币兑换宿主余额</div>
-          </div>
-          <div class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center cursor-pointer" onclick="closeWithdrawModal()">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </div>
+          <div><div class="text-base font-black text-slate-900">提现到余额</div><div class="text-[10px] text-slate-400 mt-0.5 font-medium">LUMA 币兑换宿主余额</div></div>
+          <div class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center cursor-pointer" onclick="closeWithdrawModal()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
         </div>
-        <div class="flex items-center justify-between bg-slate-50 rounded-xl p-3 mb-4 border border-slate-100">
-          <span class="text-xs text-slate-500 font-semibold">当前 LUMA 币</span>
-          <span class="text-lg font-black text-slate-900" id="withdrawLumaBal">0</span>
-        </div>
+        <div class="flex items-center justify-between bg-slate-50 rounded-xl p-3 mb-4 border border-slate-100"><span class="text-xs text-slate-500 font-semibold">当前 LUMA 币</span><span class="text-lg font-black text-slate-900" id="withdrawLumaBal">0</span></div>
         <div class="text-[11px] text-slate-500 font-semibold mb-2">选择提现数量</div>
         <div class="grid grid-cols-2 gap-2 mb-3" id="withdrawQuickGrid">
-          <div class="wl-wd-tier cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-center transition active:scale-95" data-amount="100" onclick="selectWithdrawTier(100, this)">
-            <div class="text-base font-black text-slate-900">100</div>
-            <div class="text-[9px] text-slate-400 mt-0.5">币 · ¥10</div>
-          </div>
-          <div class="wl-wd-tier cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-center transition active:scale-95" data-amount="500" onclick="selectWithdrawTier(500, this)">
-            <div class="text-base font-black text-slate-900">500</div>
-            <div class="text-[9px] text-slate-400 mt-0.5">币 · ¥50</div>
-          </div>
-          <div class="wl-wd-tier cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-center transition active:scale-95" data-amount="1000" onclick="selectWithdrawTier(1000, this)">
-            <div class="text-base font-black text-slate-900">1000</div>
-            <div class="text-[9px] text-slate-400 mt-0.5">币 · ¥100</div>
-          </div>
-          <div class="wl-wd-tier cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-center transition active:scale-95" data-amount="5000" onclick="selectWithdrawTier(5000, this)">
-            <div class="text-base font-black text-slate-900">5000</div>
-            <div class="text-[9px] text-slate-400 mt-0.5">币 · ¥500</div>
-          </div>
+          <div class="wl-wd-tier cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-center transition active:scale-95" data-amount="100" onclick="selectWithdrawTier(100, this)"><div class="text-base font-black text-slate-900">100</div><div class="text-[9px] text-slate-400 mt-0.5">币 · ¥10</div></div>
+          <div class="wl-wd-tier cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-center transition active:scale-95" data-amount="500" onclick="selectWithdrawTier(500, this)"><div class="text-base font-black text-slate-900">500</div><div class="text-[9px] text-slate-400 mt-0.5">币 · ¥50</div></div>
+          <div class="wl-wd-tier cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-center transition active:scale-95" data-amount="1000" onclick="selectWithdrawTier(1000, this)"><div class="text-base font-black text-slate-900">1000</div><div class="text-[9px] text-slate-400 mt-0.5">币 · ¥100</div></div>
+          <div class="wl-wd-tier cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-center transition active:scale-95" data-amount="all" onclick="selectWithdrawTier('all', this)"><div class="text-base font-black text-slate-900">全部</div><div class="text-[9px] text-slate-400 mt-0.5">一键提现</div></div>
         </div>
         <div class="text-[11px] text-slate-500 font-semibold mb-2">自定义数量</div>
-        <div class="bg-slate-50 rounded-xl p-3 mb-3 border border-slate-100 flex items-center gap-2">
-          <input type="number" class="flex-1 bg-transparent border-0 outline-none text-sm font-bold text-slate-900 placeholder:text-slate-300" id="withdrawCustomInput" placeholder="输入自定义数量" min="100" step="100" oninput="onWithdrawCustomInput(this.value)">
-          <span class="text-xs text-slate-400 font-semibold">币</span>
-        </div>
+        <div class="bg-slate-50 rounded-xl p-3 mb-3 border border-slate-100 flex items-center gap-2"><input type="number" class="flex-1 bg-transparent border-0 outline-none text-sm font-bold text-slate-900 placeholder:text-slate-300" id="withdrawCustomInput" placeholder="输入自定义数量" min="1" step="1" oninput="onWithdrawCustomInput(this.value)"><span class="text-xs text-slate-400 font-semibold">币</span></div>
         <div class="text-center text-[10px] text-slate-400 mb-4 py-2 bg-amber-50/60 rounded-lg">汇率：10 LUMA 币 = 1 元 · 实际到账 <b id="withdrawPreview" class="text-amber-600 font-bold">0.00</b> 元</div>
         <button class="w-full h-11 rounded-xl text-sm font-bold bg-slate-900 text-amber-400 border-0 cursor-pointer transition active:scale-95 disabled:opacity-40" id="withdrawConfirmBtn" onclick="confirmWithdraw()">确认提现</button>
-        <div class="text-[10px] text-slate-300 text-center mt-3 leading-relaxed">提现将扣除 LUMA 币，操作不可撤销<br>最低 100 币起提 · 提现免手续费</div>
+        <div class="text-[10px] text-slate-300 text-center mt-3 leading-relaxed">提现将扣除 LUMA 币，操作不可撤销<br>提现免手续费</div>
       </div>
     </div>
-    <!-- ══ 恶搞结果弹窗 ══ -->
     <div id="withdrawJokeModal" class="hidden center-modal-backdrop" onclick="if(event.target===this)closeWithdrawJokeModal()">
       <div class="center-modal-card p-6 text-center" style="max-width:320px;">
-        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-rose-50 flex items-center justify-center">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e85a7a" stroke-width="1.8"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-        </div>
+        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-rose-50 flex items-center justify-center"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e85a7a" stroke-width="1.8"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></div>
         <div class="text-base font-black text-slate-900 leading-relaxed mb-1">好吧~骗你的~</div>
         <div class="text-base font-black text-rose-500 leading-relaxed mb-1">还是扣款！</div>
         <div class="text-sm text-slate-500 font-medium mt-2 mb-5">你花了一笔冤枉钱！</div>
@@ -661,7 +477,6 @@ function renderWalletUI() {
       </div>
     </div>
   `;
-  // ── 余额显示/隐藏切换 ──
   const eyeBtn = document.getElementById('toggleWalletEye');
   const eyeIcon = document.getElementById('walletEyeIcon');
   const hostVal = document.getElementById('wlHostBalance');
@@ -676,37 +491,26 @@ function renderWalletUI() {
     };
   }
 }
-/**
- * 打开钱包页面
- * 先渲染 UI，再更新数据，最后显示页面 + 安全区定位线
- */
 async function openWalletPageView() {
-  // 1. 渲染钱包界面 DOM
   renderWalletUI();
-  // 2. 更新 LUMA 币余额
   const lumaBal = window.currentWalletBalance || revenueBalance || 0;
   const pageRev = document.getElementById('pageRevenueBalance');
   if (pageRev) pageRev.textContent = lumaBal.toLocaleString();
   const lumaEl = document.getElementById('wlLumaBalance');
   if (lumaEl) lumaEl.textContent = lumaBal.toLocaleString();
-  // 3. 异步获取宿主余额并显示
   refreshHostBalanceDisplay();
-  // 3.5 更新累计收益（预留变量 window.lumaEarnedRevenue，暂为0）
   const revEl = document.getElementById('wlRevenueTotal');
   if (revEl) {
     const earned = window.lumaEarnedRevenue || 0;
     revEl.innerHTML = earned.toLocaleString() + '<span class="s"> 币</span>';
   }
-  // 4. 渲染流水
   renderTransactionLedger();
-  // 5. 显示页面
   if (window.PageStack) {
     window.PageStack.open('walletPageView');
   } else {
     const page = document.getElementById('walletPageView');
     if (page) page.classList.remove('hidden');
   }
-  // 6. 安全区定位线（调试用，特淡浅灰）
   showSafeAreaGuides('walletPageView');
 }
 window.openWalletPageView = openWalletPageView;
@@ -720,19 +524,13 @@ function closeWalletPageView() {
   }
 }
 window.closeWalletPageView = closeWalletPageView;
-/**
- * 渲染交易流水列表（新版样式）
- * 读取真实 transactionLedger 数组，不注入假数据
- */
 function renderTransactionLedger() {
   const box = document.getElementById('transactionLedgerContainer');
   if (!box) return;
   if (!transactionLedger || transactionLedger.length === 0) {
     box.innerHTML = `
       <div class="wl-empty">
-        <div class="wl-empty-icon">
-          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="13" y2="13"/></svg>
-        </div>
+        <div class="wl-empty-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="13" y2="13"/></svg></div>
         <div class="wl-empty-text">暂无流水记录</div>
         <div class="wl-empty-sub">充值或提现后记录将显示在这里</div>
       </div>
@@ -742,7 +540,7 @@ function renderTransactionLedger() {
     return;
   }
   const iconMap = {
-    income:  '<svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+    income: '<svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
     recharge: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
     cashout: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
     expense: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>'
@@ -756,10 +554,7 @@ function renderTransactionLedger() {
       <div class="wl-tx">
         <div class="wl-tx-left">
           <div class="wl-tx-icon ${type}">${iconMap[type] || iconMap.expense}</div>
-          <div class="wl-tx-info">
-            <div class="tx-title">${item.title || '未知交易'}</div>
-            <div class="tx-meta">${item.time || ''} ${item.targetName ? '· ' + item.targetName : ''}</div>
-          </div>
+          <div class="wl-tx-info"><div class="tx-title">${item.title || '未知交易'}</div><div class="tx-meta">${item.time || ''} ${item.targetName ? '· ' + item.targetName : ''}</div></div>
         </div>
         <div class="wl-tx-amount ${amtCls}">${sign}${(item.amount || 0).toLocaleString()} LUMA</div>
       </div>
@@ -771,12 +566,16 @@ function renderTransactionLedger() {
 // ═══════════ 提现功能 ═══════════
 let _selectedWithdrawAmount = 0;
 function selectWithdrawTier(amount, el) {
-  _selectedWithdrawAmount = amount;
+  if (amount === 'all') {
+    _selectedWithdrawAmount = window.currentWalletBalance || 0;
+  } else {
+    _selectedWithdrawAmount = amount;
+  }
   document.querySelectorAll('.wl-wd-tier').forEach(t => t.classList.remove('active'));
   if (el) el.classList.add('active');
   const customInput = document.getElementById('withdrawCustomInput');
   if (customInput) customInput.value = '';
-  updateWithdrawPreview(amount);
+  updateWithdrawPreview(_selectedWithdrawAmount);
 }
 function onWithdrawCustomInput(val) {
   const num = parseInt(val) || 0;
@@ -793,7 +592,7 @@ function updateWithdrawPreview(amount) {
   const preview = document.getElementById('withdrawPreview');
   if (preview) preview.textContent = (amount / 10).toFixed(2);
   const btn = document.getElementById('withdrawConfirmBtn');
-  if (btn) btn.disabled = (amount < 100);
+  if (btn) btn.disabled = (amount <= 0);
 }
 function openWithdrawModal() {
   const modal = document.getElementById('withdrawModal');
@@ -820,8 +619,8 @@ function closeWithdrawJokeModal() {
 window.closeWithdrawJokeModal = closeWithdrawJokeModal;
 async function confirmWithdraw() {
   const amount = _selectedWithdrawAmount || 0;
-  if (amount < 100) {
-    api.ui.toast("最低提现 100 LUMA 币");
+  if (amount <= 0) {
+    api.ui.toast("请选择提现数量");
     return;
   }
   const currentLuma = window.currentWalletBalance || 0;
@@ -832,14 +631,12 @@ async function confirmWithdraw() {
   const hostAmount = amount / 10;
   const btn = document.getElementById('withdrawConfirmBtn');
   if (btn) { btn.textContent = '处理中...'; btn.disabled = true; }
-  // 扣除 LUMA 币
   window.currentWalletBalance = currentLuma - amount;
   try {
     await api.db.create("app_wallet", { id: "vault_data", balance: window.currentWalletBalance });
   } catch (e) {
     await api.db.update("app_wallet", "vault_data", { balance: window.currentWalletBalance }).catch(() => {});
   }
-  // wallet.pay 传正数（扣款）
   try {
     const wallet = await api.wallet.get();
     const accountId = wallet?.accounts?.[0]?.id;
@@ -868,17 +665,14 @@ async function confirmWithdraw() {
   refreshHostBalanceDisplay();
   if (typeof window.syncWalletDisplays === 'function') window.syncWalletDisplays();
   if (btn) { btn.textContent = '确认提现'; btn.disabled = false; }
-  // 弹出恶搞结果弹窗
   const jokeModal = document.getElementById('withdrawJokeModal');
   if (jokeModal) jokeModal.classList.remove('hidden');
 }
 window.confirmWithdraw = confirmWithdraw;
-// ═══════════ 旧版提现（兼容保留） ═══════════
 async function handleCashOutAll() {
   openWithdrawModal();
 }
 window.handleCashOutAll = handleCashOutAll;
-// 6. 充值中心模态窗
 function openRechargeModal() {
   const modal = document.getElementById('rechargeModal');
   if (modal) modal.classList.remove('hidden');
@@ -894,7 +688,6 @@ window.closeRechargeModal = closeRechargeModal;
 function selectRechargeTier(amount, price) {
   selectedRechargeAmount = amount;
   selectedRechargePrice = price;
-  
   document.querySelectorAll('.recharge-tier-card').forEach(c => c.classList.remove('active'));
   const targetCard = document.getElementById(`rechargeTier_${amount}`);
   if (targetCard) targetCard.classList.add('active');
@@ -932,10 +725,7 @@ async function submitExecuteRecharge() {
     return;
   }
   const addCoins = selectedRechargeAmount;
-  // 充值 = 宿主余额扣款 → LUMA 币增加
-  // 汇率：1 宿主货币 = 10 LUMA 币
   const hostCost = addCoins / 10;
-  // 1. 先调用宿主钱包扣款
   try {
     const wallet = await api.wallet.get();
     const accountId = wallet?.accounts?.[0]?.id;
@@ -960,21 +750,17 @@ async function submitExecuteRecharge() {
     api.ui.toast("充值失败：" + e.message);
     return;
   }
-  // 2. 扣款成功，增加 LUMA 币
   window.currentWalletBalance = (window.currentWalletBalance || 0) + addCoins;
   try {
     await api.db.create("app_wallet", { id: "vault_data", balance: window.currentWalletBalance });
   } catch (e) {
     await api.db.update("app_wallet", "vault_data", { balance: window.currentWalletBalance }).catch(() => {});
   }
-  // 3. 记录流水
   if (typeof recordTransaction === 'function') {
     await recordTransaction(`充值 ${addCoins.toLocaleString()} LUMA 币`, "recharge", addCoins, "LUMA 充值中心");
   }
-  // 4. 刷新界面
   syncWalletDisplays();
   closeRechargeModal();
-  // 5. 刷新钱包页面数据（如果钱包页面打开着）
   const walletPage = document.getElementById('walletPageView');
   if (walletPage && !walletPage.classList.contains('hidden')) {
     const pageRev = document.getElementById('pageRevenueBalance');
@@ -991,48 +777,32 @@ function syncWalletDisplays() {
   const bal = window.currentWalletBalance || 0;
   const giftBal = document.getElementById('giftWalletBalance');
   if (giftBal) giftBal.textContent = `💎 ${bal.toLocaleString()} LUMA 币`;
-  
   const pageBal = document.getElementById('pageRevenueBalance');
   if (pageBal) pageBal.textContent = bal.toLocaleString();
   const revEl = document.getElementById('liveRevenueAmount');
   if (revEl) revEl.textContent = bal.toLocaleString();
-  
   const modalBal = document.getElementById('rechargeModalBalance');
   if (modalBal) modalBal.textContent = bal.toLocaleString();
 }
 window.syncWalletDisplays = syncWalletDisplays;
-// =========================================================================
-// 【统一页面栈注册】关注列表 + 钱包
-// =========================================================================
 if (window.PageStack) {
-  window.PageStack.register('followListPageView', {
-    animationType: 'slide-right',
-  });
-  window.PageStack.register('walletPageView', {
-    animationType: 'slide-right',
-  });
+  window.PageStack.register('followListPageView', { animationType: 'slide-right' });
+  window.PageStack.register('walletPageView', { animationType: 'slide-right' });
 }
-// =========================================================================
-// 安全区定位线（调试工具）
-// 只显示特淡浅灰细线，无标签文字，无底部线
-// =========================================================================
 function showSafeAreaGuides(containerId) {
   hideSafeAreaGuides();
   const container = document.getElementById(containerId);
   if (!container) return;
   const style = getComputedStyle(document.documentElement);
   const safeTop = style.getPropertyValue('--ai-phone-app-safe-top').trim() || '88px';
-  // 顶部安全区线（特淡浅灰，无标签）
   const topLine = document.createElement('div');
   topLine.id = '__safe_guide_top';
   topLine.style.cssText = `position:absolute;top:${safeTop};left:0;right:0;height:1px;background:rgba(200,200,210,0.12);z-index:9999;pointer-events:none`;
-  // 容器需要 relative 定位才能让 absolute 生效
   if (getComputedStyle(container).position === 'static') {
     container.style.position = 'relative';
     container.dataset.__safeOldPos = 'static';
   }
   container.appendChild(topLine);
-  console.log(`[SafeArea] safe-top=${safeTop}`);
 }
 function hideSafeAreaGuides() {
   document.querySelectorAll('[id^="__safe_guide_"]').forEach(el => el.remove());
