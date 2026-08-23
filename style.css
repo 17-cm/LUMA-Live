@@ -2111,10 +2111,10 @@ input:checked + .switch-slider:before {
   padding:calc(var(--safe-top) + 20px) 16px 12px;
 }
 #communityTrendsView .cat-rail{
-  top:calc(var(--safe-top) + 84px);
+  top:calc(var(--safe-top) + 66px);
 }
 #communityTrendsView #flow{
-  padding:calc(var(--safe-top) + 150px) 16px calc(var(--safe-bottom) + 24px);
+  padding:calc(var(--safe-top) + 132px) 16px calc(var(--safe-bottom) + 24px);
 }
 /* 修复：帖子卡片不透明背景 */
 #communityTrendsView .post-card{

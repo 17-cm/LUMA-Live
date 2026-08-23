@@ -198,22 +198,13 @@
         <button onclick="handleGenerateNewTrend()" class="btn-brand text-[10px] !py-1 !px-2.5 shadow-sm"><span>刷新</span></button>
         <button onclick="openCreatePostModal('#微博热搜#')" class="w-7 h-7 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-bold shadow-sm active:scale-90 transition">+</button>
       </div>
-    </div>
-    <div class="px-4 pb-2">
-      <div class="bg-white/90 p-1 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
-        <button onclick="switchHotTrendTab('ranking')" id="btnHotTabRanking" class="flex-1 py-1.5 text-center text-xs font-bold rounded-xl transition bg-slate-900 text-white shadow-xs">🔥 实时热搜榜 TOP 50</button>
-        <button onclick="switchHotTrendTab('feed')" id="btnHotTabFeed" class="flex-1 py-1.5 text-center text-xs font-bold rounded-xl transition text-slate-600 hover:text-slate-900">📰 热点广场动态</button>
-      </div>
-    </div>
-    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-3" id="communityTrendsScrollArea">
-      <div id="hotSearchRankingContainer" class="space-y-2"></div>
-      <div id="hotSearchFeedContainer" class="hidden space-y-3.5">
-        <div id="activeTopicBanner" class="hidden luxe-card p-2.5 bg-rose-50/80 border border-rose-200 flex items-center justify-between text-xs text-rose-700">
-          <span id="activeTopicTagText" class="font-bold truncate">当前话题: #xxx#</span>
-          <span id="activeTopicTipText" class="text-[9px] text-rose-500 truncate px-1"></span>
-          <button onclick="clearHotSearchFilter()" class="text-[10px] font-bold text-rose-600 bg-white px-2 py-0.5 rounded-full border border-rose-200 flex-shrink-0">查看全部</button>
-        </div>
-        <div id="weiboPostFeedContainerFull" class="space-y-3.5"></div>
+    <div id="flow">
+      <!-- 置顶焦点热搜（JS 渲染 .hero-hot 结构） -->
+      <div id="hotSearchHeroContainer"></div>
+      <!-- 热搜榜单 -->
+      <div class="section-title">
+        <h3>🔥 实时热搜榜 <svg class="ic ic-sm" style="vertical-align:middle;opacity:.5;margin-left:4px;cursor:pointer;" viewBox="0 0 256 256" fill="currentColor" onclick="if(window.api&&api.ui&&api.ui.toast)api.ui.toast('编辑热搜')"><path d="M221.66,90.34,165.66,34.34a8,8,0,0,0-11.32,0L40,148.69V216a8,8,0,0,0,8,8h67.31L221.66,101.66A8,8,0,0,0,221.66,90.34ZM112,200H56V144l88-88,56,56Z"/></svg></h3>
+        <span class="more-link">每5分钟更新 ›</span>
       </div>
     </div>
   </div>

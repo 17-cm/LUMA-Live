@@ -32,7 +32,7 @@ function renderHotSearchRanking() {
   // 置顶焦点热搜（大图）
   if (heroBox) {
     heroBox.innerHTML = '\
-      <div class="hero-hot" onclick="filterHotSearchTopic(\'#主播连麦当场破防#\')">\
+      <div class="hero-hot" data-old-onclick="removed(\'#主播连麦当场破防#\')">\
         <img src="https://images.unsplash.com/photo-1598550476439-6847785fcea6?w=800&q=80" alt="">\
         <div class="scrim"></div>\
         <div class="content">\
@@ -52,7 +52,7 @@ function renderHotSearchRanking() {
       const rankClass = idx === 0 ? 'r1' : idx === 1 ? 'r2' : idx === 2 ? 'r3' : 'rn';
       const badgeHtml = item.badge ? '<span class="hot-badge ' + item.badge + '">' + item.badgeText + '</span>' : '';
       return '\
-      <div class="hot-item" onclick="filterHotSearchTopic(\'#' + item.title + '#\')">\
+      <div class="hot-item" data-old-onclick="removed(\'#' + item.title + '#\')">\
         <span class="hot-rank ' + rankClass + '">' + item.rank + '</span>\
         <div class="hot-info">\
           <div class="title">' + item.title + ' ' + badgeHtml + '</div>\
@@ -137,7 +137,7 @@ function getPostCardHtml(post) {
             <div class="time">' + post.time + ' · 来自 ' + deviceTag + '</div>\
           </div>\
         </div>\
-        <button class="more-btn" onclick="if(window.api&&api.ui&&api.ui.toast)api.ui.toast(\'更多操作\')">\
+        <button class="more-btn" onclick="showPostDeleteMenu(\'' + post.id + '\', event)">\
           <svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M140,128a12,12,0,1,1-12-12A12,12,0,0,1,140,128Zm56-12a12,12,0,1,0,12,12A12,12,0,0,0,196,116ZM60,116a12,12,0,1,0,12,12A12,12,0,0,0,60,116Z"/></svg>\
         </button>\
       </div>\
@@ -226,3 +226,50 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 });
+
+// 帖子删除菜单
+function showPostDeleteMenu(postId, event) {
+  event.stopPropagation();
+  // 移除已存在的菜单
+  const oldMenu = document.getElementById('postDeleteMenu');
+  if (oldMenu) oldMenu.remove();
+
+  const menu = document.createElement('div');
+  menu.id = 'postDeleteMenu';
+  menu.style.cssText = 'position:fixed;z-index:9999;background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.15);padding:6px;min-width:100px;';
+  menu.innerHTML = '<button style="display:block;width:100%;padding:10px 16px;border:0;background:none;color:#F43F5E;font-size:13px;font-weight:600;text-align:left;cursor:pointer;border-radius:8px;" onmouseover="this.style.background=\'#FFF1F2\'" onmouseout="this.style.background=\'none\'" onclick="deletePost(\'' + postId + '\')">🗑 删除</button>';
+
+  document.body.appendChild(menu);
+
+  // 定位到点击位置
+  const rect = event.target.getBoundingClientRect();
+  menu.style.top = (rect.bottom + 4) + 'px';
+  menu.style.left = (rect.right - 100) + 'px';
+
+  // 点击其他地方关闭
+  setTimeout(() => {
+    document.addEventListener('click', function closeMenu(e) {
+      if (!menu.contains(e.target)) {
+        menu.remove();
+        document.removeEventListener('click', closeMenu);
+      }
+    });
+  }, 10);
+}
+window.showPostDeleteMenu = showPostDeleteMenu;
+
+// 删除帖子
+function deletePost(postId) {
+  const menu = document.getElementById('postDeleteMenu');
+  if (menu) menu.remove();
+
+  if (window.weiboPosts) {
+    const idx = window.weiboPosts.findIndex(p => p.id === postId);
+    if (idx > -1) {
+      window.weiboPosts.splice(idx, 1);
+    }
+  }
+  renderTrends();
+  if (window.api && api.ui && api.ui.toast) api.ui.toast('帖子已删除');
+}
+window.deletePost = deletePost;
