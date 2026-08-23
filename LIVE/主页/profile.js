@@ -324,7 +324,7 @@ window.renderDualRankList = renderDualRankList;
 //   LUMA 币 = APP 内部货币（window.currentWalletBalance，存 api.db）
 //   宿主余额 = 小手机系统货币（api.wallet.get() → accounts[0].balance）
 //   汇率：1 宿主货币 = 10 LUMA 币
-//   提现 = LUMA 币 → 宿主余额（LUMA 减少，宿主增加）
+//   提现 = LUMA 币 → 宿主余额（LUMA 减少，宿主扣款）
 //   充值 = 宿主余额 → LUMA 币（api.wallet.pay 扣款，LUMA 增加）
 // =========================================================================
 // ── 宿主余额缓存（避免频繁调 SDK）──
@@ -372,6 +372,7 @@ async function refreshHostBalanceDisplay() {
  * - 眼睛：灰色，无外圈
  * - 流水：无"全部"按钮，用真实 transactionLedger 数据
  * - 提现弹窗：复用全局 center-modal-backdrop，居中缩放弹出，和充值弹窗一致
+ * - 提现快捷金额：100/500/1000/5000 币 + 自定义输入
  */
 function renderWalletUI() {
   const container = document.getElementById('walletPageView');
@@ -522,6 +523,10 @@ function renderWalletUI() {
       /* ── 提现弹窗输入框（复用全局 center-modal-backdrop / center-modal-card）── */
       .wl-modal-input { width: 140px; font-size: 30px; font-weight: 800; text-align: center; background: none; border: 0; outline: none; color: #1a1d23; letter-spacing: -.02em; }
       .wl-modal-input::placeholder { color: #d0d4dc; font-weight: 500; }
+      /* ── 提现快捷金额选中态 ── */
+      .wl-wd-tier.active { border-color: #18181b !important; background: #18181b !important; box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+      .wl-wd-tier.active > div:first-child { color: #d4b98c !important; }
+      .wl-wd-tier.active > div:last-child { color: rgba(212,185,140,.6) !important; }
     </style>
     <!-- 安全区装饰线 -->
     <div class="wl-safe-line"></div>
@@ -610,20 +615,49 @@ function renderWalletUI() {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </div>
         </div>
-        <div class="flex items-center justify-between bg-slate-50 rounded-xl p-3 mb-3 border border-slate-100">
+        <div class="flex items-center justify-between bg-slate-50 rounded-xl p-3 mb-4 border border-slate-100">
           <span class="text-xs text-slate-500 font-semibold">当前 LUMA 币</span>
           <span class="text-lg font-black text-slate-900" id="withdrawLumaBal">0</span>
         </div>
-        <div class="bg-slate-50 rounded-xl p-4 text-center mb-3 border border-slate-100">
-          <div class="text-[10px] text-slate-400 font-medium tracking-wide">提现数量</div>
-          <div class="flex items-baseline justify-center gap-1 mt-2">
-            <input type="number" class="wl-modal-input" id="withdrawAmountInput" placeholder="0" min="100" step="1">
+        <div class="text-[11px] text-slate-500 font-semibold mb-2">选择提现数量</div>
+        <div class="grid grid-cols-2 gap-2 mb-3" id="withdrawQuickGrid">
+          <div class="wl-wd-tier cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-center transition active:scale-95" data-amount="100" onclick="selectWithdrawTier(100, this)">
+            <div class="text-base font-black text-slate-900">100</div>
+            <div class="text-[9px] text-slate-400 mt-0.5">币 · ¥10</div>
           </div>
-          <div class="text-[10px] text-slate-400 mt-2 font-medium">可提现 <b id="withdrawAvail" class="text-slate-600 font-semibold">0 LUMA 币</b> · 最低 100 币</div>
+          <div class="wl-wd-tier cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-center transition active:scale-95" data-amount="500" onclick="selectWithdrawTier(500, this)">
+            <div class="text-base font-black text-slate-900">500</div>
+            <div class="text-[9px] text-slate-400 mt-0.5">币 · ¥50</div>
+          </div>
+          <div class="wl-wd-tier cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-center transition active:scale-95" data-amount="1000" onclick="selectWithdrawTier(1000, this)">
+            <div class="text-base font-black text-slate-900">1000</div>
+            <div class="text-[9px] text-slate-400 mt-0.5">币 · ¥100</div>
+          </div>
+          <div class="wl-wd-tier cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-center transition active:scale-95" data-amount="5000" onclick="selectWithdrawTier(5000, this)">
+            <div class="text-base font-black text-slate-900">5000</div>
+            <div class="text-[9px] text-slate-400 mt-0.5">币 · ¥500</div>
+          </div>
+        </div>
+        <div class="text-[11px] text-slate-500 font-semibold mb-2">自定义数量</div>
+        <div class="bg-slate-50 rounded-xl p-3 mb-3 border border-slate-100 flex items-center gap-2">
+          <input type="number" class="flex-1 bg-transparent border-0 outline-none text-sm font-bold text-slate-900 placeholder:text-slate-300" id="withdrawCustomInput" placeholder="输入自定义数量" min="100" step="100" oninput="onWithdrawCustomInput(this.value)">
+          <span class="text-xs text-slate-400 font-semibold">币</span>
         </div>
         <div class="text-center text-[10px] text-slate-400 mb-4 py-2 bg-amber-50/60 rounded-lg">汇率：10 LUMA 币 = 1 元 · 实际到账 <b id="withdrawPreview" class="text-amber-600 font-bold">0.00</b> 元</div>
         <button class="w-full h-11 rounded-xl text-sm font-bold bg-slate-900 text-amber-400 border-0 cursor-pointer transition active:scale-95 disabled:opacity-40" id="withdrawConfirmBtn" onclick="confirmWithdraw()">确认提现</button>
-        <div class="text-[10px] text-slate-300 text-center mt-3 leading-relaxed">提现将扣除 LUMA 币并增加宿主余额，操作不可撤销<br>预计 2 小时内到账 · 提现免手续费</div>
+        <div class="text-[10px] text-slate-300 text-center mt-3 leading-relaxed">提现将扣除 LUMA 币，操作不可撤销<br>最低 100 币起提 · 提现免手续费</div>
+      </div>
+    </div>
+    <!-- ══ 恶搞结果弹窗 ══ -->
+    <div id="withdrawJokeModal" class="hidden center-modal-backdrop" onclick="if(event.target===this)closeWithdrawJokeModal()">
+      <div class="center-modal-card p-6 text-center" style="max-width:320px;">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-rose-50 flex items-center justify-center">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e85a7a" stroke-width="1.8"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        </div>
+        <div class="text-base font-black text-slate-900 leading-relaxed mb-1">好吧~骗你的~</div>
+        <div class="text-base font-black text-rose-500 leading-relaxed mb-1">还是扣款！</div>
+        <div class="text-sm text-slate-500 font-medium mt-2 mb-5">你花了一笔冤枉钱！</div>
+        <button class="w-full h-11 rounded-xl text-sm font-bold bg-slate-900 text-white border-0 cursor-pointer transition active:scale-95" onclick="closeWithdrawJokeModal()">知道了</button>
       </div>
     </div>
   `;
@@ -735,33 +769,43 @@ function renderTransactionLedger() {
   if (badge) badge.textContent = `${transactionLedger.length} 笔记录`;
 }
 // ═══════════ 提现功能 ═══════════
+let _selectedWithdrawAmount = 0;
+function selectWithdrawTier(amount, el) {
+  _selectedWithdrawAmount = amount;
+  document.querySelectorAll('.wl-wd-tier').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  const customInput = document.getElementById('withdrawCustomInput');
+  if (customInput) customInput.value = '';
+  updateWithdrawPreview(amount);
+}
+function onWithdrawCustomInput(val) {
+  const num = parseInt(val) || 0;
+  if (num > 0) {
+    _selectedWithdrawAmount = num;
+    document.querySelectorAll('.wl-wd-tier').forEach(t => t.classList.remove('active'));
+    updateWithdrawPreview(num);
+  } else {
+    _selectedWithdrawAmount = 0;
+    updateWithdrawPreview(0);
+  }
+}
+function updateWithdrawPreview(amount) {
+  const preview = document.getElementById('withdrawPreview');
+  if (preview) preview.textContent = (amount / 10).toFixed(2);
+  const btn = document.getElementById('withdrawConfirmBtn');
+  if (btn) btn.disabled = (amount < 100);
+}
 function openWithdrawModal() {
   const modal = document.getElementById('withdrawModal');
   if (!modal) return;
-  // 更新弹窗里的 LUMA 币余额显示
   const balEl = document.getElementById('withdrawLumaBal');
   if (balEl) balEl.textContent = (window.currentWalletBalance || 0).toLocaleString();
-  // 更新可提现数量
-  const availEl = document.getElementById('withdrawAvail');
-  if (availEl) availEl.textContent = (window.currentWalletBalance || 0).toLocaleString() + ' LUMA 币';
-  // 清空输入
-  const input = document.getElementById('withdrawAmountInput');
-  if (input) input.value = '';
-  const preview = document.getElementById('withdrawPreview');
-  if (preview) preview.textContent = '0.00';
-  // 和充值弹窗一致的呼出方式：classList 控制
+  _selectedWithdrawAmount = 0;
+  document.querySelectorAll('.wl-wd-tier').forEach(t => t.classList.remove('active'));
+  const customInput = document.getElementById('withdrawCustomInput');
+  if (customInput) customInput.value = '';
+  updateWithdrawPreview(0);
   modal.classList.remove('hidden');
-  // 监听输入实时计算到账金额
-  if (input) {
-    input.oninput = function() {
-      const val = parseInt(this.value) || 0;
-      const preview = document.getElementById('withdrawPreview');
-      if (preview) preview.textContent = (val / 10).toFixed(2);
-      // 按钮状态
-      const btn = document.getElementById('withdrawConfirmBtn');
-      if (btn) btn.disabled = (val < 100 || val > (window.currentWalletBalance || 0));
-    };
-  }
 }
 window.openWithdrawModal = openWithdrawModal;
 function closeWithdrawModal() {
@@ -769,9 +813,13 @@ function closeWithdrawModal() {
   if (modal) modal.classList.add('hidden');
 }
 window.closeWithdrawModal = closeWithdrawModal;
+function closeWithdrawJokeModal() {
+  const modal = document.getElementById('withdrawJokeModal');
+  if (modal) modal.classList.add('hidden');
+}
+window.closeWithdrawJokeModal = closeWithdrawJokeModal;
 async function confirmWithdraw() {
-  const input = document.getElementById('withdrawAmountInput');
-  const amount = parseInt(input?.value) || 0;
+  const amount = _selectedWithdrawAmount || 0;
   if (amount < 100) {
     api.ui.toast("最低提现 100 LUMA 币");
     return;
@@ -781,9 +829,7 @@ async function confirmWithdraw() {
     api.ui.toast("LUMA 币余额不足");
     return;
   }
-  // 计算到账金额（10:1）
   const hostAmount = amount / 10;
-  // 按钮 loading 状态
   const btn = document.getElementById('withdrawConfirmBtn');
   if (btn) { btn.textContent = '处理中...'; btn.disabled = true; }
   // 扣除 LUMA 币
@@ -793,7 +839,7 @@ async function confirmWithdraw() {
   } catch (e) {
     await api.db.update("app_wallet", "vault_data", { balance: window.currentWalletBalance }).catch(() => {});
   }
-  // 增加宿主余额（wallet.pay 传正数，按用户要求测试）
+  // wallet.pay 传正数（扣款）
   try {
     const wallet = await api.wallet.get();
     const accountId = wallet?.accounts?.[0]?.id;
@@ -807,39 +853,29 @@ async function confirmWithdraw() {
         relatedOrderId: `withdraw_${Date.now()}`
       });
     }
-    _cachedHostBalance = null; // 清除余额缓存
+    _cachedHostBalance = null;
   } catch (e) {
-    console.warn('[Wallet] 宿主余额增加失败:', e.message);
+    console.warn('[Wallet] 提现扣款失败:', e.message);
   }
-  // 记录流水
   if (typeof recordTransaction === 'function') {
     await recordTransaction(`提现 ${amount.toLocaleString()} LUMA 币`, "cashout", amount, "余额");
   }
-  // 关闭弹窗
   closeWithdrawModal();
-  // 刷新钱包界面数据
   const lumaEl = document.getElementById('pageRevenueBalance');
   if (lumaEl) lumaEl.textContent = window.currentWalletBalance.toLocaleString();
   const lumaBalEl = document.getElementById('wlLumaBalance');
   if (lumaBalEl) lumaBalEl.textContent = window.currentWalletBalance.toLocaleString();
-  // 刷新宿主余额显示
   refreshHostBalanceDisplay();
-  // 同步其他余额显示
   if (typeof window.syncWalletDisplays === 'function') window.syncWalletDisplays();
-  // 恢复按钮状态
   if (btn) { btn.textContent = '确认提现'; btn.disabled = false; }
-  api.ui.toast(`成功提现 ${amount.toLocaleString()} LUMA 币 → ${hostAmount.toFixed(2)} 元`);
+  // 弹出恶搞结果弹窗
+  const jokeModal = document.getElementById('withdrawJokeModal');
+  if (jokeModal) jokeModal.classList.remove('hidden');
 }
 window.confirmWithdraw = confirmWithdraw;
 // ═══════════ 旧版提现（兼容保留） ═══════════
 async function handleCashOutAll() {
-  // 直接打开提现弹窗，默认填全部余额
   openWithdrawModal();
-  const input = document.getElementById('withdrawAmountInput');
-  if (input) {
-    input.value = window.currentWalletBalance || 0;
-    input.dispatchEvent(new Event('input'));
-  }
 }
 window.handleCashOutAll = handleCashOutAll;
 // 6. 充值中心模态窗
