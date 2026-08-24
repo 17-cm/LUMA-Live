@@ -564,7 +564,7 @@ function handleSuperTopicFollow(hostName) {
   if (idx > -1) { window.followedSuperTopics.splice(idx, 1); api.ui.toast(`已取消关注【${hostName}】超话`); }
   else { window.followedSuperTopics.push(topicId); api.ui.toast(`已成功关注【${hostName}】超话！`); }
   try { localStorage.setItem('luma_followed_supertopics', JSON.stringify(window.followedSuperTopics)); } catch (e) {}
-  try { api.db.create("luma_supertopic_follows", { id: 'user', topics: window.followedSuperTopics }).catch(() => { api.db.update("luma_supertopic_follows", 'user', { topics: window.followedSuperTopics }).catch(() => {}); }); } catch (e) {}
+  dbUpsert("luma_supertopic_follows", 'user', { topics: window.followedSuperTopics });
   if (typeof syncFollowCountDisplay === 'function') syncFollowCountDisplay();
   renderSuperTopicView(currentActiveSuperTopicCharId);
 }

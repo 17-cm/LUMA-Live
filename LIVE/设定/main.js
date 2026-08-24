@@ -45,7 +45,7 @@ function switchTab(tabId) {
     if (headerIcon) {
       headerIcon.innerHTML = `<circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path>`;
     }
-    if (typeof renderTrends === 'function') renderTrends();
+    renderTrends();
   } else if (tabId === 'profile') {
     if (headerTitle) headerTitle.textContent = '个人中心';
     if (headerSubtitle) headerSubtitle.textContent = 'My Profile & Vault';
@@ -53,9 +53,9 @@ function switchTab(tabId) {
     if (headerIcon) {
       headerIcon.innerHTML = `<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>`;
     }
-    if (typeof renderDualRankList === 'function') renderDualRankList();
-    if (typeof syncWalletDisplays === 'function') syncWalletDisplays();
-    if (typeof syncFollowCountDisplay === 'function') syncFollowCountDisplay();
+    renderDualRankList();
+    syncWalletDisplays();
+    syncFollowCountDisplay();
   } else if (tabId === 'settings') {
     if (headerTitle) headerTitle.textContent = '系统设定';
     if (headerSubtitle) headerSubtitle.textContent = 'Sandbox Configuration';
@@ -95,6 +95,9 @@ function updateParam(key, val) {
     const tagEl = document.getElementById('tagCharRate');
     if (el) el.textContent = `${num}%`;
     if (tagEl) tagEl.textContent = `${num}% 概率开播`;
+  } else if (key === 'baseStopRate') {
+    const el = document.getElementById('valBaseStopRate');
+    if (el) el.textContent = `${num}%`;
   } else if (key === 'maxLiveDuration') {
     const el = document.getElementById('valMaxLiveDuration');
     if (el) el.textContent = `${num}分钟`;
@@ -138,8 +141,9 @@ function syncParamDisplays() {
     if (text && val !== undefined) text.textContent = `${val}${suffix}`;
   };
 
-  const spawnVal = p.charSpawnRate !== undefined ? p.charSpawnRate : 45;
+  const spawnVal = p.charSpawnRate !== undefined ? p.charSpawnRate : 25;
   setVal('paramCharSpawnRate', spawnVal, 'valCharSpawnRate', '%');
+  setVal('paramBaseStopRate', p.baseStopRate !== undefined ? p.baseStopRate : 10, 'valBaseStopRate', '%');
   const tagEl = document.getElementById('tagCharRate');
   if (tagEl) tagEl.textContent = `${spawnVal}% 概率开播`;
 
@@ -158,6 +162,15 @@ function syncParamDisplays() {
   setVal('paramGiftFrequency', p.giftFrequency || 30, 'valGiftFrequency', '');
   setVal('paramEnterPlayerLiveRate', p.enterPlayerLiveRate || 60, 'valEnterPlayerLiveRate', '%');
   setVal('paramGuestbookRate', p.guestbookRate || 75, 'valGuestbookRate', '%');
+
+  // 后台轮询间隔显示
+  const pollVal = p.opsPollInterval || 3;
+  const pollInput = document.getElementById('paramOpsPollInterval');
+  const pollText = document.getElementById('valOpsPollInterval');
+  const pollTag = document.getElementById('tagOpsPollInterval');
+  if (pollInput) pollInput.value = pollVal;
+  if (pollText) pollText.textContent = `${pollVal} 分钟`;
+  if (pollTag) pollTag.textContent = `${pollVal} 分钟`;
 
   const fxSwitch = document.getElementById('paramGiftFullScreenEffect');
   if (fxSwitch) {
@@ -180,9 +193,7 @@ window.syncParamDisplays = syncParamDisplays;
 
 async function saveAllParamsExplicitly() {
   try {
-    await api.db.create("app_settings", { id: "global_params", ...window.appParams }).catch(() => {
-      api.db.update("app_settings", "global_params", window.appParams).catch(() => {});
-    });
+    await dbUpsert("app_settings", "global_params", window.appParams);
     api.ui.toast("系统运行参数已保存并落盘！");
   } catch (e) {
     api.ui.toast("保存成功");
@@ -204,13 +215,118 @@ function updateApiIntervalDisplay(value) {
 }
 window.updateApiIntervalDisplay = updateApiIntervalDisplay;
 
+// 后台轮询间隔显示更新
+function updateOpsPollIntervalDisplay(value) {
+  const minutes = Number(value) || 3;
+  const valEl = document.getElementById('valOpsPollInterval');
+  if (valEl) valEl.textContent = `${minutes} 分钟`;
+  const tagEl = document.getElementById('tagOpsPollInterval');
+  if (tagEl) tagEl.textContent = `${minutes} 分钟`;
+  if (!window.appParams) window.appParams = {};
+  window.appParams.opsPollInterval = minutes;
+}
+window.updateOpsPollIntervalDisplay = updateOpsPollIntervalDisplay;
+
+// 重启 LUMA官方运营组定时器
+function resetLumaOpsTimer() {
+  if (window.__lumaLiveSyncInterval) {
+    clearInterval(window.__lumaLiveSyncInterval);
+    window.__lumaLiveSyncInterval = null;
+  }
+  const pollMins = (window.appParams && window.appParams.opsPollInterval) || 3;
+  window.__lumaLiveSyncInterval = setInterval(() => {
+    syncLiveSessions({ allowSpawn: true });
+  }, pollMins * 60 * 1000);
+  console.log(`[LUMA官方运营组] 定时器已重启，间隔 ${pollMins} 分钟`);
+}
+window.resetLumaOpsTimer = resetLumaOpsTimer;
+
+// 保存后台轮询间隔：落盘 + 重播开屏 + 重启定时器
+async function saveOpsPollInterval() {
+  try {
+    if (!window.appParams) window.appParams = {};
+    await dbUpsert("app_settings", "global_params", window.appParams);
+    api.ui.toast("已保存，正在重启APP触发！");
+    // 重播开屏动画
+    if (typeof window.replaySplash === 'function') {
+      window.replaySplash();
+    }
+    // 重启定时器（从头开始计算轮询时间）
+    resetLumaOpsTimer();
+  } catch (e) {
+    api.ui.toast("保存成功");
+    resetLumaOpsTimer();
+  }
+}
+window.saveOpsPollInterval = saveOpsPollInterval;
+
+// 轮询日志查看器
+function openOpsLogViewer() {
+  const modal = document.getElementById('opsLogModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    renderOpsLog();
+  }
+}
+window.openOpsLogViewer = openOpsLogViewer;
+
+function closeOpsLogViewer() {
+  const modal = document.getElementById('opsLogModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
+window.closeOpsLogViewer = closeOpsLogViewer;
+
+function renderOpsLog() {
+  const container = document.getElementById('opsLogContent');
+  if (!container) return;
+  const log = window.lumaOpsLog || [];
+  if (log.length === 0) {
+    container.innerHTML = '<div class="text-center text-slate-400 py-8">暂无日志，等待下一轮轮询...</div>';
+    return;
+  }
+  container.innerHTML = log.map((cycle, idx) => {
+    const p = cycle.params;
+    const decisions = (cycle.decisions || []).map(d => {
+      // 未被评估的角色：只显示状态，不投骰
+      if (d.result === '持续直播中…' || d.result === '持续休息中…') {
+        return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50">
+          <span class="text-slate-400">${d.char}</span>
+          <span class="text-slate-300 text-[10px]">${d.state}</span>
+          <span class="text-slate-400">${d.result}</span>
+        </div>`;
+      }
+      const willColor = d.result === '开播' || d.result === '下播' ? 'text-rose-600' : d.result === '跳过' ? 'text-slate-400' : 'text-slate-500';
+      const detail = d.state === '直播中'
+        ? `已播${d.liveMins}分 下播意愿${d.stopWill}% 骰${d.dice}`
+        : `休息${d.restMins}分 开播意愿${d.spawnWill}% 骰${d.dice}`;
+      return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50">
+        <span class="text-slate-600">${d.char}</span>
+        <span class="text-slate-400 text-[10px]">${detail}</span>
+        <span class="${willColor} font-bold">${d.result}</span>
+      </div>`;
+    }).join('');
+    const s = cycle.summary;
+    return `<div class="bg-slate-50 rounded-xl p-2.5">
+      <div class="flex justify-between items-center mb-1.5">
+        <span class="font-bold text-slate-700">第${cycle.cycle || (log.length - idx)}轮 ${cycle.time}</span>
+        <span class="text-[10px] text-slate-500">在播${s.streaming} 评估${s.evaluated || 0}人 开播${s.started} 下播${s.stopped}</span>
+      </div>
+      <div class="text-[9px] text-slate-400 mb-1.5">参数: 开播${p.baseSpawnRate}% 下播${p.baseStopRate}% 直播上限${p.maxLiveMins}分 休息上限${p.maxRestMins}分</div>
+      <div class="space-y-0.5">${decisions}</div>
+    </div>`;
+  }).join('');
+}
+window.renderOpsLog = renderOpsLog;
+
 async function saveApiIntervalSetting() {
   try {
     if (!window.appParams) window.appParams = {};
     const minutes = window.appParams.apiRequestInterval || 5;
-    await api.db.create("app_settings", { id: "global_params", ...window.appParams }).catch(() => {
-      api.db.update("app_settings", "global_params", window.appParams).catch(() => {});
-    });
+    await dbUpsert("app_settings", "global_params", window.appParams);
     api.ui.toast(`API请求间隔已保存为 ${minutes} 分钟`);
   } catch (e) {
     api.ui.toast("保存成功");
@@ -247,9 +363,7 @@ async function saveLivePackagePrompt(promptText) {
   try {
     if (!window.appParams) window.appParams = {};
     window.appParams.livePackagePrompt = promptText;
-    await api.db.create("app_settings", { id: "global_params", ...window.appParams }).catch(() => {
-      api.db.update("app_settings", "global_params", window.appParams).catch(() => {});
-    });
+    await dbUpsert("app_settings", "global_params", window.appParams);
     api.ui.toast("直播间打包预设已保存");
   } catch (e) {
     api.ui.toast("保存成功");
@@ -433,9 +547,7 @@ async function saveCustomApiSettingsModal() {
     await saveDbSetting("custom_api_config", window.customApiConfig);
   } else {
     try {
-      await api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {
-        api.db.update("app_settings", "custom_api_config", window.customApiConfig).catch(() => {});
-      });
+      await dbUpsert("app_settings", "custom_api_config", window.customApiConfig);
     } catch (e) {}
   }
 
@@ -641,9 +753,7 @@ async function saveCustomImageApiSettingsModal() {
     await saveDbSetting("custom_api_config", window.customApiConfig);
   } else {
     try {
-      await api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {
-        api.db.update("app_settings", "custom_api_config", window.customApiConfig).catch(() => {});
-      });
+      await dbUpsert("app_settings", "custom_api_config", window.customApiConfig);
     } catch (e) {}
   }
 
@@ -659,9 +769,7 @@ async function toggleGlobalModelSwitch(checked) {
   if (typeof saveDbSetting === 'function') {
     await saveDbSetting("custom_api_config", window.customApiConfig);
   } else {
-    api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {
-      api.db.update("app_settings", "custom_api_config", window.customApiConfig).catch(() => {});
-    });
+    dbUpsert("app_settings", "custom_api_config", window.customApiConfig);
   }
   syncCustomApiModalFields();
   api.ui.toast(checked ? "已实时启用全局文本大模型" : "已实时切换为自定义文本API");
@@ -674,9 +782,7 @@ async function toggleGlobalImageModelSwitch(checked) {
   if (typeof saveDbSetting === 'function') {
     await saveDbSetting("custom_api_config", window.customApiConfig);
   } else {
-    api.db.create("app_settings", { id: "custom_api_config", ...window.customApiConfig }).catch(() => {
-      api.db.update("app_settings", "custom_api_config", window.customApiConfig).catch(() => {});
-    });
+    dbUpsert("app_settings", "custom_api_config", window.customApiConfig);
   }
   syncCustomApiModalFields();
   api.ui.toast(checked ? "已实时启用全局生图大模型" : "已实时切换为自定义生图API");
@@ -784,9 +890,7 @@ window.removeImagePromptEntry = removeImagePromptEntry;
 
 async function saveImageSettingsExplicitly() {
   try {
-    await api.db.create("app_settings", { id: "image_settings", ...window.imageSettings }).catch(() => {
-      api.db.update("app_settings", "image_settings", window.imageSettings).catch(() => {});
-    });
+    await dbUpsert("app_settings", "image_settings", window.imageSettings);
     api.ui.toast("生图参数与提示词已保存！");
   } catch (e) {
     api.ui.toast("生图参数已保存");
@@ -892,9 +996,7 @@ window.removeCurrentCategoryEntry = removeCurrentCategoryEntry;
 
 async function saveCurrentCategoryPresets() {
   try {
-    await api.db.create("app_settings", { id: "app_presets", data: window.appPresets }).catch(() => {
-      api.db.update("app_settings", "app_presets", { data: window.appPresets }).catch(() => {});
-    });
+    await dbUpsert("app_settings", "app_presets", { data: window.appPresets });
     api.ui.toast("当前分类提示词已保存！");
   } catch (e) {
     api.ui.toast("提示词已更新");
@@ -931,463 +1033,12 @@ async function executeConfirmResetAppData() {
 window.executeConfirmResetAppData = executeConfirmResetAppData;
 
 // =========================================================================
-// 10. 【版本更新与 Git 仓库直连系统】
-// =========================================================================
-const APP_CURRENT_VERSION = ''; // 启动时从宿主 manifest 读取，不硬编码
-const DEFAULT_GIT_REPO = '17-cm/LUMA-Live';
-const DEFAULT_GIT_BRANCH = 'star';
-
-let gitUpdateState = {
-  currentVersion: APP_CURRENT_VERSION,
-  latestVersion: APP_CURRENT_VERSION,
-  localCommit: '',
-  remoteCommit: '',
-  hasUpdate: false,
-  updateLog: '',
-  repoUrl: DEFAULT_GIT_REPO,
-  branch: DEFAULT_GIT_BRANCH,
-  lastCheckTime: null,
-  isChecking: false
-};
-window.gitUpdateState = gitUpdateState;
-
-function renderGitUpdateButton() {
-  const btn = document.getElementById('btnVersionUpdateCard');
-  const btnText = document.getElementById('versionUpdateBtnText');
-  const badge = document.getElementById('versionUpdateBadge');
-  if (!btn) return;
-
-  if (gitUpdateState.isChecking) {
-    btn.className = 'luxe-card relative w-full py-3.5 text-center text-xs font-black text-slate-400 border-slate-200/60 active:bg-slate-50 transition cursor-pointer';
-    if (btnText) btnText.textContent = '版本更新';
-    if (badge) {
-      badge.className = 'absolute right-3 bottom-1.5 text-[9px] font-mono text-slate-400 font-normal';
-      badge.textContent = '检测中...';
-    }
-    return;
-  }
-
-  if (gitUpdateState.hasUpdate) {
-    // 发现更新：绿色文字，绿色边框与点击反馈，右下角小版本号也呈绿色
-    btn.className = 'luxe-card relative w-full py-3.5 text-center text-xs font-black text-emerald-600 border-emerald-200/60 active:bg-emerald-50 transition cursor-pointer';
-    if (btnText) {
-      btnText.textContent = '版本更新';
-    }
-    if (badge) {
-      badge.className = 'absolute right-3 bottom-1.5 text-[9px] font-mono text-emerald-600 font-bold';
-      badge.textContent = gitUpdateState.latestVersion;
-    }
-  } else {
-    // 无更新：与清除缓存完全一致的玫瑰红文字与淡边框
-    btn.className = 'luxe-card relative w-full py-3.5 text-center text-xs font-black text-rose-600 border-rose-200/60 active:bg-rose-50 transition cursor-pointer';
-    if (btnText) {
-      btnText.textContent = '版本更新';
-    }
-    if (badge) {
-      badge.className = 'absolute right-3 bottom-1.5 text-[9px] font-mono text-rose-400 font-normal';
-      badge.textContent = gitUpdateState.currentVersion || '';
-    }
-  }
-}
-window.renderGitUpdateButton = renderGitUpdateButton;
-
-async function checkGitRepoUpdate(silent = false) {
-  gitUpdateState.isChecking = true;
-  renderGitUpdateButton();
-
-  // 防御：如果 localCommit 还没从数据库加载，先读一次（db → sessionStorage 兜底）
-  if (!gitUpdateState.localCommit) {
-    try {
-      const cfg = await api.db.get("app_settings", "git_repo_config");
-      if (cfg?.installedCommit) {
-        gitUpdateState.localCommit = cfg.installedCommit;
-      }
-    } catch (e) {}
-    // db 没读到，试 sessionStorage
-    if (!gitUpdateState.localCommit) {
-      try { gitUpdateState.localCommit = sessionStorage.getItem('luma_local_commit') || ''; } catch(e) {}
-    }
-  }
-
-  const repo = (gitUpdateState.repoUrl || DEFAULT_GIT_REPO).trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
-  const branch = (gitUpdateState.branch || DEFAULT_GIT_BRANCH).trim();
-
-  let remoteCommit = null;
-  let remoteCommitTime = null;
-  let remoteVer = null;
-
-  try {
-    // ── 通道A（核心）：查最新 Commit SHA + 时间 ──
-    // 只要 commit 变了就说明你 push 了新代码，不需要手动改版本号
-    const comRes = await robustNetworkRequest({
-      url: `https://api.github.com/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=1`,
-      method: 'GET',
-      headers: { 'Accept': 'application/vnd.github.v3+json' },
-      proxy: true
-    });
-    if (comRes && comRes.ok && comRes.json && Array.isArray(comRes.json) && comRes.json[0]) {
-      const commitData = comRes.json[0];
-      remoteCommit = commitData.sha ? commitData.sha.slice(0, 7) : null;
-      remoteCommitTime = commitData.commit?.author?.date || commitData.commit?.committer?.date || null;
-    }
-
-    // ── 通道B（辅助）：查 manifest.json 版本号 ──
-    // 仅用于显示，不作为判断更新的主要依据
-    try {
-      const manRes = await robustNetworkRequest({
-        url: `https://api.github.com/repos/${repo}/contents/manifest.json?ref=${encodeURIComponent(branch)}`,
-        method: 'GET',
-        headers: { 'Accept': 'application/vnd.github.v3.raw' },
-        proxy: true
-      });
-      let mData = manRes?.json;
-      if (!mData && manRes?.text) {
-        try { mData = JSON.parse(manRes.text); } catch (e) {}
-      }
-      if (mData && mData.version) {
-        const rawVer = String(mData.version).trim();
-        remoteVer = rawVer.startsWith('v') ? rawVer : `v${rawVer}`;
-      }
-    } catch (e) {
-      // manifest 读取失败不影响更新检测，commit 才是关键
-    }
-
-    // ── 判断是否有更新：只看 commit SHA ──
-    // 简单逻辑：SHA 不同 = 有更新（绿），相同 = 常态（红）
-
-    const localSha = gitUpdateState.localCommit
-      ? gitUpdateState.localCommit.replace(/\s*\(.*\)$/, '').trim()
-      : null;
-
-    console.log(`[LUMA Update] 🔍 检测对比: remote=${remoteCommit}, localRaw="${gitUpdateState.localCommit}", localSha=${localSha}`);
-
-    if (remoteCommit && localSha && remoteCommit !== localSha) {
-      // SHA 不同 → 有新代码
-      gitUpdateState.hasUpdate = true;
-      console.log(`[LUMA Update] ✅ 结果: 有更新 (SHA不同)`);
-    } else if (remoteCommit && !localSha) {
-      // 首次检测，无本地记录
-      gitUpdateState.hasUpdate = true;
-      console.log(`[LUMA Update] ✅ 结果: 有更新 (无本地记录)`);
-    } else {
-      // SHA 相同或无法判断 → 无更新
-      gitUpdateState.hasUpdate = false;
-      console.log(`[LUMA Update] ✅ 结果: 无更新 (常态)`);
-    }
-
-    if (remoteCommit) {
-      gitUpdateState.remoteCommit = `${remoteCommit} (${branch})`;
-    }
-    if (remoteVer) {
-      gitUpdateState.latestVersion = remoteVer;
-    } else if (remoteCommit) {
-      gitUpdateState.latestVersion = `${remoteCommit}`;
-    }
-
-    if (!silent && api.ui?.toast) {
-      if (gitUpdateState.hasUpdate) {
-        api.ui.toast(`🎉 发现新提交 ${gitUpdateState.latestVersion}！`);
-      } else {
-        api.ui.toast(`当前已是最新 (${gitUpdateState.currentVersion || gitUpdateState.localCommit || '未知'})`);
-      }
-    }
-  } catch (err) {
-    console.warn("检查 Git 更新异常:", err);
-    gitUpdateState.hasUpdate = false;
-    if (!silent && api.ui?.toast) {
-      api.ui.toast("检测更新失败，请稍后重试");
-    }
-  } finally {
-    gitUpdateState.isChecking = false;
-    gitUpdateState.lastCheckTime = new Date().toISOString();
-    renderGitUpdateButton();
-  }
-}
-window.checkGitRepoUpdate = checkGitRepoUpdate;
-
-async function fetchSingleRepoFile(repo, branch, filePath) {
-  // 方式 1: GitHub Raw 直连
-  try {
-    const rawUrl = `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/${filePath}`;
-    const rawRes = await robustNetworkRequest({
-      url: rawUrl,
-      method: 'GET',
-      proxy: true
-    });
-    if (rawRes && rawRes.ok && rawRes.text) {
-      return rawRes.text;
-    }
-  } catch (e) {}
-
-  // 方式 2: GitHub Contents API
-  try {
-    const apiUrl = `https://api.github.com/repos/${repo}/contents/${filePath}?ref=${encodeURIComponent(branch)}`;
-    const apiRes = await robustNetworkRequest({
-      url: apiUrl,
-      method: 'GET',
-      headers: { 'Accept': 'application/vnd.github.v3.raw' },
-      proxy: true
-    });
-    if (apiRes && apiRes.ok && apiRes.text) {
-      return apiRes.text;
-    }
-  } catch (e) {}
-
-  return null;
-}
-
-// 需要热补丁更新的文件列表（splash.js 是启动器，不参与热补丁）
-const HOTPATCH_FILES = [
-  'manifest.json',
-  'style.css',
-  'LIVE/设定/page_stack.js',
-  'LIVE/设定/app_presets.js',
-  'LIVE/core.js',
-  'LIVE/数据/data_hub.js',
-  'LIVE/数据/fans_manager.js',
-  'LIVE/数据/guard_manager.js',
-  'LIVE/数据/checkin_manager.js',
-  'LIVE/数据/titles_manager.js',
-  'LIVE/主页/profile.js',
-  'LIVE/主页/streamer_profile.js',
-  'LIVE/社区/community_store.js',
-  'LIVE/社区/module_trends.js',
-  'LIVE/社区/module_supertopic.js',
-  'LIVE/社区/module_detail.js',
-  'LIVE/社区/module_ranking.js',
-  'LIVE/社区/module_forum.js',
-  'LIVE/社区/module_mytopic.js',
-  'LIVE/社区/trends.js',
-  'LIVE/直播/room_loading.js',
-  'LIVE/直播/live.js',
-  'LIVE/设定/main.js',
-  'LIVE/设定/patch.js',
-  'LIVE/设定/gift_system.js'
-];
-
-// 从 GitHub API 获取文件树（包含每个文件的 git SHA，用于增量更新对比）
-async function fetchRepoFileTree(repo, branch) {
-  try {
-    const apiUrl = `https://api.github.com/repos/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
-    const res = await robustNetworkRequest({
-      url: apiUrl,
-      method: 'GET',
-      headers: { 'Accept': 'application/vnd.github.v3+json' },
-      proxy: true
-    });
-    if (res && res.ok && res.json && res.json.tree) {
-      const fileMap = {};
-      res.json.tree.forEach(item => {
-        if (item.type === 'blob' && item.path) {
-          fileMap[item.path] = item.sha;
-        }
-      });
-      return fileMap;
-    }
-  } catch (e) {
-    console.warn('[LUMA Update] ⚠️ 获取文件树失败，将全量下载:', e.message);
-  }
-  return null;
-}
-
-// 从本地热补丁记录中获取文件的 hash
-function getLocalFileHash(localFiles, filePath) {
-  if (!localFiles) return null;
-  const fileData = localFiles[filePath];
-  if (!fileData) return null;
-  if (typeof fileData === 'string') return null; // 旧格式没有 hash
-  if (fileData && fileData.hash) return fileData.hash;
-  return null;
-}
-
-// 从本地热补丁记录中获取文件内容
-function getLocalFileContent(localFiles, filePath) {
-  if (!localFiles) return null;
-  const fileData = localFiles[filePath];
-  if (!fileData) return null;
-  if (typeof fileData === 'string') return fileData;
-  if (fileData && typeof fileData.content === 'string') return fileData.content;
-  return null;
-}
-
-async function handleVersionUpdateClick() {
-  const repo = (gitUpdateState.repoUrl || DEFAULT_GIT_REPO).trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
-  const branch = (gitUpdateState.branch || DEFAULT_GIT_BRANCH).trim();
-
-  // 不再依赖 hasUpdate 状态判断，直接尝试更新
-  // 增量对比会自动判断是否有文件需要下载，没有就提示最新版
-  console.log(`[LUMA Update] 🔄 用户点击更新，开始检查...`);
-
-  // 直接显示启动画面，在画面上展示下载进度
-    if (typeof window.showSplashForUpdate === 'function') window.showSplashForUpdate();
-
-    try {
-    // 1. 获取本地热补丁记录（用于增量更新）
-    let localHotpatch = null;
-    try {
-      localHotpatch = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
-    } catch (e) {}
-    const localFiles = localHotpatch ? localHotpatch.files : null;
-
-    // 2. 获取远程文件树（包含每个文件的 git SHA）
-    const remoteFileTree = await fetchRepoFileTree(repo, branch);
-
-    // 3. 对比本地和远程的文件 hash，确定需要下载的文件
-    const filesToDownload = [];
-    const unchangedFiles = {};
-
-    for (const filePath of HOTPATCH_FILES) {
-      const remoteHash = remoteFileTree ? remoteFileTree[filePath] : null;
-      const localHash = getLocalFileHash(localFiles, filePath);
-
-      if (remoteHash && localHash && remoteHash === localHash) {
-        // 文件没变化，从本地复制
-        const localContent = getLocalFileContent(localFiles, filePath);
-        if (localContent) {
-          unchangedFiles[filePath] = { content: localContent, hash: localHash };
-          continue;
-        }
-      }
-
-      // 文件变化了或本地没有，需要下载
-      filesToDownload.push(filePath);
-    }
-
-    console.log(`[LUMA Update] 📊 增量更新：共 ${HOTPATCH_FILES.length} 个文件，${filesToDownload.length} 个需要下载，${Object.keys(unchangedFiles).length} 个复用本地`);
-
-    // 3.5 如果没有需要下载的文件，直接提示最新版并退出
-    if (filesToDownload.length === 0) {
-      if (typeof window.exitSplashScreen === 'function') window.exitSplashScreen();
-      if (api.ui?.toast) api.ui.toast(`当前已是最新版本 (${gitUpdateState.currentVersion || gitUpdateState.localCommit || '未知'})`);
-      // 确保按钮状态正确
-      gitUpdateState.hasUpdate = false;
-      renderGitUpdateButton();
-      return;
-    }
-
-    // 4. 下载变化的文件（在启动画面上展示进度）
-    const downloadedFiles = {};
-    let successCount = 0;
-    let failCount = 0;
-    const totalFiles = HOTPATCH_FILES.length;
-    let completedFiles = Object.keys(unchangedFiles).length;
-    if (typeof window.setSplashProgress === 'function') {
-      window.setSplashProgress(Math.round((completedFiles / totalFiles) * 100));
-    }
-
-    for (const filePath of filesToDownload) {
-      try {
-        const fileContent = await fetchSingleRepoFile(repo, branch, filePath);
-        if (fileContent && typeof fileContent === 'string' && fileContent.trim()) {
-          if (fileContent.trim().startsWith('<!DOCTYPE') || fileContent.trim().startsWith('<html')) {
-            console.error(`[LUMA Update] ❌ ${filePath} 下载到 HTML 错误页面`);
-            failCount++;
-          } else {
-            // 新格式：保存 content 和 hash（用远程 git SHA 作为 hash）
-            const remoteHash = remoteFileTree ? remoteFileTree[filePath] : '';
-            downloadedFiles[filePath] = { content: fileContent, hash: remoteHash };
-            successCount++;
-          }
-        } else {
-          console.warn(`[LUMA Update] ⚠️ ${filePath} 内容为空，下载失败`);
-          failCount++;
-        }
-      } catch (err) {
-        console.error(`[LUMA Update] ❌ ${filePath} 下载异常:`, err.message);
-        failCount++;
-      }
-      completedFiles++;
-      if (typeof window.setSplashProgress === 'function') {
-        window.setSplashProgress(Math.round((completedFiles / totalFiles) * 100));
-      }
-    }
-    
-    // 5. 合并下载的文件和未变化的文件
-    const allFiles = { ...unchangedFiles, ...downloadedFiles };
-    const totalSuccess = Object.keys(allFiles).length;
-    
-    console.log(`[LUMA Update] 下载完成：新下载 ${successCount} 个，复用 ${Object.keys(unchangedFiles).length} 个，失败 ${failCount} 个，共 ${totalSuccess} 个可用`);
-    
-    if (totalSuccess >= 10) {
-      // 成功获取大部分核心代码，写入热补丁引擎本地持久缓存
-      try {
-        const hotpatchData = {
-          id: 'current_hotpatch',
-          files: allFiles,
-          version: gitUpdateState.latestVersion || APP_CURRENT_VERSION,
-          commit: gitUpdateState.remoteCommit || '',
-          time: Date.now()
-        };
-        const totalSize = Object.values(allFiles).reduce((sum, f) => {
-          const content = typeof f === 'string' ? f : (f.content || '');
-          return sum + content.length;
-        }, 0);
-        
-        await api.db.create('app_hotpatch', hotpatchData).catch(() => {
-          return api.db.update('app_hotpatch', 'current_hotpatch', hotpatchData);
-        });
-        console.log(`[LUMA Update] 💾 热补丁已存入数据库，总大小: ${(totalSize / 1024).toFixed(1)}KB，文件数: ${totalSuccess}`);
-      } catch (e) {
-        console.error('[LUMA Update] ❌ 写入热更新缓存异常:', e.message);
-        if (typeof window.exitSplashScreen === 'function') window.exitSplashScreen();
-        if (api.ui?.toast) api.ui.toast(`存储失败: ${e.message}`);
-        return;
-      }
-      gitUpdateState.currentVersion = gitUpdateState.latestVersion;
-      if (gitUpdateState.remoteCommit) {
-        gitUpdateState.localCommit = gitUpdateState.remoteCommit;
-      }
-      gitUpdateState.hasUpdate = false;
-
-      // 持久化 localCommit：db + sessionStorage 双写确保不丢
-      try {
-        await api.db.create("app_settings", {
-          id: "git_repo_config",
-          repoUrl: gitUpdateState.repoUrl,
-          branch: gitUpdateState.branch,
-          installedVersion: gitUpdateState.currentVersion,
-          installedCommit: gitUpdateState.localCommit,
-          lastUpdated: Date.now()
-        }).catch(() => {
-          return api.db.update("app_settings", "git_repo_config", {
-            repoUrl: gitUpdateState.repoUrl,
-            branch: gitUpdateState.branch,
-            installedVersion: gitUpdateState.currentVersion,
-            installedCommit: gitUpdateState.localCommit,
-            lastUpdated: Date.now()
-          });
-        });
-        console.log(`[LUMA Update] 💾 已保存 localCommit="${gitUpdateState.localCommit}" 到数据库`);
-      } catch (e) {
-        console.warn('[LUMA Update] ⚠️ 数据库保存失败:', e.message);
-      }
-      // 兜底：sessionStorage 在 reload 后立即可用
-      try { sessionStorage.setItem('luma_local_commit', gitUpdateState.localCommit || ''); } catch(e) {}
-      renderGitUpdateButton();
-      if (typeof window.setSplashProgress === 'function') window.setSplashProgress(100);
-      // 刷新页面，splash.js 会从 api.db 读取热补丁并动态加载最新代码
-      setTimeout(() => {
-        window.location.reload();
-      }, 800);
-    } else {
-      if (typeof window.exitSplashScreen === 'function') window.exitSplashScreen();
-      if (api.ui?.toast) api.ui.toast(`网络连接超时，下载代码失败，请稍后重试`);
-    }
-    } catch (err) {
-      console.error('[LUMA Update] ❌ 更新过程异常:', err);
-      if (typeof window.exitSplashScreen === 'function') window.exitSplashScreen();
-      if (api.ui?.toast) api.ui.toast(`更新失败：${err?.message || '网络异常'}`);
-    }
-}
-window.handleVersionUpdateClick = handleVersionUpdateClick;
-
-// =========================================================================
 // 11. 数据备份与离线导出系统
 // =========================================================================
 function exportAppDataFile() {
   try {
     const backupData = {
-      version: gitUpdateState.currentVersion || '',
+      version: '',
       exportTime: new Date().toISOString(),
       appParams: window.appParams || {},
       customApiConfig: window.customApiConfig || {},
@@ -1426,19 +1077,19 @@ async function handleFileImportData(e) {
     const data = JSON.parse(text);
     if (data.appParams) {
       window.appParams = data.appParams;
-      await api.db.create("app_settings", { id: "global_params", ...data.appParams }).catch(() => {});
+      await dbUpsert("app_settings", "global_params", data.appParams);
     }
     if (data.appPresets) {
       window.appPresets = data.appPresets;
-      await api.db.create("app_settings", { id: "app_presets", data: data.appPresets }).catch(() => {});
+      await dbUpsert("app_settings", "app_presets", { data: data.appPresets });
     }
     if (data.customApiConfig) {
       window.customApiConfig = data.customApiConfig;
-      await api.db.create("app_settings", { id: "custom_api_config", ...data.customApiConfig }).catch(() => {});
+      await dbUpsert("app_settings", "custom_api_config", data.customApiConfig);
     }
     if (data.imageSettings) {
       window.imageSettings = data.imageSettings;
-      await api.db.create("app_settings", { id: "image_settings", ...data.imageSettings }).catch(() => {});
+      await dbUpsert("app_settings", "image_settings", data.imageSettings);
     }
     if (api.ui?.toast) api.ui.toast("数据导入成功！正在重载...");
     setTimeout(() => window.location.reload(), 600);
@@ -1476,7 +1127,7 @@ async function handleFileImportPresets(e) {
     const text = await file.text();
     const data = JSON.parse(text);
     window.appPresets = data;
-    await api.db.create("app_settings", { id: "app_presets", data: data }).catch(() => {});
+    await dbUpsert("app_settings", "app_presets", { data: data });
     renderPresetCategories();
     if (api.ui?.toast) api.ui.toast("提示词预设导入成功！");
   } catch (err) {
@@ -1502,11 +1153,8 @@ window.closePlayerLiveView = closePlayerLiveView;
 // =========================================================================
 // 11. 全局启动加载生命周期
 // =========================================================================
-async function lumaInitApp(options) {
-  var isHotupdate = !!(options && options.hotupdate);
-  if (typeof registerAiPhoneToolHandlers === 'function') {
-    registerAiPhoneToolHandlers();
-  }
+async function lumaInitApp() {
+  registerAiPhoneToolHandlers();
 
   // 1. 初始化数据库及本地持久化
   try {
@@ -1522,9 +1170,9 @@ async function lumaInitApp(options) {
     const catsRec = await api.db.get("app_settings", "app_presets");
     if (catsRec?.data) window.appPresets = catsRec.data;
 
-    const followsRec = await api.db.list("follows") || [];
+    const followsRec = await api.db.list("follows", { limit: 500 }) || [];
     window.followedHosts = followsRec.map(f => f.id);
-    if (typeof syncFollowCountDisplay === 'function') syncFollowCountDisplay();
+    syncFollowCountDisplay();
 
     // 加载超话关注列表
     try {
@@ -1543,7 +1191,7 @@ async function lumaInitApp(options) {
       let checkinDbRecs = [];
       // 优先从 api.db 读取
       try {
-        checkinDbRecs = await api.db.list("luma_checkin_records") || [];
+        checkinDbRecs = await api.db.list("luma_checkin_records", { limit: 500 }) || [];
       } catch (e) {}
       // 兜底从 localStorage 同步备份读取
       if (checkinDbRecs.length === 0) {
@@ -1574,43 +1222,10 @@ async function lumaInitApp(options) {
     const profileRec = await api.db.get("app_profile", "user_profile");
     if (profileRec) Object.assign(window.userProfileData, profileRec);
 
-    const ledgerRec = await api.db.list("app_ledger") || [];
+    const ledgerRec = await api.db.list("app_ledger", { limit: 500 }) || [];
     if (ledgerRec.length > 0) window.transactionLedger = ledgerRec;
 
-    // 从宿主读取当前安装版本（最可靠的来源，不需要手动同步常量）
-    try {
-      const hostManifest = await api.app?.getManifest?.();
-      if (hostManifest?.version) {
-        const ver = String(hostManifest.version).trim();
-        window.gitUpdateState.currentVersion = ver.startsWith('v') ? ver : `v${ver}`;
-      }
-    } catch (e) {}
-
-    const gitCfg = await api.db.get("app_settings", "git_repo_config");
-    if (gitCfg) {
-      if (gitCfg.repoUrl) window.gitUpdateState.repoUrl = gitCfg.repoUrl;
-      if (gitCfg.branch) window.gitUpdateState.branch = gitCfg.branch;
-      if (gitCfg.installedVersion) window.gitUpdateState.currentVersion = gitCfg.installedVersion;
-      if (gitCfg.installedCommit) window.gitUpdateState.localCommit = gitCfg.installedCommit;
-    }
-
-    // 从热补丁数据里读取 manifest.json 版本号，确保显示版本和 manifest 同步
-    try {
-      const hotpatchRec = await api.db.get('app_hotpatch', 'current_hotpatch').catch(() => null);
-      if (hotpatchRec && hotpatchRec.files) {
-        const manifestRaw = hotpatchRec.files['manifest.json'];
-        const manifestContent = typeof manifestRaw === 'string' ? manifestRaw : (manifestRaw?.content || '');
-        if (manifestContent) {
-          const manifestData = JSON.parse(manifestContent);
-          if (manifestData.version) {
-            const ver = String(manifestData.version).trim();
-            window.gitUpdateState.currentVersion = ver.startsWith('v') ? ver : `v${ver}`;
-          }
-        }
-      }
-    } catch (e) {}
-
-    const guestbookRec = await api.db.list("guestbook") || [];
+    const guestbookRec = await api.db.list("guestbook", { limit: 500 }) || [];
     guestbookRec.forEach(item => {
       if (item.hostId) {
         if (!window.guestbookData[item.hostId]) window.guestbookData[item.hostId] = [];
@@ -1622,6 +1237,17 @@ async function lumaInitApp(options) {
       const chars = await api.characters.list();
       if (chars && chars.length > 0) {
         window.allCharacters = chars;
+        // characters.list() 不含 tags，需通过 readRelations() 补充赛道标签
+        try {
+          const rel = await api.characters.readRelations({});
+          if (rel && rel.characters) {
+            const tagMap = {};
+            rel.characters.forEach(r => { tagMap[r.id] = r.tags || []; });
+            window.allCharacters.forEach(c => { if (tagMap[c.id]) c.tags = tagMap[c.id]; });
+          }
+        } catch (e2) {
+          console.warn("读取角色赛道标签异常:", e2);
+        }
       }
     } catch (e) {
       console.warn("读取角色列表异常:", e);
@@ -1631,92 +1257,41 @@ async function lumaInitApp(options) {
   }
 
   // 2. 同步个人资料
-  if (typeof syncUserProfile === 'function') await syncUserProfile();
+  await syncUserProfile();
 
   // 3. 加载社区动态
-  if (typeof loadTrendsFromDb === 'function') await loadTrendsFromDb();
+  await loadTrendsFromDb();
 
   // 4. 同步直播列表并渲染赛道
-  // 热更新模式下不生成新直播（allowSpawn:false），避免与旧数据重复
-  var spawnMode = isHotupdate ? false : true;
-  if (typeof syncLiveSessions === 'function') await syncLiveSessions({ allowSpawn: spawnMode });
+  await syncLiveSessions({ allowSpawn: true });
 
   // 5. 渲染各模块初始状态
-  if (typeof selectMainCategory === 'function') selectMainCategory('all');
-  if (typeof renderDualRankList === 'function') renderDualRankList();
-  if (typeof renderTrends === 'function') renderTrends();
-  if (typeof syncWalletDisplays === 'function') syncWalletDisplays();
+  selectMainCategory('all');
+  renderDualRankList();
+  renderTrends();
+  syncWalletDisplays();
   syncParamDisplays();
   renderPresetCategories();
   renderImagePromptEntries();
-  renderGitUpdateButton();
 
   // 6. 检查分享直达参数 (Deep link)
-  if (typeof checkDeepLinkParams === 'function') checkDeepLinkParams();
+  checkDeepLinkParams();
 
-  // 7. 启动时后台静默检查 Git 仓库版本更新
-  if (!window.__lumaGitCheckTimer) {
-    window.__lumaGitCheckTimer = setTimeout(() => {
-      checkGitRepoUpdate(true);
-    }, 1200);
-  }
-
-  // 7b. 后台定时轮询（每30分钟检测一次更新）
-  if (!window.__lumaGitPollTimer) {
-    window.__lumaGitPollTimer = setInterval(() => {
-      checkGitRepoUpdate(true);
-    }, 30 * 60 * 1000);
-  }
-
-  // 7c. APP从后台切回前台时检测一次
-  if (!window.__lumaGitVisibilityBound) {
-    window.__lumaGitVisibilityBound = true;
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        checkGitRepoUpdate(true);
-      }
-    });
-  }
-
-  // 8. 启动周期性作息推演定时器 (每 30 秒轮询)
+  // 7. 启动 LUMA官方运营组·定时器轮询
   if (!window.__lumaLiveSyncInterval) {
+    const pollMins = (window.appParams && window.appParams.opsPollInterval) || 3;
     window.__lumaLiveSyncInterval = setInterval(() => {
-      if (typeof syncLiveSessions === 'function') {
-        syncLiveSessions({ allowSpawn: true });
-      }
-    }, 30000);
+      syncLiveSessions({ allowSpawn: true });
+    }, pollMins * 60 * 1000);
   }
 
   console.log('[LUMA Live] ✅ 启动成功');
 }
 
-// 初始化逻辑：覆盖更新模式
-// - splash.js 同步设置 __lumaHotpatchLoading=true，注入完热补丁后设为 false
-// - main.js 等待标志变为 false 后自行调用 lumaInitApp（只一次）
-// - splash.js 未运行时（标志为 undefined）直接初始化
-function initWhenReady() {
-  if (window.__lumaInitStarted) {
-    return;
-  }
-  window.__lumaInitStarted = true;
-  if (window.__lumaHotpatchLoading === undefined) {
-    lumaInitApp();
-    return;
-  }
-  var attempts = 0;
-  (function wait() {
-    if (window.__lumaHotpatchLoading === false || attempts > 100) {
-      lumaInitApp();
-    } else {
-      attempts++;
-      setTimeout(wait, 50);
-    }
-  })();
-}
-
+// 初始化：DOM 就绪后直接启动
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initWhenReady);
+  document.addEventListener('DOMContentLoaded', lumaInitApp);
 } else {
-  initWhenReady();
+  lumaInitApp();
 }
 window.lumaInitApp = lumaInitApp;

@@ -179,7 +179,6 @@ function renderSubCategories() {
   }).join('');
 }
 window.renderSubCategories = renderSubCategories;
-window.renderSubCategoryBar = renderSubCategories;
 
 function normalizeCategory(cat) {
   if (!cat) return '随性杂谈';
@@ -390,7 +389,6 @@ function enterLiveRoom(sessionId) {
   }
 }
 window.enterLiveRoom = enterLiveRoom;
-window.openLiveRoom = enterLiveRoom;
 
 function closeLiveRoom() {
   clearInterval(liveDurationInterval);
@@ -413,17 +411,6 @@ function closeLiveRoom() {
 }
 window.closeLiveRoom = closeLiveRoom;
 
-function enterLiveRoomByRoomId(targetRoomId) {
-  if (!targetRoomId) return false;
-  const match = (window.liveList || liveList || []).find(s => String(s.roomId) === String(targetRoomId) || String(s.id) === String(targetRoomId));
-  if (match) {
-    enterLiveRoom(match.id);
-    return true;
-  }
-  return false;
-}
-window.enterLiveRoomByRoomId = enterLiveRoomByRoomId;
-window.openLiveByRoomId = enterLiveRoomByRoomId;
 
 // checkDeepLinkParams 增强版本定义在文件末尾，这里只保留 load 事件监听
 window.addEventListener('load', () => {
@@ -1099,11 +1086,7 @@ async function handleComboCircleClick() {
 
   // 扣款与记录
   window.currentWalletBalance = Math.max(0, curBal - totalCost);
-  try {
-    await api.db.create("app_wallet", { id: "vault_data", balance: window.currentWalletBalance });
-  } catch (e) {
-    await api.db.update("app_wallet", "vault_data", { balance: window.currentWalletBalance }).catch(() => {});
-  }
+  await dbUpsert("app_wallet", "vault_data", { balance: window.currentWalletBalance });
   if (typeof syncWalletDisplays === 'function') syncWalletDisplays();
 
   // 记录消费与打榜贡献
@@ -1158,11 +1141,7 @@ async function sendGift(name, cost) {
     }
 
     window.currentWalletBalance = Math.max(0, curBal - totalCost);
-    try {
-      await api.db.create("app_wallet", { id: "vault_data", balance: window.currentWalletBalance });
-    } catch (e) {
-      await api.db.update("app_wallet", "vault_data", { balance: window.currentWalletBalance }).catch(() => {});
-    }
+    await dbUpsert("app_wallet", "vault_data", { balance: window.currentWalletBalance });
 
     if (typeof syncWalletDisplays === 'function') syncWalletDisplays();
     toggleGiftTray();
@@ -1369,162 +1348,9 @@ window.signCurrentNPC = signCurrentNPC;
 // =========================================================================
 // 8. 周期性作息推演与同步服务
 // =========================================================================
-async function syncLiveSessions(options = {}) {
-  let sessions = await api.db.list("live_sessions") || [];
-  const now = Date.now();
-  const params = window.appParams || {};
-  const spawnRate = params.charSpawnRate !== undefined ? params.charSpawnRate : 45;
-  const maxLiveMins = params.maxLiveDuration || 120;
-  const maxRestMins = params.maxRestDuration || 360;
-  const officialCategories = ['电竞竞技', '声动音律', '次元才艺', '随性杂谈', '探索开箱'];
-
-  // 超时下播强制切断检测
-  for (let i = sessions.length - 1; i >= 0; i--) {
-    const s = sessions[i];
-    if (now >= s.endTime) {
-      if (window.lumaOpsGateway) {
-        await window.lumaOpsGateway.requestStopLive({
-          characterId: s.characterId,
-          reason: "单次直播到达上限，官方强制切断",
-          source: "auto_timeout"
-        });
-      }
-    }
-  }
-
-  sessions = await api.db.list("live_sessions") || [];
-
-  const allChars = window.allCharacters || [];
-
-  if (spawnRate === 0) {
-    const eggData = await api.db.get("app_settings", "maint_egg_triggered").catch(() => null);
-    const isEggTriggered = eggData?.value === true;
-    
-    if (!isEggTriggered && sessions.length === 0 && allChars.length > 0) {
-      const chosen = allChars[Math.floor(Math.random() * allChars.length)];
-      await api.db.create("app_settings", { id: "maint_egg_triggered", value: true }).catch(() => {});
-      if (window.lumaOpsGateway) {
-        await window.lumaOpsGateway.requestStartLive({
-          characterId: chosen.id,
-          category: "随性杂谈",
-          topic: `【被迫营业】维护期间加班中`,
-          durationMins: 30,
-          source: "egg_force"
-        });
-      }
-      sessions = await api.db.list("live_sessions") || [];
-    }
-
-    liveList = sessions;
-    window.liveList = liveList;
-    renderLiveGrid();
-    return;
-  }
-
-  if (options.allowSpawn === false || !allChars || allChars.length === 0) {
-    liveList = sessions;
-    window.liveList = liveList;
-    renderLiveGrid();
-    return;
-  }
-
-  const offlineChars = allChars.filter(c => !sessions.find(s => s.characterId === c.id));
-  const effectiveRate = Math.min(Math.max(spawnRate, 5), 80) / 100;
-
-  for (let c of offlineChars) {
-    let sched = (window.lumaOpsGateway && typeof window.lumaOpsGateway.getCharSchedule === 'function') 
-      ? await window.lumaOpsGateway.getCharSchedule(c.id) 
-      : (window.charSchedulesMap ? window.charSchedulesMap[c.id] : null);
-    
-    if (!sched || !sched.nextLiveAt) {
-      const initOffsetMins = Math.floor(Math.random() * 30 + 5);
-      const planRest = Math.max(10, Math.round(maxRestMins - (maxRestMins - 10) * effectiveRate));
-      const planDur = Math.floor(Math.random() * (maxLiveMins - 30) + 30);
-      
-      const isOngoingMock = Math.random() < effectiveRate;
-      const startMock = isOngoingMock ? (now - initOffsetMins * 60 * 1000) : (now + initOffsetMins * 60 * 1000);
-
-      sched = {
-        characterId: c.id,
-        lastOfflineAt: isOngoingMock ? (startMock - planRest * 60000) : now,
-        nextLiveAt: startMock,
-        planRestMins: planRest,
-        planDurationMins: planDur
-      };
-      if (window.lumaOpsGateway && typeof window.lumaOpsGateway.saveCharSchedule === 'function') {
-        await window.lumaOpsGateway.saveCharSchedule(c.id, sched);
-      }
-    }
-
-    const planDurationMs = (sched.planDurationMins || 60) * 60 * 1000;
-    const planEnd = sched.nextLiveAt + planDurationMs;
-
-    if (now >= planEnd) {
-      const nextPlanRestMins = Math.max(10, Math.round(maxRestMins - (maxRestMins - 10) * effectiveRate));
-      const nextPlanDurMins = Math.floor(Math.random() * (maxLiveMins - 30) + 30);
-      const newNextLive = now + nextPlanRestMins * 60 * 1000;
-
-      if (window.lumaOpsGateway && typeof window.lumaOpsGateway.saveCharSchedule === 'function') {
-        await window.lumaOpsGateway.saveCharSchedule(c.id, {
-          characterId: c.id,
-          lastOfflineAt: planEnd,
-          nextLiveAt: newNextLive,
-          planRestMins: nextPlanRestMins,
-          planDurationMins: nextPlanDurMins
-        });
-      }
-      continue;
-    }
-
-    if (now >= sched.nextLiveAt && now < planEnd) {
-      const cat = officialCategories[Math.floor(Math.random() * officialCategories.length)];
-      const subs = SUB_CATEGORIES[cat] || ['热门专场'];
-      const subTag = subs[Math.floor(Math.random() * subs.length)];
-
-      const newSession = await api.db.create("live_sessions", {
-        characterId: c.id,
-        name: c.name,
-        avatar: c.avatar || getAvatar((c && (c.name || c.id)) || null, 'first'),
-        cover: c.cover || c.avatar || getAvatar((c && (c.name || c.id)) || null, 'first'),
-        category: cat,
-        subTag: subTag,
-        topic: `【${c.name}】的${subTag}直播`,
-        heat: Math.floor(Math.random() * 12000 + 3000),
-        roomId: Math.floor(Math.random() * 899999 + 100000),
-        startTime: sched.nextLiveAt,
-        endTime: planEnd,
-        isNPC: false
-      });
-      sessions.push(newSession);
-
-      try {
-        if (api.characters?.writeState) {
-          await api.characters.writeState({
-            characterId: c.id,
-            state: {
-              name: "状态",
-              value: `${c.name}直播中`
-            }
-          });
-        }
-        if (api.memory?.addTimeline) {
-          await api.memory.addTimeline({
-            characterId: c.id,
-            appLabel: "LUMA Live",
-            detail: "live_started",
-            summary: `【${c.name}】开启了【${cat}】网络直播，标题为《${newSession.topic}》。`,
-            appEventId: `live_start_${newSession.id}`
-          });
-        }
-      } catch (e) {}
-    }
-  }
-
-  liveList = sessions;
-  window.liveList = liveList;
-  renderLiveGrid();
-}
-window.syncLiveSessions = syncLiveSessions;
+// =========================================================================
+// LUMA官方运营组·定时器轮询
+// 官方运营组定期读取参数，通过概率模拟AI决策，通知房管审核开播/下播
 
 // =========================================================================
 // 9. 分享直达与深层链接解析 (Deep Linking)

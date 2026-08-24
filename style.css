@@ -316,6 +316,7 @@ input:checked + .switch-slider:before {
 #tab-settings {
   padding-bottom: 200px !important;
 }
+#tab-settings .accordion-item.open .btn-brand { min-height: 42px; }
 
 /* 居中毛玻璃弹窗体系 */
 .center-modal-backdrop {

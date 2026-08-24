@@ -59,23 +59,6 @@
   // =========================================================================
   // 3. 工具函数
   // =========================================================================
-  function waitForApi() {
-    return new Promise((resolve) => {
-      let api = window.api || window.AiPhone || window.AiPhoneApp;
-      let count = 0;
-      const check = () => {
-        api = window.api || window.AiPhone || window.AiPhoneApp;
-        if (api || count > 50) {
-          resolve(api);
-        } else {
-          count++;
-          setTimeout(check, 50);
-        }
-      };
-      check();
-    });
-  }
-
   function formatPrice(price) {
     if (price >= 10000) {
       return (price / 10000).toFixed(1) + 'w';
@@ -124,7 +107,7 @@
   }
 
   async function doSendGift(gift, qty) {
-    const api = await waitForApi();
+    const api = window.api;
     const totalCost = gift.price * qty;
     const curBal = window.currentWalletBalance || 0;
 
@@ -152,11 +135,7 @@
     try {
       window.currentWalletBalance = Math.max(0, curBal - totalCost);
       if (api && api.db) {
-        try {
-          await api.db.create("app_wallet", { id: "vault_data", balance: window.currentWalletBalance });
-        } catch (e) {
-          await api.db.update("app_wallet", "vault_data", { balance: window.currentWalletBalance }).catch(() => {});
-        }
+        await dbUpsert("app_wallet", "vault_data", { balance: window.currentWalletBalance });
       }
       if (typeof window.syncWalletDisplays === 'function') {
         window.syncWalletDisplays();

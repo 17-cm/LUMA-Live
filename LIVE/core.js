@@ -365,14 +365,27 @@
     }
   };
 
-  window.getAiPhoneApi = function() {
-    return window.AiPhone || window.AiPhoneApp || window.api || polyfill;
-  };
-
   window.api = Object.assign(polyfill, hostApi || {});
 })();
 
 var api = window.api;
+
+/**
+ * 安全 upsert：宿主 db.create 对重复 ID 不报错（直接 prepend），
+ * 所以 create().catch(()=>update()) 模式会产生重复记录。
+ * 正确做法：先 update（找到则合并返回，找不到返回 null），再 create。
+ */
+async function dbUpsert(collection, id, data) {
+  if (!api || !api.db) return null;
+  try {
+    const updated = await api.db.update(collection, id, data);
+    if (updated) return updated;
+    return await api.db.create(collection, { id, ...data });
+  } catch (e) {
+    return null;
+  }
+}
+window.dbUpsert = dbUpsert;
 
 // 清除小手机桌面 APP 图标上的未读红色标记与通知角标 (类似微信未读红点)
 async function clearAppIconNotificationBadges() {
@@ -388,7 +401,7 @@ async function clearAppIconNotificationBadges() {
   } catch (e) {}
 
   try {
-    const targetApi = window.api || window.AiPhone || window.AiPhoneApp;
+    const targetApi = window.api;
     if (targetApi && targetApi.notifications) {
       if (typeof targetApi.notifications.clear === 'function') {
         await targetApi.notifications.clear().catch(() => {});
@@ -428,9 +441,12 @@ window.charSchedulesMap = window.charSchedulesMap || {};
 
 // 9 大沙盒核心参数
 window.appParams = window.appParams || {
-  charSpawnRate: 45,
+  charSpawnRate: 25,
+  baseStopRate: 10,
   maxLiveDuration: 120,
   maxRestDuration: 360,
+  minRestDuration: 10,
+  opsPollInterval: 3,
   replyRandomDanmakuRate: 25,
   mentionUserRate: 30,
   enterOtherLiveRate: 35,
@@ -473,259 +489,12 @@ async function saveDbSetting(settingKey, data) {
     }
     return true;
   } catch (e) {
-    try {
-      if (typeof api.db.set === 'function') {
-        await api.db.set("app_settings", settingKey, data);
-        return true;
-      }
-    } catch (err) {}
     console.warn(`[LUMA DB] 保存 ${settingKey} 异常:`, e);
     return false;
   }
 }
 window.saveDbSetting = saveDbSetting;
 
-// =========================================================================
-// 【调试回调与运营组专用通知系统】(正式运行已静默调试弹层)
-// =========================================================================
-function lumaOpsNotify(title, detail, type = 'info') {
-}
-window.lumaOpsNotify = lumaOpsNotify;
-
-// =========================================================================
-// 【LUMA 直播官方运营组】：唯一权威审核裁决网关（Single Source of Truth）
-// =========================================================================
-const lumaOpsGateway = {
-  async requestStartLive({ characterId, category, topic, durationMins, source = 'system' }) {
-    if (!characterId) {
-      lumaOpsNotify("开播驳回", "未指定有效的主播身份", "reject");
-      return { success: false, reason: "【LUMA官方运营组通告】开播申请未通过：未指定有效的主播身份。" };
-    }
-
-    const allChars = window.allCharacters || [];
-    const character = allChars.find(c => c.id === characterId) || await api.characters.get(characterId).catch(() => null);
-    const charName = character?.name || "主播";
-    const now = Date.now();
-
-    const params = window.appParams || {};
-    if (params.charSpawnRate === 0) {
-      lumaOpsNotify("开播驳回", `【${charName}】申请开播，全服正处于停机维护中`, "reject");
-      return { success: false, reason: `【LUMA官方运营组通告】抱歉【${charName}】，平台全服正在停机维护升级中，暂不开放推流权限。` };
-    }
-
-    let sched = window.charSchedulesMap[characterId];
-    if (!sched) {
-      const savedMap = await api.db.get("app_settings", "char_schedules").catch(() => null);
-      if (savedMap && savedMap[characterId]) {
-        sched = savedMap[characterId];
-        window.charSchedulesMap[characterId] = sched;
-      }
-    }
-
-    const minRestMs = (params.minRestDuration || 10) * 60 * 1000;
-    if (sched && sched.lastEndTime && (now - sched.lastEndTime < minRestMs)) {
-      const remainingMins = Math.max(1, Math.ceil((minRestMs - (now - sched.lastEndTime)) / 60000));
-      lumaOpsNotify("开播驳回", `【${charName}】刚下播休息不足，需再休息 ${remainingMins} 分钟`, "reject");
-      return {
-        success: false,
-        reason: `【LUMA官方运营组通告】主播【${charName}】开播申请未通过：您距离上次下播仅过去不久，平台规定强制休息期还剩 ${remainingMins} 分钟，请劳逸结合。`
-      };
-    }
-
-    const activeSessions = await api.db.list("live_sessions") || [];
-    const existing = activeSessions.find(s => s.characterId === characterId);
-    if (existing) {
-      lumaOpsNotify("开播拒绝", `【${charName}】已在直播中 (房号:${existing.roomId})`, "reject");
-      return { success: false, reason: `【LUMA官方运营组通告】主播【${charName}】已在直播中（房号:${existing.roomId}），请勿重复开播。` };
-    }
-
-    const dur = durationMins || Math.floor(Math.random() * (params.maxLiveDuration || 120) / 2 + 30);
-    const start = now;
-    const end = start + dur * 60 * 1000;
-
-    let coverUrl = character?.cover || character?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800';
-    let rawCat = category || (character?.tags ? character.tags[0] : '随性杂谈');
-    let chosenCat = (typeof normalizeCategory === 'function') ? normalizeCategory(rawCat) : rawCat;
-    let chosenSubTag = (character?.tags && character.tags[1]) ? character.tags[1] : (rawCat !== chosenCat ? rawCat : '日常唠嗑');
-    let chosenTopic = topic || `${charName}的精彩直播`;
-
-    const newSession = {
-      characterId: characterId,
-      name: charName,
-      avatar: character?.avatar || coverUrl,
-      cover: coverUrl,
-      category: chosenCat,
-      subTag: chosenSubTag,
-      topic: chosenTopic,
-      heat: Math.floor(Math.random() * 80000 + 20000),
-      roomId: Math.floor(Math.random() * 899999 + 100000),
-      startTime: start,
-      endTime: end,
-      isNPC: false
-    };
-
-    const created = await api.db.create("live_sessions", newSession);
-
-    window.charSchedulesMap[characterId] = {
-      isLive: true,
-      currentSessionId: created.id,
-      lastStartTime: start,
-      plannedEndTime: end,
-      lastEndTime: null
-    };
-    await saveDbSetting("char_schedules", window.charSchedulesMap);
-
-    try {
-      if (api.characters?.writeState) {
-        await api.characters.writeState({
-          characterId: characterId,
-          stateValues: [
-            { name: "状态", value: `${charName}直播中` }
-          ]
-        });
-      }
-    } catch (err) {}
-
-    lumaOpsNotify("开播批准", `【${charName}】通过审核已成功推流开播 (房号:${created.roomId})`, "approve");
-
-    if (typeof syncLiveSessions === 'function') {
-      await syncLiveSessions({ allowSpawn: false });
-    }
-
-    return {
-      success: true,
-      data: {
-        roomId: created.roomId,
-        topic: created.topic,
-        category: created.category
-      },
-      userNotice: `主播【${charName}】已成功开播，房号：${created.roomId}`,
-      message: `【LUMA官方运营组】恭喜主播【${charName}】，推流申请已通过！直播间房号【${created.roomId}】现已正式向全平台公开发送推流广播。`
-    };
-  },
-
-  async requestStopLive({ characterId, reason = "正常下播", source = "system" }) {
-    if (!characterId) return { success: false, reason: "未指定有效主播身份" };
-
-    const activeSessions = await api.db.list("live_sessions") || [];
-    const session = activeSessions.find(s => s.characterId === characterId || s.id === characterId);
-    
-    const allChars = window.allCharacters || [];
-    const character = allChars.find(c => c.id === characterId) || await api.characters.get(characterId).catch(() => null);
-    const charName = session?.name || character?.name || "主播";
-    const now = Date.now();
-
-    if (session) {
-      await api.db.delete("live_sessions", session.id);
-    }
-
-    window.charSchedulesMap[characterId] = {
-      isLive: false,
-      currentSessionId: null,
-      lastStartTime: session ? session.startTime : null,
-      lastEndTime: now,
-      plannedEndTime: null
-    };
-    await saveDbSetting("char_schedules", window.charSchedulesMap);
-
-    try {
-      if (api.characters?.writeState) {
-        await api.characters.writeState({
-          characterId: characterId,
-          stateValues: [
-            { name: "状态", value: `${charName}已下播` }
-          ]
-        });
-      }
-    } catch (err) {}
-
-    const isForced = source === 'maint_shutdown' || source === 'max_duration_reached';
-    lumaOpsNotify(
-      isForced ? "运营强制下播" : "主播已下播",
-      `【${charName}】已结束推流（原因:${reason}），进入强制休息期`,
-      isForced ? "force" : "info"
-    );
-
-    if (window.currentRoom && (window.currentRoom.characterId === characterId || window.currentRoom.id === session?.id)) {
-      if (typeof window.showHostLeftRoomStage === 'function') {
-        window.showHostLeftRoomStage(window.currentRoom);
-      } else if (typeof closeLiveRoom === 'function') {
-        closeLiveRoom();
-      }
-      api.ui.toast(`主播【${charName}】已下播休息`);
-    }
-
-    if (typeof syncLiveSessions === 'function') {
-      await syncLiveSessions({ allowSpawn: false });
-    }
-
-    return {
-      success: true,
-      userNotice: `主播【${charName}】已下播休息`,
-      message: `【LUMA官方运营组】主播【${charName}】已成功关闭推流并同步下线状态。`
-    };
-  },
-
-  async getCharSchedule(characterId) {
-    if (!characterId) return null;
-    let sched = window.charSchedulesMap ? window.charSchedulesMap[characterId] : null;
-    if (!sched) {
-      try {
-        const savedMap = await api.db.get("app_settings", "char_schedules").catch(() => null);
-        if (savedMap && savedMap[characterId]) {
-          sched = savedMap[characterId];
-          if (!window.charSchedulesMap) window.charSchedulesMap = {};
-          window.charSchedulesMap[characterId] = sched;
-        }
-      } catch (e) {}
-    }
-    return sched;
-  },
-
-  async saveCharSchedule(characterId, scheduleData) {
-    if (!characterId || !scheduleData) return false;
-    if (!window.charSchedulesMap) window.charSchedulesMap = {};
-    window.charSchedulesMap[characterId] = scheduleData;
-    return await saveDbSetting("char_schedules", window.charSchedulesMap);
-  }
-};
-window.lumaOpsGateway = lumaOpsGateway;
-
-// 注册小手机宿主工具箱 Handlers
-function registerAiPhoneToolHandlers() {
-  const targetApi = window.api || window.AiPhone || window.AiPhoneApp;
-  if (targetApi && targetApi.tools && typeof targetApi.tools.handle === 'function') {
-    targetApi.tools.handle("handleRequestStartLive", async (args, context) => {
-      const charId = (context && (context.characterId || context.charId)) || 
-                     (args && (args.characterId || args.charId)) || 
-                     (window.allCharacters && window.allCharacters[0]?.id) || 
-                     "char_1";
-      return await lumaOpsGateway.requestStartLive({
-        characterId: charId,
-        category: args?.category,
-        topic: args?.topic,
-        durationMins: args?.durationMins,
-        source: "chat_tool"
-      });
-    });
-
-    targetApi.tools.handle("handleRequestStopLive", async (args, context) => {
-      const charId = (context && (context.characterId || context.charId)) || 
-                     (args && (args.characterId || args.charId)) || 
-                     (window.allCharacters && window.allCharacters[0]?.id) || 
-                     "char_1";
-      return await lumaOpsGateway.requestStopLive({
-        characterId: charId,
-        reason: args?.reason || "正常下播",
-        source: "chat_tool"
-      });
-    });
-  }
-}
-registerAiPhoneToolHandlers();
-window.registerAiPhoneToolHandlers = registerAiPhoneToolHandlers;
-
-// =========================================================================
 // AI 生成与网络请求核心
 // =========================================================================
 function formatOpenAIEndpoint(rawUrl, path) {
