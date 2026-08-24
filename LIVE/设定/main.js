@@ -124,6 +124,31 @@ function updateParam(key, val) {
 }
 window.updateParam = updateParam;
 
+// 每日直播场次上限设置
+function setDailyLiveLimit(val) {
+  const num = Number(val);
+  if (!window.appParams) window.appParams = {};
+  window.appParams.dailyLiveLimit = num;
+  // 更新按钮选中状态
+  document.querySelectorAll('.daily-limit-btn').forEach(btn => {
+    const btnVal = Number(btn.dataset.value);
+    if (btnVal === num) {
+      btn.classList.add('bg-rose-500', 'text-white', 'border-rose-500');
+      btn.classList.remove('border-slate-200', 'text-slate-600');
+    } else {
+      btn.classList.remove('bg-rose-500', 'text-white', 'border-rose-500');
+      btn.classList.add('border-slate-200', 'text-slate-600');
+    }
+  });
+  // 更新小标签显示
+  const tagEl = document.getElementById('tagCharRate');
+  const valEl = document.getElementById('valDailyLiveLimit');
+  const label = num === 0 ? '不限制' : `${num}场`;
+  if (tagEl) tagEl.textContent = `直播场次：${label}`;
+  if (valEl) valEl.textContent = label;
+}
+window.setDailyLiveLimit = setDailyLiveLimit;
+
 function syncParamDisplays() {
   const p = window.appParams || {};
   const setVal = (id, val, textId, suffix = '') => {
@@ -133,8 +158,26 @@ function syncParamDisplays() {
     if (text && val !== undefined) text.textContent = `${val}${suffix}`;
   };
 
-  setVal('paramMaxLiveDuration', p.maxLiveDuration || 120, 'valMaxLiveDuration', '分钟');
-  setVal('paramMaxRestDuration', p.maxRestDuration || 360, 'valMaxRestDuration', '分钟');
+  // 每日直播场次上限
+  const dailyLimit = p.dailyLiveLimit !== undefined ? p.dailyLiveLimit : 0;
+  const dailyLabel = dailyLimit === 0 ? '不限制' : `${dailyLimit}场`;
+  const dailyValEl = document.getElementById('valDailyLiveLimit');
+  const dailyTagEl = document.getElementById('tagCharRate');
+  if (dailyValEl) dailyValEl.textContent = dailyLabel;
+  if (dailyTagEl) dailyTagEl.textContent = `直播场次：${dailyLabel}`;
+  document.querySelectorAll('.daily-limit-btn').forEach(btn => {
+    const btnVal = Number(btn.dataset.value);
+    if (btnVal === dailyLimit) {
+      btn.classList.add('bg-rose-500', 'text-white', 'border-rose-500');
+      btn.classList.remove('border-slate-200', 'text-slate-600');
+    } else {
+      btn.classList.remove('bg-rose-500', 'text-white', 'border-rose-500');
+      btn.classList.add('border-slate-200', 'text-slate-600');
+    }
+  });
+
+  setVal('paramMaxLiveDuration', p.maxLiveDuration || 240, 'valMaxLiveDuration', '分钟');
+  setVal('paramMaxRestDuration', p.maxRestDuration || 480, 'valMaxRestDuration', '分钟');
   setVal('paramReplyRandomDanmakuRate', p.replyRandomDanmakuRate !== undefined ? p.replyRandomDanmakuRate : 25, 'valReplyRandomDanmakuRate', '%');
   setVal('paramMentionUserRate', p.mentionUserRate !== undefined ? p.mentionUserRate : 30, 'valMentionUserRate', '%');
   setVal('paramEnterOtherLiveRate', p.enterOtherLiveRate !== undefined ? p.enterOtherLiveRate : 35, 'valEnterOtherLiveRate', '%');

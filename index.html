@@ -432,29 +432,44 @@
               <h4 class="text-xs font-black text-slate-900">参数设置</h4>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded" id="tagCharRate">45% 概率开播</span>
+              <span class="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded" id="tagCharRate">直播场次：不限制</span>
               <svg class="accordion-chevron w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
           </div>
           <div class="accordion-body space-y-3">
             <div class="h-[1px] bg-slate-100 mb-2"></div>
 
+            <!-- 1. 每日直播场次上限 -->
+            <div>
+              <div class="flex justify-between text-[11px] font-bold text-slate-700 mb-1.5">
+                <span>每日直播场次上限</span>
+                <span id="valDailyLiveLimit" class="text-rose-600 font-bold">不限制</span>
+              </div>
+              <div class="flex gap-1.5" id="dailyLiveLimitButtons">
+                <button onclick="setDailyLiveLimit(1)" class="daily-limit-btn flex-1 py-1.5 text-[10px] font-bold rounded-lg border border-slate-200 text-slate-600 hover:border-rose-300 hover:text-rose-500 transition-all" data-value="1">1场</button>
+                <button onclick="setDailyLiveLimit(2)" class="daily-limit-btn flex-1 py-1.5 text-[10px] font-bold rounded-lg border border-slate-200 text-slate-600 hover:border-rose-300 hover:text-rose-500 transition-all" data-value="2">2场</button>
+                <button onclick="setDailyLiveLimit(3)" class="daily-limit-btn flex-1 py-1.5 text-[10px] font-bold rounded-lg border border-slate-200 text-slate-600 hover:border-rose-300 hover:text-rose-500 transition-all" data-value="3">3场</button>
+                <button onclick="setDailyLiveLimit(4)" class="daily-limit-btn flex-1 py-1.5 text-[10px] font-bold rounded-lg border border-slate-200 text-slate-600 hover:border-rose-300 hover:text-rose-500 transition-all" data-value="4">4场</button>
+                <button onclick="setDailyLiveLimit(0)" class="daily-limit-btn flex-1 py-1.5 text-[10px] font-bold rounded-lg border border-slate-200 text-slate-600 hover:border-rose-300 hover:text-rose-500 transition-all" data-value="0">∞</button>
+              </div>
+            </div>
+
             <!-- 2. char单次直播时长上限 -->
             <div>
               <div class="flex justify-between text-[11px] font-bold text-slate-700 mb-1.5">
                 <span>char单次直播时长上限</span>
-                <span id="valMaxLiveDuration" class="text-rose-600 font-bold">120分钟</span>
+                <span id="valMaxLiveDuration" class="text-rose-600 font-bold">240分钟</span>
               </div>
-              <input type="range" id="paramMaxLiveDuration" min="10" max="300" step="10" value="120" oninput="updateParam('maxLiveDuration', this.value)" class="jelly-slider">
+              <input type="range" id="paramMaxLiveDuration" min="30" max="720" step="10" value="240" oninput="updateParam('maxLiveDuration', this.value)" class="jelly-slider">
             </div>
 
             <!-- 3. char单次下播休息时长上限 -->
             <div>
               <div class="flex justify-between text-[11px] font-bold text-slate-700 mb-1.5">
                 <span>char单次下播休息时长上限</span>
-                <span id="valMaxRestDuration" class="text-rose-600 font-bold">360分钟</span>
+                <span id="valMaxRestDuration" class="text-rose-600 font-bold">480分钟</span>
               </div>
-              <input type="range" id="paramMaxRestDuration" min="10" max="720" step="10" value="360" oninput="updateParam('maxRestDuration', this.value)" class="jelly-slider">
+              <input type="range" id="paramMaxRestDuration" min="30" max="720" step="10" value="480" oninput="updateParam('maxRestDuration', this.value)" class="jelly-slider">
             </div>
 
             <!-- 4. char回复随机弹幕的概率 -->

@@ -441,9 +441,10 @@ window.charSchedulesMap = window.charSchedulesMap || {};
 
 // 9 大沙盒核心参数
 window.appParams = window.appParams || {
-  maxLiveDuration: 120,
-  maxRestDuration: 360,
+  maxLiveDuration: 240,
+  maxRestDuration: 480,
   minRestDuration: 10,
+  dailyLiveLimit: 0,
   opsPollInterval: 3,
   replyRandomDanmakuRate: 25,
   mentionUserRate: 30,
