@@ -344,7 +344,7 @@ function renderOpsLog() {
         <span class="font-bold text-slate-700">第${cycle.cycle || (log.length - idx)}轮 ${cycle.time}</span>
         <span class="text-[10px] text-slate-500">在播${s.streaming} 评估${s.evaluated || 0}人 开播${s.started} 下播${s.stopped}</span>
       </div>
-      <div class="text-[9px] text-slate-400 mb-1.5">意愿值由AI聊天驱动 | 直播上限${p.maxLiveMins}分 休息上限${p.maxRestMins}分</div>
+      <div class="text-[9px] text-slate-400 mb-1.5">意愿值由角色聊天驱动 | 直播上限${p.maxLiveMins}分 休息上限${p.maxRestMins}分</div>
       <div class="space-y-0.5">${decisions}</div>
     </div>`;
   }).join('');
