@@ -233,7 +233,14 @@
         const list = getStore("characters") || defaultCharacters;
         return list.find(c => c.id === id) || null;
       },
+      async readState({ characterId }) {
+        const states = getStore("character_states") || {};
+        return states[characterId] || { stateValues: [] };
+      },
       async writeState({ characterId, stateValues }) {
+        let states = getStore("character_states") || {};
+        states[characterId] = { stateValues };
+        setStore("character_states", states);
         return { success: true };
       }
     },

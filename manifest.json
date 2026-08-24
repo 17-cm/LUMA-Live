@@ -28,7 +28,8 @@
     "calendar.read",
     "calendar.write",
     "network.fetch",
-    "tasks.schedule"
+    "tasks.schedule",
+    "characters.state.read"
   ],
   "network": {
     "allowedDomains": [

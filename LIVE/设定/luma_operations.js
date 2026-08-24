@@ -16,15 +16,124 @@ if (!window.lumaOpsLog) window.lumaOpsLog = [];
 async function getCharWillMap() {
   try {
     const saved = await api.db.get("app_settings", "char_will_map").catch(() => null);
-    return saved && typeof saved === 'object' ? saved : {};
+    return saved && typeof saved === "object" ? saved : {};
   } catch (e) { return {}; }
 }
+
+// 辅助函数：从角色状态栏/动态状态中提取意愿数值
+function extractWillFromStateData(stateData) {
+  if (!stateData) return null;
+  let startWill = null;
+  let stopWill = null;
+  let generalWill = null;
+
+  // 1. 如果是数组: [{ name: "意愿", value: 30 }, ...]
+  const list = Array.isArray(stateData)
+    ? stateData
+    : (Array.isArray(stateData.stateValues) ? stateData.stateValues : (Array.isArray(stateData.states) ? stateData.states : null));
+
+  if (list && list.length > 0) {
+    for (const item of list) {
+      if (!item) continue;
+      const name = String(item.name || item.key || item.title || item.label || "").trim();
+      const val = Number(item.value !== undefined ? item.value : (item.val !== undefined ? item.val : item.number));
+      if (isNaN(val)) continue;
+
+      if (name.includes("开播")) {
+        startWill = val;
+      } else if (name.includes("下播")) {
+        stopWill = val;
+      } else if (name.includes("意愿") || name.includes("直播") || name.toLowerCase().includes("will")) {
+        generalWill = val;
+      }
+    }
+  }
+
+  // 2. 如果是键值对象: { "意愿": 30, "好感度": 50 }
+  if (typeof stateData === "object" && !Array.isArray(stateData)) {
+    for (const [key, valRaw] of Object.entries(stateData)) {
+      const k = String(key).trim();
+      let val = NaN;
+      if (typeof valRaw === "object" && valRaw !== null) {
+        val = Number(valRaw.value ?? valRaw.val ?? valRaw.number);
+      } else {
+        val = Number(valRaw);
+      }
+      if (isNaN(val)) continue;
+
+      if (k.includes("开播")) {
+        startWill = val;
+      } else if (k.includes("下播")) {
+        stopWill = val;
+      } else if (k.includes("意愿") || k.includes("直播") || k.toLowerCase().includes("will")) {
+        generalWill = val;
+      }
+    }
+  }
+
+  return { startWill, stopWill, generalWill };
+}
+
+// 获取角色意愿：【核心】优先主动读取角色状态栏/动态状态 (characters.readState)，兜底读取 char_will_map
 async function getCharWill(characterId) {
   if (!characterId) return { startWill: 0, stopWill: 0 };
-  const map = await getCharWillMap();
-  const w = map[characterId];
-  return { startWill: w?.startWill || 0, stopWill: w?.stopWill || 0 };
+
+  let startWill = null;
+  let stopWill = null;
+
+  // 1. 主动从角色状态栏中读取 (characters.readState)
+  try {
+    const charApi = (typeof AiPhone !== "undefined" && AiPhone.characters) ? AiPhone.characters : (window.api && window.api.characters);
+    if (charApi && typeof charApi.readState === "function") {
+      const stateRes = await charApi.readState({ characterId }).catch(() => null);
+      if (stateRes) {
+        const extracted = extractWillFromStateData(stateRes);
+        if (extracted) {
+          if (extracted.startWill !== null) startWill = extracted.startWill;
+          if (extracted.stopWill !== null) stopWill = extracted.stopWill;
+          if (extracted.generalWill !== null) {
+            if (startWill === null) startWill = extracted.generalWill;
+            if (stopWill === null) stopWill = extracted.generalWill;
+          }
+        }
+      }
+    }
+
+    // 1.1 若 readState 未拿到，尝试从 characters.get 档案对象中提取
+    if ((startWill === null || stopWill === null) && charApi && typeof charApi.get === "function") {
+      const charObj = await charApi.get(characterId).catch(() => null);
+      if (charObj) {
+        const extracted = extractWillFromStateData(charObj.state || charObj.stateValues || charObj.states || charObj);
+        if (extracted) {
+          if (startWill === null && extracted.startWill !== null) startWill = extracted.startWill;
+          if (stopWill === null && extracted.stopWill !== null) stopWill = extracted.stopWill;
+          if (extracted.generalWill !== null) {
+            if (startWill === null) startWill = extracted.generalWill;
+            if (stopWill === null) stopWill = extracted.generalWill;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.log("[LUMA Live] 读取角色状态栏意愿异常", e);
+  }
+
+  // 2. 兜底：若状态栏中未找到，则读取本地保存的 char_will_map
+  if (startWill === null || stopWill === null) {
+    const map = await getCharWillMap();
+    const w = map[characterId];
+    if (w) {
+      if (startWill === null && w.startWill !== undefined) startWill = w.startWill;
+      if (stopWill === null && w.stopWill !== undefined) stopWill = w.stopWill;
+    }
+  }
+
+  const finalStart = Math.max(0, Number(startWill) || 0);
+  const finalStop = Math.max(0, Number(stopWill) || 0);
+
+  return { startWill: finalStart, stopWill: finalStop };
 }
+
 async function setCharWill(characterId, type, value) {
   if (!characterId || !type) return;
   const num = Math.max(0, Math.min(50, Number(value) || 0));
@@ -33,7 +142,20 @@ async function setCharWill(characterId, type, value) {
   map[characterId][type] = num;
   map[characterId].updatedAt = Date.now();
   try { await saveDbSetting("char_will_map", map); } catch (e) {}
+
+  // 同时同步写入角色状态栏
+  try {
+    const charApi = (typeof AiPhone !== "undefined" && AiPhone.characters) ? AiPhone.characters : (window.api && window.api.characters);
+    if (charApi && typeof charApi.writeState === "function") {
+      const stateName = type === "startWill" ? "开播意愿" : "下播意愿";
+      await charApi.writeState({
+        characterId,
+        stateValues: [{ name: stateName, value: num }, { name: "意愿", value: num }]
+      }).catch(() => {});
+    }
+  } catch (e) {}
 }
+
 window.getCharWill = getCharWill;
 window.setCharWill = setCharWill;
 window.getCharWillMap = getCharWillMap;
