@@ -480,8 +480,9 @@ window.syncLiveSessions = syncLiveSessions;
 window.lumaOpsPoll = syncLiveSessions;
 
 // =========================================================================
-// 【状态同步到聊天历史】后台定时把每个角色的直播状态写入聊天历史
-// AI下次回复时从历史里读到真实状态，然后输出对应的意愿值
+// 【状态同步到角色日程】后台定时把每个角色的直播状态写入角色日程
+// 通过{{当前日程}}宏自动注入提示词，AI聊天时自动看到真实状态
+// 不依赖短期记忆、不依赖聊天历史、不依赖工具调用
 // =========================================================================
 async function syncCharStatusToChat() {
   try {
@@ -490,30 +491,57 @@ async function syncCharStatusToChat() {
     const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
     const streamingIds = new Set(sessions.map(s => s.characterId));
     const now = Date.now();
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const calendarApi = (typeof AiPhone !== 'undefined' && AiPhone.calendar) ? AiPhone.calendar : (api.calendar || null);
+    if (!calendarApi || !calendarApi.write) {
+      console.log("[LUMA Live] calendar.write 不可用，跳过状态同步");
+      return;
+    }
     for (const c of allChars) {
       try {
         const isStreaming = streamingIds.has(c.id);
         const session = sessions.find(s => s.characterId === c.id);
-        let statusText;
+        let title;
         if (isStreaming && session) {
           const liveMins = Math.round((now - (session.startTime || now)) / 60000);
-          statusText = `[LUMA Live 系统通知] 你当前正在直播中，已直播${liveMins}分钟。直播间：${session.topic || '正在直播'}。`;
+          title = `LUMA Live直播中，已播${liveMins}分钟`;
         } else {
           const sched = window.charSchedulesMap ? window.charSchedulesMap[c.id] : null;
           const lastEndTime = sched?.lastEndTime;
           const restMins = lastEndTime ? Math.round((now - lastEndTime) / 60000) : 0;
-          statusText = `[LUMA Live 系统通知] 你当前处于休息状态，已休息${restMins}分钟。可以随时申请开播。`;
+          title = `LUMA Live休息中，已休息${restMins}分钟`;
         }
-        if (api.chat?.writeHistory) {
-          await api.chat.writeHistory({
-            characterId: c.id,
-            role: "system",
-            content: statusText
-          }).catch(() => {});
-        }
+        // 先读取整周日程，过滤掉已有的LUMA Live日程，再添加今天的新状态日程
+        let existingItems = [];
+        try {
+          const weekData = await calendarApi.read({
+            ownerType: "character",
+            ownerId: c.id,
+            weekStart: today
+          }).catch(() => null);
+          if (weekData && weekData.plan && Array.isArray(weekData.plan.items)) {
+            existingItems = weekData.plan.items.filter(item => !String(item.title || '').startsWith('LUMA Live'));
+          }
+        } catch (e) {}
+        // 添加今天的LUMA Live状态日程（全天）
+        const lumaItem = {
+          date: today,
+          startTime: "00:00",
+          endTime: "23:59",
+          title: title,
+          location: "LUMA Live",
+          source: "luma_live"
+        };
+        const allItems = [...existingItems, lumaItem];
+        await calendarApi.write({
+          ownerType: "character",
+          ownerId: c.id,
+          operation: "replace",
+          items: allItems
+        }).catch(() => {});
       } catch (e) {}
     }
-    console.log(`[LUMA Live] 状态同步完成，共同步 ${allChars.length} 个角色`);
+    console.log(`[LUMA Live] 状态同步完成（日程），共同步 ${allChars.length} 个角色`);
   } catch (e) {
     console.log("[LUMA Live] 状态同步失败", e);
   }

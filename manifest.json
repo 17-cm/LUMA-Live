@@ -25,6 +25,8 @@
     "ui.toast",
     "notifications.write",
     "memory.write",
+    "calendar.read",
+    "calendar.write",
     "network.fetch"
   ],
   "network": {
