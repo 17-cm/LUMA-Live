@@ -257,7 +257,7 @@ function updateOpsPollIntervalDisplay(value) {
 window.updateOpsPollIntervalDisplay = updateOpsPollIntervalDisplay;
 
 // 重启 LUMA官方运营组定时器
-function resetLumaOpsTimer() {
+async function resetLumaOpsTimer() {
   if (window.__lumaLiveSyncInterval) {
     clearInterval(window.__lumaLiveSyncInterval);
     window.__lumaLiveSyncInterval = null;
@@ -266,7 +266,22 @@ function resetLumaOpsTimer() {
   window.__lumaLiveSyncInterval = setInterval(() => {
     syncLiveSessions({ allowSpawn: true });
   }, pollMins * 60 * 1000);
-  console.log(`[LUMA官方运营组] 定时器已重启，间隔 ${pollMins} 分钟`);
+  console.log(`[LUMA官方运营组] 前台定时器已重启，间隔 ${pollMins} 分钟`);
+
+  // 注册小手机系统后台定时任务（退出 APP 离开前台后依然由宿主定时唤醒执行）
+  try {
+    const tasksApi = (typeof AiPhone !== 'undefined' && AiPhone.tasks) ? AiPhone.tasks : (window.api && window.api.tasks);
+    if (tasksApi && tasksApi.schedule) {
+      await tasksApi.schedule({
+        id: "luma_ops_background_poll",
+        cron: `*/${pollMins} * * * *`,
+        action: "lumaOpsPoll"
+      });
+      console.log(`[LUMA官方运营组] 系统后台任务已注册: */${pollMins} * * * * -> lumaOpsPoll`);
+    }
+  } catch (e) {
+    console.log("[LUMA官方运营组] 系统后台任务注册跳过或失败", e);
+  }
 }
 window.resetLumaOpsTimer = resetLumaOpsTimer;
 

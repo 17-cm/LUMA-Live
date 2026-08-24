@@ -621,37 +621,55 @@ window.syncCharStatusToChat = syncCharStatusToChat;
 // =========================================================================
 // 【事件监听】监听角色聊天消息，提取[意愿：X]指令并更新角色意愿值
 // =========================================================================
+// 兼容系统后台事件入口(window.luma_will_listener)与前台AiPhone.on事件
+async function luma_will_listener(payload) {
+  try {
+    if (!payload) return;
+
+    // 兼容多种 payload 结构 (payload.message 或 直接 payload)
+    const msg = payload.message || payload;
+    const role = msg.role || payload.role;
+
+    // 只处理角色(assistant)发出的消息，忽略用户发送的消息
+    if (role && role !== "assistant" && role !== "character") return;
+
+    const content = msg.text || msg.content || payload.text || payload.content || "";
+    if (!content) return;
+
+    // 提取 [意愿：X] 或 [意愿: X] 指令
+    const match = content.match(/\[意愿[：:]\s*(\d+(?:\.\d+)?)\s*\]/);
+    if (!match) return;
+
+    const willValue = Math.max(0, Math.min(50, Number(match[1]) || 0));
+    const characterId = payload.characterId || payload.charId || msg.characterId || msg.charId;
+    if (!characterId) return;
+
+    // 判断角色当前状态，更新对应的意愿值
+    const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
+    const isStreaming = sessions.some(s => s.characterId === characterId);
+    const willType = isStreaming ? "stopWill" : "startWill";
+
+    await setCharWill(characterId, willType, willValue);
+    console.log(`[LUMA Live] 成功捕获角色意愿: ${characterId} ${willType}=${willValue} (${isStreaming ? "直播中" : "休息中"})`);
+  } catch (e) {
+    console.log("[LUMA Live] 意愿提取异常", e);
+  }
+}
+
+// 导出全局供小手机后台 Worker 直接调用
+window.luma_will_listener = luma_will_listener;
+
 function registerLumaEventListeners() {
   try {
-    if (typeof AiPhone !== 'undefined' && AiPhone.on) {
-      AiPhone.on("chat.message.created", async (event) => {
-        try {
-          // 只处理角色发出的消息
-          if (!event || event.role !== 'assistant') return;
-          const content = event.content || event.text || '';
-          if (!content) return;
-          // 提取[意愿：X]指令
-          const match = content.match(/\[意愿[：:]\s*(\d+(?:\.\d+)?)\s*\]/);
-          if (!match) return;
-          const willValue = Math.max(0, Math.min(50, Number(match[1]) || 0));
-          const characterId = event.characterId || event.charId;
-          if (!characterId) return;
-          // 判断角色当前状态，更新对应的意愿值
-          const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
-          const isStreaming = sessions.some(s => s.characterId === characterId);
-          const willType = isStreaming ? 'stopWill' : 'startWill';
-          await setCharWill(characterId, willType, willValue);
-          console.log(`[LUMA Live] 角色意愿更新: ${characterId} ${willType}=${willValue} (${isStreaming ? '直播中' : '休息中'})`);
-        } catch (e) {
-          console.log("[LUMA Live] 意愿提取失败", e);
-        }
-      });
-      console.log("[LUMA Live] 事件监听已注册");
+    if (typeof AiPhone !== "undefined" && AiPhone.on) {
+      AiPhone.on("chat.message.created", luma_will_listener);
+      console.log("[LUMA Live] 前台事件监听已注册");
     }
   } catch (e) {
-    console.log("[LUMA Live] 事件监听注册失败", e);
+    console.log("[LUMA Live] 前台事件监听注册失败", e);
   }
 }
 window.registerLumaEventListeners = registerLumaEventListeners;
+
 // 文件加载时自动注册事件监听
 registerLumaEventListeners();
