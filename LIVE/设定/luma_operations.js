@@ -50,7 +50,7 @@ window.lumaOpsNotify = lumaOpsNotify;
 // 官方运营组（定时器轮询）做概率决策后通知房管，房管审核通过才开关直播间
 // =========================================================================
 const lumaOpsGateway = {
-  async requestStartLive({ characterId, category, topic, durationMins, source = 'system' }) {
+  async requestStartLive({ characterId, category, topic, durationMins, source = 'system' }, nowTime = null) {
     if (!characterId) {
       lumaOpsNotify("开播驳回", "未指定有效的主播身份", "reject");
       return { success: false, reason: "【LUMA官方运营组通告】开播申请未通过：未指定有效的主播身份。" };
@@ -59,7 +59,7 @@ const lumaOpsGateway = {
     const allChars = window.allCharacters || [];
     const character = allChars.find(c => c.id === characterId) || await api.characters.get(characterId).catch(() => null);
     const charName = character?.name || "主播";
-    const now = Date.now();
+    const now = nowTime || Date.now();
 
     const params = window.appParams || {};
 
@@ -144,7 +144,7 @@ const lumaOpsGateway = {
     };
   },
 
-  async requestStopLive({ characterId, reason = "正常下播", source = "system" }) {
+  async requestStopLive({ characterId, reason = "正常下播", source = "system" }, nowTime = null) {
     if (!characterId) return { success: false, reason: "未指定有效主播身份" };
 
     const activeSessions = await api.db.list("live_sessions", { limit: 500 }) || [];
@@ -266,24 +266,24 @@ async function getPendingActions() {
     return Array.isArray(saved) ? saved : [];
   } catch (e) { return []; }
 }
-async function addPendingAction(characterId, action, delayMins, reason) {
+async function addPendingAction(characterId, action, delayMins, reason, nowTime = null) {
   const queue = await getPendingActions();
   // 移除该角色已有的同类型待执行动作
   const filtered = queue.filter(a => !(a.characterId === characterId && a.action === action));
   filtered.push({
     characterId,
     action, // 'start' or 'stop'
-    executeAt: Date.now() + delayMins * 60 * 1000,
+    executeAt: (nowTime || Date.now()) + delayMins * 60 * 1000,
     delayMins,
     reason,
-    createdAt: Date.now()
+    createdAt: nowTime || Date.now()
   });
   try { await saveDbSetting("luma_pending_actions", filtered); } catch (e) {}
   return filtered;
 }
-async function executeDueActions() {
+async function executeDueActions(nowTime = null) {
   const queue = await getPendingActions();
-  const now = Date.now();
+  const now = nowTime || Date.now();
   const due = queue.filter(a => a.executeAt <= now);
   const remaining = queue.filter(a => a.executeAt > now);
   try { await saveDbSetting("luma_pending_actions", remaining); } catch (e) {}
@@ -337,7 +337,7 @@ window.incrementDailyStartCount = incrementDailyStartCount;
 // =========================================================================
 // 决策公式：安全区外(达到时长上限)=100%必然；安全区内=基础意愿 + (已持续时长/上限)×50%
 // =========================================================================
-async function syncLiveSessions(options = {}) {
+async function syncLiveSessions(options = {}, nowTime = null) {
   let sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
 
   // 仅刷新模式：房管操作后调用，不做新决策
@@ -347,7 +347,7 @@ async function syncLiveSessions(options = {}) {
     return;
   }
 
-  const now = Date.now();
+  const now = nowTime || Date.now();
   const params = window.appParams || {};
   const maxLiveMins = params.maxLiveDuration || 120;
   const maxRestMins = params.maxRestDuration || 360;
@@ -490,7 +490,7 @@ async function syncLiveSessions(options = {}) {
         cycleLog.summary.stopped++;
         // 延迟1-10分钟执行下播
         const delayMins = Math.floor(Math.random() * 10) + 1;
-        await addPendingAction(item.charId, 'stop', delayMins, isUrgent ? "达到直播时长上限" : "角色意愿值决定下播休息");
+        await addPendingAction(item.charId, 'stop', delayMins, isUrgent ? "达到直播时长上限" : "角色意愿值决定下播休息", now);
         cycleLog.decisions[cycleLog.decisions.length - 1].delayMins = delayMins;
         cycleLog.decisions[cycleLog.decisions.length - 1].result = `${delayMins}分后下播`;
       }
@@ -525,7 +525,7 @@ async function syncLiveSessions(options = {}) {
         cycleLog.summary.started++;
         // 延迟1-10分钟执行开播
         const delayMins = Math.floor(Math.random() * 10) + 1;
-        await addPendingAction(item.charId, 'start', delayMins, "角色意愿值决定开播");
+        await addPendingAction(item.charId, 'start', delayMins, "角色意愿值决定开播", now);
         cycleLog.decisions[cycleLog.decisions.length - 1].delayMins = delayMins;
         cycleLog.decisions[cycleLog.decisions.length - 1].result = `${delayMins}分后开播`;
       }
@@ -537,6 +537,11 @@ async function syncLiveSessions(options = {}) {
   window.liveList = sessions;
   renderLiveGrid();
 
+  // 更新上次轮询时间（正常轮询时，不是补跑时）
+  if (!nowTime) {
+    try { await saveDbSetting("last_poll_time", Date.now()); } catch (e) {}
+  }
+
   // ── 写入轮询日志 ──
   cycleLog.summary.streaming = sessions.length;
   if (!window.lumaOpsLog) window.lumaOpsLog = [];
@@ -544,9 +549,65 @@ async function syncLiveSessions(options = {}) {
   if (window.lumaOpsLog.length > 3) window.lumaOpsLog.pop();
   console.log(`[LUMA官方运营组] 第${cycle}轮 ${cycleLog.time} | 在播${cycleLog.summary.streaming} | 评估${cycleLog.summary.evaluated}人 开播${cycleLog.summary.started} 下播${cycleLog.summary.stopped}`, cycleLog);
   // 轮询完成后同步状态到聊天历史
-  syncCharStatusToChat();
+  syncCharStatusToChat(now);
 }
 window.syncLiveSessions = syncLiveSessions;
+
+// =========================================================================
+// 【离线时间差推演·补跑机制】APP打开时根据离开时间补跑轮询，模拟后台一直在跑
+// 原理：记录每次轮询时间，APP打开时计算离开了多久，按轮询间隔逐次补跑
+// 补跑时传入模拟时间，开播/下播时间戳用模拟时间，保证直播时长真实
+// =========================================================================
+async function catchUpOfflinePolling() {
+  try {
+    const lastPollTime = await api.db.get("app_settings", "last_poll_time").catch(() => null);
+    const now = Date.now();
+    
+    // 第一次使用，没有记录，直接初始化
+    if (!lastPollTime) {
+      try { await saveDbSetting("last_poll_time", now); } catch (e) {}
+      return { caughtUp: false, reason: "first_run" };
+    }
+    
+    const pollIntervalMs = ((window.appParams && window.appParams.opsPollInterval) || 3) * 60 * 1000;
+    const elapsed = now - lastPollTime;
+    
+    // 离开时间不足一个轮询间隔，不需要补跑
+    if (elapsed < pollIntervalMs) {
+      return { caughtUp: false, reason: "too_short", elapsedMs: elapsed };
+    }
+    
+    // 计算需要补跑的次数（最多补跑30次，避免太慢）
+    const maxCatchUp = 30;
+    const catchUpCount = Math.min(Math.floor(elapsed / pollIntervalMs), maxCatchUp);
+    const actualElapsed = catchUpCount * pollIntervalMs;
+    
+    console.log(`[LUMA Live] 离线补跑：离开 ${Math.round(elapsed/60000)} 分钟，补跑 ${catchUpCount} 次轮询`);
+    
+    // 逐次补跑，每次传入模拟时间
+    for (let i = 0; i < catchUpCount; i++) {
+      const simulatedNow = lastPollTime + (i + 1) * pollIntervalMs;
+      try {
+        await syncLiveSessions({ allowSpawn: true, catchUp: true }, simulatedNow);
+      } catch (e) {
+        console.log(`[LUMA Live] 补跑第 ${i+1} 次失败`, e);
+      }
+    }
+    
+    // 补跑完成后，用真实时间再执行一次到期延迟动作（补跑时用的是模拟时间，真实时间已超过）
+    try { await executeDueActions(); } catch (e) {}
+    
+    // 补跑完成后，更新上次轮询时间为当前时间
+    try { await saveDbSetting("last_poll_time", now); } catch (e) {}
+    
+    console.log(`[LUMA Live] 离线补跑完成：共补跑 ${catchUpCount} 次，模拟时长 ${Math.round(actualElapsed/60000)} 分钟`);
+    return { caughtUp: true, catchUpCount, elapsedMs: elapsed, simulatedMs: actualElapsed };
+  } catch (e) {
+    console.log("[LUMA Live] 离线补跑失败", e);
+    return { caughtUp: false, reason: "error", error: String(e) };
+  }
+}
+window.catchUpOfflinePolling = catchUpOfflinePolling;
 window.lumaOpsPoll = syncLiveSessions;
 
 // =========================================================================
@@ -554,14 +615,14 @@ window.lumaOpsPoll = syncLiveSessions;
 // 通过{{当前日程}}宏自动注入提示词，角色聊天时自动看到真实状态
 // 不依赖短期记忆、不依赖聊天历史、不依赖工具调用
 // =========================================================================
-async function syncCharStatusToChat() {
+async function syncCharStatusToChat(nowTime = null) {
   try {
     const allChars = window.allCharacters || [];
     if (allChars.length === 0) return;
     const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
     const streamingIds = new Set(sessions.map(s => s.characterId));
-    const now = Date.now();
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const now = nowTime || Date.now();
+    const today = new Date(now).toISOString().split('T')[0]; // YYYY-MM-DD
     const calendarApi = (typeof AiPhone !== 'undefined' && AiPhone.calendar) ? AiPhone.calendar : (api.calendar || null);
     if (!calendarApi || !calendarApi.write) {
       console.log("[LUMA Live] calendar.write 不可用，跳过状态同步");
