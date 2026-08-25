@@ -130,7 +130,54 @@ async function scanAllMessagesForCharWill(characterId) {
     const tablesToTry = ["messages", "chat_messages", "chat_history", "chats", "conversations", "records"];
     let allFound = [];
 
-    // 1. 尝试从 api.db 读取
+    // 0. 尝试直接从角色对象、联系人对象、以及角色状态表读取（好感度/焦虑值/自定义状态）
+    try {
+      if (typeof api !== 'undefined') {
+        // A. 查角色表中的 state 字段
+        const charObj = (api.characters && typeof api.characters.get === 'function') ? await api.characters.get(characterId).catch(() => null) : null;
+        if (charObj) {
+          const rawState = charObj.state || charObj.states || charObj.customState || charObj.memory || charObj.status;
+          if (rawState) {
+            const extracted = extractWillValueFromText(rawState);
+            if (extracted && typeof extracted.value === 'number') {
+              const willType = extracted.type === 'auto' ? 'startWill' : extracted.type;
+              await setCharWill(characterId, willType, extracted.value);
+              return { type: willType, value: extracted.value };
+            }
+          }
+        }
+
+        // B. 查 contacts 表中是否有绑定状态
+        const contactObj = (api.contacts && typeof api.contacts.get === 'function') ? await api.contacts.get(characterId).catch(() => null) : null;
+        if (contactObj) {
+          const rawState = contactObj.state || contactObj.states || contactObj.customState || contactObj.status;
+          if (rawState) {
+            const extracted = extractWillValueFromText(rawState);
+            if (extracted && typeof extracted.value === 'number') {
+              const willType = extracted.type === 'auto' ? 'startWill' : extracted.type;
+              await setCharWill(characterId, willType, extracted.value);
+              return { type: willType, value: extracted.value };
+            }
+          }
+        }
+
+        // C. 查 character_states / states 独立状态表
+        const stateTables = ["character_states", "char_states", "states", "user_states", "memories"];
+        for (const stTbl of stateTables) {
+          try {
+            const stItem = await api.db.get(stTbl, characterId).catch(() => null);
+            if (stItem) {
+              const extracted = extractWillValueFromText(stItem);
+              if (extracted && typeof extracted.value === 'number') {
+                const willType = extracted.type === 'auto' ? 'startWill' : extracted.type;
+                await setCharWill(characterId, willType, extracted.value);
+                return { type: willType, value: extracted.value };
+              }
+            }
+          } catch(e) {}
+        }
+      }
+    } catch(e) {}
     if (typeof api !== 'undefined' && api.db && typeof api.db.list === 'function') {
       for (const tbl of tablesToTry) {
         try {
@@ -184,15 +231,19 @@ async function scanAllMessagesForCharWill(characterId) {
 
     for (const msg of targetMsgs) {
       const content = msg.content || msg.text || msg.message || msg.body || (typeof msg === 'string' ? msg : JSON.stringify(msg));
-      const val = extractWillValueFromText(content);
-      if (val !== null) {
-        // 判断当前状态
-        let isStreaming = false;
-        try {
-          const sessions = (typeof api !== 'undefined' && api.db && await api.db.list("live_sessions", { limit: 500 }).catch(() => [])) || [];
-          isStreaming = sessions.some(s => s.characterId === characterId);
-        } catch (e) {}
-        const willType = isStreaming ? 'stopWill' : 'startWill';
+      const extracted = extractWillValueFromText(content);
+      if (extracted && typeof extracted.value === 'number') {
+        const val = extracted.value;
+        let willType = extracted.type;
+        if (willType === 'auto') {
+          // 判断当前状态
+          let isStreaming = false;
+          try {
+            const sessions = (typeof api !== 'undefined' && api.db && await api.db.list("live_sessions", { limit: 500 }).catch(() => [])) || [];
+            isStreaming = sessions.some(s => s.characterId === characterId);
+          } catch (e) {}
+          willType = isStreaming ? 'stopWill' : 'startWill';
+        }
         await setCharWill(characterId, willType, val);
         console.log(`[LUMA Live] 深度扫描成功恢复角色 ${characterId} 意愿: ${willType}=${val}`);
         return { type: willType, value: val };
