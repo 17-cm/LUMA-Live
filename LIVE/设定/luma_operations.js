@@ -792,10 +792,10 @@ function registerLumaEventListeners() {
           if (!event || event.role !== 'assistant') return;
           const content = event.content || event.text || '';
           if (!content) return;
-          // 提取[意愿：X]指令
+          // 提取[意愿:X]或[意愿：X]指令
           const match = content.match(/\[意愿[：:]\s*(\d+(?:\.\d+)?)\s*\]/);
           if (!match) return;
-          const willValue = Math.max(0, Math.min(50, Number(match[1]) || 0));
+          const willValue = Math.max(0, Math.min(100, Number(match[1]) || 0));
           const characterId = event.characterId || event.charId;
           if (!characterId) return;
           // 判断角色当前状态，更新对应的意愿值
