@@ -1301,6 +1301,15 @@ async function lumaInitApp() {
         await bootstrapWorldInitialState(window.allCharacters, window.appParams);
       }
     }
+
+    // 启动时后台异步深度扫描各角色最新聊天记录恢复意愿
+    if (window.allCharacters && Array.isArray(window.allCharacters) && typeof scanAllMessagesForCharWill === 'function') {
+      setTimeout(() => {
+        window.allCharacters.forEach(c => {
+          if (c && c.id) scanAllMessagesForCharWill(c.id);
+        });
+      }, 300);
+    }
   } catch (e) {
     console.warn("DB读取警告:", e);
   }

@@ -41,24 +41,24 @@
       "directives": [
         {
           "label": "LUMA直播意愿",
-          "syntax": "[意愿:数值]",
-          "description": "输出角色当前直播意愿值（0-100，数值越大意愿越强）。",
+          "syntax": "[{{意愿类型}}意愿:{{数值}}]",
+          "description": "【强制输出】你已入驻 LUMA Live 平台，每轮回复必须在状态栏或开头输出此意愿指令。\n1. {{意愿类型}}判定：\n- 若你当前【未开播/休息/空闲】：{{意愿类型}} 必须填【开播】（如 [开播意愿:80]），基于当前日程与精力反映开启直播的主动意愿（0-100）。\n- 若你当前【正在直播中】：{{意愿类型}} 必须填【下播】（如 [下播意愿:20]），基于直播时长与疲劳度反映结束下播的主动意愿（0-100）。\n2. {{数值}}逻辑：\n- 范围 0-100，必须基于上一轮同类型意愿的基准值与当前日程、情绪进行连贯小幅增减，严禁无故突变。\n- 意愿为后台系统与状态卡片使用，无需在正文中解释数值。",
           "card": {
-            "title": "LUMA Live · 直播意愿",
-            "body": "当前意愿值：{{数值}}",
-            "accentColor": "#f43f5e"
+            "title": "LUMA Live · {{意愿类型}}意愿",
+            "body": "当前{{意愿类型}}倾向：{{数值}}%",
+            "accentColor": "#6366f1"
           }
-        }
-      ],
-      "events": [
-        {
-          "event": "chat.message.created",
-          "handler": "luma_will_listener",
-          "background": true,
-          "description": "后台监听角色聊天消息，提取意愿值指令并更新角色意愿数据库"
         }
       ]
     },
+    "events": [
+      {
+        "event": "chat.message.created",
+        "handler": "luma_will_listener",
+        "background": true,
+        "description": "后台监听角色聊天消息，提取意愿值指令并更新角色意愿数据库"
+      }
+    ],
     "tools": [
       {
         "id": "luma-request-start-live",
