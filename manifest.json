@@ -53,9 +53,9 @@
       "events": [
         {
           "event": "chat.message.created",
-          "entry": "luma_will_listener",
+          "handler": "luma_will_listener",
           "background": true,
-          "description": "监听角色聊天消息，提取[意愿：X]指令并更新角色意愿值"
+          "description": "后台监听角色聊天消息，提取意愿值指令并更新角色意愿数据库"
         }
       ]
     },
