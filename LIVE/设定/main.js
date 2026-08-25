@@ -1197,7 +1197,9 @@ async function lumaInitApp() {
     if (imgCfg) Object.assign(window.imageSettings, imgCfg);
 
     const catsRec = await api.db.get("app_settings", "app_presets");
-    if (catsRec?.data) window.appPresets = catsRec.data;
+    if (catsRec?.data && catsRec.data.live?.entries?.length > 0) {
+      window.appPresets = catsRec.data;
+    }
 
     const followsRec = await api.db.list("follows", { limit: 500 }) || [];
     window.followedHosts = followsRec.map(f => f.id);

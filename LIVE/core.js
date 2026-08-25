@@ -475,9 +475,22 @@ function renderPresetTemplate(tpl, vars) {
   return tpl.replace(/\{\{(\w+)\}\}/g, (m, k) => (vars[k] !== undefined && vars[k] !== null ? vars[k] : ''));
 }
 
-function getEffectivePresetTemplate(tagKey) {
+function getEffectivePresetTemplate(tagKey, categoryKey = null) {
   const p = window.appPresets || {};
-  // 遍历所有分类，查找 id === tagKey 的条目
+  // 1. 如果指定了分类（例如 live），且该分类下有预设条目：
+  if (categoryKey && p[categoryKey]?.entries?.length > 0) {
+    const entries = p[categoryKey].entries;
+    // 如果是 live 直播分类，将所有规则条目按编号顺序整合成完整的【LUMA 房间导演调度规范】下发
+    if (categoryKey === 'live') {
+      return entries.map(e => `${e.title}\n${e.content}`).join('\n\n---\n\n');
+    }
+    // 否则按 id 查找
+    const found = entries.find(e => e.id === tagKey);
+    if (found && found.content) return found.content;
+    return entries[0]?.content || '';
+  }
+
+  // 2. 遍历所有分类查找 id === tagKey 的条目
   for (const catKey of Object.keys(p)) {
     const entries = p[catKey]?.entries || [];
     const found = entries.find(e => e.id === tagKey);
@@ -487,8 +500,11 @@ function getEffectivePresetTemplate(tagKey) {
 }
 
 async function aiGenerate(params) {
-  const tagKey = (params.appTags || []).find(t => t !== 'live') || 'reply';
-  const tpl = getEffectivePresetTemplate(tagKey);
+  const appTags = params.appTags || [];
+  const isLive = appTags.includes('live');
+  const catKey = isLive ? 'live' : (appTags[0] || 'live');
+  const tagKey = appTags.find(t => t !== 'live') || 'reply';
+  const tpl = getEffectivePresetTemplate(tagKey, catKey);
 
   let charName = '主播';
   let persona = '';

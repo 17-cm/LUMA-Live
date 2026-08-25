@@ -500,15 +500,13 @@ async function fetchBatchLivePackage() {
       giftHistoryText = '\n最近观众送礼记录：' + recentGifts.map(g => `${g.giftName}x${g.count}`).join('、') + '，请在台词里自然地感谢这些送礼。';
     }
     
-    // 从预设里读取打包 prompt，代码只保留动态内容（频道、标题、送礼记录）
-    const packagePrompt = (typeof window.getLivePackagePrompt === 'function') 
-      ? window.getLivePackagePrompt() 
-      : '请生成观众弹幕（danmakus数组）和主播互动台词（hostSpeeches数组，每条包含speech和action字段）。返回JSON格式。';
+    // 动态上下文：赛道频道、标题与最近送礼
+    const dynamicContext = `当前赛道：${currentRoom.category}（${currentRoom.subTag || '日常'}），标题：《${currentRoom.topic}》${giftHistoryText}`;
     
     const res = await window.aiGenerate({
       characterId: currentRoom.characterId,
       appTags: ['live', 'package'],
-      instruction: `当前频道：${currentRoom.category}（${currentRoom.subTag}），标题：${currentRoom.topic}。${packagePrompt}${giftHistoryText}`
+      instruction: dynamicContext
     });
 
     const parsed = window.extractJsonFromText(res.text);
