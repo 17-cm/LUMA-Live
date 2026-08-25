@@ -477,11 +477,11 @@ function renderPresetTemplate(tpl, vars) {
 
 function getEffectivePresetTemplate(tagKey, categoryKey = null) {
   const p = window.appPresets || {};
-  // 1. 如果指定了分类（例如 live），且该分类下有预设条目：
+  // 1. 如果指定了分类（例如 live 或 trends），且该分类下有预设条目：
   if (categoryKey && p[categoryKey]?.entries?.length > 0) {
     const entries = p[categoryKey].entries;
-    // 如果是 live 直播分类，将所有规则条目按编号顺序整合成完整的【LUMA 房间导演调度规范】下发
-    if (categoryKey === 'live') {
+    // 如果是 live 直播分类或 trends 热搜分类，将所有规则条目按编号顺序整合成完整的规范下发
+    if (categoryKey === 'live' || categoryKey === 'trends') {
       return entries.map(e => `${e.title}\n${e.content}`).join('\n\n---\n\n');
     }
     // 否则按 id 查找
@@ -506,17 +506,22 @@ async function aiGenerate(params) {
   const tagKey = appTags.find(t => t !== 'live') || 'reply';
   const tpl = getEffectivePresetTemplate(tagKey, catKey);
 
+  let characterId = params.characterId;
+  if (!characterId && window.allCharacters && window.allCharacters.length > 0) {
+    characterId = window.allCharacters[0].id;
+  }
+
   let charName = '主播';
   let persona = '';
-  if (params.characterId) {
-    const found = (window.allCharacters || []).find(c => c.id === params.characterId);
+  if (characterId) {
+    const found = (window.allCharacters || []).find(c => c.id === characterId);
     if (found) charName = found.name;
     try {
-      const full = await api.characters.get(params.characterId);
+      const full = await api.characters.get(characterId);
       persona = full?.persona || full?.description || '';
     } catch (e) {}
   }
-  const userName = (typeof currentUser !== 'undefined' && currentUser?.name) || 'user';
+  const userName = (typeof currentUser !== 'undefined' && currentUser?.name) || (window.currentUser && window.currentUser.name) || 'user';
 
   const filledInstruction = tpl
     ? renderPresetTemplate(tpl, { char: charName, user: userName, instruction: params.instruction || '' })
@@ -524,10 +529,14 @@ async function aiGenerate(params) {
 
   const customApi = window.customApiConfig || {};
   if (customApi.enableGlobalModel) {
-    return api.ai.generate({
+    const genOptions = {
       ...params,
       instruction: filledInstruction
-    });
+    };
+    if (characterId && !genOptions.characterId) {
+      genOptions.characterId = characterId;
+    }
+    return api.ai.generate(genOptions);
   }
 
   const type = customApi.apiType || 'siliconflow';

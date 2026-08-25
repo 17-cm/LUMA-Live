@@ -27,60 +27,109 @@ let isRefreshingTrends = false;
 async function refreshTrendsWithAI() {
   if (isRefreshingTrends) return;
   isRefreshingTrends = true;
-  if (window.api && api.ui && api.ui.toast) api.ui.toast('正在生成新动态…');
+  if (window.api && api.ui && api.ui.toast) api.ui.toast('正在生成热搜新动态…');
 
   try {
-    let contextText = '平台目前没有正在直播的主播，请生成一条泛娱乐八卦动态。';
+    let contextText = '平台目前没有正在直播的主播，请生成包含主播八卦、日常随笔与全网热点的动态。';
+    let targetCharId = null;
     try {
       const sessions = await api.db.list('live_sessions', { limit: 500 }) || [];
       const active = sessions.filter(s => s && s.name);
       if (active.length > 0) {
         const picked = active[Math.floor(Math.random() * active.length)];
+        targetCharId = picked.characterId || null;
         const duration = picked.startTime ? Math.floor((Date.now() - picked.startTime) / 60000) : 0;
-        contextText = `主播【${picked.name}】正在直播，赛道：${picked.category || '日常'}（${picked.subTag || '闲聊'}），标题：${picked.topic || '无标题'}，已播${duration}分钟，热度${picked.heat || 0}。请根据这个直播情况生成一条社区动态。`;
+        contextText = `当前主播【${picked.name}】正在直播中，赛道：${picked.category || '日常'}（${picked.subTag || '闲聊'}），标题：${picked.topic || '无标题'}，已播${duration}分钟，热度${picked.heat || 0}。请以此为背景，并结合其他主播日常生活、热搜吃瓜与全网爆梗，生成3条仿微博热搜帖子。`;
+      } else if (window.allCharacters && window.allCharacters.length > 0) {
+        const pickedChar = window.allCharacters[Math.floor(Math.random() * window.allCharacters.length)];
+        targetCharId = pickedChar.id;
+        contextText = `参考平台主播【${pickedChar.name}】（赛道标签：${(pickedChar.tags || []).join(' ')}），结合主播与用户的日常互动、赛博热点与全网八卦，生成3条仿微博热搜帖子。`;
       }
     } catch (e) {}
 
     const res = await window.aiGenerate({
+      characterId: targetCharId,
       appTags: ['trends', 'post'],
       instruction: contextText
     });
 
     const parsed = window.extractJsonFromText ? window.extractJsonFromText(res.text) : null;
-    if (!parsed || !parsed.content) {
-      if (window.api && api.ui && api.ui.toast) api.ui.toast('生成失败，请检查API配置');
+    let postList = [];
+    if (parsed) {
+      if (Array.isArray(parsed.posts) && parsed.posts.length > 0) {
+        postList = parsed.posts;
+      } else if (Array.isArray(parsed) && parsed.length > 0) {
+        postList = parsed;
+      } else if (parsed.content) {
+        postList = [parsed];
+      }
+    }
+
+    if (!postList || postList.length === 0) {
+      if (window.api && api.ui && api.ui.toast) api.ui.toast('生成格式异常，请重试');
       return;
     }
 
-    const mediaAccounts = ['星芒吃瓜周刊', '赛博娱乐前线', '直播圈内君', '热搜挖掘机', 'LUMA速报'];
-    const accountName = parsed.mediaName || mediaAccounts[Math.floor(Math.random() * mediaAccounts.length)];
-    const newPost = {
-      id: 'post_ai_' + Date.now(),
-      author: {
-        name: accountName,
-        avatar: '',
-        badge: parsed.badge || '娱乐速报',
-        verified: true
-      },
-      time: '刚刚',
-      tag: parsed.tag || '#LUMA Live#',
-      mention: parsed.mention || '',
-      linkText: parsed.linkText || '',
-      clipText: parsed.clipText || '',
-      content: parsed.content,
-      image: '',
-      stats: { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false },
-      commentTree: []
-    };
+    const mediaAccounts = ['星芒吃瓜周刊', '赛博娱乐前线', '直播圈内君', '热搜挖掘机', 'LUMA速报', '吃瓜课代表', '赛博八卦侦探', '圈内大表哥'];
+    const badgePool = ['娱乐速报', '数码博主', '吃瓜大队长', '知名大V', '热搜爆料官', '游戏先锋', '头条主编'];
+    const ipPool = ['北京', '上海', '广东', '浙江', '四川', '江苏', '山东', '赛博星云'];
 
     if (!window.weiboPosts) window.weiboPosts = [];
-    window.weiboPosts.unshift(newPost);
 
-    try { await api.db.create('community_posts', newPost).catch(() => {}); } catch (e) {}
+    for (let i = 0; i < postList.length; i++) {
+      const p = postList[i];
+      if (!p || !p.content) continue;
+
+      const accountName = p.mediaName || mediaAccounts[Math.floor(Math.random() * mediaAccounts.length)];
+      const badge = p.badge || badgePool[Math.floor(Math.random() * badgePool.length)];
+      
+      const commentTree = Array.isArray(p.comments) ? p.comments.map((c, cIdx) => ({
+        id: `c_${Date.now()}_${i}_${cIdx}`,
+        user: c.user || `网友_${Math.floor(Math.random() * 9000 + 1000)}`,
+        avatar: (typeof window.getAvatar === 'function') ? window.getAvatar(c.user || `网友_${cIdx}`, 'first') : '',
+        text: c.text || '围观打卡！',
+        time: c.time || `${Math.floor(Math.random() * 10 + 1)}分钟前`,
+        ip: c.ip || ipPool[Math.floor(Math.random() * ipPool.length)],
+        likes: typeof c.likes === 'number' ? c.likes : Math.floor(Math.random() * 200 + 5),
+        isLiked: false,
+        replies: []
+      })) : [];
+
+      const rawStats = p.stats || {};
+      const stats = {
+        reposts: typeof rawStats.reposts === 'number' ? rawStats.reposts : Math.floor(Math.random() * 1500 + 120),
+        comments: typeof rawStats.comments === 'number' ? rawStats.comments : (commentTree.length > 0 ? Math.floor(Math.random() * 3000 + commentTree.length * 100) : Math.floor(Math.random() * 2000 + 300)),
+        likes: typeof rawStats.likes === 'number' ? rawStats.likes : Math.floor(Math.random() * 20000 + 2500),
+        isLiked: false,
+        isDownloaded: false
+      };
+
+      const newPost = {
+        id: 'post_ai_' + Date.now() + '_' + i,
+        author: {
+          name: accountName,
+          avatar: (typeof window.getAvatar === 'function') ? window.getAvatar(accountName, 'emoji') : '',
+          badge: badge,
+          verified: true
+        },
+        time: '刚刚',
+        tag: p.tag || (p.topic ? `#${p.topic.replace(/#/g, '')}#` : '#微博热搜#'),
+        mention: p.mention || '',
+        linkText: p.linkText || '',
+        clipText: p.clipText || '',
+        content: p.content,
+        image: p.image || '',
+        stats: stats,
+        commentTree: commentTree
+      };
+
+      window.weiboPosts.unshift(newPost);
+      try { await api.db.create('community_posts', newPost).catch(() => {}); } catch (e) {}
+    }
 
     renderHotSearchRanking();
     renderTrends();
-    if (window.api && api.ui && api.ui.toast) api.ui.toast('新动态已生成');
+    if (window.api && api.ui && api.ui.toast) api.ui.toast(`已成功生成 ${postList.length} 条热搜动态`);
   } catch (e) {
     if (window.api && api.ui && api.ui.toast) api.ui.toast('生成失败：' + (e.message || '未知错误'));
   } finally {
