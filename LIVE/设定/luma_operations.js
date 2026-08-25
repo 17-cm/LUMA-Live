@@ -19,34 +19,34 @@ if (!window.lumaOpsLog) window.lumaOpsLog = [];
 // 未聊过/未获取的角色返回 null，基础分按 0 计算，日志与UI标注「暂未获取」
 // =========================================================================
 
-// 宽容模式提取文本中的意愿数值（支持开播意愿、下播意愿、通用意愿、中英文冒号、等号、多标签连缀等）
+// 宽容模式提取文本中的意愿/倾向数值（支持开播倾向/意愿、下播倾向/意愿、通用倾向/意愿、中英文冒号、等号、多标签连缀等）
 function extractWillValueFromText(rawText) {
   if (!rawText) return null;
   const str = typeof rawText === 'object' ? JSON.stringify(rawText) : String(rawText);
   
-  // 1. 精准提取【开播意愿】
-  const mStart = str.match(/(?:\[|【)?\s*(?:LUMA)?(?:Live)?(?:开启)?开播意愿(?:值)?\s*[:：=—\- ]\s*(\d+(?:\.\d+)?)\s*(?:\/100|分|%)?\s*(?:\]|】)?/i);
+  // 1. 精准提取【开播倾向 / 开播意愿】
+  const mStart = str.match(/(?:\[|【)?\s*(?:LUMA)?(?:Live)?(?:开启)?开播(?:倾向|意愿)(?:值)?\s*[:：=—\- ]\s*(\d+(?:\.\d+)?)\s*(?:\/100|分|%)?\s*(?:\]|】)?/i);
   if (mStart) {
     const num = Number(mStart[1]);
     if (!isNaN(num)) return { type: 'startWill', value: Math.max(0, Math.min(100, Math.round(num))) };
   }
 
-  // 2. 精准提取【下播意愿】
-  const mStop = str.match(/(?:\[|【)?\s*(?:LUMA)?(?:Live)?(?:关闭)?下播意愿(?:值)?\s*[:：=—\- ]\s*(\d+(?:\.\d+)?)\s*(?:\/100|分|%)?\s*(?:\]|】)?/i);
+  // 2. 精准提取【下播倾向 / 下播意愿】
+  const mStop = str.match(/(?:\[|【)?\s*(?:LUMA)?(?:Live)?(?:关闭)?下播(?:倾向|意愿)(?:值)?\s*[:：=—\- ]\s*(\d+(?:\.\d+)?)\s*(?:\/100|分|%)?\s*(?:\]|】)?/i);
   if (mStop) {
     const num = Number(mStop[1]);
     if (!isNaN(num)) return { type: 'stopWill', value: Math.max(0, Math.min(100, Math.round(num))) };
   }
 
-  // 3. 标准通用正则：[意愿:10] / [意愿：10] / [LUMA直播意愿:10] / 【意愿：10】 / [意愿值:10] / [当前意愿值：10]
-  const m1 = str.match(/(?:\[|【)?\s*(?:LUMA)?(?:Live)?(?:直播)?(?:当前)?意愿(?:值)?\s*[:：=—\- ]\s*(\d+(?:\.\d+)?)\s*(?:\/100|分|%)?\s*(?:\]|】)?/i);
+  // 3. 标准通用正则：[倾向:10] / [意愿:10] / [LUMA直播倾向:10] / 【倾向：10】 / [倾向值:10]
+  const m1 = str.match(/(?:\[|【)?\s*(?:LUMA)?(?:Live)?(?:直播)?(?:当前)?(?:倾向|意愿)(?:值)?\s*[:：=—\- ]\s*(\d+(?:\.\d+)?)\s*(?:\/100|分|%)?\s*(?:\]|】)?/i);
   if (m1) {
     const num = Number(m1[1]);
     if (!isNaN(num)) return { type: 'auto', value: Math.max(0, Math.min(100, Math.round(num))) };
   }
 
-  // 4. 卡片 json 格式如 "body": "当前意愿值：10" 或 "label": "10"
-  const m2 = str.match(/意愿.*?(\d+)/);
+  // 4. 卡片 json 格式如 "body": "当前倾向：10" 或 "body": "当前意愿值：10"
+  const m2 = str.match(/(?:倾向|意愿).*?(\d+)/);
   if (m2) {
     const num = Number(m2[1]);
     if (!isNaN(num) && num >= 0 && num <= 100) {
@@ -1123,7 +1123,7 @@ async function luma_will_listener(event) {
     // 检查是否有 directives 结构化参数
     if (willVal === null && raw.directives && Array.isArray(raw.directives)) {
       for (const d of raw.directives) {
-        if (d && (d.label?.includes('意愿') || d.syntax?.includes('意愿') || d.name?.includes('意愿'))) {
+        if (d && (d.label?.includes('倾向') || d.label?.includes('意愿') || d.syntax?.includes('倾向') || d.syntax?.includes('意愿') || d.name?.includes('倾向') || d.name?.includes('意愿'))) {
           const v = extractWillValueFromText(d.value || d.params || d.content);
           if (v !== null) { willVal = v; break; }
         }
