@@ -1,5 +1,5 @@
 // =========================================================================
-// LUMA Live 直播运营核心
+// LUMA Live 直播运营核心 (v1.3.1 - rawResponseText 精准意愿解析同步)
 // 包含：LUMA官方运营组（定时器轮询决策）+ 房管（审核裁决网关）+ 工具注册
 // 本文件从 core.js 和 live.js 抽取，独立管理直播流程逻辑
 // 依赖：core.js (dbUpsert/saveDbSetting/api) + live.js (renderLiveGrid/normalizeCategory)
