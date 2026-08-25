@@ -477,19 +477,14 @@ function renderPresetTemplate(tpl, vars) {
 
 function getEffectivePresetTemplate(tagKey, categoryKey = null) {
   const p = window.appPresets || {};
-  // 1. 如果指定了分类（例如 live 或 trends），且该分类下有预设条目：
+  // 1. 如果指定了分类，先在该分类下按 id 查找
   if (categoryKey && p[categoryKey]?.entries?.length > 0) {
     const entries = p[categoryKey].entries;
-    // 如果是 live 直播分类或 trends 热搜分类，将所有规则条目按编号顺序整合成完整的规范下发
-    if (categoryKey === 'live' || categoryKey === 'trends') {
-      return entries.map(e => `${e.title}\n${e.content}`).join('\n\n---\n\n');
-    }
-    // 否则按 id 查找
     const found = entries.find(e => e.id === tagKey);
     if (found && found.content) return found.content;
-    return entries[0]?.content || '';
+    // 找不到对应 id 时，用该分类第一条作为兜底
+    if (entries[0]?.content) return entries[0].content;
   }
-
   // 2. 遍历所有分类查找 id === tagKey 的条目
   for (const catKey of Object.keys(p)) {
     const entries = p[catKey]?.entries || [];

@@ -11,7 +11,7 @@ window.appPresets = window.appPresets || {
     desc: 'LUMA 房间导演引擎：推流架构、主播人设、公屏生态、礼物反馈、用户时差判定',
     entries: [
       {
-        id: 'luma_live_format_engine',
+        id: 'package',
         title: '① 整体架构与推流大包',
         content: `【LUMA 房间导演系统提示 · 批处理推流规范】
 你当前是 LUMA Live 直播间的全景推流生成引擎。你需要同时模拟主播表现、观众公屏与房间事件，生成一段高度连贯、具有真实网络直播节奏的数据大包。
@@ -106,7 +106,7 @@ window.appPresets = window.appPresets || {
     desc: '仿微博热搜与热点生态：话题标签自拟、多赛道真实动态、活人感网民跟评',
     entries: [
       {
-        id: 'luma_trends_generation_spec',
+        id: 'post',
         title: '① 仿微博热搜广场与多赛道动态生成',
         content: `【LUMA 社区导演提示 · 热搜动态生成规范】
 你当前是 LUMA 社区热搜与热点广场的内容导演引擎。你需要模拟真实的微博/社交平台吃瓜广场生态，生成 3 条风格多样、充满网感与活人感的全网热搜帖子。
@@ -138,7 +138,7 @@ window.appPresets = window.appPresets || {
   - 每条帖子的 stats 需随机生成贴近真实热搜的数值：reposts（转发数 100~3000）、comments（评论数 500~9000）、likes（点赞数 2000~50000）。`
       },
       {
-        id: 'luma_trends_output_format',
+        id: 'highlight',
         title: '③ 结构化输出协议 (JSON)',
         content: `【LUMA 社区导演提示 · 输出格式协议】
 必须严格输出纯合法 JSON 对象，包含 posts 数组（共 3 条热搜帖子），严禁输出任何 Markdown 标记或外部多余说明。
