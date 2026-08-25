@@ -217,8 +217,6 @@ function renderLiveGrid() {
   if (!box) return;
   
   const currentLives = window.liveList || liveList || [];
-  const params = window.appParams || {};
-  const isMaintenance = (params.charSpawnRate === 0);
 
   let filtered = currentLives.filter(s => isSessionMatchingCategory(s, activeMainCategory, activeSubCategory));
 
@@ -230,8 +228,8 @@ function renderLiveGrid() {
             <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
           </div>
           <div>
-            <h4 class="text-xs font-black text-slate-800">${isMaintenance ? '全服维护中 · 暂无直播' : '当前暂无正在直播的主播'}</h4>
-            <p class="text-[10px] text-slate-400 mt-1">${isMaintenance ? '可在设定中调整开播意愿或召唤野生主播测试' : '可在小手机中添加角色，或召唤野生主播即刻开播！'}</p>
+            <h4 class="text-xs font-black text-slate-800">当前暂无正在直播的主播</h4>
+            <p class="text-[10px] text-slate-400 mt-1">可在小手机中添加角色，或召唤野生主播即刻开播！</p>
           </div>
           <button onclick="handleGenerateWildNPC()" class="btn-brand text-xs !py-2 !px-4 shadow-md">
             <span>立即召唤野生主播</span>
@@ -509,7 +507,7 @@ async function fetchBatchLivePackage() {
     
     const res = await window.aiGenerate({
       characterId: currentRoom.characterId,
-      appTags: ['luma', 'stream', 'content'],
+      appTags: ['live', 'package'],
       instruction: `当前频道：${currentRoom.category}（${currentRoom.subTag}），标题：${currentRoom.topic}。${packagePrompt}${giftHistoryText}`
     });
 
@@ -655,7 +653,7 @@ async function sendUserDanmaku() {
   try {
     const res = await window.aiGenerate({
       characterId: currentRoom.characterId,
-      appTags: ['luma', 'stream', 'interaction'],
+      appTags: ['live', 'reply'],
       instruction: `【${uInfo.tag}】${uInfo.name}发言：“${val}”`
     });
 
@@ -1193,7 +1191,7 @@ async function sendGift(name, cost) {
     try {
       const res = await window.aiGenerate({
         characterId: currentRoom.characterId,
-        appTags: ['luma', 'stream', 'interaction'],
+        appTags: ['live', 'reply'],
         instruction: `【${uInfo.tag}】${uInfo.name}送了 ${qty} 个【${name}】（总价值 ${totalCost} LUMA 币）给主播`
       });
       const parsed = window.extractJsonFromText(res.text);
@@ -1292,7 +1290,7 @@ async function handleGenerateWildNPC() {
     const imgRes = await window.aiGenerateImage({
       prompt: `1girl, aesthetic anime live streaming portrait, cozy lighting, masterpiece, ${ratioPrompt}`
     });
-    const coverUrl = imgRes?.dataUrl || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800';
+    const coverUrl = imgRes?.dataUrl || character?.avatar || '';
 
     const npcNames = ['可可', '夏桃', '安妮', '琉璃', '星奈'];
     const chosenName = `野生主播·${npcNames[Math.floor(Math.random() * npcNames.length)]}`;

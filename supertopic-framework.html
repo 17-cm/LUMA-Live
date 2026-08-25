@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>超话专区 - 样板</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    background:#F5F5F7;
+    color:#1A1A1A;
+    max-width:430px;
+    margin:0 auto;
+    min-height:100vh;
+    position:relative;
+    overflow-x:hidden;
+  }
+
+  /* ===== 顶部导航栏 ===== */
+  .st-topbar {
+    position:sticky;
+    top:0;
+    z-index:100;
+    background:#FFFFFF;
+    display:flex;
+    align-items:center;
+    padding:12px 16px;
+    gap:12px;
+    border-bottom:1px solid #EEEEEE;
+  }
+  .st-icon-btn {
+    width:32px; height:32px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:50%;
+    cursor:pointer;
+    flex-shrink:0;
+    color:#1A1A1A;
+  }
+  .st-icon-btn:hover { background:#F5F5F7; }
+  .st-icon-btn svg { width:20px; height:20px; }
+  .st-channel-switch {
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    cursor:pointer;
+  }
+  .st-channel-name {
+    font-size:16px;
+    font-weight:700;
+    color:#1A1A1A;
+  }
+  .st-channel-switch svg { width:14px; height:14px; color:#888888; }
+
+  /* ===== 超话信息卡 ===== */
+  .st-info-card {
+    background:#FFFFFF;
+    margin:12px 16px 0;
+    padding:16px;
+    border-radius:14px;
+    border:1px solid #EEEEEE;
+  }
+  .st-info-top {
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .st-avatar {
+    width:56px; height:56px;
+    border-radius:14px;
+    object-fit:cover;
+    flex-shrink:0;
+    border:2px solid #F5F5F7;
+  }
+  .st-info-meta {
+    flex:1;
+    min-width:0;
+  }
+  .st-name {
+    font-size:16px;
+    font-weight:800;
+    color:#1A1A1A;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .st-level-badge {
+    display:inline-flex;
+    align-items:center;
+    gap:3px;
+    background:linear-gradient(135deg, #FF6B9D, #C44569);
+    color:#FFFFFF;
+    font-size:9px;
+    font-weight:700;
+    padding:2px 5px;
+    border-radius:5px;
+  }
+  .st-level-badge svg { width:9px; height:9px; fill:#FFFFFF; }
+  .st-desc {
+    font-size:11px;
+    color:#888888;
+    margin-top:4px;
+  }
+  .st-follow-btn {
+    flex-shrink:0;
+    background:linear-gradient(135deg, #FF6B9D, #C44569);
+    color:#FFFFFF;
+    font-size:12px;
+    font-weight:600;
+    padding:7px 14px;
+    border-radius:16px;
+    border:none;
+    cursor:pointer;
+  }
+  .st-follow-btn.followed {
+    background:#F5F5F7;
+    color:#888888;
+  }
+
+  .st-stats {
+    display:flex;
+    margin-top:14px;
+    padding-top:14px;
+    border-top:1px solid #F5F5F7;
+  }
+  .st-stat {
+    flex:1;
+    text-align:center;
+    position:relative;
+  }
+  .st-stat:not(:last-child)::after {
+    content:'';
+    position:absolute;
+    right:0; top:50%;
+    transform:translateY(-50%);
+    width:1px; height:18px;
+    background:#EEEEEE;
+  }
+  .st-stat-num {
+    font-size:14px;
+    font-weight:700;
+    color:#1A1A1A;
+  }
+  .st-stat-label {
+    font-size:10px;
+    color:#888888;
+    margin-top:2px;
+  }
+
+  /* ===== 功能入口 ===== */
+  .st-actions {
+    display:flex;
+    background:#FFFFFF;
+    margin:10px 16px 0;
+    padding:14px 8px;
+    border-radius:14px;
+    border:1px solid #EEEEEE;
+    justify-content:space-around;
+  }
+  .st-action {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+    cursor:pointer;
+    flex:1;
+  }
+  .st-action-icon {
+    width:38px; height:38px;
+    border-radius:11px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#F5F5F7;
+    color:#555555;
+  }
+  .st-action-icon svg { width:18px; height:18px; }
+  .st-action-icon.checkin { background:rgba(0,180,120,.1); color:#00B478; }
+  .st-action-icon.post { background:rgba(255,107,157,.1); color:#FF6B9D; }
+  .st-action-icon.rank { background:rgba(108,92,231,.1); color:#6C5CE7; }
+  .st-action-icon.gift { background:rgba(255,165,0,.1); color:#FFA500; }
+  .st-action-label {
+    font-size:10px;
+    color:#555555;
+    font-weight:500;
+  }
+
+  /* ===== 通用区块 ===== */
+  .st-section {
+    background:#FFFFFF;
+    margin:10px 16px 0;
+    padding:14px;
+    border-radius:14px;
+    border:1px solid #EEEEEE;
+  }
+  .st-section-header {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:12px;
+  }
+  .st-section-title {
+    font-size:14px;
+    font-weight:700;
+    color:#1A1A1A;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .st-section-title svg { width:15px; height:15px; }
+  .st-section-more {
+    font-size:11px;
+    color:#888888;
+    display:flex;
+    align-items:center;
+    gap:2px;
+    cursor:pointer;
+  }
+  .st-section-more svg { width:12px; height:12px; }
+
+  /* ===== 签到打卡区 ===== */
+  .st-checkin-area {
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .st-checkin-calendar {
+    display:flex;
+    gap:4px;
+    flex:1;
+  }
+  .st-cal-day {
+    flex:1;
+    aspect-ratio:1;
+    border-radius:6px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:9px;
+    font-weight:600;
+  }
+  .st-cal-day.checked {
+    background:rgba(255,107,157,.1);
+    color:#FF6B9D;
+    border:1px solid #FF6B9D;
+  }
+  .st-cal-day.today {
+    background:#FFFFFF;
+    color:#FF6B9D;
+    border:1px dashed #FF6B9D;
+  }
+  .st-cal-day.unchecked {
+    background:#FFFFFF;
+    color:#CCCCCC;
+    border:1px solid #EEEEEE;
+  }
+  .st-checkin-btn {
+    flex-shrink:0;
+    background:rgba(255,107,157,.1);
+    color:#FF6B9D;
+    font-size:12px;
+    font-weight:600;
+    padding:8px 14px;
+    border-radius:16px;
+    border:1px solid #FF6B9D;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .st-checkin-btn.checked {
+    background:#F5F5F7;
+    color:#888888;
+    border:1px solid #EEEEEE;
+  }
+  .st-checkin-info {
+    font-size:10px;
+    color:#888888;
+    margin-top:8px;
+    text-align:center;
+  }
+  .st-checkin-info span { color:#FF6B9D; font-weight:600; }
+
+  /* ===== 打榜应援区 ===== */
+  .st-rank-area {
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .st-rank-current {
+    text-align:center;
+    flex-shrink:0;
+  }
+  .st-rank-num {
+    font-size:24px;
+    font-weight:800;
+    color:#FF6B9D;
+    line-height:1;
+  }
+  .st-rank-label {
+    font-size:9px;
+    color:#888888;
+    margin-top:2px;
+  }
+  .st-rank-bar-wrap {
+    flex:1;
+  }
+  .st-rank-bar {
+    height:8px;
+    background:#F5F5F7;
+    border-radius:4px;
+    overflow:hidden;
+  }
+  .st-rank-bar-fill {
+    height:100%;
+    background:linear-gradient(90deg, #FF6B9D, #C44569);
+    border-radius:4px;
+    width:68%;
+  }
+  .st-rank-bar-text {
+    font-size:10px;
+    color:#888888;
+    margin-top:6px;
+  }
+  .st-rank-bar-text span { color:#FF6B9D; font-weight:600; }
+  .st-support-btn {
+    flex-shrink:0;
+    background:linear-gradient(135deg, #FFA500, #FF8C00);
+    color:#FFFFFF;
+    font-size:12px;
+    font-weight:600;
+    padding:8px 14px;
+    border-radius:16px;
+    border:none;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+
+  /* ===== 粉丝贡献榜 ===== */
+  .st-fans-list {
+    display:flex;
+    gap:8px;
+  }
+  .st-fan-item {
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+    padding:10px 4px;
+    border-radius:10px;
+    background:#F5F5F7;
+  }
+  .st-fan-rank {
+    font-size:10px;
+    font-weight:700;
+    color:#888888;
+  }
+  .st-fan-item.top1 .st-fan-rank { color:#FFD700; }
+  .st-fan-item.top2 .st-fan-rank { color:#C0C0C0; }
+  .st-fan-item.top3 .st-fan-rank { color:#CD7F32; }
+  .st-fan-avatar {
+    width:36px; height:36px;
+    border-radius:50%;
+    object-fit:cover;
+  }
+  .st-fan-name {
+    font-size:10px;
+    color:#555555;
+    font-weight:500;
+    text-align:center;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    width:100%;
+  }
+  .st-fan-score {
+    font-size:9px;
+    color:#888888;
+  }
+
+  /* ===== 帖子流标题 ===== */
+  .st-feed-title {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:16px 16px 8px;
+  }
+  .st-feed-title-text {
+    font-size:14px;
+    font-weight:700;
+    color:#1A1A1A;
+  }
+  .st-feed-title-tabs {
+    display:flex;
+    gap:12px;
+  }
+  .st-feed-tab {
+    font-size:12px;
+    color:#888888;
+    cursor:pointer;
+    padding:4px 0;
+  }
+  .st-feed-tab.active {
+    color:#1A1A1A;
+    font-weight:600;
+    position:relative;
+  }
+  .st-feed-tab.active::after {
+    content:'';
+    position:absolute;
+    bottom:0; left:50%;
+    transform:translateX(-50%);
+    width:16px; height:2px;
+    background:#1A1A1A;
+    border-radius:1px;
+  }
+
+  /* ===== 帖子流 ===== */
+  .st-feed {
+    padding:0 16px 80px;
+  }
+  .st-post-card {
+    background:#FFFFFF;
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:10px;
+    border:1px solid #EEEEEE;
+  }
+  .st-post-head {
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .st-post-avatar {
+    width:38px; height:38px;
+    border-radius:50%;
+    object-fit:cover;
+    flex-shrink:0;
+  }
+  .st-post-userinfo {
+    flex:1;
+    min-width:0;
+  }
+  .st-post-username {
+    font-size:13px;
+    font-weight:600;
+    color:#1A1A1A;
+    display:flex;
+    align-items:center;
+    gap:4px;
+  }
+  .st-post-level {
+    font-size:9px;
+    background:linear-gradient(135deg, #FF6B9D, #C44569);
+    color:#FFFFFF;
+    padding:1px 4px;
+    border-radius:4px;
+    font-weight:600;
+  }
+  .st-post-time {
+    font-size:10px;
+    color:#AAAAAA;
+    margin-top:2px;
+  }
+  .st-post-delete {
+    width:28px; height:28px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:50%;
+    cursor:pointer;
+    flex-shrink:0;
+    color:#CCCCCC;
+  }
+  .st-post-delete:hover { background:#F5F5F7; color:#888888; }
+  .st-post-delete svg { width:15px; height:15px; }
+
+  .st-post-content {
+    font-size:13px;
+    color:#444444;
+    line-height:1.6;
+    margin-top:10px;
+  }
+  .st-post-tag {
+    color:#FF6B9D;
+    font-weight:500;
+  }
+  .st-post-mention {
+    color:#C44569;
+    font-weight:500;
+  }
+  .st-post-link {
+    color:#6C5CE7;
+    text-decoration:underline;
+  }
+  .st-post-image {
+    width:100%;
+    aspect-ratio:16/9;
+    border-radius:10px;
+    object-fit:cover;
+    margin-top:10px;
+    background:#F5F5F7;
+  }
+
+  .st-post-actions {
+    display:flex;
+    margin-top:12px;
+    padding-top:10px;
+    border-top:1px solid #F5F5F7;
+  }
+  .st-post-action {
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+    font-size:11px;
+    color:#888888;
+    cursor:pointer;
+  }
+  .st-post-action svg { width:15px; height:15px; }
+  .st-post-action.liked { color:#FF6B9D; }
+  .st-post-action.liked svg { fill:#FF6B9D; }
+
+  /* ===== 底部操作栏 ===== */
+  .st-bottom-bar {
+    position:fixed;
+    bottom:0;
+    left:50%;
+    transform:translateX(-50%);
+    width:100%;
+    max-width:430px;
+    background:#FFFFFF;
+    border-top:1px solid #EEEEEE;
+    display:flex;
+    padding:10px 16px;
+    padding-bottom:calc(10px + env(safe-area-inset-bottom));
+    gap:10px;
+    z-index:200;
+    align-items:center;
+  }
+  .st-bottom-input {
+    flex:1;
+    background:#F5F5F7;
+    border-radius:18px;
+    padding:8px 14px;
+    font-size:12px;
+    color:#AAAAAA;
+    display:flex;
+    align-items:center;
+    cursor:pointer;
+  }
+  .st-bottom-btn {
+    width:34px; height:34px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    flex-shrink:0;
+    color:#555555;
+  }
+  .st-bottom-btn:hover { background:#F5F5F7; }
+  .st-bottom-btn svg { width:17px; height:17px; }
+  .st-bottom-btn.primary {
+    background:linear-gradient(135deg, #FF6B9D, #C44569);
+    color:#FFFFFF;
+  }
+</style>
+</head>
+<body>
+
+<!-- 顶部导航栏 -->
+<div class="st-topbar">
+  <div class="st-icon-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+  </div>
+  <div class="st-channel-switch">
+    <span class="st-channel-name">希尔维娅超话</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+  </div>
+  <div class="st-icon-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+  </div>
+</div>
+
+<!-- 超话信息卡 -->
+<div class="st-info-card">
+  <div class="st-info-top">
+    <img class="st-avatar" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&q=80" alt="超话头像">
+    <div class="st-info-meta">
+      <div class="st-name">
+        #希尔维娅超话#
+        <span class="st-level-badge">
+          <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg>
+          皇冠
+        </span>
+      </div>
+      <div class="st-desc">主持人：@希尔维娅后援会 · 2023年创建</div>
+    </div>
+    <button class="st-follow-btn">+ 关注</button>
+  </div>
+  <div class="st-stats">
+    <div class="st-stat">
+      <div class="st-stat-num">12.8万</div>
+      <div class="st-stat-label">粉丝</div>
+    </div>
+    <div class="st-stat">
+      <div class="st-stat-num">3,256</div>
+      <div class="st-stat-label">今日讨论</div>
+    </div>
+    <div class="st-stat">
+      <div class="st-stat-num">98.6万</div>
+      <div class="st-stat-label">超话热度</div>
+    </div>
+    <div class="st-stat">
+      <div class="st-stat-num">128</div>
+      <div class="st-stat-label">连续签到</div>
+    </div>
+  </div>
+</div>
+
+<!-- 功能入口 -->
+<div class="st-actions">
+  <div class="st-action">
+    <div class="st-action-icon checkin">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><polyline points="9 16 11 18 15 14"></polyline></svg>
+    </div>
+    <div class="st-action-label">每日签到</div>
+  </div>
+  <div class="st-action">
+    <div class="st-action-icon post">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+    </div>
+    <div class="st-action-label">发超话帖</div>
+  </div>
+  <div class="st-action">
+    <div class="st-action-icon rank">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
+    </div>
+    <div class="st-action-label">贡献榜</div>
+  </div>
+  <div class="st-action">
+    <div class="st-action-icon gift">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect x="2" y="7" width="20" height="5"></rect><line x1="12" y1="22" x2="12" y2="7"></line><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg>
+    </div>
+    <div class="st-action-label">打榜应援</div>
+  </div>
+</div>
+
+<!-- 签到打卡区 -->
+<div class="st-section">
+  <div class="st-section-header">
+    <div class="st-section-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#00B478" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+      本周签到
+    </div>
+    <div class="st-section-more">
+      签到日历
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </div>
+  </div>
+  <div class="st-checkin-area">
+    <div class="st-checkin-calendar">
+      <div class="st-cal-day checked">一</div>
+      <div class="st-cal-day checked">二</div>
+      <div class="st-cal-day checked">三</div>
+      <div class="st-cal-day checked">四</div>
+      <div class="st-cal-day today">五</div>
+      <div class="st-cal-day unchecked">六</div>
+      <div class="st-cal-day unchecked">日</div>
+    </div>
+    <button class="st-checkin-btn">立即签到</button>
+  </div>
+  <div class="st-checkin-info">已连续签到 <span>128</span> 天 · 今日已有 <span>2,847</span> 人签到</div>
+</div>
+
+<!-- 打榜应援区 -->
+<div class="st-section">
+  <div class="st-section-header">
+    <div class="st-section-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#FF6B9D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
+      超话打榜
+    </div>
+    <div class="st-section-more">
+      打榜规则
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </div>
+  </div>
+  <div class="st-rank-area">
+    <div class="st-rank-current">
+      <div class="st-rank-num">#3</div>
+      <div class="st-rank-label">当前排名</div>
+    </div>
+    <div class="st-rank-bar-wrap">
+      <div class="st-rank-bar">
+        <div class="st-rank-bar-fill"></div>
+      </div>
+      <div class="st-rank-bar-text">距离上一名还差 <span>12.5万</span> 热度值</div>
+    </div>
+    <button class="st-support-btn">去打榜</button>
+  </div>
+</div>
+
+<!-- 粉丝贡献榜 -->
+<div class="st-section">
+  <div class="st-section-header">
+    <div class="st-section-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#6C5CE7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+      贡献榜 TOP5
+    </div>
+    <div class="st-section-more">
+      完整榜单
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </div>
+  </div>
+  <div class="st-fans-list">
+    <div class="st-fan-item top1">
+      <div class="st-fan-rank">NO.1</div>
+      <img class="st-fan-avatar" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&q=80" alt="">
+      <div class="st-fan-name">希尔维娅的小迷妹</div>
+      <div class="st-fan-score">8.6万</div>
+    </div>
+    <div class="st-fan-item top2">
+      <div class="st-fan-rank">NO.2</div>
+      <img class="st-fan-avatar" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80" alt="">
+      <div class="st-fan-name">守护希尔维娅</div>
+      <div class="st-fan-score">7.2万</div>
+    </div>
+    <div class="st-fan-item top3">
+      <div class="st-fan-rank">NO.3</div>
+      <img class="st-fan-avatar" src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&q=80" alt="">
+      <div class="st-fan-name">希尔维娅的猫</div>
+      <div class="st-fan-score">6.8万</div>
+    </div>
+    <div class="st-fan-item">
+      <div class="st-fan-rank">NO.4</div>
+      <img class="st-fan-avatar" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&q=80" alt="">
+      <div class="st-fan-name">星辰大海</div>
+      <div class="st-fan-score">5.4万</div>
+    </div>
+    <div class="st-fan-item">
+      <div class="st-fan-rank">NO.5</div>
+      <img class="st-fan-avatar" src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&q=80" alt="">
+      <div class="st-fan-name">希尔维娅的小粉丝</div>
+      <div class="st-fan-score">4.9万</div>
+    </div>
+  </div>
+</div>
+
+<!-- 帖子流标题 -->
+<div class="st-feed-title">
+  <div class="st-feed-title-text">超话动态</div>
+  <div class="st-feed-title-tabs">
+    <div class="st-feed-tab active">最新</div>
+    <div class="st-feed-tab">精华</div>
+  </div>
+</div>
+
+<!-- 帖子流 -->
+<div class="st-feed">
+  <!-- 帖子卡片1 - 粉丝打卡 -->
+  <div class="st-post-card">
+    <div class="st-post-head">
+      <img class="st-post-avatar" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&q=80" alt="用户头像">
+      <div class="st-post-userinfo">
+        <div class="st-post-username">
+          希尔维娅的小迷妹
+          <span class="st-post-level">Lv.12</span>
+        </div>
+        <div class="st-post-time">刚刚 · 来自 Float 17 Pro Max</div>
+      </div>
+      <div class="st-post-delete">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      </div>
+    </div>
+    <div class="st-post-content">
+      <span class="st-post-tag">#希尔维娅超话#</span> 打卡第128天！今天也是爱希尔维娅的一天～昨晚直播的《星辰大海》真的太绝了，循环了一整夜！姐妹们都来打卡呀 <span class="st-post-mention">@希尔维娅</span>
+    </div>
+    <div class="st-post-actions">
+      <div class="st-post-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+        <span>180</span>
+      </div>
+      <div class="st-post-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        <span>24</span>
+      </div>
+      <div class="st-post-action liked">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+        <span>680</span>
+      </div>
+      <div class="st-post-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- 帖子卡片2 - 二创作品 -->
+  <div class="st-post-card">
+    <div class="st-post-head">
+      <img class="st-post-avatar" src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&q=80" alt="用户头像">
+      <div class="st-post-userinfo">
+        <div class="st-post-username">
+          希尔维娅的猫
+          <span class="st-post-level">Lv.10</span>
+        </div>
+        <div class="st-post-time">30分钟前 · 来自 Float 17 Ultra</div>
+      </div>
+      <div class="st-post-delete">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      </div>
+    </div>
+    <div class="st-post-content">
+      <span class="st-post-tag">#希尔维娅超话#</span> 花了三天做的希尔维娅同人图，大家觉得怎么样？求轻喷～如果喜欢的话可以抱图当壁纸哦 <span class="st-post-link">网页链接</span>
+    </div>
+    <img class="st-post-image" src="https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80" alt="二创作品">
+    <div class="st-post-actions">
+      <div class="st-post-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+        <span>89</span>
+      </div>
+      <div class="st-post-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        <span>56</span>
+      </div>
+      <div class="st-post-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+        <span>456</span>
+      </div>
+      <div class="st-post-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- 帖子卡片3 - 应援打榜 -->
+  <div class="st-post-card">
+    <div class="st-post-head">
+      <img class="st-post-avatar" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80" alt="用户头像">
+      <div class="st-post-userinfo">
+        <div class="st-post-username">
+          守护希尔维娅
+          <span class="st-post-level">Lv.11</span>
+        </div>
+        <div class="st-post-time">1小时前 · 来自 Float 17 Pro</div>
+      </div>
+      <div class="st-post-delete">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      </div>
+    </div>
+    <div class="st-post-content">
+      <span class="st-post-tag">#希尔维娅超话#</span> 本周打榜冲刺！目前排名第3，距离第2只差12.5万热度值！大家一起冲呀，把希尔维娅送上第2！应援礼物已备好，就等大家了 <span class="st-post-mention">@希尔维娅后援会</span>
+    </div>
+    <div class="st-post-actions">
+      <div class="st-post-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+        <span>45</span>
+      </div>
+      <div class="st-post-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        <span>12</span>
+      </div>
+      <div class="st-post-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+        <span>234</span>
+      </div>
+      <div class="st-post-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 底部操作栏 -->
+<div class="st-bottom-bar">
+  <div class="st-bottom-input">说点什么...</div>
+  <div class="st-bottom-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+  </div>
+  <div class="st-bottom-btn primary">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+  </div>
+</div>
+
+</body>
+</html>

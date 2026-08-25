@@ -22,6 +22,139 @@ function switchHotTrendTab(tabType) {
 }
 window.switchHotTrendTab = switchHotTrendTab;
 
+// 热搜刷新：调用API生成新帖子
+let isRefreshingTrends = false;
+async function refreshTrendsWithAI() {
+  if (isRefreshingTrends) return;
+  isRefreshingTrends = true;
+  if (window.api && api.ui && api.ui.toast) api.ui.toast('正在生成新动态…');
+
+  try {
+    let contextText = '平台目前没有正在直播的主播，请生成一条泛娱乐八卦动态。';
+    try {
+      const sessions = await api.db.list('live_sessions', { limit: 500 }) || [];
+      const active = sessions.filter(s => s && s.name);
+      if (active.length > 0) {
+        const picked = active[Math.floor(Math.random() * active.length)];
+        const duration = picked.startTime ? Math.floor((Date.now() - picked.startTime) / 60000) : 0;
+        contextText = `主播【${picked.name}】正在直播，赛道：${picked.category || '日常'}（${picked.subTag || '闲聊'}），标题：${picked.topic || '无标题'}，已播${duration}分钟，热度${picked.heat || 0}。请根据这个直播情况生成一条社区动态。`;
+      }
+    } catch (e) {}
+
+    const res = await window.aiGenerate({
+      appTags: ['trends', 'post'],
+      instruction: contextText
+    });
+
+    const parsed = window.extractJsonFromText ? window.extractJsonFromText(res.text) : null;
+    if (!parsed || !parsed.content) {
+      if (window.api && api.ui && api.ui.toast) api.ui.toast('生成失败，请检查API配置');
+      return;
+    }
+
+    const mediaAccounts = ['星芒吃瓜周刊', '赛博娱乐前线', '直播圈内君', '热搜挖掘机', 'LUMA速报'];
+    const accountName = parsed.mediaName || mediaAccounts[Math.floor(Math.random() * mediaAccounts.length)];
+    const newPost = {
+      id: 'post_ai_' + Date.now(),
+      author: {
+        name: accountName,
+        avatar: '',
+        badge: parsed.badge || '娱乐速报',
+        verified: true
+      },
+      time: '刚刚',
+      tag: parsed.tag || '#LUMA Live#',
+      mention: parsed.mention || '',
+      linkText: parsed.linkText || '',
+      clipText: parsed.clipText || '',
+      content: parsed.content,
+      image: '',
+      stats: { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false },
+      commentTree: []
+    };
+
+    if (!window.weiboPosts) window.weiboPosts = [];
+    window.weiboPosts.unshift(newPost);
+
+    try { await api.db.create('community_posts', newPost).catch(() => {}); } catch (e) {}
+
+    renderHotSearchRanking();
+    renderTrends();
+    if (window.api && api.ui && api.ui.toast) api.ui.toast('新动态已生成');
+  } catch (e) {
+    if (window.api && api.ui && api.ui.toast) api.ui.toast('生成失败：' + (e.message || '未知错误'));
+  } finally {
+    isRefreshingTrends = false;
+  }
+}
+window.refreshTrendsWithAI = refreshTrendsWithAI;
+
+// 置顶热搜数据管理
+const HERO_STORAGE_KEY = 'luma_hero_hot_search';
+const DEFAULT_HERO_DATA = {
+  image: 'https://files.catbox.moe/d1jldl.png',
+  title: '主播连麦当场破防！神秘神豪连续狂砸5个嘉年华瞬间反超',
+  heat: '389.2万',
+  discussions: '5000+'
+};
+
+function getHeroData() {
+  try {
+    const saved = localStorage.getItem(HERO_STORAGE_KEY);
+    if (saved) return { ...DEFAULT_HERO_DATA, ...JSON.parse(saved) };
+  } catch (e) {}
+  return { ...DEFAULT_HERO_DATA };
+}
+
+function saveHeroData(data) {
+  try { localStorage.setItem(HERO_STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
+}
+
+// 置顶热搜编辑模式
+let heroEditMode = false;
+
+function enterHeroEdit() {
+  heroEditMode = true;
+  renderHotSearchRanking();
+}
+window.enterHeroEdit = enterHeroEdit;
+
+function cancelHeroEdit() {
+  heroEditMode = false;
+  renderHotSearchRanking();
+}
+window.cancelHeroEdit = cancelHeroEdit;
+
+function saveHeroEdit() {
+  const titleEl = document.getElementById('heroEditTitle');
+  const heatEl = document.getElementById('heroEditHeat');
+  const discEl = document.getElementById('heroEditDisc');
+  const imgEl = document.getElementById('heroEditImg');
+  const data = {
+    title: titleEl ? titleEl.value.trim() || DEFAULT_HERO_DATA.title : DEFAULT_HERO_DATA.title,
+    heat: heatEl ? heatEl.value.trim() || DEFAULT_HERO_DATA.heat : DEFAULT_HERO_DATA.heat,
+    discussions: discEl ? discEl.value.trim() || DEFAULT_HERO_DATA.discussions : DEFAULT_HERO_DATA.discussions,
+    image: imgEl ? imgEl.src : DEFAULT_HERO_DATA.image
+  };
+  saveHeroData(data);
+  heroEditMode = false;
+  renderHotSearchRanking();
+  if (window.api && api.ui && api.ui.toast) api.ui.toast('置顶热搜已保存');
+}
+window.saveHeroEdit = saveHeroEdit;
+
+function handleHeroImageUpload(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const imgEl = document.getElementById('heroEditImg');
+    if (imgEl) imgEl.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+window.handleHeroImageUpload = handleHeroImageUpload;
+
 // 渲染热搜 TOP 榜（样板结构：.hero-hot 大图 + .hot-list）
 // 热搜编辑模式状态
 let hotSearchEditMode = false;
@@ -32,21 +165,52 @@ function renderHotSearchRanking() {
   if (!listBox) return;
   const items = window.HOT_SEARCH_ITEMS || [];
 
-  // 置顶焦点热搜（大图）
+  // 置顶焦点热搜（大图）—— 支持编辑
   if (heroBox) {
-    heroBox.innerHTML = '\
-      <div class="hero-hot" style="cursor:default;">\
-        <img src="https://images.unsplash.com/photo-1598550476439-6847785fcea6?w=800&q=80" alt="">\
-        <div class="scrim"></div>\
-        <div class="content">\
-          <div><span class="pin-badge">📌 置顶热搜</span></div>\
-          <div>\
-            <div class="title">主播连麦当场破防！神秘神豪连续狂砸5个嘉年华瞬间反超</div>\
-            <div class="meta"><span>🔥 389.2万热度</span><span>5000+ 讨论</span></div>\
+    const hero = getHeroData();
+    if (heroEditMode) {
+      heroBox.innerHTML = '\
+        <div class="hero-hot hero-hot-edit" style="cursor:default;">\
+          <div class="hero-edit-img-wrap">\
+            <img src="' + hero.image + '" alt="" id="heroEditImg">\
+            <label class="hero-upload-btn">\
+              <input type="file" accept="image/*" style="display:none;" onchange="handleHeroImageUpload(event)">\
+              📷 更换图片\
+            </label>\
+          </div>\
+          <div class="hero-edit-form">\
+            <input type="text" id="heroEditTitle" value="' + hero.title.replace(/"/g, '&quot;') + '" placeholder="热搜标题" class="hero-edit-input">\
+            <div class="hero-edit-row">\
+              <input type="text" id="heroEditHeat" value="' + hero.heat + '" placeholder="热度" class="hero-edit-input-sm">\
+              <input type="text" id="heroEditDisc" value="' + hero.discussions + '" placeholder="讨论数" class="hero-edit-input-sm">\
+            </div>\
+            <div class="hero-edit-actions">\
+              <button onclick="saveHeroEdit()" class="hero-save-btn">保存</button>\
+              <button onclick="cancelHeroEdit()" class="hero-cancel-btn">取消</button>\
+            </div>\
           </div>\
         </div>\
-      </div>\
-    ';
+      ';
+    } else {
+      heroBox.innerHTML = '\
+        <div class="hero-hot" style="cursor:default;">\
+          <img src="' + hero.image + '" alt="">\
+          <div class="scrim"></div>\
+          <div class="content">\
+            <div style="display:flex;justify-content:space-between;align-items:center;">\
+              <span class="pin-badge">📌 置顶热搜</span>\
+              <button onclick="enterHeroEdit()" class="hero-edit-btn" title="编辑置顶热搜">\
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>\
+              </button>\
+            </div>\
+            <div>\
+              <div class="title">' + hero.title + '</div>\
+              <div class="meta"><span>🔥 ' + hero.heat + ' 热度</span><span>' + hero.discussions + ' 讨论</span></div>\
+            </div>\
+          </div>\
+        </div>\
+      ';
+    }
   }
 
   // 热搜榜单（.hot-list）
@@ -283,17 +447,16 @@ function showPostDeleteMenu(postId, event) {
   const oldMenu = document.getElementById('postDeleteMenu');
   if (oldMenu) oldMenu.remove();
 
+  // 找到帖子卡片
+  const card = event.target.closest('.post-card');
+  if (!card) return;
+
   const menu = document.createElement('div');
   menu.id = 'postDeleteMenu';
-  menu.style.cssText = 'position:fixed;z-index:9999;background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.15);padding:6px;min-width:100px;';
-  menu.innerHTML = '<button style="display:block;width:100%;padding:10px 16px;border:0;background:none;color:#F43F5E;font-size:13px;font-weight:600;text-align:left;cursor:pointer;border-radius:8px;" onmouseover="this.style.background=\'#FFF1F2\'" onmouseout="this.style.background=\'none\'" onclick="deletePost(\'' + postId + '\')">🗑 删除</button>';
+  menu.style.cssText = 'position:absolute;z-index:10;top:44px;right:10px;background:#fff;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);padding:4px;min-width:80px;';
+  menu.innerHTML = '<button style="display:block;width:100%;padding:8px 14px;border:0;background:none;color:#F43F5E;font-size:13px;font-weight:600;text-align:center;cursor:pointer;border-radius:8px;" onmouseover="this.style.background=\'#FFF1F2\'" onmouseout="this.style.background=\'none\'" onclick="deletePost(\'' + postId + '\')">删除</button>';
 
-  document.body.appendChild(menu);
-
-  // 定位到点击位置
-  const rect = event.target.getBoundingClientRect();
-  menu.style.top = (rect.bottom + 4) + 'px';
-  menu.style.left = (rect.right - 100) + 'px';
+  card.appendChild(menu);
 
   // 点击其他地方关闭
   setTimeout(() => {

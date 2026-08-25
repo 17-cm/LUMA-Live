@@ -90,15 +90,7 @@ function updateParam(key, val) {
   if (!window.appParams) window.appParams = {};
   window.appParams[key] = num;
 
-  if (key === 'charSpawnRate') {
-    const el = document.getElementById('valCharSpawnRate');
-    const tagEl = document.getElementById('tagCharRate');
-    if (el) el.textContent = `${num}%`;
-    if (tagEl) tagEl.textContent = `${num}% 概率开播`;
-  } else if (key === 'baseStopRate') {
-    const el = document.getElementById('valBaseStopRate');
-    if (el) el.textContent = `${num}%`;
-  } else if (key === 'maxLiveDuration') {
+  if (key === 'maxLiveDuration') {
     const el = document.getElementById('valMaxLiveDuration');
     if (el) el.textContent = `${num}分钟`;
   } else if (key === 'maxRestDuration') {
@@ -132,6 +124,31 @@ function updateParam(key, val) {
 }
 window.updateParam = updateParam;
 
+// 每日直播场次上限设置
+function setDailyLiveLimit(val) {
+  const num = Number(val);
+  if (!window.appParams) window.appParams = {};
+  window.appParams.dailyLiveLimit = num;
+  // 更新按钮选中状态
+  document.querySelectorAll('.daily-limit-btn').forEach(btn => {
+    const btnVal = Number(btn.dataset.value);
+    if (btnVal === num) {
+      btn.classList.add('bg-rose-500', 'text-white', 'border-rose-500');
+      btn.classList.remove('border-slate-200', 'text-slate-600');
+    } else {
+      btn.classList.remove('bg-rose-500', 'text-white', 'border-rose-500');
+      btn.classList.add('border-slate-200', 'text-slate-600');
+    }
+  });
+  // 更新小标签显示
+  const tagEl = document.getElementById('tagCharRate');
+  const valEl = document.getElementById('valDailyLiveLimit');
+  const label = num === 0 ? '不限制' : `${num}场`;
+  if (tagEl) tagEl.textContent = `直播场次：${label}`;
+  if (valEl) valEl.textContent = label;
+}
+window.setDailyLiveLimit = setDailyLiveLimit;
+
 function syncParamDisplays() {
   const p = window.appParams || {};
   const setVal = (id, val, textId, suffix = '') => {
@@ -141,14 +158,26 @@ function syncParamDisplays() {
     if (text && val !== undefined) text.textContent = `${val}${suffix}`;
   };
 
-  const spawnVal = p.charSpawnRate !== undefined ? p.charSpawnRate : 25;
-  setVal('paramCharSpawnRate', spawnVal, 'valCharSpawnRate', '%');
-  setVal('paramBaseStopRate', p.baseStopRate !== undefined ? p.baseStopRate : 10, 'valBaseStopRate', '%');
-  const tagEl = document.getElementById('tagCharRate');
-  if (tagEl) tagEl.textContent = `${spawnVal}% 概率开播`;
+  // 每日直播场次上限
+  const dailyLimit = p.dailyLiveLimit !== undefined ? p.dailyLiveLimit : 0;
+  const dailyLabel = dailyLimit === 0 ? '不限制' : `${dailyLimit}场`;
+  const dailyValEl = document.getElementById('valDailyLiveLimit');
+  const dailyTagEl = document.getElementById('tagCharRate');
+  if (dailyValEl) dailyValEl.textContent = dailyLabel;
+  if (dailyTagEl) dailyTagEl.textContent = `直播场次：${dailyLabel}`;
+  document.querySelectorAll('.daily-limit-btn').forEach(btn => {
+    const btnVal = Number(btn.dataset.value);
+    if (btnVal === dailyLimit) {
+      btn.classList.add('bg-rose-500', 'text-white', 'border-rose-500');
+      btn.classList.remove('border-slate-200', 'text-slate-600');
+    } else {
+      btn.classList.remove('bg-rose-500', 'text-white', 'border-rose-500');
+      btn.classList.add('border-slate-200', 'text-slate-600');
+    }
+  });
 
-  setVal('paramMaxLiveDuration', p.maxLiveDuration || 120, 'valMaxLiveDuration', '分钟');
-  setVal('paramMaxRestDuration', p.maxRestDuration || 360, 'valMaxRestDuration', '分钟');
+  setVal('paramMaxLiveDuration', p.maxLiveDuration || 240, 'valMaxLiveDuration', '分钟');
+  setVal('paramMaxRestDuration', p.maxRestDuration || 480, 'valMaxRestDuration', '分钟');
   setVal('paramReplyRandomDanmakuRate', p.replyRandomDanmakuRate !== undefined ? p.replyRandomDanmakuRate : 25, 'valReplyRandomDanmakuRate', '%');
   setVal('paramMentionUserRate', p.mentionUserRate !== undefined ? p.mentionUserRate : 30, 'valMentionUserRate', '%');
   setVal('paramEnterOtherLiveRate', p.enterOtherLiveRate !== undefined ? p.enterOtherLiveRate : 35, 'valEnterOtherLiveRate', '%');
@@ -301,8 +330,8 @@ function renderOpsLog() {
       }
       const willColor = d.result === '开播' || d.result === '下播' ? 'text-rose-600' : d.result === '跳过' ? 'text-slate-400' : 'text-slate-500';
       const detail = d.state === '直播中'
-        ? `已播${d.liveMins}分 下播意愿${d.stopWill}% 骰${d.dice}`
-        : `休息${d.restMins}分 开播意愿${d.spawnWill}% 骰${d.dice}`;
+        ? `已播${d.liveMins}分 基础${d.baseWill}%+比例 总${d.stopWill}% 骰${d.dice}`
+        : `休息${d.restMins}分 基础${d.baseWill}%+比例 总${d.spawnWill}% 骰${d.dice}`;
       return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50">
         <span class="text-slate-600">${d.char}</span>
         <span class="text-slate-400 text-[10px]">${detail}</span>
@@ -315,7 +344,7 @@ function renderOpsLog() {
         <span class="font-bold text-slate-700">第${cycle.cycle || (log.length - idx)}轮 ${cycle.time}</span>
         <span class="text-[10px] text-slate-500">在播${s.streaming} 评估${s.evaluated || 0}人 开播${s.started} 下播${s.stopped}</span>
       </div>
-      <div class="text-[9px] text-slate-400 mb-1.5">参数: 开播${p.baseSpawnRate}% 下播${p.baseStopRate}% 直播上限${p.maxLiveMins}分 休息上限${p.maxRestMins}分</div>
+      <div class="text-[9px] text-slate-400 mb-1.5">意愿值由角色聊天驱动 | 直播上限${p.maxLiveMins}分 休息上限${p.maxRestMins}分</div>
       <div class="space-y-0.5">${decisions}</div>
     </div>`;
   }).join('');
@@ -1251,6 +1280,26 @@ async function lumaInitApp() {
       }
     } catch (e) {
       console.warn("读取角色列表异常:", e);
+    }
+
+    // 读取角色作息调度持久化
+    try {
+      const savedSchedules = await api.db.get("app_settings", "char_schedules");
+      if (savedSchedules && typeof savedSchedules === 'object') {
+        window.charSchedulesMap = savedSchedules;
+      } else {
+        window.charSchedulesMap = {};
+      }
+    } catch (e) {
+      window.charSchedulesMap = {};
+    }
+
+    // 检查是否需要世界冷启动初始化（全新安装或首次运行）
+    const isBootstrapped = Object.keys(window.charSchedulesMap || {}).length > 0;
+    if (!isBootstrapped && window.allCharacters && window.allCharacters.length > 0) {
+      if (typeof bootstrapWorldInitialState === 'function') {
+        await bootstrapWorldInitialState(window.allCharacters, window.appParams);
+      }
     }
   } catch (e) {
     console.warn("DB读取警告:", e);
