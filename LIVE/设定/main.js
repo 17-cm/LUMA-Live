@@ -330,8 +330,8 @@ function renderOpsLog() {
       }
       const willColor = d.result === '开播' || d.result === '下播' ? 'text-rose-600' : d.result === '跳过' ? 'text-slate-400' : 'text-slate-500';
       const detail = d.state === '直播中'
-        ? `已播${d.liveMins}分 基础${d.baseWill}%+比例 总${d.stopWill}% 骰${d.dice}`
-        : `休息${d.restMins}分 基础${d.baseWill}%+比例 总${d.spawnWill}% 骰${d.dice}`;
+        ? `已播${d.liveMins}分 意愿[${d.baseWill}]+比例 总${d.stopWill}% 骰${d.dice}`
+        : `休息${d.restMins}分 意愿[${d.baseWill}]+比例 总${d.spawnWill}% 骰${d.dice}`;
       return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50">
         <span class="text-slate-600">${d.char}</span>
         <span class="text-slate-400 text-[10px]">${detail}</span>

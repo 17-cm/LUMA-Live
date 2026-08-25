@@ -8,10 +8,10 @@
 // 轮询日志：文件加载即初始化，避免首次轮询前访问报错
 if (!window.lumaOpsLog) window.lumaOpsLog = [];
 // =========================================================================
-// 【角色意愿值管理】角色聊天驱动，初始为0，无默认值
-// 开播意愿(startWill)：休息中时角色想开播的意愿，0-50
-// 下播意愿(stopWill)：直播中时角色想下播的意愿，0-50
-// 意愿值由角色在聊天中输出[意愿：X]时通过events监听提取并更新
+// 【角色意愿值管理】角色聊天驱动，仅存放聊天真实获取的意愿值
+// 聊天中输出[意愿:X]时，后台先判定角色当前状态（直播中=下播意愿，休息中=开播意愿）
+// 意愿值范围 0-100，轮询计算时取 1/2（0-50分）+ 比例式增长（0-50分）
+// 未聊过/未获取的角色返回 null，基础分按 0 计算，日志与UI标注「暂未获取」
 // =========================================================================
 async function getCharWillMap() {
   try {
@@ -20,16 +20,19 @@ async function getCharWillMap() {
   } catch (e) { return {}; }
 }
 async function getCharWill(characterId) {
-  if (!characterId) return { startWill: 0, stopWill: 0 };
+  if (!characterId) return { startWill: null, stopWill: null };
   const map = await getCharWillMap();
   const w = map[characterId];
-  return { startWill: w?.startWill || 0, stopWill: w?.stopWill || 0 };
+  return { 
+    startWill: (w && typeof w.startWill === 'number') ? w.startWill : null, 
+    stopWill: (w && typeof w.stopWill === 'number') ? w.stopWill : null 
+  };
 }
 async function setCharWill(characterId, type, value) {
   if (!characterId || !type) return;
-  const num = Math.max(0, Math.min(50, Number(value) || 0));
+  const num = Math.max(0, Math.min(100, Number(value) || 0));
   const map = await getCharWillMap();
-  if (!map[characterId]) map[characterId] = { startWill: 0, stopWill: 0 };
+  if (!map[characterId]) map[characterId] = { startWill: null, stopWill: null };
   map[characterId][type] = num;
   map[characterId].updatedAt = Date.now();
   try { await saveDbSetting("char_will_map", map); } catch (e) {}
@@ -574,16 +577,33 @@ async function syncLiveSessions(options = {}, nowTime = null) {
       const liveMins = Math.round(item.liveMins);
       const isUrgent = liveMins >= maxLiveMins;
       const charWill = await getCharWill(item.charId);
-      let stopWill, reason;
-      if (isUrgent) { stopWill = 100; reason = '达到上限必然下播'; }
-      else { stopWill = Math.round(charWill.stopWill + (liveMins / maxLiveMins) * 50); reason = '安全区比例增长'; }
+      const hasRealWill = charWill.stopWill !== null && charWill.stopWill !== undefined;
+      const rawWill = hasRealWill ? Number(charWill.stopWill) : null;
+      // 意愿值取二分之一折算为0-50分；若暂未获取则基础得分计0
+      const willScore = hasRealWill ? Math.round(rawWill / 2) : 0;
+      const timeScore = Math.round((liveMins / maxLiveMins) * 50);
+      
+      let stopWill, reason, baseWillText;
+      if (isUrgent) {
+        stopWill = 100;
+        reason = '达到上限必然下播';
+        baseWillText = hasRealWill ? `${rawWill}` : '暂未获取';
+      } else {
+        stopWill = Math.min(100, willScore + timeScore);
+        reason = hasRealWill ? '意愿(1/2)+时间增长' : '暂未获取意愿(仅时间增长)';
+        baseWillText = hasRealWill ? `${rawWill} (折算${willScore})` : '暂未获取';
+      }
 
       const dice = Math.round(Math.random() * 100);
       const willStop = dice < stopWill;
 
       cycleLog.decisions.push({
         char: item.charName, state: '直播中',
-        liveMins: liveMins, baseWill: charWill.stopWill, stopWill: stopWill, dice: dice, reason: reason,
+        liveMins: liveMins,
+        baseWill: baseWillText,
+        stopWill: stopWill,
+        dice: dice,
+        reason: reason,
         result: willStop ? '准备下播' : '继续播'
       });
 
@@ -609,16 +629,33 @@ async function syncLiveSessions(options = {}, nowTime = null) {
       const restMins = Math.round(item.restMins);
       const isUrgent = restMins >= maxRestMins;
       const charWill = await getCharWill(item.charId);
-      let spawnWill, reason;
-      if (isUrgent) { spawnWill = 100; reason = '达到上限必然开播'; }
-      else { spawnWill = Math.round(charWill.startWill + (restMins / maxRestMins) * 50); reason = '安全区比例增长'; }
+      const hasRealWill = charWill.startWill !== null && charWill.startWill !== undefined;
+      const rawWill = hasRealWill ? Number(charWill.startWill) : null;
+      // 意愿值取二分之一折算为0-50分；若暂未获取则基础得分计0
+      const willScore = hasRealWill ? Math.round(rawWill / 2) : 0;
+      const timeScore = Math.round((restMins / maxRestMins) * 50);
+
+      let spawnWill, reason, baseWillText;
+      if (isUrgent) {
+        spawnWill = 100;
+        reason = '达到上限必然开播';
+        baseWillText = hasRealWill ? `${rawWill}` : '暂未获取';
+      } else {
+        spawnWill = Math.min(100, willScore + timeScore);
+        reason = hasRealWill ? '意愿(1/2)+时间增长' : '暂未获取意愿(仅时间增长)';
+        baseWillText = hasRealWill ? `${rawWill} (折算${willScore})` : '暂未获取';
+      }
 
       const dice = Math.round(Math.random() * 100);
       const willSpawn = dice < spawnWill;
 
       cycleLog.decisions.push({
         char: item.charName, state: '休息中',
-        restMins: restMins, baseWill: charWill.startWill, spawnWill: spawnWill, dice: dice, reason: reason,
+        restMins: restMins,
+        baseWill: baseWillText,
+        spawnWill: spawnWill,
+        dice: dice,
+        reason: reason,
         result: willSpawn ? '准备开播' : '不播'
       });
 
@@ -781,39 +818,62 @@ async function syncCharStatusToChat(nowTime = null) {
 window.syncCharStatusToChat = syncCharStatusToChat;
 
 // =========================================================================
-// 【事件监听】监听角色聊天消息，提取[意愿：X]指令并更新角色意愿值
+// 【事件监听】监听角色聊天消息，提取[意愿:X]指令并更新角色意愿值
+// 读取时严格先判定该角色当前是【直播中】还是【休息中】，再归类记录为下播意愿或开播意愿
 // =========================================================================
+async function handleExtractedCharWill(characterId, rawText) {
+  if (!characterId || !rawText) return;
+  const match = String(rawText).match(/\[意愿[：:]\s*(\d+(?:\.\d+)?)\s*\]/);
+  if (!match) return;
+  const willValue = Math.max(0, Math.min(100, Number(match[1]) || 0));
+  
+  // 实时查验角色当前状态（直播中 vs 休息中）
+  const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
+  const isStreaming = sessions.some(s => s.characterId === characterId);
+  const willType = isStreaming ? 'stopWill' : 'startWill';
+  
+  await setCharWill(characterId, willType, willValue);
+  console.log(`[LUMA Live] 意愿提取入库: 角色${characterId} 当前状态=${isStreaming ? '直播中' : '休息中'} 判定为${willType}=${willValue}`);
+}
+
 function registerLumaEventListeners() {
   try {
+    // 1. AiPhone SDK 原生事件监听
     if (typeof AiPhone !== 'undefined' && AiPhone.on) {
       AiPhone.on("chat.message.created", async (event) => {
         try {
-          // 只处理角色发出的消息
           if (!event || event.role !== 'assistant') return;
           const content = event.content || event.text || '';
-          if (!content) return;
-          // 提取[意愿:X]或[意愿：X]指令
-          const match = content.match(/\[意愿[：:]\s*(\d+(?:\.\d+)?)\s*\]/);
-          if (!match) return;
-          const willValue = Math.max(0, Math.min(100, Number(match[1]) || 0));
           const characterId = event.characterId || event.charId;
-          if (!characterId) return;
-          // 判断角色当前状态，更新对应的意愿值
-          const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
-          const isStreaming = sessions.some(s => s.characterId === characterId);
-          const willType = isStreaming ? 'stopWill' : 'startWill';
-          await setCharWill(characterId, willType, willValue);
-          console.log(`[LUMA Live] 角色意愿更新: ${characterId} ${willType}=${willValue} (${isStreaming ? '直播中' : '休息中'})`);
+          await handleExtractedCharWill(characterId, content);
         } catch (e) {
-          console.log("[LUMA Live] 意愿提取失败", e);
+          console.log("[LUMA Live] AiPhone 意愿提取失败", e);
         }
       });
-      console.log("[LUMA Live] 事件监听已注册");
+      console.log("[LUMA Live] AiPhone 事件监听已注册");
     }
+
+    // 2. Window postMessage 宿主跨窗口通信保底监听
+    window.addEventListener('message', async (e) => {
+      try {
+        const data = e.data;
+        if (!data) return;
+        // 兼容宿主 postMessage 转发格式
+        if (data.type === 'chat.message.created' || data.type === 'onMessage' || data.action === 'message_created') {
+          const payload = data.payload || data.data || data;
+          if (payload.role === 'assistant' || payload.isAssistant) {
+            const content = payload.content || payload.text || payload.message || '';
+            const charId = payload.characterId || payload.charId || data.characterId;
+            await handleExtractedCharWill(charId, content);
+          }
+        }
+      } catch (err) {}
+    });
   } catch (e) {
     console.log("[LUMA Live] 事件监听注册失败", e);
   }
 }
 window.registerLumaEventListeners = registerLumaEventListeners;
 // 文件加载时自动注册事件监听
+registerLumaEventListeners();
 registerLumaEventListeners();
