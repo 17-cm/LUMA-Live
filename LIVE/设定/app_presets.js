@@ -154,6 +154,7 @@ window.appPresets = window.appPresets || {
       "content": "生动有趣的微博正文内容（80-150字）",
       "linkText": "相关网页链接或直播间传送门（可选）",
       "clipText": "高光切片说明（可选）",
+      "imagePrompt": "贴合该热搜内容的英文生图提示词（如 live stream funny moment, cyberpunk room, anime style 等）",
       "stats": {
         "reposts": 892,
         "comments": 2341,

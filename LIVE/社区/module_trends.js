@@ -104,6 +104,91 @@ async function refreshTrendsWithAI() {
         isDownloaded: false
       };
 
+      // 生成或适配动态配图
+      let postImage = p.image || '';
+      
+      // 如果配置了生图API且未携带图，尝试生成配图，或自动生成精美的赛博切片海报封面（纯本地Canvas生成，无外部URL）
+      if (!postImage && p.imagePrompt && typeof window.aiGenerateImage === 'function') {
+        try {
+          const imgRes = await window.aiGenerateImage({ prompt: p.imagePrompt });
+          if (imgRes && imgRes.dataUrl) postImage = imgRes.dataUrl;
+        } catch (err) {}
+      }
+
+      // 如果依然没有图，自动用本地Canvas生成一张极具网感的高清切片配图（规避外部链接，纯本地DataURL）
+      if (!postImage) {
+        try {
+          const cvs = document.createElement('canvas');
+          cvs.width = 800;
+          cvs.height = 450;
+          const ctx = cvs.getContext('2d');
+          
+          // 渐变底色
+          const gradients = [
+            ['#0f172a', '#1e293b', '#334155'],
+            ['#18181b', '#27272a', '#3f3f46'],
+            ['#1e1b4b', '#312e81', '#4338ca'],
+            ['#4c0519', '#881337', '#9f1239'],
+            ['#022c22', '#064e3b', '#047857']
+          ];
+          const gColors = gradients[Math.floor(Math.random() * gradients.length)];
+          const bgGrad = ctx.createLinearGradient(0, 0, 800, 450);
+          bgGrad.addColorStop(0, gColors[0]);
+          bgGrad.addColorStop(0.5, gColors[1]);
+          bgGrad.addColorStop(1, gColors[2]);
+          ctx.fillStyle = bgGrad;
+          ctx.fillRect(0, 0, 800, 450);
+
+          // 装饰图形
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+          ctx.lineWidth = 1.5;
+          for (let l = 0; l < 8; l++) {
+            ctx.beginPath();
+            ctx.moveTo(0, l * 60);
+            ctx.lineTo(800, l * 60 + 40);
+            ctx.stroke();
+          }
+
+          // 光晕
+          const radGrad = ctx.createRadialGradient(400, 225, 20, 400, 225, 350);
+          radGrad.addColorStop(0, 'rgba(244, 63, 94, 0.25)');
+          radGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = radGrad;
+          ctx.fillRect(0, 0, 800, 450);
+
+          // 标签角标
+          ctx.fillStyle = '#f43f5e';
+          ctx.beginPath();
+          ctx.roundRect(40, 40, 140, 36, 18);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 18px sans-serif';
+          ctx.fillText('LIVE 切片', 68, 65);
+
+          // 话题文字
+          const displayTag = p.tag || '#热搜吃瓜#';
+          ctx.fillStyle = '#f43f5e';
+          ctx.font = 'bold 24px sans-serif';
+          ctx.fillText(displayTag, 40, 140);
+
+          // 大标题/正文切片摘要
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 32px sans-serif';
+          const summaryText = (p.content || '').slice(0, 38) + '...';
+          ctx.fillText(summaryText.slice(0, 18), 40, 200);
+          if (summaryText.length > 18) {
+            ctx.fillText(summaryText.slice(18, 36), 40, 250);
+          }
+
+          // 底部发帖博主
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+          ctx.font = '20px sans-serif';
+          ctx.fillText(`@${accountName} · LUMA 社交广场独家热点`, 40, 390);
+
+          postImage = cvs.toDataURL('image/jpeg', 0.85);
+        } catch (err) {}
+      }
+
       const newPost = {
         id: 'post_ai_' + Date.now() + '_' + i,
         author: {
@@ -118,7 +203,7 @@ async function refreshTrendsWithAI() {
         linkText: p.linkText || '',
         clipText: p.clipText || '',
         content: p.content,
-        image: p.image || '',
+        image: postImage,
         stats: stats,
         commentTree: commentTree
       };
