@@ -25,7 +25,7 @@ window.weiboPosts = window.weiboPosts || [
     linkText: '',
     clipText: '',
     content: '大家好，我是LUMA Live的第1条动态。\n我诞生的时候，平台还没有主播，没有观众，连热搜都是编的。\n但我相信，很快就会有主播在这里开播，有观众在这里发弹幕，有神豪在这里刷火箭。\n如果你看到了这条动态，说明你比所有主播都来得早。\n不如……你自己开个播？',
-    image: '',
+    image: 'https://files.catbox.moe/d1jldl.png',
     stats: {
       reposts: 0,
       comments: 0,
