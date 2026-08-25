@@ -1304,26 +1304,33 @@ async function lumaInitApp() {
 
     // 启动时后台异步深度扫描各角色最新聊天记录恢复意愿
     if (window.allCharacters && Array.isArray(window.allCharacters) && typeof scanAllMessagesForCharWill === 'function') {
-      setTimeout(() => {
-        window.allCharacters.forEach(c => {
-          if (c && c.id) scanAllMessagesForCharWill(c.id);
-        });
-      }, 300);
+      try {
+        await Promise.all(window.allCharacters.map(c => c && c.id ? scanAllMessagesForCharWill(c.id) : Promise.resolve()));
+      } catch (e) {}
     }
   } catch (e) {
     console.warn("DB读取警告:", e);
   }
 
-  // 2. 同步个人资料
+  // 2. 离线时间差推演（若用户离线超过轮询时间，按离开时长自动模拟后台多轮轮询与到期下播）
+  try {
+    if (typeof catchUpOfflinePolling === 'function') {
+      await catchUpOfflinePolling();
+    }
+  } catch (e) {
+    console.warn("[LUMA Live] 离线时间差推演失败:", e);
+  }
+
+  // 3. 同步个人资料
   await syncUserProfile();
 
-  // 3. 加载社区动态
+  // 4. 加载社区动态
   await loadTrendsFromDb();
 
-  // 4. 同步直播列表并渲染赛道
+  // 5. 同步直播列表并渲染赛道
   await syncLiveSessions({ allowSpawn: true });
 
-  // 5. 渲染各模块初始状态
+  // 6. 渲染各模块初始状态
   selectMainCategory('all');
   renderDualRankList();
   renderTrends();
@@ -1332,10 +1339,10 @@ async function lumaInitApp() {
   renderPresetCategories();
   renderImagePromptEntries();
 
-  // 6. 检查分享直达参数 (Deep link)
+  // 7. 检查分享直达参数 (Deep link)
   checkDeepLinkParams();
 
-  // 7. 启动 LUMA官方运营组·定时器轮询
+  // 8. 启动 LUMA官方运营组·定时器轮询
   if (!window.__lumaLiveSyncInterval) {
     const pollMins = (window.appParams && window.appParams.opsPollInterval) || 3;
     window.__lumaLiveSyncInterval = setInterval(() => {

@@ -221,16 +221,16 @@ async function scanAllMessagesForCharWill(characterId) {
       const allChars = window.allCharacters || [];
       const charObj = allChars.find(c => c.id === characterId);
       if (charObj && (m.characterName === charObj.name || m.senderName === charObj.name || m.name === charObj.name)) return true;
-      // 单人或通用消息且包含意愿字样
-      const txt = m.content || m.text || m.message || '';
-      return typeof txt === 'string' && (txt.includes('意愿') || txt.includes('[意愿'));
+      // 单人或通用消息且包含倾向或意愿字样
+      const txt = m.rawResponseText || m.rawText || m.content || m.text || m.message || '';
+      return typeof txt === 'string' && (txt.includes('倾向') || txt.includes('意愿') || txt.includes('[开播') || txt.includes('[下播'));
     });
 
     // 按时间倒序排序
     targetMsgs.sort((a, b) => (b.createdAt || b.timestamp || b.time || 0) - (a.createdAt || a.timestamp || a.time || 0));
 
     for (const msg of targetMsgs) {
-      const content = msg.content || msg.text || msg.message || msg.body || (typeof msg === 'string' ? msg : JSON.stringify(msg));
+      const content = msg.rawResponseText || msg.rawText || msg.content || msg.text || msg.message || msg.body || (typeof msg === 'string' ? msg : JSON.stringify(msg));
       const extracted = extractWillValueFromText(content);
       if (extracted && typeof extracted.value === 'number') {
         const val = extracted.value;
@@ -395,7 +395,7 @@ const lumaOpsGateway = {
     const allChars = window.allCharacters || [];
     const character = allChars.find(c => c.id === characterId) || await api.characters.get(characterId).catch(() => null);
     const charName = session?.name || character?.name || "主播";
-    const now = Date.now();
+    const now = nowTime || Date.now();
 
     if (session) {
       await api.db.delete("live_sessions", session.id);
@@ -535,13 +535,13 @@ async function executeDueActions(nowTime = null) {
         await window.lumaOpsGateway.requestStartLive({
           characterId: action.characterId,
           source: "delayed_start"
-        });
+        }, action.executeAt || now);
       } else if (action.action === 'stop') {
         await window.lumaOpsGateway.requestStopLive({
           characterId: action.characterId,
           reason: action.reason || "角色意愿值决定下播休息",
           source: "delayed_stop"
-        });
+        }, action.executeAt || now);
       }
     } catch (e) {}
   }
