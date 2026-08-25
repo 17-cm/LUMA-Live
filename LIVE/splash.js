@@ -4,17 +4,12 @@
  */
 (function initSplashScreenModule() {
 
-  // 加载字体
-  const fontLink = document.createElement('link');
-  fontLink.rel = 'stylesheet';
-  fontLink.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap';
-  document.head.appendChild(fontLink);
-
   const styleEl = document.createElement('style');
   styleEl.id = 'luma-splash-style';
   styleEl.textContent = `
     #appSplashScreen {
       position: fixed; inset: 0; width: 100vw; height: 100vh;
+      font-family: Georgia, "Times New Roman", "Songti SC", serif;
       background:
         radial-gradient(ellipse at 50% 45%, rgba(30, 20, 60, 0.5) 0%, transparent 55%),
         radial-gradient(ellipse at 25% 75%, rgba(50, 20, 70, 0.25) 0%, transparent 50%),

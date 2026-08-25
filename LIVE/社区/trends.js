@@ -13,8 +13,26 @@ let currentActiveCommunityPage = 'trends'; // 'trends' | 'super_topic' | 'rankin
 async function loadTrendsFromDb() {
   try {
     const savedPosts = await api.db.list("app_posts", { limit: 500 }) || [];
-    if (savedPosts && savedPosts.length > 0) {
-      window.weiboPosts = savedPosts;
+    const postMap = new Map();
+
+    // 优先读取 DB 中持久化的真实帖子
+    if (Array.isArray(savedPosts)) {
+      savedPosts.forEach(p => {
+        if (p && p.id) postMap.set(p.id, p);
+      });
+    }
+
+    // 将内存已有但未在 DB 中的帖子也补入（防止覆盖丢失，去重合并）
+    if (Array.isArray(window.weiboPosts)) {
+      window.weiboPosts.forEach(p => {
+        if (p && p.id && !postMap.has(p.id)) {
+          postMap.set(p.id, p);
+        }
+      });
+    }
+
+    if (postMap.size > 0) {
+      window.weiboPosts = Array.from(postMap.values());
     }
   } catch (e) {}
 }

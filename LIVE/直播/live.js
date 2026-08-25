@@ -310,7 +310,6 @@ function enterLiveRoomDirectly(sessionId) {
   
   const feed = document.getElementById('danmakuFeed');
   if (feed) feed.innerHTML = '';
-  // 如果过渡阶段已经打包填充了 danmakuPool/hostSpeechPool，保留它们，不要暴力清空导致重复等待
   if (!window.danmakuPool || window.danmakuPool.length === 0) {
     danmakuPool = [];
   }
@@ -330,27 +329,15 @@ function enterLiveRoomDirectly(sessionId) {
   updateLiveRoomDuration();
   liveDurationInterval = setInterval(updateLiveRoomDuration, 1000);
 
-  // 如果已经有打包好的内容，立即推首条台词并启动流，不用再阻塞请求
+  // 重置单次进房请求锁
+  lastPackageRequestTime = 0;
+
+  // 如果已经有打包好的内容，立即推首条台词并启动流
   if (hostSpeechPool.length > 0) {
     const first = hostSpeechPool.shift();
     renderHostSpeech(first.speech, first.action);
   } else {
-    fetchBatchLivePackage();
-  }
-  
-  // 进房第 0 秒立即弹出 2 条欢迎/互动弹幕，让直播间瞬间活起来
-  if (danmakuPool.length > 0) {
-    const firstDanmaku = danmakuPool.shift();
-    const sInfo1 = getSenderLiveInfo(firstDanmaku.sender, firstDanmaku.type);
-    pushDanmakuToScreen(sInfo1, firstDanmaku.text, firstDanmaku.type);
-    if (danmakuPool.length > 0) {
-      setTimeout(() => {
-        if (!currentRoom) return;
-        const secondDanmaku = danmakuPool.shift();
-        const sInfo2 = getSenderLiveInfo(secondDanmaku.sender, secondDanmaku.type);
-        pushDanmakuToScreen(sInfo2, secondDanmaku.text, secondDanmaku.type);
-      }, 200);
-    }
+    fetchBatchLivePackage(true);
   }
 
   startDanmakuDripFeed();
@@ -476,7 +463,7 @@ window.toggleFollowRoomHost = toggleFollowRoomHost;
 // 上次打包请求时间（用于请求冷却）
 let lastPackageRequestTime = 0;
 
-async function fetchBatchLivePackage() {
+async function fetchBatchLivePackage(force = false) {
   if (!currentRoom || isFetchingBatchPackage) return;
   
   // 请求冷却：两次请求至少间隔用户设置的时间（分钟转毫秒）
@@ -485,7 +472,9 @@ async function fetchBatchLivePackage() {
     : 5;
   const minIntervalMs = intervalMinutes * 60 * 1000;
   const now = Date.now();
-  if (now - lastPackageRequestTime < minIntervalMs) {
+  
+  // 如果非强制且弹幕池与台词池均充足，且在冷却时间内，则不重复请求
+  if (!force && danmakuPool.length > 5 && hostSpeechPool.length > 2 && (now - lastPackageRequestTime < minIntervalMs)) {
     return; // 冷却中，不请求
   }
   lastPackageRequestTime = now;
@@ -509,18 +498,36 @@ async function fetchBatchLivePackage() {
       instruction: dynamicContext
     });
 
-    const parsed = window.extractJsonFromText(res.text);
+    const parsed = window.extractJsonFromText ? window.extractJsonFromText(res.text) : null;
 
-    if (parsed && parsed.danmakus && parsed.danmakus.length > 0) {
-      danmakuPool.push(...parsed.danmakus);
-    }
-    if (parsed && parsed.hostSpeeches && parsed.hostSpeeches.length > 0) {
-      hostSpeechPool.push(...parsed.hostSpeeches);
-      const first = hostSpeechPool.shift();
-      renderHostSpeech(first.speech, first.action);
+    if (parsed) {
+      // 灵活提取弹幕池 (兼容各种可能命名的字段)
+      const rawDanmakus = parsed.danmakus || parsed.danmaku || parsed.barrages || parsed.comments || parsed.bullet_chats || [];
+      if (Array.isArray(rawDanmakus) && rawDanmakus.length > 0) {
+        danmakuPool.push(...rawDanmakus);
+      }
+
+      // 灵活提取台词流 (兼容各种可能命名的字段)
+      const rawSpeeches = parsed.hostSpeeches || parsed.host_speeches || parsed.hostSpeech || parsed.speeches || parsed.dialogues || [];
+      if (Array.isArray(rawSpeeches) && rawSpeeches.length > 0) {
+        hostSpeechPool.push(...rawSpeeches);
+        if (hostSpeechPool.length > 0) {
+          const first = hostSpeechPool.shift();
+          renderHostSpeech(first.speech, first.action);
+        }
+      } else if (Array.isArray(parsed) && parsed.length > 0) {
+        parsed.forEach(item => {
+          if (item && item.speech) hostSpeechPool.push(item);
+          else if (item && (item.text || item.sender)) danmakuPool.push(item);
+        });
+        if (hostSpeechPool.length > 0) {
+          const first = hostSpeechPool.shift();
+          renderHostSpeech(first.speech, first.action);
+        }
+      }
     }
   } catch (e) {
-    renderHostSpeech('欢迎来到直播间！感谢大家的支持～', '微笑着挥手');
+    console.warn('[fetchBatchLivePackage request error]:', e);
   }
 
   isFetchingBatchPackage = false;

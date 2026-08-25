@@ -104,18 +104,26 @@ async function refreshTrendsWithAI() {
         isDownloaded: false
       };
 
-      // 生成或适配动态配图
-      let postImage = p.image || '';
-      
-      // 如果配置了生图API且未携带图，尝试生成配图，或自动生成精美的赛博切片海报封面（纯本地Canvas生成，无外部URL）
-      if (!postImage && p.imagePrompt && typeof window.aiGenerateImage === 'function') {
-        try {
-          const imgRes = await window.aiGenerateImage({ prompt: p.imagePrompt });
-          if (imgRes && imgRes.dataUrl) postImage = imgRes.dataUrl;
-        } catch (err) {}
+      // 提取或组装生图提示词（确保每条帖子都能拿到高质量英文提示词调用生图API）
+      let imgPrompt = p.imagePrompt || p.image_prompt || p.imgPrompt || p.prompt || '';
+      if (!imgPrompt && p.content) {
+        imgPrompt = `anime style masterpiece, social media trending scene, live stream screenshot, ${p.tag || '#热搜#'}, ${p.content.slice(0, 45)}, vivid aesthetic lighting, high quality`;
       }
 
-      // 如果依然没有图，自动用本地Canvas生成一张极具网感的高清切片配图（规避外部链接，纯本地DataURL）
+      // 生成或适配动态配图：优先调用生图API
+      let postImage = p.image || '';
+      if (!postImage && imgPrompt && typeof window.aiGenerateImage === 'function') {
+        try {
+          const imgRes = await window.aiGenerateImage({ prompt: imgPrompt });
+          if (imgRes) {
+            postImage = imgRes.dataUrl || imgRes.imageUrl || imgRes.url || (typeof imgRes === 'string' ? imgRes : '');
+          }
+        } catch (err) {
+          console.warn(`第 ${i + 1} 条动态生图API调用失败:`, err);
+        }
+      }
+
+      // 仅当生图API报错或未返回时，才启用纯本地Canvas生成切片配图作为兜底（无外部URL）
       if (!postImage) {
         try {
           const cvs = document.createElement('canvas');
@@ -123,15 +131,15 @@ async function refreshTrendsWithAI() {
           cvs.height = 450;
           const ctx = cvs.getContext('2d');
           
-          // 渐变底色
           const gradients = [
-            ['#0f172a', '#1e293b', '#334155'],
-            ['#18181b', '#27272a', '#3f3f46'],
-            ['#1e1b4b', '#312e81', '#4338ca'],
-            ['#4c0519', '#881337', '#9f1239'],
-            ['#022c22', '#064e3b', '#047857']
+            ['#0f172a', '#1e293b', '#334155', '#f43f5e'],
+            ['#18181b', '#27272a', '#3f3f46', '#8b5cf6'],
+            ['#1e1b4b', '#312e81', '#4338ca', '#06b6d4'],
+            ['#4c0519', '#881337', '#9f1239', '#fbbf24'],
+            ['#022c22', '#064e3b', '#047857', '#10b981'],
+            ['#1c1917', '#292524', '#44403c', '#ec4899']
           ];
-          const gColors = gradients[Math.floor(Math.random() * gradients.length)];
+          const gColors = gradients[(i + Math.floor(Math.random() * 2)) % gradients.length];
           const bgGrad = ctx.createLinearGradient(0, 0, 800, 450);
           bgGrad.addColorStop(0, gColors[0]);
           bgGrad.addColorStop(0.5, gColors[1]);
@@ -139,51 +147,60 @@ async function refreshTrendsWithAI() {
           ctx.fillStyle = bgGrad;
           ctx.fillRect(0, 0, 800, 450);
 
-          // 装饰图形
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
           ctx.lineWidth = 1.5;
           for (let l = 0; l < 8; l++) {
             ctx.beginPath();
-            ctx.moveTo(0, l * 60);
-            ctx.lineTo(800, l * 60 + 40);
+            ctx.moveTo(0, l * 65);
+            ctx.lineTo(800, l * 65 + 50);
             ctx.stroke();
           }
 
-          // 光晕
-          const radGrad = ctx.createRadialGradient(400, 225, 20, 400, 225, 350);
-          radGrad.addColorStop(0, 'rgba(244, 63, 94, 0.25)');
+          const radGrad = ctx.createRadialGradient(400, 225, 20, 400, 225, 380);
+          radGrad.addColorStop(0, gColors[3] + '40');
           radGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
           ctx.fillStyle = radGrad;
           ctx.fillRect(0, 0, 800, 450);
 
-          // 标签角标
-          ctx.fillStyle = '#f43f5e';
+          ctx.fillStyle = gColors[3];
+          const bx = 40, by = 40, bw = 140, bh = 36, br = 18;
           ctx.beginPath();
-          ctx.roundRect(40, 40, 140, 36, 18);
+          if (ctx.roundRect) {
+            ctx.roundRect(bx, by, bw, bh, br);
+          } else {
+            ctx.moveTo(bx + br, by);
+            ctx.lineTo(bx + bw - br, by);
+            ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + br);
+            ctx.lineTo(bx + bw, by + bh - br);
+            ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - br, by + bh);
+            ctx.lineTo(bx + br, by + bh);
+            ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - br);
+            ctx.lineTo(bx, by + br);
+            ctx.quadraticCurveTo(bx, by, bx + br, by);
+            ctx.closePath();
+          }
           ctx.fill();
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 18px sans-serif';
-          ctx.fillText('LIVE 切片', 68, 65);
 
-          // 话题文字
-          const displayTag = p.tag || '#热搜吃瓜#';
-          ctx.fillStyle = '#f43f5e';
-          ctx.font = 'bold 24px sans-serif';
-          ctx.fillText(displayTag, 40, 140);
-
-          // 大标题/正文切片摘要
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 32px sans-serif';
-          const summaryText = (p.content || '').slice(0, 38) + '...';
-          ctx.fillText(summaryText.slice(0, 18), 40, 200);
+          ctx.font = 'bold 16px sans-serif';
+          ctx.fillText('LIVE 切片', 66, 64);
+
+          const displayTag = p.tag || (p.topic ? `#${p.topic.replace(/#/g, '')}#` : '#热搜头条#');
+          ctx.fillStyle = gColors[3];
+          ctx.font = 'bold 22px sans-serif';
+          ctx.fillText(displayTag, 40, 135);
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 28px sans-serif';
+          const summaryText = String(p.content || '').replace(/\n/g, ' ');
+          ctx.fillText(summaryText.slice(0, 18), 40, 195);
           if (summaryText.length > 18) {
-            ctx.fillText(summaryText.slice(18, 36), 40, 250);
+            ctx.fillText(summaryText.slice(18, 36) + (summaryText.length > 36 ? '...' : ''), 40, 245);
           }
 
-          // 底部发帖博主
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-          ctx.font = '20px sans-serif';
-          ctx.fillText(`@${accountName} · LUMA 社交广场独家热点`, 40, 390);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+          ctx.font = '18px sans-serif';
+          ctx.fillText(`@${accountName} · LUMA 社交广场独家热点`, 40, 395);
 
           postImage = cvs.toDataURL('image/jpeg', 0.85);
         } catch (err) {}
@@ -208,8 +225,20 @@ async function refreshTrendsWithAI() {
         commentTree: commentTree
       };
 
-      window.weiboPosts.unshift(newPost);
-      try { await api.db.create('community_posts', newPost).catch(() => {}); } catch (e) {}
+      // 内存去重
+      const exIdx = window.weiboPosts.findIndex(item => item.id === newPost.id);
+      if (exIdx >= 0) {
+        window.weiboPosts[exIdx] = newPost;
+      } else {
+        window.weiboPosts.unshift(newPost);
+      }
+      
+      // 持久化到 app_posts 表
+      try { 
+        await api.db.create('app_posts', newPost).catch(async () => {
+          await api.db.update('app_posts', newPost.id, newPost).catch(() => {});
+        }); 
+      } catch (e) {}
     }
 
     renderHotSearchRanking();
@@ -226,7 +255,7 @@ window.refreshTrendsWithAI = refreshTrendsWithAI;
 // 置顶热搜数据管理
 const HERO_STORAGE_KEY = 'luma_hero_hot_search';
 const DEFAULT_HERO_DATA = {
-  image: 'https://files.catbox.moe/d1jldl.png',
+  image: '',
   title: '主播连麦当场破防！神秘神豪连续狂砸5个嘉年华瞬间反超',
   heat: '389.2万',
   discussions: '5000+'
