@@ -19,38 +19,76 @@ if (!window.lumaOpsLog) window.lumaOpsLog = [];
 // 未聊过/未获取的角色返回 null，基础分按 0 计算，日志与UI标注「暂未获取」
 // =========================================================================
 
+// =========================================================================
+// 【角色意愿提取与状态映射核心层】
 // 宽容模式提取文本中的意愿/倾向数值（支持开播倾向/意愿、下播倾向/意愿、通用倾向/意愿、中英文冒号、等号、多标签连缀等）
+// =========================================================================
 function extractWillValueFromText(rawText) {
   if (!rawText) return null;
-  const str = typeof rawText === 'object' ? JSON.stringify(rawText) : String(rawText);
   
-  // 1. 精准提取【开播倾向 / 开播意愿】
-  const mStart = str.match(/(?:\[|【)?\s*(?:LUMA)?(?:Live)?(?:开启)?开播(?:倾向|意愿)(?:值)?\s*[:：=—\- ]\s*(\d+(?:\.\d+)?)\s*(?:\/100|分|%)?\s*(?:\]|】)?/i);
-  if (mStart) {
-    const num = Number(mStart[1]);
-    if (!isNaN(num)) return { type: 'startWill', value: Math.max(0, Math.min(100, Math.round(num))) };
+  // 若传入的是对象或包含 directives 数组
+  if (typeof rawText === 'object') {
+    // 1. 结构化 directives 检查
+    if (rawText.directives && Array.isArray(rawText.directives)) {
+      for (const d of rawText.directives) {
+        const v = extractWillValueFromText(d);
+        if (v !== null) return v;
+      }
+    }
+    // 2. 指令对象 params 检查 (如 { 倾向类型: "开播", 数值: "75" })
+    if (rawText.params && typeof rawText.params === 'object') {
+      const pType = String(rawText.params['倾向类型'] || rawText.params.type || rawText.params.kind || '');
+      const pVal = Number(rawText.params['数值'] || rawText.params.value || rawText.params.score);
+      if (!isNaN(pVal) && pVal >= 0 && pVal <= 100) {
+        if (pType.includes('开播') || pType.includes('start')) return { type: 'startWill', value: Math.round(pVal) };
+        if (pType.includes('下播') || pType.includes('stop')) return { type: 'stopWill', value: Math.round(pVal) };
+        return { type: 'auto', value: Math.round(pVal) };
+      }
+    }
+    // 3. 卡片 card 或 body / title 字段
+    if (rawText.body || rawText.title || rawText.text || rawText.content || rawText.value) {
+      const subStr = `${rawText.title || ''} ${rawText.body || ''} ${rawText.text || ''} ${rawText.content || ''} ${rawText.value || ''}`;
+      const subRes = extractWillValueFromText(subStr);
+      if (subRes !== null) return subRes;
+    }
   }
 
-  // 2. 精准提取【下播倾向 / 下播意愿】
-  const mStop = str.match(/(?:\[|【)?\s*(?:LUMA)?(?:Live)?(?:关闭)?下播(?:倾向|意愿)(?:值)?\s*[:：=—\- ]\s*(\d+(?:\.\d+)?)\s*(?:\/100|分|%)?\s*(?:\]|】)?/i);
+  const str = typeof rawText === 'object' ? JSON.stringify(rawText) : String(rawText);
+  
+  // 1. 精准提取【开播倾向 / 开播意愿】(例如: [开播倾向:75] / 【开播倾向：75%】 / [开播:75] / 开播倾向:75 / [开播意愿:75])
+  const mStart = str.match(/(?:\[|【)?\s*(?:LUMA)?(?:Live)?(?:开启)?开播(?:倾向|意愿)?(?:值)?\s*[:：=—\- ]\s*(\d+(?:\.\d+)?)\s*(?:\/100|分|%)?\s*(?:\]|】)?/i);
+  if (mStart) {
+    const num = Number(mStart[1]);
+    if (!isNaN(num) && num >= 0 && num <= 100) return { type: 'startWill', value: Math.round(num) };
+  }
+
+  // 2. 精准提取【下播倾向 / 下播意愿】(例如: [下播倾向:20] / 【下播倾向：20%】 / [下播:20] / 下播倾向:20 / [下播意愿:20])
+  const mStop = str.match(/(?:\[|【)?\s*(?:LUMA)?(?:Live)?(?:关闭)?下播(?:倾向|意愿)?(?:值)?\s*[:：=—\- ]\s*(\d+(?:\.\d+)?)\s*(?:\/100|分|%)?\s*(?:\]|】)?/i);
   if (mStop) {
     const num = Number(mStop[1]);
-    if (!isNaN(num)) return { type: 'stopWill', value: Math.max(0, Math.min(100, Math.round(num))) };
+    if (!isNaN(num) && num >= 0 && num <= 100) return { type: 'stopWill', value: Math.round(num) };
   }
 
   // 3. 标准通用正则：[倾向:10] / [意愿:10] / [LUMA直播倾向:10] / 【倾向：10】 / [倾向值:10]
   const m1 = str.match(/(?:\[|【)?\s*(?:LUMA)?(?:Live)?(?:直播)?(?:当前)?(?:倾向|意愿)(?:值)?\s*[:：=—\- ]\s*(\d+(?:\.\d+)?)\s*(?:\/100|分|%)?\s*(?:\]|】)?/i);
   if (m1) {
     const num = Number(m1[1]);
-    if (!isNaN(num)) return { type: 'auto', value: Math.max(0, Math.min(100, Math.round(num))) };
+    if (!isNaN(num) && num >= 0 && num <= 100) return { type: 'auto', value: Math.round(num) };
   }
 
-  // 4. 卡片 json 格式如 "body": "当前倾向：10" 或 "body": "当前意愿值：10"
-  const m2 = str.match(/(?:倾向|意愿).*?(\d+)/);
-  if (m2) {
-    const num = Number(m2[1]);
-    if (!isNaN(num) && num >= 0 && num <= 100) {
-      return { type: 'auto', value: Math.round(num) };
+  // 4. 卡片/文本模糊匹配如 "当前开播倾向：75%" 或 "开播倾向 75"
+  if (str.includes('开播')) {
+    const m2 = str.match(/开播.*?(?:倾向|意愿).*?(\d+)/) || str.match(/(?:倾向|意愿).*?开播.*?(\d+)/);
+    if (m2) {
+      const num = Number(m2[1]);
+      if (!isNaN(num) && num >= 0 && num <= 100) return { type: 'startWill', value: Math.round(num) };
+    }
+  }
+  if (str.includes('下播')) {
+    const m3 = str.match(/下播.*?(?:倾向|意愿).*?(\d+)/) || str.match(/(?:倾向|意愿).*?下播.*?(\d+)/);
+    if (m3) {
+      const num = Number(m3[1]);
+      if (!isNaN(num) && num >= 0 && num <= 100) return { type: 'stopWill', value: Math.round(num) };
     }
   }
 
@@ -127,16 +165,17 @@ async function setCharWill(characterId, type, value) {
 async function scanAllMessagesForCharWill(characterId) {
   if (!characterId) return null;
   try {
-    const tablesToTry = ["messages", "chat_messages", "chat_history", "chats", "conversations", "records"];
-    let allFound = [];
+    const allChars = window.allCharacters || (typeof api !== 'undefined' && api.characters && (await api.characters.list().catch(() => []))) || [];
+    const charObj = allChars.find(c => c.id === characterId);
+    const charName = charObj?.name || '';
 
     // 0. 尝试直接从角色对象、联系人对象、以及角色状态表读取（好感度/焦虑值/自定义状态）
     try {
       if (typeof api !== 'undefined') {
-        // A. 查角色表中的 state 字段
-        const charObj = (api.characters && typeof api.characters.get === 'function') ? await api.characters.get(characterId).catch(() => null) : null;
-        if (charObj) {
-          const rawState = charObj.state || charObj.states || charObj.customState || charObj.memory || charObj.status;
+        // A. 查角色表中的 state / directives 字段
+        const fullChar = (api.characters && typeof api.characters.get === 'function') ? await api.characters.get(characterId).catch(() => null) : null;
+        if (fullChar) {
+          const rawState = fullChar.state || fullChar.states || fullChar.customState || fullChar.memory || fullChar.status || fullChar.directives;
           if (rawState) {
             const extracted = extractWillValueFromText(rawState);
             if (extracted && typeof extracted.value === 'number') {
@@ -150,7 +189,7 @@ async function scanAllMessagesForCharWill(characterId) {
         // B. 查 contacts 表中是否有绑定状态
         const contactObj = (api.contacts && typeof api.contacts.get === 'function') ? await api.contacts.get(characterId).catch(() => null) : null;
         if (contactObj) {
-          const rawState = contactObj.state || contactObj.states || contactObj.customState || contactObj.status;
+          const rawState = contactObj.state || contactObj.states || contactObj.customState || contactObj.status || contactObj.directives;
           if (rawState) {
             const extracted = extractWillValueFromText(rawState);
             if (extracted && typeof extracted.value === 'number') {
@@ -161,8 +200,30 @@ async function scanAllMessagesForCharWill(characterId) {
           }
         }
 
-        // C. 查 character_states / states 独立状态表
-        const stateTables = ["character_states", "char_states", "states", "user_states", "memories"];
+        // C. 尝试调用 api.chat 或 api.messages 的直接查询接口
+        if (api.chat) {
+          const chatMethods = ['getMessages', 'listMessages', 'getHistory', 'history', 'list'];
+          for (const m of chatMethods) {
+            if (typeof api.chat[m] === 'function') {
+              try {
+                const res = await api.chat[m]({ characterId, limit: 50 }).catch(() => null);
+                if (Array.isArray(res) && res.length > 0) {
+                  for (const msg of res) {
+                    const ex = extractWillValueFromText(msg);
+                    if (ex && typeof ex.value === 'number') {
+                      let willType = ex.type === 'auto' ? 'startWill' : ex.type;
+                      await setCharWill(characterId, willType, ex.value);
+                      return { type: willType, value: ex.value };
+                    }
+                  }
+                }
+              } catch(e) {}
+            }
+          }
+        }
+
+        // D. 查 character_states / states 独立状态表
+        const stateTables = ["character_states", "char_states", "states", "user_states", "memories", "luma_states"];
         for (const stTbl of stateTables) {
           try {
             const stItem = await api.db.get(stTbl, characterId).catch(() => null);
@@ -178,6 +239,14 @@ async function scanAllMessagesForCharWill(characterId) {
         }
       }
     } catch(e) {}
+
+    // 1. 扫描数据库中的各类消息表
+    let allFound = [];
+    const tablesToTry = [
+      "messages", "chat_messages", "chat_history", "chats", "conversations", 
+      "records", "chat_records", "dialogues", "dialogs", "character_messages", 
+      "msg_records", "message_list", "chat_sessions", "chatLogs", "logs"
+    ];
     if (typeof api !== 'undefined' && api.db && typeof api.db.list === 'function') {
       for (const tbl of tablesToTry) {
         try {
@@ -193,7 +262,7 @@ async function scanAllMessagesForCharWill(characterId) {
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && (k.includes('msg') || k.includes('chat') || k.includes('history') || k.includes('message'))) {
+        if (k && (k.includes('msg') || k.includes('chat') || k.includes('history') || k.includes('message') || k.includes('dialog') || k.includes(characterId))) {
           try {
             const raw = localStorage.getItem(k);
             if (raw && (raw.startsWith('[') || raw.startsWith('{'))) {
@@ -212,26 +281,26 @@ async function scanAllMessagesForCharWill(characterId) {
     const targetMsgs = allFound.filter(m => {
       if (!m) return false;
       // 排除明确是用户的消息
-      if (m.role === 'user' || m.isUser === true || m.sender === 'user') return false;
+      if (m.role === 'user' || m.isUser === true || m.sender === 'user' || m.from === 'user') return false;
       
-      const mCharId = m.characterId || m.charId || m.senderId || m.author || m.speaker || m.character_id || m.targetId || m.from;
+      const mCharId = m.characterId || m.charId || m.senderId || m.author || m.speaker || m.character_id || m.targetId || m.from || m.contactId;
       // 角色ID匹配
       if (mCharId === characterId) return true;
       // 角色名称匹配
-      const allChars = window.allCharacters || [];
-      const charObj = allChars.find(c => c.id === characterId);
-      if (charObj && (m.characterName === charObj.name || m.senderName === charObj.name || m.name === charObj.name)) return true;
-      // 单人或通用消息且包含倾向或意愿字样
-      const txt = m.rawResponseText || m.rawText || m.content || m.text || m.message || '';
-      return typeof txt === 'string' && (txt.includes('倾向') || txt.includes('意愿') || txt.includes('[开播') || txt.includes('[下播'));
+      if (charName && (m.characterName === charName || m.senderName === charName || m.name === charName || m.authorName === charName)) return true;
+      
+      // 单人角色或消息内容中包含倾向/意愿指令
+      const txt = m.rawResponseText || m.rawText || m.content || m.text || m.message || (typeof m === 'string' ? m : '');
+      const hasKey = typeof txt === 'string' && (txt.includes('倾向') || txt.includes('意愿') || txt.includes('开播') || txt.includes('下播'));
+      if (allChars.length <= 1 && hasKey) return true;
+      return hasKey;
     });
 
     // 按时间倒序排序
     targetMsgs.sort((a, b) => (b.createdAt || b.timestamp || b.time || 0) - (a.createdAt || a.timestamp || a.time || 0));
 
     for (const msg of targetMsgs) {
-      const content = msg.rawResponseText || msg.rawText || msg.content || msg.text || msg.message || msg.body || (typeof msg === 'string' ? msg : JSON.stringify(msg));
-      const extracted = extractWillValueFromText(content);
+      const extracted = extractWillValueFromText(msg);
       if (extracted && typeof extracted.value === 'number') {
         const val = extracted.value;
         let willType = extracted.type;
@@ -1091,12 +1160,12 @@ async function luma_will_listener(event) {
   try {
     if (!event) return;
     
-    // 兼容可能的多层包裹 (event.data / event.payload / event.message / event)
-    const raw = (event.payload || event.data || event.message || event);
+    // 兼容可能的多层包裹 (event.data / event.payload / event.message / event.detail / event)
+    const raw = (event.payload || event.data || event.message || event.detail || event);
     if (!raw) return;
 
     // 排除明确是用户发的消息
-    if (raw.role === 'user' || raw.isUser === true || raw.sender === 'user' || raw.type === 'user') {
+    if (raw.role === 'user' || raw.isUser === true || raw.sender === 'user' || raw.from === 'user') {
       return;
     }
 
@@ -1107,26 +1176,24 @@ async function luma_will_listener(event) {
     }
 
     // 提取角色ID
-    let charId = raw.characterId || raw.charId || raw.senderId || raw.author || raw.speaker || raw.character_id || raw.targetId || raw.from || event.characterId || event.charId || event.senderId;
+    let charId = raw.characterId || raw.charId || raw.senderId || raw.author || raw.speaker || raw.character_id || raw.targetId || raw.from || raw.contactId || event.characterId || event.charId || event.senderId || event.contactId;
 
     // 若无直接 ID，尝试按角色名匹配
     const allChars = window.allCharacters || (typeof api !== 'undefined' && api.characters && (await api.characters.list().catch(() => []))) || [];
-    if (!charId && (raw.senderName || raw.characterName || raw.name)) {
-      const sName = raw.senderName || raw.characterName || raw.name;
+    if (!charId && (raw.senderName || raw.characterName || raw.name || raw.authorName)) {
+      const sName = raw.senderName || raw.characterName || raw.name || raw.authorName;
       const matched = allChars.find(c => c.name === sName || (c.name && sName.includes(c.name)));
       if (matched) charId = matched.id;
     }
 
-    // 提取意愿数值
-    let willVal = extractWillValueFromText(content);
+    // 提取意愿数值（优先从结构化对象或文本提取）
+    let willVal = extractWillValueFromText(raw) || extractWillValueFromText(content);
     
     // 检查是否有 directives 结构化参数
     if (willVal === null && raw.directives && Array.isArray(raw.directives)) {
       for (const d of raw.directives) {
-        if (d && (d.label?.includes('倾向') || d.label?.includes('意愿') || d.syntax?.includes('倾向') || d.syntax?.includes('意愿') || d.name?.includes('倾向') || d.name?.includes('意愿'))) {
-          const v = extractWillValueFromText(d.value || d.params || d.content);
-          if (v !== null) { willVal = v; break; }
-        }
+        const v = extractWillValueFromText(d);
+        if (v !== null) { willVal = v; break; }
       }
     }
 
@@ -1153,19 +1220,50 @@ window.handleExtractedCharWill = handleExtractedCharWill;
 
 function registerLumaEventListeners() {
   try {
+    const eventNames = [
+      "chat.message.created",
+      "chat.message",
+      "message.created",
+      "message",
+      "chat:message",
+      "chat_message_created",
+      "chat.response",
+      "character.message",
+      "directive",
+      "state.changed"
+    ];
+
     // 1. AiPhone SDK 原生事件监听
     if (typeof AiPhone !== 'undefined' && AiPhone.on) {
-      AiPhone.on("chat.message.created", luma_will_listener);
-      console.log("[LUMA Live] AiPhone 事件监听 (chat.message.created) 已注册");
+      for (const evt of eventNames) {
+        try {
+          AiPhone.on(evt, luma_will_listener);
+        } catch(e) {}
+      }
+      console.log("[LUMA Live] AiPhone 多事件监听已注册");
     }
 
-    // 2. Window postMessage 宿主跨窗口通信保底监听
+    // 2. api.events / api.on 监听
+    if (typeof api !== 'undefined') {
+      if (api.on) {
+        for (const evt of eventNames) {
+          try { api.on(evt, luma_will_listener); } catch(e) {}
+        }
+      }
+      if (api.events && api.events.on) {
+        for (const evt of eventNames) {
+          try { api.events.on(evt, luma_will_listener); } catch(e) {}
+        }
+      }
+    }
+
+    // 3. Window postMessage 宿主跨窗口通信保底监听
     window.addEventListener('message', async (e) => {
       try {
         const data = e.data;
         if (!data) return;
         // 兼容宿主 postMessage 转发格式
-        if (data.type === 'chat.message.created' || data.type === 'onMessage' || data.action === 'message_created' || data.event === 'chat.message.created') {
+        if (data.type?.includes('message') || data.action?.includes('message') || data.event?.includes('message') || data.type?.includes('chat') || data.directives) {
           const payload = data.payload || data.data || data;
           await luma_will_listener(payload);
         }
