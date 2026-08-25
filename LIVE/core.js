@@ -587,17 +587,52 @@ async function aiGenerateImage(params) {
   }
 
   const customApi = window.customApiConfig || {};
+  
+  // 1. 全局宿主生图大模型分支
   if (customApi.enableGlobalImageModel) {
-    return api.ai.generateImage({
-      ...params,
-      prompt: promptText
-    });
+    try {
+      const res = await api.ai.generateImage({
+        ...params,
+        prompt: promptText
+      });
+      if (res) {
+        if (typeof res === 'string') return { dataUrl: res };
+        if (res.dataUrl) return { dataUrl: res.dataUrl };
+        if (res.imageUrl) return { dataUrl: res.imageUrl };
+        if (res.url) return { dataUrl: res.url };
+        if (res.image) return { dataUrl: res.image };
+        if (Array.isArray(res.data) && res.data[0]?.url) return { dataUrl: res.data[0].url };
+        if (Array.isArray(res.data) && res.data[0]?.b64_json) return { dataUrl: `data:image/png;base64,${res.data[0].b64_json}` };
+      }
+      return res;
+    } catch (e) {
+      console.warn('Global generateImage error:', e);
+      throw e;
+    }
   }
 
+  // 2. 自定义生图 API 分支
   const url = customApi.image?.url || '';
   const key = customApi.image?.key || '';
   const model = customApi.image?.model || 'dall-e-3';
-  if (!url) throw new Error('自定义生图API未配置地址');
+  
+  if (!url) {
+    // 若未配置自定义地址，但宿主环境支持全局生图，自动降级调用宿主 API
+    if (api && api.ai && typeof api.ai.generateImage === 'function') {
+      try {
+        const res = await api.ai.generateImage({ ...params, prompt: promptText });
+        if (res) {
+          if (typeof res === 'string') return { dataUrl: res };
+          if (res.dataUrl) return { dataUrl: res.dataUrl };
+          if (res.imageUrl) return { dataUrl: res.imageUrl };
+          if (res.url) return { dataUrl: res.url };
+          if (res.image) return { dataUrl: res.image };
+        }
+        return res;
+      } catch (e) {}
+    }
+    throw new Error('生图API未配置地址');
+  }
 
   const endpoint = formatOpenAIEndpoint(url, 'images');
   try {
@@ -632,6 +667,8 @@ async function aiGenerateImage(params) {
       return { dataUrl: `data:image/png;base64,${firstImg}` };
     }
     if (res.ok && data?.url) return { dataUrl: data.url };
+    if (res.ok && data?.imageUrl) return { dataUrl: data.imageUrl };
+    if (res.ok && data?.image) return { dataUrl: data.image };
 
     throw new Error(`自定义生图API请求失败: ${data?.error?.message || data?.message || res.status}`);
   } catch (e) {
@@ -673,13 +710,49 @@ window.robustNetworkRequest = robustNetworkRequest;
 
 function extractJsonFromText(text) {
   if (!text) return null;
+  let cleaned = String(text).trim();
+  
+  // 1. 剥离思考链标签 (<think>...</think> 或 [think]...[/think])
+  cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  cleaned = cleaned.replace(/\[think\][\s\S]*?\[\/think\]/gi, '').trim();
+
+  // 2. 去除代码块包裹 (```json ... ``` 或 ``` ...)
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  // 3. 尝试直接解析
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) return JSON.parse(jsonMatch[0]);
-    return JSON.parse(text);
-  } catch (e) {
-    return null;
-  }
+    return JSON.parse(cleaned);
+  } catch (e) {}
+
+  // 4. 提取最外层的 { ... } 或 [ ... ]
+  try {
+    const objFirst = cleaned.indexOf('{');
+    const objLast = cleaned.lastIndexOf('}');
+    const arrFirst = cleaned.indexOf('[');
+    const arrLast = cleaned.lastIndexOf(']');
+
+    let candidate = null;
+    if (objFirst !== -1 && objLast !== -1 && (arrFirst === -1 || objFirst < arrFirst)) {
+      candidate = cleaned.slice(objFirst, objLast + 1);
+    } else if (arrFirst !== -1 && arrLast !== -1) {
+      candidate = cleaned.slice(arrFirst, arrLast + 1);
+    }
+
+    if (candidate) {
+      try {
+        return JSON.parse(candidate);
+      } catch (e) {
+        // 清洗常见的尾随逗号、注释与控制字符
+        const sanitized = candidate
+          .replace(/,\s*([\}\]])/g, '$1')
+          .replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, '$1')
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+        return JSON.parse(sanitized);
+      }
+    }
+  } catch (e) {}
+
+  return null;
 }
 window.extractJsonFromText = extractJsonFromText;
 

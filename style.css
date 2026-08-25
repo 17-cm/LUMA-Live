@@ -144,7 +144,7 @@ input:checked + .switch-slider:before {
   width: 100vw !important;
   height: 100vh !important;
   height: 100dvh !important;
-  z-index: 100 !important;
+  z-index: 100;
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;

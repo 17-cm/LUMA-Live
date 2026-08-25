@@ -330,8 +330,8 @@ function renderOpsLog() {
       }
       const willColor = d.result === '开播' || d.result === '下播' ? 'text-rose-600' : d.result === '跳过' ? 'text-slate-400' : 'text-slate-500';
       const detail = d.state === '直播中'
-        ? `已播${d.liveMins}分 基础${d.baseWill}%+比例 总${d.stopWill}% 骰${d.dice}`
-        : `休息${d.restMins}分 基础${d.baseWill}%+比例 总${d.spawnWill}% 骰${d.dice}`;
+        ? `已播${d.liveMins}分 意愿[${d.baseWill}]+比例 总${d.stopWill}% 骰${d.dice}`
+        : `休息${d.restMins}分 意愿[${d.baseWill}]+比例 总${d.spawnWill}% 骰${d.dice}`;
       return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50">
         <span class="text-slate-600">${d.char}</span>
         <span class="text-slate-400 text-[10px]">${detail}</span>
@@ -1197,7 +1197,9 @@ async function lumaInitApp() {
     if (imgCfg) Object.assign(window.imageSettings, imgCfg);
 
     const catsRec = await api.db.get("app_settings", "app_presets");
-    if (catsRec?.data) window.appPresets = catsRec.data;
+    if (catsRec?.data && catsRec.data.live?.entries?.length > 0) {
+      window.appPresets = catsRec.data;
+    }
 
     const followsRec = await api.db.list("follows", { limit: 500 }) || [];
     window.followedHosts = followsRec.map(f => f.id);
@@ -1281,20 +1283,56 @@ async function lumaInitApp() {
     } catch (e) {
       console.warn("读取角色列表异常:", e);
     }
+
+    // 读取角色作息调度持久化
+    try {
+      const savedSchedules = await api.db.get("app_settings", "char_schedules");
+      if (savedSchedules && typeof savedSchedules === 'object') {
+        window.charSchedulesMap = savedSchedules;
+      } else {
+        window.charSchedulesMap = {};
+      }
+    } catch (e) {
+      window.charSchedulesMap = {};
+    }
+
+    // 检查是否需要世界冷启动初始化（全新安装或首次运行）
+    const isBootstrapped = Object.keys(window.charSchedulesMap || {}).length > 0;
+    if (!isBootstrapped && window.allCharacters && window.allCharacters.length > 0) {
+      if (typeof bootstrapWorldInitialState === 'function') {
+        await bootstrapWorldInitialState(window.allCharacters, window.appParams);
+      }
+    }
+
+    // 启动时后台异步深度扫描各角色最新聊天记录恢复意愿
+    if (window.allCharacters && Array.isArray(window.allCharacters) && typeof scanAllMessagesForCharWill === 'function') {
+      try {
+        await Promise.all(window.allCharacters.map(c => c && c.id ? scanAllMessagesForCharWill(c.id) : Promise.resolve()));
+      } catch (e) {}
+    }
   } catch (e) {
     console.warn("DB读取警告:", e);
   }
 
-  // 2. 同步个人资料
+  // 2. 离线时间差推演（若用户离线超过轮询时间，按离开时长自动模拟后台多轮轮询与到期下播）
+  try {
+    if (typeof catchUpOfflinePolling === 'function') {
+      await catchUpOfflinePolling();
+    }
+  } catch (e) {
+    console.warn("[LUMA Live] 离线时间差推演失败:", e);
+  }
+
+  // 3. 同步个人资料
   await syncUserProfile();
 
-  // 3. 加载社区动态
+  // 4. 加载社区动态
   await loadTrendsFromDb();
 
-  // 4. 同步直播列表并渲染赛道
+  // 5. 同步直播列表并渲染赛道
   await syncLiveSessions({ allowSpawn: true });
 
-  // 5. 渲染各模块初始状态
+  // 6. 渲染各模块初始状态
   selectMainCategory('all');
   renderDualRankList();
   renderTrends();
@@ -1303,10 +1341,10 @@ async function lumaInitApp() {
   renderPresetCategories();
   renderImagePromptEntries();
 
-  // 6. 检查分享直达参数 (Deep link)
+  // 7. 检查分享直达参数 (Deep link)
   checkDeepLinkParams();
 
-  // 7. 启动 LUMA官方运营组·定时器轮询
+  // 8. 启动 LUMA官方运营组·定时器轮询
   if (!window.__lumaLiveSyncInterval) {
     const pollMins = (window.appParams && window.appParams.opsPollInterval) || 3;
     window.__lumaLiveSyncInterval = setInterval(() => {

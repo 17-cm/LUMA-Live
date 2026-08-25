@@ -502,8 +502,8 @@ function getPostCardHtml(post) {
   const isDownloaded = post.stats && post.stats.isDownloaded;
 
   return '\
-    <article class="post-card" data-post-id="' + post.id + '" onclick="openTrendDetail(\'' + post.id + '\')">\
-      <div class="post-head" onclick="event.stopPropagation()">\
+    <article class="post-card cursor-pointer" data-post-id="' + post.id + '" onclick="openTrendDetail(\'' + post.id + '\')">\
+      <div class="post-head">\
         <div class="author">\
           <div class="avatar-wrap">' + avatarInner + verifiedHtml + '</div>\
           <div class="author-info">\

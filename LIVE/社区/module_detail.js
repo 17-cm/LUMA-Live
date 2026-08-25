@@ -171,6 +171,175 @@ function renderPostDetailView(post) {
   box.innerHTML = html;
 }
 
+// 真实下载动态图片到本地文件
+function downloadPostImageToLocal(post) {
+  const imageUrl = post.image;
+  const fileName = `luma_post_${post.id || Date.now()}.png`;
+
+  if (imageUrl && (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:'))) {
+    try {
+      const a = document.createElement('a');
+      a.href = imageUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      if (api.ui && api.ui.toast) api.ui.toast("图片已保存至本地！");
+      return;
+    } catch (e) {
+      console.warn("直接下载失败，尝试canvas转换:", e);
+    }
+  }
+
+  // 若为远程URL或需通过Canvas转换为Blob安全下载
+  if (imageUrl) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function () {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width || 800;
+        canvas.height = img.naturalHeight || img.height || 450;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob(function (blob) {
+          if (!blob) {
+            if (api.ui && api.ui.toast) api.ui.toast("图片处理失败");
+            return;
+          }
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+          if (api.ui && api.ui.toast) api.ui.toast("图片已保存至本地！");
+        }, 'image/png');
+      } catch (err) {
+        // 若跨域受限则直接触发链接下载
+        const a = document.createElement('a');
+        a.href = imageUrl;
+        a.download = fileName;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        if (api.ui && api.ui.toast) api.ui.toast("正在下载图片…");
+      }
+    };
+    img.onerror = function () {
+      if (api.ui && api.ui.toast) api.ui.toast("图片资源加载失败，无法下载");
+    };
+    img.src = imageUrl;
+  } else {
+    // 动态无附图时，生成动态长图海报并下载
+    generateAndDownloadPostPoster(post, fileName);
+  }
+}
+
+// 无附图时，用 Canvas 绘制精美的动态卡片海报并直接保存为本地图片
+function generateAndDownloadPostPoster(post, fileName) {
+  try {
+    const canvas = document.createElement('canvas');
+    const width = 750;
+    const height = 900;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    // 背景渐变
+    const grad = ctx.createLinearGradient(0, 0, 0, height);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(1, '#f8fafc');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+
+    // 顶部品牌装饰条
+    ctx.fillStyle = '#f43f5e';
+    ctx.fillRect(0, 0, width, 12);
+
+    // 标题与来源
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 36px "PingFang SC","Microsoft YaHei",sans-serif';
+    ctx.fillText(post.author?.name || 'LUMA 热点', 50, 80);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '22px "PingFang SC","Microsoft YaHei",sans-serif';
+    ctx.fillText(`${post.time || '刚刚'} · 来自 LUMA 社区热搜`, 50, 120);
+
+    // 分割线
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(50, 150);
+    ctx.lineTo(700, 150);
+    ctx.stroke();
+
+    // 话题标签
+    let startY = 210;
+    if (post.tag) {
+      ctx.fillStyle = '#f43f5e';
+      ctx.font = 'bold 30px "PingFang SC","Microsoft YaHei",sans-serif';
+      ctx.fillText(post.tag, 50, startY);
+      startY += 50;
+    }
+
+    // 艾特
+    if (post.mention) {
+      ctx.fillStyle = '#0284c7';
+      ctx.font = 'bold 26px "PingFang SC","Microsoft YaHei",sans-serif';
+      ctx.fillText(post.mention, 50, startY);
+      startY += 45;
+    }
+
+    // 正文自动换行
+    ctx.fillStyle = '#1e293b';
+    ctx.font = '28px "PingFang SC","Microsoft YaHei",sans-serif';
+    const text = post.content || '';
+    const maxWidth = 650;
+    const lineHeight = 42;
+    let line = '';
+    let currentY = startY + 10;
+
+    for (let n = 0; n < text.length; n++) {
+      const testLine = line + text[n];
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxWidth && n > 0) {
+        ctx.fillText(line, 50, currentY);
+        line = text[n];
+        currentY += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, 50, currentY);
+
+    // 底部水印与数据
+    const statY = height - 70;
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '22px "PingFang SC","Microsoft YaHei",sans-serif';
+    ctx.fillText(`👍 ${post.stats?.likes || 0}   💬 ${post.stats?.comments || 0}   🔁 ${post.stats?.reposts || 0}`, 50, statY);
+    ctx.fillText('LUMA LIVE · 赛博社交沙盒', 440, statY);
+
+    canvas.toBlob(function (blob) {
+      if (!blob) return;
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      if (api.ui && api.ui.toast) api.ui.toast("已保存动态海报到本地！");
+    }, 'image/png');
+  } catch (e) {
+    if (api.ui && api.ui.toast) api.ui.toast("动态保存完成");
+  }
+}
+
 // 动态互动与操作
 function handlePostAction(postId, action) {
   const posts = window.weiboPosts || [];
@@ -182,9 +351,7 @@ function handlePostAction(postId, action) {
     post.stats.likes += post.stats.isLiked ? 1 : -1;
   } else if (action === 'download') {
     post.stats.isDownloaded = !post.stats.isDownloaded;
-    if (api.ui && api.ui.toast) {
-      api.ui.toast(post.stats.isDownloaded ? "已下载保存该动态！" : "已移除保存");
-    }
+    downloadPostImageToLocal(post);
   } else if (action === 'repost') {
     if (typeof openSharePickerModal === 'function') openSharePickerModal();
   }

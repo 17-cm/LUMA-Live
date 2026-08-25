@@ -1,0 +1,8 @@
+{
+  "name": "LUMA Live",
+  "description": "Cyber Live Ecosystem AI 虚拟直播模拟沙盒游戏",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
