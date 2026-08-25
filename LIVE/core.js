@@ -475,9 +475,22 @@ function renderPresetTemplate(tpl, vars) {
   return tpl.replace(/\{\{(\w+)\}\}/g, (m, k) => (vars[k] !== undefined && vars[k] !== null ? vars[k] : ''));
 }
 
-function getEffectivePresetTemplate(tagKey) {
+function getEffectivePresetTemplate(tagKey, categoryKey = null) {
   const p = window.appPresets || {};
-  // 遍历所有分类，查找 id === tagKey 的条目
+  // 1. 如果指定了分类（例如 live 或 trends），且该分类下有预设条目：
+  if (categoryKey && p[categoryKey]?.entries?.length > 0) {
+    const entries = p[categoryKey].entries;
+    // 如果是 live 直播分类或 trends 热搜分类，将所有规则条目按编号顺序整合成完整的规范下发
+    if (categoryKey === 'live' || categoryKey === 'trends') {
+      return entries.map(e => `${e.title}\n${e.content}`).join('\n\n---\n\n');
+    }
+    // 否则按 id 查找
+    const found = entries.find(e => e.id === tagKey);
+    if (found && found.content) return found.content;
+    return entries[0]?.content || '';
+  }
+
+  // 2. 遍历所有分类查找 id === tagKey 的条目
   for (const catKey of Object.keys(p)) {
     const entries = p[catKey]?.entries || [];
     const found = entries.find(e => e.id === tagKey);
@@ -487,20 +500,28 @@ function getEffectivePresetTemplate(tagKey) {
 }
 
 async function aiGenerate(params) {
-  const tagKey = (params.appTags || []).find(t => t !== 'live') || 'reply';
-  const tpl = getEffectivePresetTemplate(tagKey);
+  const appTags = params.appTags || [];
+  const isLive = appTags.includes('live');
+  const catKey = isLive ? 'live' : (appTags[0] || 'live');
+  const tagKey = appTags.find(t => t !== 'live') || 'reply';
+  const tpl = getEffectivePresetTemplate(tagKey, catKey);
+
+  let characterId = params.characterId;
+  if (!characterId && window.allCharacters && window.allCharacters.length > 0) {
+    characterId = window.allCharacters[0].id;
+  }
 
   let charName = '主播';
   let persona = '';
-  if (params.characterId) {
-    const found = (window.allCharacters || []).find(c => c.id === params.characterId);
+  if (characterId) {
+    const found = (window.allCharacters || []).find(c => c.id === characterId);
     if (found) charName = found.name;
     try {
-      const full = await api.characters.get(params.characterId);
+      const full = await api.characters.get(characterId);
       persona = full?.persona || full?.description || '';
     } catch (e) {}
   }
-  const userName = (typeof currentUser !== 'undefined' && currentUser?.name) || 'user';
+  const userName = (typeof currentUser !== 'undefined' && currentUser?.name) || (window.currentUser && window.currentUser.name) || 'user';
 
   const filledInstruction = tpl
     ? renderPresetTemplate(tpl, { char: charName, user: userName, instruction: params.instruction || '' })
@@ -508,10 +529,21 @@ async function aiGenerate(params) {
 
   const customApi = window.customApiConfig || {};
   if (customApi.enableGlobalModel) {
-    return api.ai.generate({
+    const genOptions = {
       ...params,
       instruction: filledInstruction
-    });
+    };
+    if (characterId && !genOptions.characterId) {
+      genOptions.characterId = characterId;
+    }
+    const hostRes = await api.ai.generate(genOptions);
+    let hostText = '';
+    if (typeof hostRes === 'string') hostText = hostRes;
+    else if (hostRes && typeof hostRes.text === 'string') hostText = hostRes.text;
+    else if (hostRes && typeof hostRes.content === 'string') hostText = hostRes.content;
+    else if (hostRes && typeof hostRes.message === 'string') hostText = hostRes.message;
+    else if (hostRes) hostText = JSON.stringify(hostRes);
+    return { text: hostText };
   }
 
   const type = customApi.apiType || 'siliconflow';
@@ -537,7 +569,7 @@ async function aiGenerate(params) {
       body: { model: model, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: filledInstruction }], temperature: 0.9 }
     });
     const data = res.json || (res.text ? JSON.parse(res.text) : null);
-    const text = data?.choices?.[0]?.message?.content;
+    const text = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || data?.text || data?.response;
     if (!res.ok || !text) throw new Error(`自定义API请求失败: ${data?.error?.message || res.status}`);
     return { text };
   } catch (e) {
