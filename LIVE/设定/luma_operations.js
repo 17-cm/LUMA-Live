@@ -96,8 +96,22 @@ const lumaOpsGateway = {
     let coverUrl = character?.cover || character?.avatar || '';
     let rawCat = category || (character?.tags ? character.tags[0] : '随性杂谈');
     let chosenCat = (typeof normalizeCategory === 'function') ? normalizeCategory(rawCat) : rawCat;
-    let chosenSubTag = (character?.tags && character.tags[1]) ? character.tags[1] : (rawCat !== chosenCat ? rawCat : '日常唠嗑');
-    let chosenTopic = topic || `${charName}的精彩直播`;
+    // 从该一级频道下选择二级频道（确保严谨，不跨级）
+    const availableSubTags = (window.SUB_CATEGORIES && window.SUB_CATEGORIES[chosenCat]) || ['日常唠嗑'];
+    let chosenSubTag = '日常唠嗑';
+    if (category) {
+      const matched = availableSubTags.find(s => s.includes(category) || category.includes(s));
+      if (matched) chosenSubTag = matched;
+    }
+    if (chosenSubTag === '日常唠嗑' && character?.tags && character.tags[1]) {
+      const matched = availableSubTags.find(s => s.includes(character.tags[1]) || character.tags[1].includes(s));
+      if (matched) chosenSubTag = matched;
+    }
+    if (!availableSubTags.includes(chosenSubTag)) {
+      chosenSubTag = availableSubTags[Math.floor(Math.random() * availableSubTags.length)];
+    }
+    // 标题格式：【char】+ 角色自起标题
+    let chosenTopic = topic ? `【${charName}】${topic}` : `【${charName}】的精彩直播`;
 
     const newSession = {
       characterId: characterId,
@@ -385,14 +399,23 @@ async function syncLiveSessions(options = {}, nowTime = null) {
       const coverUrl = c.cover || c.avatar || '';
       const rawCat = c.tags ? c.tags[0] : '随性杂谈';
       const chosenCat = (typeof normalizeCategory === 'function') ? normalizeCategory(rawCat) : rawCat;
+      const initAvailableSubTags = (window.SUB_CATEGORIES && window.SUB_CATEGORIES[chosenCat]) || ['日常唠嗑'];
+      let initSubTag = '日常唠嗑';
+      if (c.tags && c.tags[1]) {
+        const matched = initAvailableSubTags.find(s => s.includes(c.tags[1]) || c.tags[1].includes(s));
+        if (matched) initSubTag = matched;
+      }
+      if (!initAvailableSubTags.includes(initSubTag)) {
+        initSubTag = initAvailableSubTags[Math.floor(Math.random() * initAvailableSubTags.length)];
+      }
       const newSession = {
         characterId: c.id,
         name: c.name || '主播',
         avatar: c.avatar || coverUrl,
         cover: coverUrl,
         category: chosenCat,
-        subTag: (c.tags && c.tags[1]) || '日常唠嗑',
-        topic: `${c.name || '主播'}的精彩直播`,
+        subTag: initSubTag,
+        topic: `【${c.name || '主播'}】的精彩直播`,
         heat: Math.floor(Math.random() * 80000 + 20000),
         roomId: Math.floor(Math.random() * 899999 + 100000),
         startTime: now - initLiveMins * 60000,

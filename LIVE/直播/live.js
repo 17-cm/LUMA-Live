@@ -25,7 +25,7 @@ let currentWalletBalance = 0;
 let guestbookData = {};
 window.guestbookData = guestbookData;
 
-const SUB_CATEGORIES = {
+const SUB_CATEGORIES = window.SUB_CATEGORIES || {
   'all': ['全部推荐', '热门精选', '新人出道', '高光时刻', '连麦互动'],
   '电竞竞技': ['王者荣耀', '原神 / 星铁', '无畏契约', '和平精英', '我的世界'],
   '声动音律': ['流行点唱', '深夜电台', '治愈声优', '器乐演奏', '古风国潮'],
@@ -33,6 +33,7 @@ const SUB_CATEGORIES = {
   '随性杂谈': ['吃瓜茶话会', '情感连麦', '深夜树洞', '查房PK', '日常唠嗑'],
   '探索开箱': ['硬核数码', '潮玩手办', '美食探店', '户外漫游', '新奇测评']
 };
+window.SUB_CATEGORIES = SUB_CATEGORIES;
 
 function escapeHtml(text) {
   if (!text) return '';
@@ -261,7 +262,7 @@ function renderLiveGrid() {
       </div>
       <div class="p-2.5">
         <h4 class="text-xs font-black truncate text-slate-900">${s.topic}</h4>
-        <p class="text-[10px] text-slate-400 mt-0.5 truncate">${s.name}</p>
+        <p class="text-[10px] text-slate-400 mt-0.5 truncate">房间号 ${s.roomId}</p>
       </div>
     </div>
   `}).join('');
