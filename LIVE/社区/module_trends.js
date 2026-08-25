@@ -22,6 +22,73 @@ function switchHotTrendTab(tabType) {
 }
 window.switchHotTrendTab = switchHotTrendTab;
 
+// 热搜刷新：调用API生成新帖子
+let isRefreshingTrends = false;
+async function refreshTrendsWithAI() {
+  if (isRefreshingTrends) return;
+  isRefreshingTrends = true;
+  if (window.api && api.ui && api.ui.toast) api.ui.toast('正在生成新动态…');
+
+  try {
+    let contextText = '平台目前没有正在直播的主播，请生成一条泛娱乐八卦动态。';
+    try {
+      const sessions = await api.db.list('live_sessions', { limit: 500 }) || [];
+      const active = sessions.filter(s => s && s.name);
+      if (active.length > 0) {
+        const picked = active[Math.floor(Math.random() * active.length)];
+        const duration = picked.startTime ? Math.floor((Date.now() - picked.startTime) / 60000) : 0;
+        contextText = `主播【${picked.name}】正在直播，赛道：${picked.category || '日常'}（${picked.subTag || '闲聊'}），标题：${picked.topic || '无标题'}，已播${duration}分钟，热度${picked.heat || 0}。请根据这个直播情况生成一条社区动态。`;
+      }
+    } catch (e) {}
+
+    const res = await window.aiGenerate({
+      appTags: ['trends', 'post'],
+      instruction: contextText
+    });
+
+    const parsed = window.extractJsonFromText ? window.extractJsonFromText(res.text) : null;
+    if (!parsed || !parsed.content) {
+      if (window.api && api.ui && api.ui.toast) api.ui.toast('生成失败，请检查API配置');
+      return;
+    }
+
+    const mediaAccounts = ['星芒吃瓜周刊', '赛博娱乐前线', '直播圈内君', '热搜挖掘机', 'LUMA速报'];
+    const accountName = parsed.mediaName || mediaAccounts[Math.floor(Math.random() * mediaAccounts.length)];
+    const newPost = {
+      id: 'post_ai_' + Date.now(),
+      author: {
+        name: accountName,
+        avatar: '',
+        badge: parsed.badge || '娱乐速报',
+        verified: true
+      },
+      time: '刚刚',
+      tag: parsed.tag || '#LUMA Live#',
+      mention: parsed.mention || '',
+      linkText: parsed.linkText || '',
+      clipText: parsed.clipText || '',
+      content: parsed.content,
+      image: '',
+      stats: { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false },
+      commentTree: []
+    };
+
+    if (!window.weiboPosts) window.weiboPosts = [];
+    window.weiboPosts.unshift(newPost);
+
+    try { await api.db.create('community_posts', newPost).catch(() => {}); } catch (e) {}
+
+    renderHotSearchRanking();
+    renderTrends();
+    if (window.api && api.ui && api.ui.toast) api.ui.toast('新动态已生成');
+  } catch (e) {
+    if (window.api && api.ui && api.ui.toast) api.ui.toast('生成失败：' + (e.message || '未知错误'));
+  } finally {
+    isRefreshingTrends = false;
+  }
+}
+window.refreshTrendsWithAI = refreshTrendsWithAI;
+
 // 置顶热搜数据管理
 const HERO_STORAGE_KEY = 'luma_hero_hot_search';
 const DEFAULT_HERO_DATA = {

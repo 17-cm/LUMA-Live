@@ -442,34 +442,32 @@ window.formatOpenAIEndpoint = formatOpenAIEndpoint;
 const CUSTOM_API_PRESET_TEMPLATES = {
   package: `你正在以【{{char}}】的身份进行直播推流与弹幕大包批处理生成。
 补充上下文：{{instruction}}
+# 输出格式（严格合法 JSON）：
+{"hostSpeeches":[{"speech":"台词","action":"动作"}],"danmakus":[{"sender":"昵称","text":"弹幕","type":"fan"}]}`,
 
-# 生成任务与参数规则：
-1. 生成主播的 3 句随性发言与过渡台词（包含微动作）。
-2. 生成 15~20 条真实的观众弹幕（包含乐子人、黑粉、真爱粉、考据党、复读机）。
-3. 如果当前决定结束直播，请在最后一句台词末尾附带动作标记 [动作:关闭直播]；若继续直播则严禁出现该标记。
-4. 可根据情况让公屏或台词主动提及用户【{{user}}】。
+  reply: `你正在以【{{char}}】的身份直播，用户【{{user}}】互动：{{instruction}}
+以主播身份口语化短句回复（30-60字）。
+# 输出格式（严格合法 JSON）：
+{"speech":"回复","emotion":"happy","action":"动作"}`,
 
-# 输出格式（严格合法 JSON，不要输出任何多余文字）：
-{"hostSpeeches":[{"speech":"台词内容1","action":"喝了口水"},{"speech":"台词内容2","action":"看了眼公屏"},{"speech":"台词内容3","action":"调整麦克风"}],"danmakus":[{"sender":"网友A","text":"弹幕内容","type":"fan"},{"sender":"网友B","text":"弹幕内容","type":"meme"},{"sender":"网友C","text":"弹幕内容","type":"troll"}]}`,
+  plan: `请以【{{char}}】的身份决定本次直播赛道与标题。上下文：{{instruction}}
+# 输出格式（严格合法 JSON）：
+{"category":"赛道","subTag":"子分类","topic":"标题"}`,
 
-  reply: `你正在以【{{char}}】的身份进行直播，用户【{{user}}】刚刚有以下互动：{{instruction}}
+  highlight: `根据主播【{{char}}】的直播情况生成1条热搜话题与切片。上下文：{{instruction}}
+# 输出格式（严格合法 JSON）：
+{"tag":"#话题#","heat":"88w","category":"娱乐","summary":"总结","comments":[{"user":"昵称","text":"评论"}]}`,
 
-# 规则准则：
-1. 以主播身份立刻给出针对该用户的专属即时反馈（口语化短句，30~60字以内）。
-2. 若你认为该下播了，请在回复最后加上动作标记 [动作:关闭直播]；否则严禁附带该标记。
+  post: `根据直播情况生成一条社区动态帖子。上下文：{{instruction}}
+# 输出格式（严格合法 JSON）：
+{"tag":"#话题#","mention":"@主播","content":"正文","linkText":"网页链接","clipText":"直播间切片"}`,
 
-# 输出格式（严格合法 JSON，不要输出任何多余文字）：
-{"speech":"主播回复台词","emotion":"happy | shy | angry | surprised | neutral","action":"微动作描述"}`,
+  supertopic_post: `根据直播情况生成一条超话动态。上下文：{{instruction}}
+# 输出格式（严格合法 JSON）：
+{"title":"标题","content":"正文","tags":["#标签#"]}`,
 
-  trends: `根据主播【{{char}}】的直播情况生成 1 条热搜话题与切片总结。补充上下文：{{instruction}}
-
-# 输出格式（严格合法 JSON，不要输出任何多余文字）：
-{"tag":"#话题#","heat":"88w","category":"娱乐","summary":"50字以内总结","comments":[]}`,
-
-  netizen: `用户评论了热搜：{{instruction}}
-请以随机路人身份跟评一句话（带梗或吐槽）。
-
-# 输出格式（严格合法 JSON，不要输出任何多余文字）：
+  netizen: `热搜：{{instruction}}。以随机路人身份跟评一句话（带梗）。
+# 输出格式（严格合法 JSON）：
 {"user":"昵称","text":"内容"}`
 };
 
@@ -479,18 +477,11 @@ function renderPresetTemplate(tpl, vars) {
 
 function getEffectivePresetTemplate(tagKey) {
   const p = window.appPresets || {};
-  if (p[tagKey]?.entries?.length > 0) {
-    return p[tagKey].entries.map(e => e.content).join('\n\n');
-  }
-  if (tagKey === 'package') {
-    const danmakuContent = p['danmaku']?.entries?.map(e => e.content).join('\n') || '';
-    const hostContent = p['host']?.entries?.map(e => e.content).join('\n') || '';
-    return CUSTOM_API_PRESET_TEMPLATES['package'] + (danmakuContent ? `\n\n# 弹幕参考规则：\n${danmakuContent}` : '') + (hostContent ? `\n\n# 主播参考规则：\n${hostContent}` : '');
-  }
-  if (tagKey === 'reply') {
-    if (p['host']?.entries?.length > 0) {
-      return p['host'].entries.map(e => e.content).join('\n\n');
-    }
+  // 遍历所有分类，查找 id === tagKey 的条目
+  for (const catKey of Object.keys(p)) {
+    const entries = p[catKey]?.entries || [];
+    const found = entries.find(e => e.id === tagKey);
+    if (found && found.content) return found.content;
   }
   return CUSTOM_API_PRESET_TEMPLATES[tagKey] || '';
 }

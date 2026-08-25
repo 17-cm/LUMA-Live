@@ -507,7 +507,7 @@ async function fetchBatchLivePackage() {
     
     const res = await window.aiGenerate({
       characterId: currentRoom.characterId,
-      appTags: ['luma', 'stream', 'content'],
+      appTags: ['live', 'package'],
       instruction: `当前频道：${currentRoom.category}（${currentRoom.subTag}），标题：${currentRoom.topic}。${packagePrompt}${giftHistoryText}`
     });
 
@@ -653,7 +653,7 @@ async function sendUserDanmaku() {
   try {
     const res = await window.aiGenerate({
       characterId: currentRoom.characterId,
-      appTags: ['luma', 'stream', 'interaction'],
+      appTags: ['live', 'reply'],
       instruction: `【${uInfo.tag}】${uInfo.name}发言：“${val}”`
     });
 
@@ -1191,7 +1191,7 @@ async function sendGift(name, cost) {
     try {
       const res = await window.aiGenerate({
         characterId: currentRoom.characterId,
-        appTags: ['luma', 'stream', 'interaction'],
+        appTags: ['live', 'reply'],
         instruction: `【${uInfo.tag}】${uInfo.name}送了 ${qty} 个【${name}】（总价值 ${totalCost} LUMA 币）给主播`
       });
       const parsed = window.extractJsonFromText(res.text);
