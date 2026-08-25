@@ -1290,7 +1290,7 @@ async function handleGenerateWildNPC() {
     const imgRes = await window.aiGenerateImage({
       prompt: `1girl, aesthetic anime live streaming portrait, cozy lighting, masterpiece, ${ratioPrompt}`
     });
-    const coverUrl = imgRes?.dataUrl || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800';
+    const coverUrl = imgRes?.dataUrl || character?.avatar || '';
 
     const npcNames = ['可可', '夏桃', '安妮', '琉璃', '星奈'];
     const chosenName = `野生主播·${npcNames[Math.floor(Math.random() * npcNames.length)]}`;

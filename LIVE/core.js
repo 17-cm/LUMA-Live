@@ -48,68 +48,7 @@
     }
   ];
 
-  const defaultLiveSessions = [
-    {
-      id: "sess_1",
-      characterId: "char_1",
-      name: "傲娇同桌",
-      avatar: getAvatar('傲娇同桌', 'first'),
-      cover: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800",
-      category: "电竞竞技",
-      subTag: "无畏契约",
-      topic: "谁说我打不过？今晚单排上赋能！",
-      heat: 88500,
-      roomId: 102938,
-      startTime: Date.now() - 1000 * 60 * 20,
-      endTime: Date.now() + 1000 * 60 * 100,
-      isNPC: false
-    },
-    {
-      id: "sess_2",
-      characterId: "char_2",
-      name: "赛博歌姬 · 露娜",
-      avatar: getAvatar('赛博歌姬 · 露娜', 'first'),
-      cover: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800",
-      category: "声动音律",
-      subTag: "深夜电台",
-      topic: "雨夜温柔点唱，倾听你的心事 🎵",
-      heat: 124000,
-      roomId: 492019,
-      startTime: Date.now() - 1000 * 60 * 35,
-      endTime: Date.now() + 1000 * 60 * 85,
-      isNPC: false
-    },
-    {
-      id: "sess_3",
-      characterId: "char_4",
-      name: "次元猫娘 · 桃桃",
-      avatar: getAvatar('次元猫娘 · 桃桃', 'first'),
-      cover: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800",
-      category: "次元才艺",
-      subTag: "虚拟歌姬",
-      topic: "新装扮发布！快来投喂小鱼干喵~",
-      heat: 64200,
-      roomId: 773912,
-      startTime: Date.now() - 1000 * 60 * 10,
-      endTime: Date.now() + 1000 * 60 * 110,
-      isNPC: false
-    },
-    {
-      id: "sess_4",
-      characterId: "char_5",
-      name: "极客阿峰",
-      avatar: getAvatar('极客阿峰', 'first'),
-      cover: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800",
-      category: "探索开箱",
-      subTag: "硬核数码",
-      topic: "首发上手！超旗舰透明主机拆解",
-      heat: 45100,
-      roomId: 883192,
-      startTime: Date.now() - 1000 * 60 * 5,
-      endTime: Date.now() + 1000 * 60 * 95,
-      isNPC: false
-    }
-  ];
+  const defaultLiveSessions = [];
 
   function getStore(table) {
     try {
@@ -343,15 +282,7 @@
         };
       },
       async generateImage(options) {
-        const sampleCovers = [
-          "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800",
-          "https://images.unsplash.com/photo-1563089145-599997674d42?w=800",
-          "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800",
-          "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800",
-          "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800"
-        ];
-        const randomCover = sampleCovers[Math.floor(Math.random() * sampleCovers.length)];
-        return { imageUrl: randomCover, url: randomCover };
+        return { imageUrl: null, url: null };
       }
     },
     on(event, handler) {

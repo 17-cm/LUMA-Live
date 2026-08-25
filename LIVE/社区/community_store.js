@@ -11,112 +11,29 @@ var api = window.api || {};
 
 // 1. 基础预置帖子数据
 window.weiboPosts = window.weiboPosts || [
-  // ⚠️ 样板帖子（临时展示用，确认框架后删除）
   {
-    id: 'post_sample_framework',
+    id: 'post_welcome_001',
     author: {
-      name: '希尔维娅的超话前线',
+      name: 'LUMA Live小助手',
       avatar: '',
-      badge: '独家爆料',
+      badge: '系统消息',
       verified: true
     },
     time: '刚刚',
-    tag: '#希尔维娅直播间空间错位#',
-    mention: '@希尔维娅',
-    linkText: '网页链接 🔗',
-    clipText: '直播间切片',
-    content: '希尔维娅在直播国风宅舞时，因实验室通风系统异常导致重心偏移，她下意识动用S级空间异能修正姿态，结果导致直播间全息投影瞬间发生折叠，背景中的实验架直接被"折叠"到了天花板上。面对满屏惊叹，教授冷静地关掉舞蹈伴奏，对着镜头开始分析此次空间介质紊乱的力学原理，直播画风从"才艺秀"瞬间秒变"空间物理公开课"。',
-    image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800',
+    tag: '#第一条动态#',
+    mention: '',
+    linkText: '',
+    clipText: '',
+    content: '大家好，我是LUMA Live的第1条动态。\n我诞生的时候，平台还没有主播，没有观众，连热搜都是编的。\n但我相信，很快就会有主播在这里开播，有观众在这里发弹幕，有神豪在这里刷火箭。\n如果你看到了这条动态，说明你比所有主播都来得早。\n不如……你自己开个播？',
+    image: 'https://files.catbox.moe/d1jldl.png',
     stats: {
-      reposts: 814,
-      comments: 4,
-      likes: 3066,
+      reposts: 0,
+      comments: 0,
+      likes: 0,
       isLiked: false,
       isDownloaded: false
     },
     commentTree: []
-  },
-  {
-    id: 'post_1',
-    author: {
-      name: '星芒吃瓜周刊',
-      avatar: getAvatar('星芒吃瓜周刊', 'first'),
-      badge: '独家狗仔',
-      verified: true
-    },
-    time: '10分钟前',
-    tag: '#主播连麦当场破防#',
-    mention: '@苏小喵',
-    linkText: '网页链接 🔗 直播间回放',
-    content: '昨晚在连麦PK对决中，某主播声称“全网没人能偷我的塔”，结果惨遭神秘神豪连续狂砸 5 个嘉年华瞬间反超！主播当场害羞捂脸光速下播！现场视频已传疯！',
-    image: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800',
-    stats: {
-      reposts: 1240,
-      comments: 3842,
-      likes: 12400,
-      isLiked: false,
-      isDownloaded: false
-    },
-    commentTree: [
-      {
-        id: 'c1',
-        user: '吃瓜第一线',
-        avatar: getAvatar(null, 'emoji'),
-        ip: '塞博空间',
-        time: '12分钟前',
-        text: '昨晚看直播的我笑得想死，主播当场破防把摄像头都晃歪了哈哈哈哈！',
-        likes: 342,
-        isLiked: false,
-        replies: [
-          {
-            id: 'r1',
-            user: '苏小喵',
-            avatar: getAvatar(null, 'emoji'),
-            isAuthor: true,
-            replyTo: '吃瓜第一线',
-            ip: '星环港',
-            time: '8分钟前',
-            text: '谁踹摄像头了？！那是机械臂故障！别造谣啊！',
-            likes: 128
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'post_2',
-    author: {
-      name: '电竞前线大队长',
-      avatar: getAvatar('电竞前线大队长', 'first'),
-      badge: '赛事解说',
-      verified: true
-    },
-    time: '25分钟前',
-    tag: '#神秘神豪空降直播间#',
-    mention: '@星奈',
-    linkText: '网页链接 🔗 榜单战报',
-    content: '今日全服热度榜被刷新！神秘土豪连续点亮 99 个至尊冠名灯牌，引发全服粉丝后援会疯狂围观，超话热度直冲千万大关！',
-    image: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800',
-    stats: {
-      reposts: 890,
-      comments: 1540,
-      likes: 8760,
-      isLiked: false,
-      isDownloaded: false
-    },
-    commentTree: [
-      {
-        id: 'c2',
-        user: '柠檬树下柠檬精',
-        avatar: getAvatar(null, 'emoji'),
-        ip: '上海',
-        time: '20分钟前',
-        text: '有钱人的世界真的太震撼了，这才是真正的榜一大哥！',
-        likes: 189,
-        isLiked: false,
-        replies: []
-      }
-    ]
   }
 ];
 

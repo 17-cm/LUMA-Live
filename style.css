@@ -2105,6 +2105,24 @@ input:checked + .switch-slider:before {
   font-size:10px;font-weight:800;padding:4px 10px;border-radius:var(--r-pill)}
 .hero-hot .title{font-size:16px;font-weight:800;color:#fff;line-height:1.35;margin-bottom:6px}
 .hero-hot .meta{display:flex;align-items:center;gap:10px;font-size:11px;color:rgba(255,255,255,.85);font-weight:500}
+.hero-edit-btn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.4);border:0;color:#fff;cursor:pointer;backdrop-filter:blur(4px);transition:all .2s}
+.hero-edit-btn:hover{background:rgba(0,0,0,.6);transform:scale(1.1)}
+.hero-hot-edit{height:auto;display:flex;flex-direction:column;background:#1a1a2e}
+.hero-edit-img-wrap{position:relative;width:100%;height:160px;overflow:hidden}
+.hero-edit-img-wrap img{width:100%;height:100%;object-fit:cover}
+.hero-upload-btn{position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;font-weight:600;padding:6px 12px;border-radius:8px;cursor:pointer;backdrop-filter:blur(4px)}
+.hero-upload-btn:hover{background:rgba(0,0,0,.8)}
+.hero-edit-form{padding:12px;display:flex;flex-direction:column;gap:8px}
+.hero-edit-input{width:100%;border:1px solid #333;border-radius:8px;padding:8px 10px;font-size:13px;font-weight:600;background:#2a2a3e;color:#fff;outline:none}
+.hero-edit-input:focus{border-color:#F43F5E}
+.hero-edit-row{display:flex;gap:8px}
+.hero-edit-input-sm{flex:1;border:1px solid #333;border-radius:8px;padding:6px 10px;font-size:12px;background:#2a2a3e;color:#fff;outline:none}
+.hero-edit-input-sm:focus{border-color:#F43F5E}
+.hero-edit-actions{display:flex;gap:8px;justify-content:flex-end}
+.hero-save-btn{background:#F43F5E;color:#fff;border:0;border-radius:8px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer}
+.hero-save-btn:hover{background:#E11D48}
+.hero-cancel-btn{background:#333;color:#fff;border:0;border-radius:8px;padding:6px 16px;font-size:12px;font-weight:600;cursor:pointer}
+.hero-cancel-btn:hover{background:#444}
 
 /* 热搜榜单 */
 .hot-list{background:var(--surface);border-radius:var(--r-card);overflow:hidden;
@@ -2143,7 +2161,7 @@ input:checked + .switch-slider:before {
    post.stats.likes      点赞数
    post.stats.isLiked    是否已点赞
    ═══════════════════════════════════════════════════════════════ */
-.post-card{background:var(--surface);border-radius:var(--r-card);overflow:hidden;
+.post-card{position:relative;background:var(--surface);border-radius:var(--r-card);overflow:hidden;
   border:1px solid var(--line);margin-bottom:12px;
   box-shadow:0 1px 3px rgba(26,26,46,.04)}
 .post-card .post-head{display:flex;align-items:center;justify-content:space-between;padding:14px 14px 8px}

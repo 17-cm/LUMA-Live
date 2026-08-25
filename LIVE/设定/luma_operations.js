@@ -93,7 +93,7 @@ const lumaOpsGateway = {
     const start = now;
     const end = start + dur * 60 * 1000;
 
-    let coverUrl = character?.cover || character?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800';
+    let coverUrl = character?.cover || character?.avatar || '';
     let rawCat = category || (character?.tags ? character.tags[0] : '随性杂谈');
     let chosenCat = (typeof normalizeCategory === 'function') ? normalizeCategory(rawCat) : rawCat;
     let chosenSubTag = (character?.tags && character.tags[1]) ? character.tags[1] : (rawCat !== chosenCat ? rawCat : '日常唠嗑');
@@ -382,7 +382,7 @@ async function syncLiveSessions(options = {}, nowTime = null) {
     if (Math.random() < 0.5) {
       // 初始状态：开播中，随机已播时长
       const initLiveMins = Math.floor(Math.random() * Math.floor(maxLiveMins * 0.7)) + 1;
-      const coverUrl = c.cover || c.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800';
+      const coverUrl = c.cover || c.avatar || '';
       const rawCat = c.tags ? c.tags[0] : '随性杂谈';
       const chosenCat = (typeof normalizeCategory === 'function') ? normalizeCategory(rawCat) : rawCat;
       const newSession = {

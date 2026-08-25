@@ -209,7 +209,7 @@ async function handleGenerateNewTrend() {
     mention: `@${host.name}`,
     linkText: '网页链接 🔗 直播间切片',
     content: parsed.summary,
-    image: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800',
+    image: '',
     stats: {
       reposts: Math.floor(Math.random() * 800 + 50),
       comments: (parsed.comments || []).length,
