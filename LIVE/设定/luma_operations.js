@@ -1100,8 +1100,8 @@ async function luma_will_listener(event) {
       return;
     }
 
-    // 提取文本内容
-    let content = raw.content || raw.text || raw.message || raw.body || raw.prompt || '';
+    // 优先提取 rawResponseText（宿主在 content 中剥离了指令，原始状态指令存放在 rawResponseText/rawText 中）
+    let content = raw.rawResponseText || raw.rawText || raw.raw || raw.fullResponse || raw.content || raw.text || raw.message || raw.body || raw.prompt || '';
     if (typeof content !== 'string') {
       content = typeof raw === 'string' ? raw : JSON.stringify(raw);
     }
