@@ -7,38 +7,7 @@
   const hub = window.LumaDataHub;
 
   // 预设默认的 Char 互动打赏初始种子（保证初始主页和榜单有合理的生态数据）
-  const DEFAULT_SEEDS = [
-    {
-      fromId: 'char_1',
-      fromName: '傲娇同桌', fromAvatar: getAvatar('傲娇同桌', 'first'),
-      toId: 'user',
-      toName: '玩家', toAvatar: getAvatar('玩家', 'first'),
-      totalAmount: 9990,
-      giftCount: 9,
-      lastTimestamp: Date.now() - 10 * 60 * 1000,
-      tag: '👑 至尊帝王'
-    },
-    {
-      fromId: 'char_2',
-      fromName: '赛博歌姬 · 露娜', fromAvatar: getAvatar('赛博歌姬 · 露娜', 'first'),
-      toId: 'user',
-      toName: '玩家', toAvatar: getAvatar('玩家', 'first'),
-      totalAmount: 5200,
-      giftCount: 6,
-      lastTimestamp: Date.now() - 25 * 60 * 1000,
-      tag: '💎 超级粉丝团'
-    },
-    {
-      fromId: 'char_4',
-      fromName: '次元猫娘 · 桃桃', fromAvatar: getAvatar('次元猫娘 · 桃桃', 'first'),
-      toId: 'user',
-      toName: '玩家', toAvatar: getAvatar('玩家', 'first'),
-      totalAmount: 2330,
-      giftCount: 4,
-      lastTimestamp: Date.now() - 60 * 60 * 1000,
-      tag: '💖 铁杆守护'
-    }
-  ];
+  const DEFAULT_SEEDS = [];
 
   function getMatrixKey(fromId, toId) {
     return `${fromId}_TO_${toId}`;
