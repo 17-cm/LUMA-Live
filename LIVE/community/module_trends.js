@@ -661,3 +661,95 @@ function deletePost(postId) {
   if (window.api && api.ui && api.ui.toast) api.ui.toast('帖子已删除');
 }
 window.deletePost = deletePost;
+
+
+// =========================================================================
+// 热搜分类（动态渲染 + 原地编辑 + api.db 持久化）
+// =========================================================================
+const DEFAULT_HOT_CATEGORIES = ['实时', '娱乐', '科技', '体育', '游戏', '音乐', '影视'];
+let hotCategories = [...DEFAULT_HOT_CATEGORIES];
+let hotCatEditMode = false;
+
+async function loadHotCategories() {
+  try {
+    if (window.api && api.db && api.db.get) {
+      const saved = await api.db.get('app_config', 'hot_categories');
+      if (saved && Array.isArray(saved) && saved.length > 0) {
+        hotCategories = saved;
+      }
+    }
+  } catch (e) {}
+  renderHotCatChips();
+}
+
+async function saveHotCategories() {
+  try {
+    if (window.api && api.db && api.db.set) {
+      await api.db.set('app_config', 'hot_categories', hotCategories);
+    }
+  } catch (e) {}
+}
+
+function renderHotCatChips() {
+  const container = document.getElementById('hotCatChips');
+  if (!container) return;
+  
+  if (hotCatEditMode) {
+    // 编辑模式：每个分类变成 input
+    container.innerHTML = hotCategories.map((cat, idx) => 
+      '<input type="text" class="cat-chip cat-edit-input" data-idx="' + idx + '" value="' + cat.replace(/"/g, '&quot;') + '" style="width:60px;text-align:center;border:1px solid #3B82F6;border-radius:9999px;padding:4px 8px;font-size:12px;outline:none;">'
+    ).join('');
+    // 绑定失焦保存
+    container.querySelectorAll('.cat-edit-input').forEach(input => {
+      input.addEventListener('blur', function() {
+        const idx = parseInt(this.dataset.idx);
+        const newVal = this.value.trim();
+        if (newVal) hotCategories[idx] = newVal;
+      });
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') this.blur();
+      });
+    });
+  } else {
+    // 正常模式：显示按钮
+    container.innerHTML = hotCategories.map((cat, idx) => 
+      '<button class="cat-chip' + (idx === 0 ? ' on' : '') + '" onclick="selectHotCategory(' + idx + ')">' + cat + '</button>'
+    ).join('');
+  }
+}
+
+function selectHotCategory(idx) {
+  document.querySelectorAll('#hotCatChips .cat-chip').forEach((b, i) => {
+    b.classList.toggle('on', i === idx);
+  });
+  // 这里可以加分类筛选逻辑
+}
+
+function toggleHotCatEdit() {
+  hotCatEditMode = !hotCatEditMode;
+  const btn = document.getElementById('hotCatEditBtn');
+  if (btn) {
+    if (hotCatEditMode) {
+      btn.style.opacity = '1';
+      btn.style.color = '#3B82F6';
+      btn.style.transform = 'rotate(-15deg)';
+    } else {
+      btn.style.opacity = '.5';
+      btn.style.color = 'inherit';
+      btn.style.transform = 'rotate(0)';
+      // 退出编辑模式时保存
+      saveHotCategories();
+      renderHotCatChips();
+      if (window.api && api.ui && api.ui.toast) api.ui.toast('分类已保存');
+    }
+  }
+  renderHotCatChips();
+}
+window.toggleHotCatEdit = toggleHotCatEdit;
+
+// 页面加载时初始化分类
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', loadHotCategories);
+} else {
+  loadHotCategories();
+}
