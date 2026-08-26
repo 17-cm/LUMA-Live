@@ -1369,11 +1369,11 @@ async function lumaInitApp() {
   console.log('[LUMA Live] ✅ 启动成功');
 }
 
-// 初始化：暂不自动调用，等所有模块迁移完成后启用
-// if (document.readyState === 'loading') {
-//   document.addEventListener('DOMContentLoaded', lumaInitApp);
-// } else {
-//   lumaInitApp();
-// }
+// 初始化：DOM 就绪后自动启动
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', lumaInitApp);
+} else {
+  lumaInitApp();
+}
 window.lumaInitApp = lumaInitApp;
-console.log('[settings] 交互函数已加载，初始化待启用');
+console.log('[settings] 交互函数已加载，初始化已启用');
