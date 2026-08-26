@@ -96,14 +96,19 @@
   <script src="LIVE/community/module_forum.js"></script>
   <!-- 8. 社区入口（依赖所有子模块，最后加载） -->
   <script src="LIVE/community/trends.js"></script>
-  <!-- 9. 主页全屏页面 HTML -->
+  <!-- 9. 直播全屏页面 HTML -->
+  <script src="LIVE/live/live_pages.js"></script>
+  <!-- 10. 直播逻辑（room_loading 先加载，live_logic 依赖它） -->
+  <script src="LIVE/live/room_loading.js"></script>
+  <script src="LIVE/live/live_logic.js"></script>
+  <!-- 11. 主页全屏页面 HTML -->
   <script src="LIVE/home/home_pages.js"></script>
-  <!-- 10. 主页逻辑 -->
+  <!-- 12. 主页逻辑 -->
   <script src="LIVE/home/profile.js"></script>
   <script src="LIVE/home/streamer_profile.js"></script>
-  <!-- 11. 设定页交互逻辑 -->
+  <!-- 13. 设定页交互逻辑 -->
   <script src="LIVE/settings/main.js"></script>
-  <!-- 12. 主入口初始化（最后） -->
+  <!-- 14. 主入口初始化（最后） -->
   <script src="logic/main.js"></script>
 </body>
 </html>
