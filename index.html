@@ -78,14 +78,27 @@
   <script src="logic/app_presets.js"></script>
   <!-- 3. 核心工具库（存储/AI/网络/工具函数） -->
   <script src="logic/core.js"></script>
-  <!-- 4. 四个主页面（各自注入自己的 HTML） -->
+  <!-- 4. 数据层 -->
+  <script src="data/community_store.js"></script>
+  <!-- 5. 四个主页面（各自注入自己的 HTML） -->
   <script src="LIVE/live/live.js"></script>
   <script src="LIVE/community/community.js"></script>
   <script src="LIVE/home/home.js"></script>
   <script src="LIVE/settings/settings.js"></script>
-  <!-- 5. 设定页交互逻辑 -->
+  <!-- 6. 社区全屏页面 HTML -->
+  <script src="LIVE/community/community_pages.js"></script>
+  <!-- 7. 社区子模块（按依赖顺序） -->
+  <script src="LIVE/community/module_detail.js"></script>
+  <script src="LIVE/community/module_ranking.js"></script>
+  <script src="LIVE/community/module_trends.js"></script>
+  <script src="LIVE/community/module_supertopic.js"></script>
+  <script src="LIVE/community/module_mytopic.js"></script>
+  <script src="LIVE/community/module_forum.js"></script>
+  <!-- 8. 社区入口（依赖所有子模块，最后加载） -->
+  <script src="LIVE/community/trends.js"></script>
+  <!-- 9. 设定页交互逻辑 -->
   <script src="LIVE/settings/main.js"></script>
-  <!-- 6. 主入口初始化（最后） -->
+  <!-- 10. 主入口初始化（最后） -->
   <script src="logic/main.js"></script>
 </body>
 </html>
