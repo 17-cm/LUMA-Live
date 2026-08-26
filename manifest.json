@@ -24,7 +24,8 @@
     "memory.write",
     "network.fetch",
     "chat.read",
-    "chat.read.background"
+    "chat.read.background",
+    "chat.tools"
   ],
   "extensions": {
     "chat": {
