@@ -3,134 +3,57 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>注入测试 - LUMA Live</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, "PingFang SC", sans-serif; background: #f5f5f7; height: 100vh; display: flex; flex-direction: column; }
-    .tab-page { flex: 1; overflow-y: auto; padding: 20px; display: none; }
-    .tab-page.active { display: block; }
-    .tab-bar { display: flex; border-top: 1px solid #e0e0e0; background: white; padding-bottom: env(safe-area-inset-bottom); }
-    .tab-btn { flex: 1; padding: 12px 0; text-align: center; cursor: pointer; font-size: 13px; color: #999; }
-    .tab-btn.active { color: #6366f1; font-weight: 700; }
-    .full-page { position: fixed; inset: 0; background: white; z-index: 100; display: none; padding: 20px; overflow-y: auto; }
-    .full-page.open { display: block; }
-    .result { margin: 8px 0; padding: 10px 14px; border-radius: 10px; font-size: 13px; }
-    .pass { background: #dcfce7; color: #166534; }
-    .fail { background: #fee2e2; color: #991b1b; }
-    button { padding: 10px 18px; margin: 6px 4px; border: none; border-radius: 10px; background: #6366f1; color: white; font-size: 14px; cursor: pointer; }
-    button.secondary { background: #e0e7ff; color: #4338ca; }
-    h2 { font-size: 18px; margin-bottom: 12px; color: #1f2937; }
-    h3 { font-size: 15px; margin: 16px 0 8px; color: #374151; }
-    p { font-size: 14px; color: #6b7280; line-height: 1.6; margin-bottom: 8px; }
-    .hint { font-size: 12px; color: #9ca3af; margin-top: 20px; }
-  </style>
+  <title>LUMA Live</title>
+  <!-- 字体：只保留 Playfair Display（开屏用） -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600;1,800&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 全局样式 -->
+  <link rel="stylesheet" href="style.css">
+  <!-- 开屏动画：必须在 head 阻塞加载，第一帧即创建遮罩 -->
+  <script src="logic/splash.js"></script>
 </head>
-<body>
-  <!-- 页面容器：所有页面由 JS 动态注入 -->
-  <div id="pages-root"></div>
+<body class="h-screen w-screen flex flex-col relative select-none">
 
-  <!-- 底部 Tab 栏（静态公共部分） -->
-  <div class="tab-bar">
-    <div class="tab-btn active" onclick="switchTab('live')">直播</div>
-    <div class="tab-btn" onclick="switchTab('community')">社区</div>
-    <div class="tab-btn" onclick="switchTab('home')">主页</div>
-    <div class="tab-btn" onclick="switchTab('settings')">设定</div>
+  <!-- 页面容器：四个主 Tab 页面由各自 JS 动态注入 -->
+  <div id="pages-root" class="flex-1 flex flex-col overflow-hidden"></div>
+
+  <!-- 底部导航栏 -->
+  <div class="fixed bottom-0 left-0 right-0 z-30 pb-safe">
+    <nav class="dock-glass h-[70px] flex items-center justify-around px-3 pb-2 pt-1">
+      <button onclick="switchTab('live')" id="nav-btn-live" class="dock-btn active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+        <span class="text-[9px] font-black">直播</span>
+      </button>
+      <button onclick="switchTab('trends')" id="nav-btn-trends" class="dock-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        <span class="text-[9px] font-black">社区</span>
+      </button>
+      <button onclick="switchTab('profile')" id="nav-btn-profile" class="dock-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <span class="text-[9px] font-black">主页</span>
+      </button>
+      <button onclick="switchTab('settings')" id="nav-btn-settings" class="dock-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span class="text-[9px] font-black">设定</span>
+      </button>
+    </nav>
   </div>
 
-  <script>
-  (function () {
-    'use strict';
+  <!-- 全屏页面容器：直播间、主播主页、社区子页等由 JS 动态注入 -->
+  <div id="fullscreen-root"></div>
 
-    // ---------- 1. 动态注入四个 Tab 页面 + 一个全屏页面 ----------
-    var pagesRoot = document.getElementById('pages-root');
-    pagesRoot.innerHTML =
-      '<div id="tab-live" class="tab-page active">' +
-        '<h2>🎬 直播广场</h2>' +
-        '<p>这个页面的 HTML 是由 JS 动态注入的，不是写在 index.html 里的。</p>' +
-        '<button onclick="window.__testInlineOnclick()">测试内联 onclick</button>' +
-        '<button class="secondary" onclick="window.__openFullPage()">打开全屏页</button>' +
-        '<div id="inline-result"></div>' +
-        '<div id="auto-results"></div>' +
-      '</div>' +
-      '<div id="tab-community" class="tab-page">' +
-        '<h2>🔥 社区</h2>' +
-        '<p>社区页面内容（动态注入）</p>' +
-        '<p>如果你能切换到这里并看到内容，说明 Tab 切换工作正常。</p>' +
-      '</div>' +
-      '<div id="tab-home" class="tab-page">' +
-        '<h2>👤 主页</h2>' +
-        '<p>主页内容（动态注入）</p>' +
-      '</div>' +
-      '<div id="tab-settings" class="tab-page">' +
-        '<h2>⚙️ 设定</h2>' +
-        '<p>设定页面内容（动态注入）</p>' +
-      '</div>' +
-      '<div id="fullPageTest" class="full-page">' +
-        '<h2>🪟 全屏页面测试</h2>' +
-        '<p>这个页面也是 JS 动态注入的。</p>' +
-        '<p>如果你能看到这个，说明 PageStack 模式的动态注入也工作了。</p>' +
-        '<button onclick="window.__closeFullPage()">关闭全屏页</button>' +
-      '</div>';
-
-    // ---------- 2. Tab 切换 ----------
-    window.switchTab = function (tabName) {
-      var pages = document.querySelectorAll('.tab-page');
-      for (var i = 0; i < pages.length; i++) pages[i].classList.remove('active');
-      var btns = document.querySelectorAll('.tab-btn');
-      for (var j = 0; j < btns.length; j++) btns[j].classList.remove('active');
-      var page = document.getElementById('tab-' + tabName);
-      if (page) page.classList.add('active');
-      if (event && event.target) event.target.classList.add('active');
-    };
-
-    // ---------- 3. 内联 onclick 测试 ----------
-    window.__testInlineOnclick = function () {
-      var el = document.getElementById('inline-result');
-      el.innerHTML = '<div class="result pass">✅ 内联 onclick 在动态注入的 HTML 上工作正常！</div>';
-    };
-
-    // ---------- 4. 全屏页面（模拟 PageStack） ----------
-    window.__openFullPage = function () {
-      document.getElementById('fullPageTest').classList.add('open');
-    };
-    window.__closeFullPage = function () {
-      document.getElementById('fullPageTest').classList.remove('open');
-    };
-
-    // ---------- 5. 自动检测 ----------
-    function runAutoTests() {
-      var tests = [
-        ['pages-root 容器存在', !!document.getElementById('pages-root')],
-        ['tab-live 动态注入成功', !!document.getElementById('tab-live')],
-        ['tab-community 动态注入成功', !!document.getElementById('tab-community')],
-        ['tab-home 动态注入成功', !!document.getElementById('tab-home')],
-        ['tab-settings 动态注入成功', !!document.getElementById('tab-settings')],
-        ['fullPageTest 动态注入成功', !!document.getElementById('fullPageTest')],
-        ['switchTab 是全局函数', typeof window.switchTab === 'function'],
-        ['内联onclick函数已注册', typeof window.__testInlineOnclick === 'function'],
-        ['全屏页打开函数已注册', typeof window.__openFullPage === 'function'],
-        ['动态注入的元素可见', document.getElementById('tab-live').classList.contains('active')],
-      ];
-
-      var allPass = true;
-      for (var k = 0; k < tests.length; k++) {
-        if (!tests[k][1]) allPass = false;
-      }
-
-      var resultsDiv = document.getElementById('auto-results');
-      if (resultsDiv) {
-        var html = '<h3>🔍 自动检测结果</h3>';
-        for (var m = 0; m < tests.length; m++) {
-          html += '<div class="result ' + (tests[m][1] ? 'pass' : 'fail') + '">' +
-            (tests[m][1] ? '✅' : '❌') + ' ' + tests[m][0] + '</div>';
-        }
-        html += '<div class="hint">请手动测试：切换底部Tab、点击「测试内联onclick」、点击「打开全屏页」</div>';
-        resultsDiv.innerHTML = html;
-      }
-    }
-
-    runAutoTests();
-  })();
-  </script>
+  <!-- ==================== 脚本加载顺序 ==================== -->
+  <!-- 1. 页面栈管理器 -->
+  <script src="page-stack/page-stack.js"></script>
+  <!-- 2. 四个主页面（各自注入自己的 HTML + 逻辑） -->
+  <script src="LIVE/live/live.js"></script>
+  <script src="LIVE/community/community.js"></script>
+  <script src="LIVE/home/home.js"></script>
+  <script src="LIVE/settings/settings.js"></script>
+  <!-- 3. 主入口初始化（最后） -->
+  <script src="logic/main.js"></script>
 </body>
 </html>
