@@ -74,12 +74,18 @@
   <!-- ==================== 脚本加载顺序 ==================== -->
   <!-- 1. 页面栈管理器 -->
   <script src="page-stack/page-stack.js"></script>
-  <!-- 2. 四个主页面（各自注入自己的 HTML + 逻辑） -->
+  <!-- 2. 预设管理（core.js 依赖） -->
+  <script src="logic/app_presets.js"></script>
+  <!-- 3. 核心工具库（存储/AI/网络/工具函数） -->
+  <script src="logic/core.js"></script>
+  <!-- 4. 四个主页面（各自注入自己的 HTML） -->
   <script src="LIVE/live/live.js"></script>
   <script src="LIVE/community/community.js"></script>
   <script src="LIVE/home/home.js"></script>
   <script src="LIVE/settings/settings.js"></script>
-  <!-- 3. 主入口初始化（最后） -->
+  <!-- 5. 设定页交互逻辑 -->
+  <script src="LIVE/settings/main.js"></script>
+  <!-- 6. 主入口初始化（最后） -->
   <script src="logic/main.js"></script>
 </body>
 </html>
