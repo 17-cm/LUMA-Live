@@ -380,8 +380,8 @@ async function loadHotSearchItems() {
 
 async function saveHotSearchItems() {
   try {
-    if (window.api && api.db && api.db.set && window.HOT_SEARCH_ITEMS) {
-      await api.db.set('app_config', 'hot_search_items', window.HOT_SEARCH_ITEMS);
+    if (window.api && api.db && window.HOT_SEARCH_ITEMS) {
+      await dbUpsert('app_config', 'hot_search_items', window.HOT_SEARCH_ITEMS);
     }
   } catch (e) {}
 }
@@ -742,8 +742,8 @@ async function loadHotCategories() {
 
 async function saveHotCategories() {
   try {
-    if (window.api && api.db && api.db.set) {
-      await api.db.set('app_config', 'hot_categories', hotCategories);
+    if (window.api && api.db) {
+      await dbUpsert('app_config', 'hot_categories', hotCategories);
     }
   } catch (e) {}
 }
