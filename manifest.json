@@ -28,7 +28,8 @@
     "chat.tools",
     "calendar.read",
     "calendar.write",
-    "notifications.write"
+    "notifications.write",
+    "characters.state.read"
   ],
   "extensions": {
     "chat": {
