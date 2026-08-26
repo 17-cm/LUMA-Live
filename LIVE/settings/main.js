@@ -45,7 +45,7 @@ function switchTab(tabId) {
     if (headerIcon) {
       headerIcon.innerHTML = `<circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path>`;
     }
-    renderTrends();
+    if (typeof renderTrends === "function") renderTrends();
   } else if (tabId === 'profile') {
     if (headerTitle) headerTitle.textContent = '个人中心';
     if (headerSubtitle) headerSubtitle.textContent = 'My Profile & Vault';
@@ -53,9 +53,9 @@ function switchTab(tabId) {
     if (headerIcon) {
       headerIcon.innerHTML = `<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>`;
     }
-    renderDualRankList();
-    syncWalletDisplays();
-    syncFollowCountDisplay();
+    if (typeof renderDualRankList === "function") renderDualRankList();
+    if (typeof syncWalletDisplays === "function") syncWalletDisplays();
+    if (typeof syncFollowCountDisplay === "function") syncFollowCountDisplay();
   } else if (tabId === 'settings') {
     if (headerTitle) headerTitle.textContent = '系统设定';
     if (headerSubtitle) headerSubtitle.textContent = 'Sandbox Configuration';
@@ -63,10 +63,10 @@ function switchTab(tabId) {
     if (headerIcon) {
       headerIcon.innerHTML = `<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>`;
     }
-    syncParamDisplays();
-    renderPresetCategories();
-    renderImagePromptEntries();
-    syncCustomApiModalFields();
+    if (typeof syncParamDisplays === "function") syncParamDisplays();
+    if (typeof renderPresetCategories === "function") renderPresetCategories();
+    if (typeof renderImagePromptEntries === "function") renderImagePromptEntries();
+    if (typeof syncCustomApiModalFields === "function") syncCustomApiModalFields();
   }
 }
 window.switchTab = switchTab;
@@ -855,7 +855,7 @@ function handleImageSizeChange(val) {
   const ratioEntry = (window.imageSettings.prompts || []).find(p => p.id === 'ratio_prompt');
   if (ratioEntry) {
     ratioEntry.content = val === '9:16' ? '竖屏 9:16 构图，vertical 9:16 composition' : val === '16:9' ? '横屏 16:9 构图，widescreen 16:9 composition' : '正方形 1:1 构图，square 1:1 composition';
-    renderImagePromptEntries();
+    if (typeof renderImagePromptEntries === "function") renderImagePromptEntries();
   }
 }
 window.handleImageSizeChange = handleImageSizeChange;
@@ -912,7 +912,7 @@ window.addNewImagePromptEntry = addNewImagePromptEntry;
 function removeImagePromptEntry(idx) {
   if (window.imageSettings?.prompts) {
     window.imageSettings.prompts.splice(idx, 1);
-    renderImagePromptEntries();
+    if (typeof renderImagePromptEntries === "function") renderImagePromptEntries();
   }
 }
 window.removeImagePromptEntry = removeImagePromptEntry;
@@ -1157,7 +1157,7 @@ async function handleFileImportPresets(e) {
     const data = JSON.parse(text);
     window.appPresets = data;
     await dbUpsert("app_settings", "app_presets", { data: data });
-    renderPresetCategories();
+    if (typeof renderPresetCategories === "function") renderPresetCategories();
     if (api.ui?.toast) api.ui.toast("提示词预设导入成功！");
   } catch (err) {
     if (api.ui?.toast) api.ui.toast("提示词文件解析失败");
@@ -1203,7 +1203,7 @@ async function lumaInitApp() {
 
     const followsRec = await api.db.list("follows", { limit: 500 }) || [];
     window.followedHosts = followsRec.map(f => f.id);
-    syncFollowCountDisplay();
+    if (typeof syncFollowCountDisplay === "function") syncFollowCountDisplay();
 
     // 加载超话关注列表
     try {
