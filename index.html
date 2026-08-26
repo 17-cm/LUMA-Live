@@ -78,7 +78,10 @@
   <script src="logic/app_presets.js"></script>
   <!-- 3. 核心工具库（存储/AI/网络/工具函数） -->
   <script src="logic/core.js"></script>
-  <!-- 4. 数据层 -->
+  <!-- 4. 业务逻辑层 -->
+  <script src="logic/offline_simulation_engine.js"></script>
+  <script src="logic/luma_operations.js"></script>
+  <!-- 5. 数据层 -->
   <script src="data/community_store.js"></script>
   <!-- 5. 四个主页面（各自注入自己的 HTML） -->
   <script src="LIVE/live/live.js"></script>
@@ -101,6 +104,8 @@
   <!-- 10. 直播逻辑（room_loading 先加载，live_logic 依赖它） -->
   <script src="LIVE/live/room_loading.js"></script>
   <script src="LIVE/live/live_logic.js"></script>
+  <!-- 10.5 礼物系统（依赖直播间容器，在直播模块之后加载） -->
+  <script src="logic/gift_system.js"></script>
   <!-- 11. 主页全屏页面 HTML -->
   <script src="LIVE/home/home_pages.js"></script>
   <!-- 12. 主页逻辑 -->
