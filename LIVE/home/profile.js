@@ -99,6 +99,13 @@ async function saveUserProfileEdits() {
   closeEditProfileModal();
   await dbUpsert("app_profile", "user_profile", userProfileData);
   api.ui.toast("个人资料已保存！");
+
+  // 保存到 api.db
+  try {
+    if (window.api && api.db && api.db.set) {
+      await api.db.set('app_profile', 'user_profile', userProfileData);
+    }
+  } catch (e) {}
 }
 window.saveUserProfileEdits = saveUserProfileEdits;
 function openFollowListPageView() {
@@ -808,42 +815,3 @@ function hideSafeAreaGuides() {
 window.showSafeAreaGuides = showSafeAreaGuides;
 window.hideSafeAreaGuides = hideSafeAreaGuides;
 
-// =========================================================================
-// 用户资料原地编辑（替代弹窗）
-// =========================================================================
-let userProfileEditMode = false;
-
-function toggleUserProfileEdit() {
-  userProfileEditMode = !userProfileEditMode;
-  const nameEl = document.getElementById('userName');
-  const bioEl = document.getElementById('userBioText');
-  const editBtn = document.getElementById('userProfileEditBtn');
-  
-  if (userProfileEditMode) {
-    if (nameEl) {
-      nameEl.innerHTML = '<input id="editUserNameInput" type="text" value="' + (userProfileData.name || '玩家').replace(/"/g, '&quot;') + '" style="width:120px;font-size:14px;font-weight:800;border:1px solid #3B82F6;border-radius:8px;padding:2px 6px;outline:none;text-align:center;">';
-    }
-    if (bioEl) {
-      bioEl.innerHTML = '<textarea id="editUserBioInput" style="width:100%;font-size:12px;border:1px solid #3B82F6;border-radius:8px;padding:6px;outline:none;resize:none;min-height:60px;">' + (userProfileData.bio || '') + '</textarea>';
-    }
-    if (editBtn) editBtn.style.color = '#3B82F6';
-  } else {
-    const nameInput = document.getElementById('editUserNameInput');
-    const bioInput = document.getElementById('editUserBioInput');
-    if (nameInput) userProfileData.name = nameInput.value.trim() || '玩家';
-    if (bioInput) userProfileData.bio = bioInput.value.trim();
-    saveUserProfile();
-    syncUserProfile();
-    if (editBtn) editBtn.style.color = 'inherit';
-    if (window.api && api.ui && api.ui.toast) api.ui.toast('资料已保存');
-  }
-}
-window.toggleUserProfileEdit = toggleUserProfileEdit;
-
-async function saveUserProfile() {
-  try {
-    if (window.api && api.db && api.db.set) {
-      await api.db.set('app_profile', 'user_profile', userProfileData);
-    }
-  } catch (e) {}
-}
