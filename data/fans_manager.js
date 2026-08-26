@@ -9,7 +9,7 @@
   // 默认初始粉丝库 (当未持久化时计算并初始化)
   function getBaseFansSeed(entityId, charObj) {
     if (entityId === 'user' || entityId === 'player') {
-      return (window.userProfileData && window.userProfileData.fans) || 128;
+      return (window.userProfileData && window.userProfileData.fans) || 0;
     }
     const idStr = String(entityId || 'char_1');
     let hash = 0;
@@ -34,7 +34,7 @@
       if (id === 'user' || id === 'player' || id === 'current_user') {
         const stored = hub.getFans('user');
         if (stored !== null) return stored;
-        const initial = (window.userProfileData && window.userProfileData.fans) || 128;
+        const initial = (window.userProfileData && window.userProfileData.fans) || 0;
         hub.setFans('user', initial);
         return initial;
       }
