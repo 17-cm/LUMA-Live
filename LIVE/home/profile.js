@@ -13,9 +13,9 @@ let userProfileData = {
   ip: 'LUMA',
   tag: '新人主播',
   bio: '保持好奇，在赛博世界里做最真实的自己。',
-  fans: 128,
-  likes: 1240,
-  medals: 3
+  fans: 0,
+  likes: 0,
+  medals: 0
 };
 window.userProfileData = userProfileData;
 let revenueBalance = 0;
@@ -52,7 +52,7 @@ async function syncUserProfile() {
   const statLikeEl = document.getElementById('statLikeCount');
   if (statLikeEl) statLikeEl.textContent = (userProfileData.likes || 1240).toLocaleString();
   const statMedalEl = document.getElementById('statMedalCount');
-  if (statMedalEl) statMedalEl.textContent = userProfileData.medals || 3;
+  if (statMedalEl) statMedalEl.textContent = userProfileData.medals || 0;
   if (window.LumaTitlesManager) {
     const activeTitle = window.LumaTitlesManager.getActiveTitle('user');
     if (activeTitle) {
