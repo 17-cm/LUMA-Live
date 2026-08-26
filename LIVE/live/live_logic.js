@@ -1495,3 +1495,19 @@ if (window.PageStack) {
     zIndex: 150,  // 直播间层级高一些
   });
 }
+
+
+// =========================================================================
+// 【自动初始化】页面加载后默认渲染直播广场
+// =========================================================================
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    if (typeof selectMainCategory === 'function') {
+      selectMainCategory('all');
+    }
+  });
+} else {
+  if (typeof selectMainCategory === 'function') {
+    selectMainCategory('all');
+  }
+}
