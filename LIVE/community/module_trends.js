@@ -269,12 +269,31 @@ const DEFAULT_HERO_DATA = {
   discussions: '5000+'
 };
 
-function getHeroData() {
+let cachedHeroData = null;
+
+async function loadHeroData() {
+  try {
+    if (window.api && api.db && api.db.get) {
+      const saved = await api.db.get('app_config', 'hero_hot_search');
+      if (saved) {
+        cachedHeroData = { ...DEFAULT_HERO_DATA, ...saved };
+        return cachedHeroData;
+      }
+    }
+  } catch (e) {}
   try {
     const saved = localStorage.getItem(HERO_STORAGE_KEY);
-    if (saved) return { ...DEFAULT_HERO_DATA, ...JSON.parse(saved) };
+    if (saved) {
+      cachedHeroData = { ...DEFAULT_HERO_DATA, ...JSON.parse(saved) };
+      return cachedHeroData;
+    }
   } catch (e) {}
-  return { ...DEFAULT_HERO_DATA };
+  cachedHeroData = { ...DEFAULT_HERO_DATA };
+  return cachedHeroData;
+}
+
+function getHeroData() {
+  return cachedHeroData || { ...DEFAULT_HERO_DATA };
 }
 
 function saveHeroData(data) {
@@ -329,6 +348,43 @@ window.handleHeroImageUpload = handleHeroImageUpload;
 // 渲染热搜 TOP 榜（样板结构：.hero-hot 大图 + .hot-list）
 // 热搜编辑模式状态
 let hotSearchEditMode = false;
+
+
+// 热搜列表数据加载与保存
+async function loadHotSearchItems() {
+  try {
+    if (window.api && api.db && api.db.get) {
+      const saved = await api.db.get('app_config', 'hot_search_items');
+      if (saved && Array.isArray(saved) && saved.length > 0) {
+        window.HOT_SEARCH_ITEMS = saved;
+        return;
+      }
+    }
+  } catch (e) {}
+  // 默认热搜数据
+  if (!window.HOT_SEARCH_ITEMS || window.HOT_SEARCH_ITEMS.length === 0) {
+    window.HOT_SEARCH_ITEMS = [
+      { rank: 1, title: '赛博歌姬露娜深夜直播破百万', heat: '999万', badge: 'hot', badgeText: '爆' },
+      { rank: 2, title: '主播打赏榜一竟是程序员', heat: '856万', badge: 'new', badgeText: '新' },
+      { rank: 3, title: '虚拟主播出道即巅峰', heat: '723万', badge: '', badgeText: '' },
+      { rank: 4, title: '直播间礼物系统全新升级', heat: '612万', badge: '', badgeText: '' },
+      { rank: 5, title: '粉丝守护团招募中', heat: '501万', badge: '', badgeText: '' },
+      { rank: 6, title: '今日热搜：谁是下一个顶流', heat: '432万', badge: '', badgeText: '' },
+      { rank: 7, title: '超话签到活动开启', heat: '389万', badge: '', badgeText: '' },
+      { rank: 8, title: '主播联动夜即将开始', heat: '301万', badge: '', badgeText: '' },
+      { rank: 9, title: '平台年度盛典投票中', heat: '256万', badge: '', badgeText: '' },
+      { rank: 10, title: '新人主播扶持计划上线', heat: '198万', badge: '', badgeText: '' }
+    ];
+  }
+}
+
+async function saveHotSearchItems() {
+  try {
+    if (window.api && api.db && api.db.set && window.HOT_SEARCH_ITEMS) {
+      await api.db.set('app_config', 'hot_search_items', window.HOT_SEARCH_ITEMS);
+    }
+  } catch (e) {}
+}
 
 function renderHotSearchRanking() {
   const heroBox = document.getElementById('hotSearchHeroContainer');
@@ -412,6 +468,7 @@ function renderHotSearchRanking() {
           const idx = parseInt(this.dataset.idx);
           if (window.HOT_SEARCH_ITEMS && window.HOT_SEARCH_ITEMS[idx]) {
             window.HOT_SEARCH_ITEMS[idx].title = this.value;
+            saveHotSearchItems();
           }
         });
         input.addEventListener('keydown', function(e) {
@@ -663,12 +720,13 @@ function deletePost(postId) {
 window.deletePost = deletePost;
 
 
+
+
 // =========================================================================
-// 热搜分类（动态渲染 + 原地编辑 + api.db 持久化）
+// 热搜分类（与热搜榜共用小铅笔，编辑模式下边框变蓝可点击修改）
 // =========================================================================
 const DEFAULT_HOT_CATEGORIES = ['实时', '娱乐', '科技', '体育', '游戏', '音乐', '影视'];
 let hotCategories = [...DEFAULT_HOT_CATEGORIES];
-let hotCatEditMode = false;
 
 async function loadHotCategories() {
   try {
@@ -694,24 +752,41 @@ function renderHotCatChips() {
   const container = document.getElementById('hotCatChips');
   if (!container) return;
   
-  if (hotCatEditMode) {
-    // 编辑模式：每个分类变成 input
+  const editMode = hotSearchEditMode;
+  
+  if (editMode) {
+    // 编辑模式：每个分类变成可点击编辑的按钮（边框变蓝）
     container.innerHTML = hotCategories.map((cat, idx) => 
-      '<input type="text" class="cat-chip cat-edit-input" data-idx="' + idx + '" value="' + cat.replace(/"/g, '&quot;') + '" style="width:60px;text-align:center;border:1px solid #3B82F6;border-radius:9999px;padding:4px 8px;font-size:12px;outline:none;">'
+      '<button class="cat-chip cat-editable" data-idx="' + idx + '" style="border:1px solid #3B82F6;color:#3B82F6;background:#EFF6FF;">' + cat + '</button>'
     ).join('');
-    // 绑定失焦保存
-    container.querySelectorAll('.cat-edit-input').forEach(input => {
-      input.addEventListener('blur', function() {
+    // 绑定点击编辑
+    container.querySelectorAll('.cat-editable').forEach(btn => {
+      btn.addEventListener('click', function() {
         const idx = parseInt(this.dataset.idx);
-        const newVal = this.value.trim();
-        if (newVal) hotCategories[idx] = newVal;
-      });
-      input.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') this.blur();
+        const currentVal = hotCategories[idx];
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentVal;
+        input.style.cssText = 'width:60px;text-align:center;border:1px solid #3B82F6;border-radius:9999px;padding:4px 8px;font-size:12px;outline:none;background:#fff;';
+        this.replaceWith(input);
+        input.focus();
+        input.select();
+        const save = () => {
+          const newVal = input.value.trim();
+          if (newVal) {
+            hotCategories[idx] = newVal;
+            saveHotCategories();
+          }
+          renderHotCatChips();
+        };
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') input.blur();
+        });
       });
     });
   } else {
-    // 正常模式：显示按钮
+    // 正常模式：显示按钮（极细边框）
     container.innerHTML = hotCategories.map((cat, idx) => 
       '<button class="cat-chip' + (idx === 0 ? ' on' : '') + '" onclick="selectHotCategory(' + idx + ')">' + cat + '</button>'
     ).join('');
@@ -722,34 +797,20 @@ function selectHotCategory(idx) {
   document.querySelectorAll('#hotCatChips .cat-chip').forEach((b, i) => {
     b.classList.toggle('on', i === idx);
   });
-  // 这里可以加分类筛选逻辑
 }
 
-function toggleHotCatEdit() {
-  hotCatEditMode = !hotCatEditMode;
-  const btn = document.getElementById('hotCatEditBtn');
-  if (btn) {
-    if (hotCatEditMode) {
-      btn.style.opacity = '1';
-      btn.style.color = '#3B82F6';
-      btn.style.transform = 'rotate(-15deg)';
-    } else {
-      btn.style.opacity = '.5';
-      btn.style.color = 'inherit';
-      btn.style.transform = 'rotate(0)';
-      // 退出编辑模式时保存
-      saveHotCategories();
-      renderHotCatChips();
-      if (window.api && api.ui && api.ui.toast) api.ui.toast('分类已保存');
-    }
-  }
-  renderHotCatChips();
-}
-window.toggleHotCatEdit = toggleHotCatEdit;
+// 修改 toggleHotSearchEdit：同时控制 tag 编辑
+const _origToggleHotSearchEdit = toggleHotSearchEdit;
+window.toggleHotSearchEdit = function() {
+  _origToggleHotSearchEdit();
+  // 延迟渲染 tag，因为 _origToggleHotSearchEdit 里会先 renderHotSearchRanking
+  setTimeout(renderHotCatChips, 50);
+};
 
-// 页面加载时初始化分类
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', loadHotCategories);
-} else {
-  loadHotCategories();
-}
+// 初始化：加载数据
+(async function initHotSearchData() {
+  await loadHeroData();
+  await loadHotSearchItems();
+  await loadHotCategories();
+  renderHotSearchRanking();
+})();
