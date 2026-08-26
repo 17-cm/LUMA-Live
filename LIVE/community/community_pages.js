@@ -21,11 +21,8 @@
       </button>
     </div>
     <!-- 分类横滑 -->
-    <div class="cat-rail" id="hotCatRail" style="display:flex;align-items:center;gap:6px;">
-      <div id="hotCatChips" style="display:flex;gap:6px;flex:1;overflow-x:auto;"></div>
-      <button id="hotCatEditBtn" onclick="toggleHotCatEdit()" class="flex-shrink-0 p-1.5 rounded-full bg-slate-100 text-slate-600 active:scale-95 transition" title="编辑分类" style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:0;cursor:pointer;">
-        <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-      </button>
+    <div class="cat-rail" id="hotCatRail">
+      <div id="hotCatChips" style="display:flex;gap:6px;"></div>
     </div>
     <div id="flow">
       <!-- 置顶焦点热搜（JS 渲染 .hero-hot 结构） -->
