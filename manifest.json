@@ -25,7 +25,10 @@
     "network.fetch",
     "chat.read",
     "chat.read.background",
-    "chat.tools"
+    "chat.tools",
+    "calendar.read",
+    "calendar.write",
+    "notifications.write"
   ],
   "extensions": {
     "chat": {
