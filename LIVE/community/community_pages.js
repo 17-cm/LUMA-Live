@@ -16,7 +16,7 @@
       <button class="icon-btn" onclick="openCreatePostModal('#微博热搜#')">
         <svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></svg>
       </button>
-      <button class="icon-btn" onclick="refreshTrendsWithAI()" aria-label="刷新">
+      <button class="icon-btn" id="btnRefreshTrends" onclick="refreshTrendsWithAI()" aria-label="刷新">
         <svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M224,48v48a8,8,0,0,1-8,8H168a8,8,0,0,1,0-16h21.74A79.54,79.54,0,0,0,128,40a80,80,0,1,0,78.36,97.78,8,8,0,0,1,15.68,3.17A96,96,0,1,1,128,24a95.6,95.6,0,0,1,67.6,28.14V48a8,8,0,0,1,8-8A8,8,0,0,1,224,48Z"/></svg>
       </button>
     </div>

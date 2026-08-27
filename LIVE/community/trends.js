@@ -10,29 +10,35 @@ var api = window.api || {};
 let currentActiveCommunityPage = 'trends'; // 'trends' | 'super_topic' | 'ranking' | 'live_settings' | 'forum' | 'my_topic'
 
 // 1. 社区全量数据初始化与异步载入
+// DB (app_posts) 作为唯一权威数据源：删帖后从 DB 移除，退出 APP 重新进入也不会再恢复；
+// 首次运行（DB 为空且未 seed 过）才将预置初始帖 seed 入 DB 并打上标记，
+// 之后即使删光全部帖子（DB 为空）也不会重新注入初始帖。
 async function loadTrendsFromDb() {
   try {
     const savedPosts = await api.db.list("app_posts", { limit: 500 }) || [];
-    const postMap = new Map();
+    const dbPosts = Array.isArray(savedPosts) ? savedPosts.filter(p => p && p.id) : [];
 
-    // 优先读取 DB 中持久化的真实帖子
-    if (Array.isArray(savedPosts)) {
-      savedPosts.forEach(p => {
-        if (p && p.id) postMap.set(p.id, p);
-      });
-    }
-
-    // 将内存已有但未在 DB 中的帖子也补入（防止覆盖丢失，去重合并）
-    if (Array.isArray(window.weiboPosts)) {
-      window.weiboPosts.forEach(p => {
-        if (p && p.id && !postMap.has(p.id)) {
-          postMap.set(p.id, p);
+    if (dbPosts.length > 0) {
+      // DB 有记录：以其为准，按 id 去重合并，避免历史重复记录
+      const byId = new Map();
+      dbPosts.forEach(p => byId.set(p.id, p));
+      window.weiboPosts = Array.from(byId.values());
+    } else {
+      // DB 为空：仅首次运行（未 seed 过）才注入预置初始帖
+      let seeded = false;
+      try { seeded = localStorage.getItem('luma_weibo_seeded') === '1'; } catch (e) {}
+      if (!seeded && Array.isArray(window.weiboPosts) && window.weiboPosts.length > 0) {
+        for (const p of window.weiboPosts) {
+          try {
+            if (typeof window.persistPostToDb === 'function') {
+              await window.persistPostToDb(p);
+            } else {
+              await api.db.create("app_posts", { id: p.id, ...p }).catch(() => {});
+            }
+          } catch (e) {}
         }
-      });
-    }
-
-    if (postMap.size > 0) {
-      window.weiboPosts = Array.from(postMap.values());
+        try { localStorage.setItem('luma_weibo_seeded', '1'); } catch (e) {}
+      }
     }
   } catch (e) {}
 }

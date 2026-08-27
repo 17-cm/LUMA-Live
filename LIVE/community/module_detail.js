@@ -395,9 +395,13 @@ function handlePostAction(postId, action) {
   if (activePostId === postId) renderPostDetailView(post);
 
   try {
-    api.db.create("app_posts", post).catch(() => {
-      api.db.update("app_posts", post.id, post).catch(() => {});
-    });
+    if (typeof window.persistPostToDb === 'function') {
+      window.persistPostToDb(post);
+    } else {
+      api.db.create("app_posts", post).catch(() => {
+        api.db.update("app_posts", post.id, post).catch(() => {});
+      });
+    }
   } catch (e) {}
 }
 window.handlePostAction = handlePostAction;
@@ -477,9 +481,13 @@ async function submitTrendComment() {
   if (typeof renderTrends === 'function') renderTrends();
 
   try {
-    await api.db.create("app_posts", post).catch(() => {
-      api.db.update("app_posts", post.id, post).catch(() => {});
-    });
+    if (typeof window.persistPostToDb === 'function') {
+      await window.persistPostToDb(post);
+    } else {
+      await api.db.create("app_posts", post).catch(() => {
+        api.db.update("app_posts", post.id, post).catch(() => {});
+      });
+    }
   } catch (e) {}
 
   if (api.ui && api.ui.toast) {
@@ -488,8 +496,112 @@ async function submitTrendComment() {
 }
 window.submitTrendComment = submitTrendComment;
 
-function handleShareCurrentPost() {
-  if (typeof openSharePickerModal === 'function') openSharePickerModal();
+// 右上角「分享」按钮：改为调用 AI 根据帖子内容批量生成真实路人回复（含楼中楼、主播空降、楼主互动），
+// 生成结果注入 commentTree 并持久化，退出 APP 后不丢失。
+async function handleShareCurrentPost() {
+  const post = (window.weiboPosts || []).find(p => p.id === activePostId);
+  if (!post) return;
+
+  const btn = document.getElementById('btnSharePost');
+  const getAvatarFn = (typeof window.getAvatar === 'function') ? window.getAvatar : (() => '');
+  const resolveAvatar = (uname) => {
+    if (typeof window.getCharAvatarByName === 'function') {
+      const charAv = window.getCharAvatarByName(uname);
+      if (charAv) return charAv;
+    }
+    return getAvatarFn(uname, 'first');
+  };
+
+  if (typeof window.toggleBtnLoading === 'function') window.toggleBtnLoading(btn, true);
+  if (window.api && api.ui && api.ui.toast) api.ui.toast('正在根据帖子内容生成回复…');
+
+  try {
+    // 组装丰富的上下文：楼主、当前用户、平台主播名单、已有评论，供 AI 生成真实评论区（主播空降、围绕用户互动、楼主再次下场）
+    const userName = (window.currentUser && window.currentUser.name) || '';
+    const authorName = (post.author && post.author.name) || '楼主';
+    const charList = (typeof window.getAvailableCharsList === 'function') ? window.getAvailableCharsList() : [];
+    const charNames = charList.map(c => c.name).filter(Boolean);
+    const existingComments = (Array.isArray(post.commentTree) ? post.commentTree : [])
+      .slice(0, 10)
+      .map(c => `${c.user}：${c.text}`).join('\n');
+    const userCommented = (Array.isArray(post.commentTree) ? post.commentTree : [])
+      .some(c => c.user === userName);
+
+    const instruction = [
+      `【帖子作者(楼主)】：${authorName}`,
+      userName ? `【当前用户】：${userName}（${userCommented ? '已在本帖发表过评论，需围绕其发言展开互动' : '尚未发言，按普通路人处理'}）` : '',
+      charNames.length ? `【平台主播名单】：${charNames.join('、')}（请随机挑选其中 1~2 位以真实姓名空降评论区发言）` : '',
+      `【帖子正文】：${post.content || '(无正文)'}`,
+      existingComments ? `【已有评论概览】：\n${existingComments}` : ''
+    ].filter(Boolean).join('\n\n');
+
+    const res = await window.aiGenerate({
+      appTags: ['comment'],
+      instruction: instruction
+    });
+
+    const parsed = window.extractJsonFromText ? window.extractJsonFromText(res.text) : null;
+    const rawReplies = parsed && Array.isArray(parsed.replies) ? parsed.replies : (Array.isArray(parsed) ? parsed : null);
+    if (!rawReplies || rawReplies.length === 0) {
+      if (window.api && api.ui && api.ui.toast) api.ui.toast('生成回复失败，请重试');
+      return;
+    }
+
+    const baseTs = Date.now();
+    const ipPool = ['北京', '上海', '广东', '浙江', '四川', '江苏', '山东', '赛博星云'];
+
+    const mapped = rawReplies.map((r, i) => {
+      const rUser = r.user || `网友_${Math.floor(Math.random() * 9000 + 1000)}`;
+      const subReplies = Array.isArray(r.replies) ? r.replies : [];
+      return {
+        id: `c_ai_${baseTs}_${i}`,
+        user: rUser,
+        avatar: resolveAvatar(rUser),
+        ip: r.ip || ipPool[Math.floor(Math.random() * ipPool.length)],
+        createdAt: baseTs - i * 30000,
+        text: r.text || '围观打卡！',
+        likes: typeof r.likes === 'number' ? r.likes : Math.floor(Math.random() * 200 + 5),
+        isLiked: false,
+        replies: subReplies.map((sub, j) => {
+          const subUser = sub.user || `网友_${Math.floor(Math.random() * 9000 + 1000)}`;
+          return {
+            id: `r_ai_${baseTs}_${i}_${j}`,
+            user: subUser,
+            avatar: resolveAvatar(subUser),
+            isAuthor: !!sub.isAuthor,
+            replyTo: sub.replyTo || rUser,
+            ip: sub.ip || ipPool[Math.floor(Math.random() * ipPool.length)],
+            createdAt: baseTs - i * 30000 + (j + 1) * 5000,
+            text: sub.text || '',
+            likes: Math.floor(Math.random() * 60 + 4)
+          };
+        })
+      };
+    });
+
+    if (!Array.isArray(post.commentTree)) post.commentTree = [];
+    post.commentTree = post.commentTree.concat(mapped);
+    post.stats.comments += mapped.length;
+
+    try {
+      if (typeof window.persistPostToDb === 'function') {
+        await window.persistPostToDb(post);
+      } else {
+        await api.db.create("app_posts", post).catch(() => {
+          api.db.update("app_posts", post.id, post).catch(() => {});
+        });
+      }
+    } catch (e) {}
+
+    renderPostDetailView(post);
+    if (typeof renderTrends === 'function') renderTrends();
+
+    if (window.api && api.ui && api.ui.toast) api.ui.toast(`已生成 ${mapped.length} 条回复`);
+  } catch (e) {
+    if (window.api && api.ui && api.ui.toast) api.ui.toast('生成失败：' + (e.message || '未知错误'));
+  } finally {
+    if (typeof window.toggleBtnLoading === 'function') window.toggleBtnLoading(btn, false);
+  }
 }
 window.handleShareCurrentPost = handleShareCurrentPost;
 

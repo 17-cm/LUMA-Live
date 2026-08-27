@@ -28,6 +28,9 @@ async function refreshTrendsWithAI(baseNow) {
   if (isRefreshingTrends) return;
   isRefreshingTrends = true;
   if (window.api && api.ui && api.ui.toast) api.ui.toast('正在生成热搜新动态…');
+  if (typeof window.toggleBtnLoading === 'function') {
+    window.toggleBtnLoading(document.getElementById('btnRefreshTrends'), true);
+  }
   const refNow = baseNow && typeof baseNow === 'number' && baseNow > 0 ? baseNow : Date.now();
 
   try {
@@ -241,12 +244,21 @@ async function refreshTrendsWithAI(baseNow) {
         window.weiboPosts.unshift(newPost);
       }
       
-      // 持久化到 app_posts 表
-      try { 
-        await api.db.create('app_posts', newPost).catch(async () => {
-          await api.db.update('app_posts', newPost.id, newPost).catch(() => {});
-        }); 
+      // 持久化到 app_posts 表（安全 upsert，避免重复记录）
+      try {
+        if (typeof window.persistPostToDb === 'function') {
+          await window.persistPostToDb(newPost);
+        } else {
+          await api.db.create('app_posts', newPost).catch(async () => {
+            await api.db.update('app_posts', newPost.id, newPost).catch(() => {});
+          });
+        }
       } catch (e) {}
+    }
+
+    // 上限裁剪：超出 MAX_WEIBO_POSTS 的最旧帖子自动覆盖清理
+    if (typeof window.trimWeiboPosts === 'function') {
+      await window.trimWeiboPosts();
     }
 
     renderHotSearchRanking();
@@ -256,6 +268,9 @@ async function refreshTrendsWithAI(baseNow) {
     if (window.api && api.ui && api.ui.toast) api.ui.toast('生成失败：' + (e.message || '未知错误'));
   } finally {
     isRefreshingTrends = false;
+    if (typeof window.toggleBtnLoading === 'function') {
+      window.toggleBtnLoading(document.getElementById('btnRefreshTrends'), false);
+    }
   }
 }
 window.refreshTrendsWithAI = refreshTrendsWithAI;
@@ -731,6 +746,14 @@ function deletePost(postId) {
       window.weiboPosts.splice(idx, 1);
     }
   }
+
+  // 同步删除 DB 持久化记录，确保退出 APP 后删除的帖子不再恢复
+  if (typeof window.deletePostFromDb === 'function') {
+    window.deletePostFromDb(postId);
+  } else if (window.api && api.db && typeof api.db.delete === 'function') {
+    try { api.db.delete('app_posts', postId); } catch (e) {}
+  }
+
   renderTrends();
   if (window.api && api.ui && api.ui.toast) api.ui.toast('帖子已删除');
 }

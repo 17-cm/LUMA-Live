@@ -347,3 +347,96 @@ class CommunityVirtualScroller {
 }
 
 window.CommunityVirtualScroller = CommunityVirtualScroller;
+
+// =========================================================================
+// 【帖子数量上限与持久化辅助】热搜/社区帖子统一持久化 + 上限裁剪
+// 1. 帖子总量上限 MAX_WEIBO_POSTS (默认 10)，超出后自动覆盖/清理最旧帖子，避免缓存堆积
+// 2. 统一 upsert 持久化（先 update 再 create，杜绝 api.db.create 对重复 ID prepend 导致的重复记录）
+// 3. 删除同步清理 DB，保证退出 APP 后删除的帖子不再恢复
+// =========================================================================
+window.MAX_WEIBO_POSTS = 10;
+
+// 安全 upsert 持久化：与 core.js 的 dbUpsert 语义一致
+window.persistPostToDb = async function(post) {
+  try {
+    if (!window.api || !api.db) return false;
+    const existing = await api.db.get('app_posts', post.id).catch(() => null);
+    if (existing) {
+      await api.db.update('app_posts', post.id, post);
+    } else {
+      await api.db.create('app_posts', { id: post.id, ...post });
+    }
+    return true;
+  } catch (e) {
+    console.warn('[persistPostToDb] failed:', e);
+    return false;
+  }
+};
+
+// 从 DB 删除帖子（ID 维度）
+window.deletePostFromDb = async function(postId) {
+  try {
+    if (window.api && api.db && typeof api.db.delete === 'function') {
+      await api.db.delete('app_posts', postId);
+    }
+    return true;
+  } catch (e) {
+    console.warn('[deletePostFromDb] failed:', e);
+    return false;
+  }
+};
+
+// 裁剪帖子到上限：保留最新前 N 条，超出部分从内存与 DB 同时移除（覆盖式清理，含初始帖）
+window.trimWeiboPosts = async function(maxCount) {
+  const cap = maxCount || window.MAX_WEIBO_POSTS || 10;
+  if (!Array.isArray(window.weiboPosts)) return;
+  if (window.weiboPosts.length <= cap) return;
+  const overflow = window.weiboPosts.splice(cap);
+  for (const p of overflow) {
+    try { await window.deletePostFromDb(p.id); } catch (e) {}
+  }
+};
+
+// =========================================================================
+// 【按钮加载态】生成帖子/评论等 AI 耗时操作时，按钮切换为转圈 spinner
+// =========================================================================
+window.toggleBtnLoading = function(btn, loading) {
+  if (!btn) return;
+  if (loading) {
+    if (!btn.dataset.originalHtml) btn.dataset.originalHtml = btn.innerHTML;
+    btn.innerHTML = '<svg class="animate-spin" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none"><circle style="opacity:.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle><path style="opacity:.75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>';
+    btn.disabled = true;
+  } else {
+    if (btn.dataset.originalHtml) {
+      btn.innerHTML = btn.dataset.originalHtml;
+      btn.dataset.originalHtml = '';
+    }
+    btn.disabled = false;
+  }
+};
+
+// =========================================================================
+// 【Char 真实头像解析】根据角色名在 liveList / allCharacters 中匹配 char 真实头像，
+// 用于评论区等场景中 char 出现时展示真实头像（而非随机人物头像）。
+// =========================================================================
+window.getCharAvatarByName = function(name) {
+  if (!name) return '';
+  const n = String(name).trim();
+  if (!n) return '';
+
+  const liveList = window.liveList || [];
+  const allChars = window.allCharacters || [];
+
+  for (const c of liveList) {
+    if (c && String(c.name || '') === n && (c.avatar || c.cover)) {
+      return c.avatar || c.cover;
+    }
+  }
+  for (const c of allChars) {
+    if (c && String(c.name || '') === n && (c.avatar || c.cover)) {
+      return c.avatar || c.cover;
+    }
+  }
+  // 名字包含匹配：char 名作为评论者昵称的一部分（如「主播名·小迷妹」不匹配，仅精确名匹配）
+  return '';
+};

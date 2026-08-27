@@ -159,6 +159,12 @@ async function handlePublishNewPost() {
 
   if (!window.weiboPosts) window.weiboPosts = [];
   window.weiboPosts.unshift(newPost);
+
+  // 上限裁剪：超出 MAX_WEIBO_POSTS 的最旧帖子自动覆盖清理
+  if (typeof window.trimWeiboPosts === 'function') {
+    window.trimWeiboPosts();
+  }
+
   closeCreatePostModal();
 
   if (typeof renderTrends === 'function') renderTrends();
@@ -168,7 +174,11 @@ async function handlePublishNewPost() {
   renderMyTopicView();
 
   try {
-    await api.db.create("app_posts", newPost);
+    if (typeof window.persistPostToDb === 'function') {
+      await window.persistPostToDb(newPost);
+    } else {
+      await api.db.create("app_posts", newPost);
+    }
   } catch (e) {}
 
   if (api.ui && api.ui.toast) {
@@ -239,11 +249,21 @@ async function handleGenerateNewTrend() {
 
   if (!window.weiboPosts) window.weiboPosts = [];
   window.weiboPosts.unshift(newPost);
+
+  // 上限裁剪：超出 MAX_WEIBO_POSTS 的最旧帖子自动覆盖清理
+  if (typeof window.trimWeiboPosts === 'function') {
+    window.trimWeiboPosts();
+  }
+
   if (typeof renderTrends === 'function') renderTrends();
   if (typeof renderHotSearchRanking === 'function') renderHotSearchRanking();
   
   try {
-    await api.db.create("app_posts", newPost);
+    if (typeof window.persistPostToDb === 'function') {
+      await window.persistPostToDb(newPost);
+    } else {
+      await api.db.create("app_posts", newPost);
+    }
   } catch (e) {}
 
   if (api.ui && api.ui.toast) {
