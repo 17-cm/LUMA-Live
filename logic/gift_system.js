@@ -144,7 +144,7 @@
       console.warn('[GiftSystem] 更新余额失败:', e.message);
     }
 
-    // 4. 关闭礼物抽屉
+    // 4. 关闭礼物抽屉（送完礼物后自动收起弹窗）
     try {
       const modal = document.getElementById('giftTrayModal');
       if (modal) modal.classList.remove('open');

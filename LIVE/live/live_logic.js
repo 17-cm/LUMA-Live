@@ -604,9 +604,15 @@ function startDanmakuDripFeed() {
       const sInfo = getSenderLiveInfo(item.sender, item.type);
       pushDanmakuToScreen(sInfo, item.text, item.type);
       if (item.type === 'gift' || String(item.text).includes('送出了') || String(item.text).includes('送了')) {
-        const giftMatch = String(item.text).match(/【(.*?)】/) || ['', '星光礼物'];
-        const countMatch = String(item.text).match(/送[了出]\s*(\d+)\s*个/) || ['', '1'];
-        const giftCount = Number(countMatch[1]) || 1;
+        const txt = String(item.text);
+        const giftMatch = txt.match(/【(.*?)】/) || ['', '星光礼物'];
+        // 兼容多种送礼数量格式：「x10」「×10」「10个」等，避免横幅计数恒为 1
+        let giftCount = 1;
+        const xMatch = txt.match(/[x×]\s*(\d+)/i);
+        const geMatch = txt.match(/送[了出上]?\s*(\d+)\s*(?:个|份|次)/);
+        if (xMatch && xMatch[1]) giftCount = Number(xMatch[1]);
+        else if (geMatch && geMatch[1]) giftCount = Number(geMatch[1]);
+        if (!giftCount || giftCount < 1) giftCount = 1;
         showGrandGiftBanner(sInfo, giftMatch[1], giftCount);
         
         // 仅 char 赠送顶级礼物时触发全屏特效（随机观众不触发全屏特效）
@@ -822,20 +828,19 @@ function closePlusDrawer() {
 window.closePlusDrawer = closePlusDrawer;
 
 function handleDrawerAction(action) {
-  closePlusDrawer();
   if (action === 'share') {
+    closePlusDrawer();
     openSharePickerModal();
   } else if (action === 'gift') {
-    const drawer = document.getElementById('plusDrawerSheet');
-    const plusBtn = document.getElementById('mainPlusBtn');
-    if (drawer) drawer.classList.remove('open');
-    if (plusBtn) plusBtn.classList.remove('open');
     toggleGiftTray();
   } else if (action === 'quality') {
+    closePlusDrawer();
     api.ui.toast("画质与画布比例调节（即将支持 1:1、9:16 及原画切换）");
   } else if (action === 'call') {
+    closePlusDrawer();
     api.ui.toast("连麦互动模式（专属连麦互动功能即将上线）");
   } else if (action === 'clear') {
+    closePlusDrawer();
     const feed = document.getElementById('danmakuFeed');
     if (feed) feed.innerHTML = '';
     api.ui.toast("已清空当前公屏弹幕");
