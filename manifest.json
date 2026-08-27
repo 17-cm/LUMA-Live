@@ -82,6 +82,30 @@
         "handler": "luma_will_listener",
         "background": true,
         "description": "监听状态变化，同步意愿值"
+      },
+      {
+        "event": "message.created",
+        "handler": "luma_will_listener",
+        "background": true,
+        "description": "兼容旧版SDK事件名，监听聊天消息提取意愿值"
+      },
+      {
+        "event": "message",
+        "handler": "luma_will_listener",
+        "background": true,
+        "description": "兼容旧版SDK事件名，监听聊天消息提取意愿值"
+      },
+      {
+        "event": "chat:message",
+        "handler": "luma_will_listener",
+        "background": true,
+        "description": "兼容旧版SDK事件名，监听聊天消息提取意愿值"
+      },
+      {
+        "event": "chat_message_created",
+        "handler": "luma_will_listener",
+        "background": true,
+        "description": "兼容旧版SDK事件名，监听聊天消息提取意愿值"
       }
     ],
     "tools": [
