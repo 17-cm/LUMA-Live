@@ -453,16 +453,18 @@
       <div id="opsLogContent" class="flex-1 overflow-y-auto p-3 space-y-2 text-[11px]">
         <div class="text-center text-slate-400 py-8">暂无日志，等待下一轮轮询...</div>
       </div>
-      <div class="p-3 border-t border-slate-100 text-[9px] text-slate-400 text-center">
-        保留最近 50 轮 · 控制台输入 lumaOpsLog 可查看原始数据
+      <div id="opsLogRaw" class="hidden flex-1 overflow-y-auto p-3 text-[10px] font-mono bg-slate-900 text-slate-100 whitespace-pre-wrap" style="display:none"></div>
+      <div class="p-3 border-t border-slate-100 text-[9px] text-slate-400 text-center flex items-center justify-center gap-2">
+        <button onclick="toggleOpsLogRaw()" class="font-bold text-cyan-600 hover:text-cyan-700">查看原始数据</button>
+        <span>·</span>
+        <span>保留最近 50 轮</span>
       </div>
     </div>
-  </div
+  </div>
   `;
 
   function doInject() {
     document.body.insertAdjacentHTML('beforeend', modalsHTML);
-    console.log('[modals] 弹窗层已注入，共 16 个弹窗');
   }
 
   if (document.body) {

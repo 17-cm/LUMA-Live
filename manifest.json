@@ -46,68 +46,7 @@
         }
       ]
     },
-    "events": [
-      {
-        "event": "chat.message.created",
-        "handler": "luma_will_listener",
-        "background": true,
-        "description": "后台监听角色聊天消息，提取意愿值指令并更新角色意愿数据库"
-      },
-      {
-        "event": "chat.message",
-        "handler": "luma_will_listener",
-        "background": true,
-        "description": "监听聊天消息，提取意愿值指令"
-      },
-      {
-        "event": "chat.response",
-        "handler": "luma_will_listener",
-        "background": true,
-        "description": "监听AI回复消息，提取意愿值指令"
-      },
-      {
-        "event": "character.message",
-        "handler": "luma_will_listener",
-        "background": true,
-        "description": "监听角色消息，提取意愿值指令"
-      },
-      {
-        "event": "directive",
-        "handler": "luma_will_listener",
-        "background": true,
-        "description": "监听指令事件，提取意愿值指令"
-      },
-      {
-        "event": "state.changed",
-        "handler": "luma_will_listener",
-        "background": true,
-        "description": "监听状态变化，同步意愿值"
-      },
-      {
-        "event": "message.created",
-        "handler": "luma_will_listener",
-        "background": true,
-        "description": "兼容旧版SDK事件名，监听聊天消息提取意愿值"
-      },
-      {
-        "event": "message",
-        "handler": "luma_will_listener",
-        "background": true,
-        "description": "兼容旧版SDK事件名，监听聊天消息提取意愿值"
-      },
-      {
-        "event": "chat:message",
-        "handler": "luma_will_listener",
-        "background": true,
-        "description": "兼容旧版SDK事件名，监听聊天消息提取意愿值"
-      },
-      {
-        "event": "chat_message_created",
-        "handler": "luma_will_listener",
-        "background": true,
-        "description": "兼容旧版SDK事件名，监听聊天消息提取意愿值"
-      }
-    ],
+    "events": [],
     "tools": [
       {
         "id": "luma-request-start-live",

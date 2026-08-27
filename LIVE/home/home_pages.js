@@ -185,5 +185,4 @@
     </div>
   </div>
   `);
-  console.log('[home] 全屏页面HTML已注入');
 })();

@@ -6,8 +6,6 @@
 
   // 初始化
   function init() {
-    console.log('[LUMA Live] 框架初始化完成');
-    console.log('[LUMA Live] 已加载页面:', document.querySelectorAll('.tab-page').length, '个');
     // 设定页参数显示同步（如果函数存在）
     if (typeof syncParamDisplays === 'function') {
       try { syncParamDisplays(); } catch(e) {}

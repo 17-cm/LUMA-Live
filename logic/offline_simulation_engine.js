@@ -32,8 +32,6 @@
         return { stepsRun: 0, reason: "DELTA_TOO_SHORT" };
       }
 
-      console.log(`[Offline Engine] 检测到离线时间差: ${(elapsedMs / 60000).toFixed(1)} 分钟，开始结算离线期间的直播场次...`);
-
       // 1. 获取当前所有仍标记为在播的直播间与角色排班（真实持久化接口为 api.db）
       let liveSessions = [];
       let schedulesMap = {};
@@ -112,7 +110,6 @@
             for (const rec of closedHistoryRecords) {
               await api.db.create("streamer_history", rec);
             }
-            console.log(`[Offline Engine] 已完成 ${closedHistoryRecords.length} 场离线直播真实下播结算与历史归档。`);
           }
         } catch (e) {
           console.warn("[Offline Engine] 保存历史场次失败:", e);
@@ -131,14 +128,12 @@
       const OFFLINE_TRENDS_THRESHOLD_MS = 30 * 60 * 1000; // 离线 ≥30 分钟才触发
       if (elapsedMs >= OFFLINE_TRENDS_THRESHOLD_MS && typeof window.refreshTrendsWithAI === 'function') {
         try {
-          console.log(`[Offline Engine] 离线时长达标，驱动热搜发帖...`);
           await window.refreshTrendsWithAI(now);
         } catch (e) {
           console.warn("[Offline Engine] 离线驱动热搜发帖失败:", e);
         }
       }
 
-      console.log(`[Offline Engine] 离线推演完毕：结算下播 ${closedHistoryRecords.length} 场。`);
       return { closedCount: closedHistoryRecords.length };
     },
 

@@ -218,5 +218,4 @@
 
     <!-- Tab 3: 我的个人主页 -->
   `);
-  console.log('[community] 页面HTML已注入');
 })();

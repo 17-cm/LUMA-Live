@@ -372,5 +372,4 @@
   <!-- ======================== 纯矢量 SVG 悬浮 Dock 栏 ======================== -->
   <div class="fixed bottom-0 left-0 right-0 z-30 pb-safe">
   `);
-  console.log('[settings] 页面HTML已注入');
 })();

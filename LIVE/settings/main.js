@@ -266,7 +266,6 @@ function resetLumaOpsTimer() {
   window.__lumaLiveSyncInterval = setInterval(() => {
     syncLiveSessions({ allowSpawn: true });
   }, pollMins * 60 * 1000);
-  console.log(`[LUMA官方运营组] 定时器已重启，间隔 ${pollMins} 分钟`);
 }
 window.resetLumaOpsTimer = resetLumaOpsTimer;
 
@@ -330,8 +329,8 @@ function renderOpsLog() {
       }
       const willColor = d.result === '开播' || d.result === '下播' ? 'text-rose-600' : d.result === '跳过' ? 'text-slate-400' : 'text-slate-500';
       const detail = d.state === '直播中'
-        ? `已播${d.liveMins}分 意愿[${d.baseWill}]+比例 总${d.stopWill}% 骰${d.dice}`
-        : `休息${d.restMins}分 意愿[${d.baseWill}]+比例 总${d.spawnWill}% 骰${d.dice}`;
+        ? `已播${d.liveMins}分 下播倾向[${d.baseTendency}]+比例 总${d.stopTendency}% 骰${d.dice}`
+        : `休息${d.restMins}分 开播倾向[${d.baseTendency}]+比例 总${d.spawnTendency}% 骰${d.dice}`;
       return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50">
         <span class="text-slate-600">${d.char}</span>
         <span class="text-slate-400 text-[10px]">${detail}</span>
@@ -344,12 +343,28 @@ function renderOpsLog() {
         <span class="font-bold text-slate-700">第${cycle.cycle || (log.length - idx)}轮 ${cycle.time}</span>
         <span class="text-[10px] text-slate-500">在播${s.streaming} 评估${s.evaluated || 0}人 开播${s.started} 下播${s.stopped}</span>
       </div>
-      <div class="text-[9px] text-slate-400 mb-1.5">意愿值由角色聊天驱动 | 直播上限${p.maxLiveMins}分 休息上限${p.maxRestMins}分</div>
+      <div class="text-[9px] text-slate-400 mb-1.5">倾向值由角色状态栏驱动 | 直播上限${p.maxLiveMins}分 休息上限${p.maxRestMins}分</div>
       <div class="space-y-0.5">${decisions}</div>
     </div>`;
   }).join('');
 }
 window.renderOpsLog = renderOpsLog;
+
+function toggleOpsLogRaw() {
+  const content = document.getElementById('opsLogContent');
+  const raw = document.getElementById('opsLogRaw');
+  if (!content || !raw) return;
+  const showing = raw.style.display !== 'none';
+  if (showing) {
+    raw.style.display = 'none';
+    content.style.display = '';
+  } else {
+    raw.textContent = JSON.stringify(window.lumaOpsLog || [], null, 2);
+    raw.style.display = '';
+    content.style.display = 'none';
+  }
+}
+window.toggleOpsLogRaw = toggleOpsLogRaw;
 
 async function saveApiIntervalSetting() {
   try {
@@ -1304,10 +1319,10 @@ async function lumaInitApp() {
       }
     }
 
-    // 启动时后台异步深度扫描各角色最新聊天记录恢复意愿
-    if (window.allCharacters && Array.isArray(window.allCharacters) && typeof scanAllMessagesForCharWill === 'function') {
+    // 启动时后台异步预读各角色状态栏倾向值，缓存本地供轮询快速使用
+    if (window.allCharacters && Array.isArray(window.allCharacters) && typeof readCharTendency === 'function') {
       try {
-        await Promise.all(window.allCharacters.map(c => c && c.id ? scanAllMessagesForCharWill(c.id) : Promise.resolve()));
+        await Promise.all(window.allCharacters.map(c => c && c.id ? readCharTendency(c.id) : Promise.resolve()));
       } catch (e) {}
     }
   } catch (e) {
@@ -1376,4 +1391,3 @@ if (document.readyState === 'loading') {
   lumaInitApp();
 }
 window.lumaInitApp = lumaInitApp;
-console.log('[settings] 交互函数已加载，初始化已启用');

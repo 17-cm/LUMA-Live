@@ -4,7 +4,14 @@
 // =========================================================================
 
 (function initAiPhoneSdkPolyfill() {
-  const hostApi = window.AiPhone || window.AiPhoneApp;
+  // SDK 可能注入在 window / window.parent / window.top；按顺序探测
+  let hostApi = window.AiPhone || window.AiPhoneApp;
+  if (!hostApi) {
+    try { if (window.parent && window.parent.AiPhone) hostApi = window.parent.AiPhone; } catch (e) {}
+  }
+  if (!hostApi) {
+    try { if (window.top && window.top !== window && window.top.AiPhone) hostApi = window.top.AiPhone; } catch (e) {}
+  }
   if (hostApi && hostApi.db && hostApi.characters) {
     window.api = hostApi;
     return;
@@ -172,7 +179,13 @@
         const list = getStore("characters") || defaultCharacters;
         return list.find(c => c.id === id) || null;
       },
-      async writeState({ characterId, stateValues }) {
+      async readState({ characterId } = {}) {
+        const raw = getStore(`luma_state_${characterId}`);
+        if (Array.isArray(raw)) return raw;
+        return [];
+      },
+      async writeState({ characterId, stateValues } = {}) {
+        setStore(`luma_state_${characterId}`, stateValues || []);
         return { success: true };
       }
     },
@@ -221,7 +234,6 @@
     },
     chat: {
       async sendMessage(msg) {
-        console.log("[LUMA Chat Polyfill] Message sent:", msg);
         return { success: true };
       }
     },
@@ -231,7 +243,6 @@
         this.handlers[name] = fn;
       },
       register(tool) {
-        console.log("[LUMA Tools Polyfill] Tool registered:", tool);
       }
     },
     ui: {
