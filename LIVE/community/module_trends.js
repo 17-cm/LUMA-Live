@@ -297,6 +297,7 @@ function getHeroData() {
 }
 
 async function saveHeroData(data) {
+  cachedHeroData = { ...DEFAULT_HERO_DATA, ...data };
   try {
     if (window.api && api.db) {
       await dbUpsert('app_config', 'hero_hot_search', data);
@@ -362,8 +363,9 @@ async function loadHotSearchItems() {
   try {
     if (window.api && api.db && api.db.get) {
       const saved = await api.db.get('app_config', 'hot_search_items');
-      if (saved && Array.isArray(saved) && saved.length > 0) {
-        window.HOT_SEARCH_ITEMS = saved;
+      const list = saved && Array.isArray(saved.list) ? saved.list : (Array.isArray(saved) ? saved : null);
+      if (list && list.length > 0) {
+        window.HOT_SEARCH_ITEMS = list;
         return;
       }
     }
@@ -388,7 +390,7 @@ async function loadHotSearchItems() {
 async function saveHotSearchItems() {
   try {
     if (window.api && api.db && window.HOT_SEARCH_ITEMS) {
-      await dbUpsert('app_config', 'hot_search_items', window.HOT_SEARCH_ITEMS);
+      await dbUpsert('app_config', 'hot_search_items', { list: window.HOT_SEARCH_ITEMS });
     }
   } catch (e) {}
 }
@@ -745,8 +747,9 @@ async function loadHotCategories() {
   try {
     if (window.api && api.db && api.db.get) {
       const saved = await api.db.get('app_config', 'hot_categories');
-      if (saved && Array.isArray(saved) && saved.length > 0) {
-        hotCategories = saved;
+      const list = saved && Array.isArray(saved.list) ? saved.list : (Array.isArray(saved) ? saved : null);
+      if (list && list.length > 0) {
+        hotCategories = list;
       }
     }
   } catch (e) {}
@@ -756,7 +759,7 @@ async function loadHotCategories() {
 async function saveHotCategories() {
   try {
     if (window.api && api.db) {
-      await dbUpsert('app_config', 'hot_categories', hotCategories);
+      await dbUpsert('app_config', 'hot_categories', { list: hotCategories });
     }
   } catch (e) {}
 }
