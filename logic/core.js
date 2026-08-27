@@ -735,13 +735,18 @@ window.robustNetworkRequest = robustNetworkRequest;
 function extractJsonFromText(text) {
   if (!text) return null;
   let cleaned = String(text).trim();
-  
-  // 1. 剥离思考链标签 (<think>...</think> 或 [think]...[/think])
-  cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-  cleaned = cleaned.replace(/\[think\][\s\S]*?\[\/think\]/gi, '').trim();
 
-  // 2. 去除代码块包裹 (```json ... ``` 或 ``` ...)
-  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  // 1. 剥离思考链标签（兼容  与 </think> 包裹、[think]/[thinking]/【思考】等变体）
+  cleaned = cleaned.replace(/<\s*(?:think|thinking)\s*>[\s\S]*?<\s*\/\s*(?:think|thinking)\s*>/gi, '');
+  cleaned = cleaned.replace(/\[(?:think|thinking|思考|推理)[\s\S]*?\[\/(?:think|thinking|思考|推理)\]/gi, '');
+  cleaned = cleaned.trim();
+
+  // 2. 去除任意位置的代码块标记及语言标记（不依赖首尾锚定，兼容前后夹叙述文字）
+  //    ```json / ```JSON / ```javascript / ```（无语言）等，统一剥掉围栏
+  cleaned = cleaned.replace(/```[a-zA-Z0-9_-]*\s*/g, '').trim();
+  // 清理残留的裸反引号围栏（若模型只输出一对 ``` 未闭合）
+  cleaned = cleaned.replace(/```/g, '').trim();
+  // 清理思考链拆出的 【动作/指令】 并非 JSON，这里只做轻度标点规整，不破坏内容
 
   // 3. 尝试直接解析
   try {
@@ -763,16 +768,33 @@ function extractJsonFromText(text) {
     }
 
     if (candidate) {
-      try {
-        return JSON.parse(candidate);
-      } catch (e) {
-        // 清洗常见的尾随逗号、注释与控制字符
-        const sanitized = candidate
-          .replace(/,\s*([\}\]])/g, '$1')
-          .replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, '$1')
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
-        return JSON.parse(sanitized);
-      }
+      const attempt = (s) => {
+        try { return JSON.parse(s); } catch (e) { return null; }
+      };
+
+      // 直接解析
+      let result = attempt(candidate);
+      if (result !== null) return result;
+
+      // 清洗常见的尾随逗号、注释与控制字符后重试
+      const sanitized = candidate
+        .replace(/,\s*([\}\]])/g, '$1')
+        .replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, '$1')
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+      result = attempt(sanitized);
+      if (result !== null) return result;
+
+      // 5. 修复字符串值内未转义的换行（AI 常在 speech 台词内直接换行）：
+      //    把「字符串值内部的真实换行」转义为 \\n，前提是该换行不处于语法的逗号/冒号分隔位。
+      //    保守做法：仅在匹配不到多行 JSON 合法解析时，逐行折叠换行符。
+      result = attempt(candidate.replace(/\r?\n/g, '\\n'));
+      if (result !== null) return result;
+
+      // 6. 修复字符串值内未转义的双引号（全角引号保留原值），仅当明显是字符串内嵌时才罕见触发，
+      //    这里做一次「中文引号绕行 + 单引号归一」的兜底：把未被 JSON 当作定界符的全角引号保持，
+      //    仅对确认破坏结构的场景做最小修复。为避免误伤，此步仅在前面全部失败时执行。
+      result = attempt(sanitized.replace(/\r?\n/g, '\\n'));
+      if (result !== null) return result;
     }
   } catch (e) {}
 

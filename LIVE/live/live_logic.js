@@ -632,8 +632,46 @@ function startHostSpeechDripFeed() {
   }, 50000);
 }
 
+// 展示前清洗：剥离主播台词里残留的代码块、思考链、JSON 结构标记，
+// 尽量还原成纯口语文本，避免 char 说话时露出代码/JSON 原始格式。
+function cleanSpeechForDisplay(raw) {
+  let s = typeof raw === 'string' ? raw : String(raw || '');
+  s = s.trim();
+
+  // 剥离思考链标签
+  s = s.replace(/<\s*(?:think|thinking)\s*>[\s\S]*?<\s*\/\s*(?:think|thinking)\s*>/gi, '');
+  s = s.replace(/\[(?:think|thinking|思考|推理)\s*\][\s\S]*?\[\/(?:think|thinking|思考|推理)\s*\]/gi, '');
+  s = s.trim();
+
+  // 先尝试整段 JSON 解析（无论开头是 ```json 还是 { / [），优先取 speech/text/内容/回复 字段
+  const parsed = window.extractJsonFromText ? window.extractJsonFromText(s) : null;
+  if (parsed && typeof parsed === 'object') {
+    if (!Array.isArray(parsed)) {
+      const textVal = parsed.speech || parsed.text || parsed.content || parsed.reply
+        || parsed.message || parsed.台词 || parsed.内容 || parsed.回复;
+      if (typeof textVal === 'string' && textVal.trim()) return textVal.trim();
+      // 大包含 hostSpeeches/speeches 数组时，取第一条 speech
+      const pool = parsed.hostSpeeches || parsed.host_speeches || parsed.hostSpeech || parsed.speeches || parsed.dialogues;
+      if (Array.isArray(pool) && pool.length && typeof pool[0] === 'object') {
+        const first = pool[0].speech || pool[0].text;
+        if (typeof first === 'string' && first.trim()) return first.trim();
+      }
+    } else if (parsed.length && typeof parsed[0] === 'object') {
+      const first = parsed[0].speech || parsed[0].text;
+      if (typeof first === 'string' && first.trim()) return first.trim();
+    }
+  }
+
+  // 解析失败时的兜底：剥离代码块围栏与残存 JSON 外层定型符号，保留可读文本
+  s = s.replace(/```[a-zA-Z0-9_-]*\s*/g, '').replace(/```/g, '');
+  s = s.replace(/^\s*[{\[]/, '').replace(/[}\]]\s*$/, '');
+
+  return s.trim();
+}
+window.cleanSpeechForDisplay = cleanSpeechForDisplay;
+
 function renderHostSpeech(speech, action) {
-  let displaySpeech = typeof speech === 'string' ? speech : String(speech || '');
+  let displaySpeech = cleanSpeechForDisplay(speech);
   let detectedCloseLive = false;
   let parsedAction = typeof action === 'string' ? action.trim() : '';
 
@@ -752,7 +790,7 @@ async function sendUserDanmaku() {
     });
 
     const parsed = window.extractJsonFromText(res.text);
-    if (parsed) {
+    if (parsed && typeof parsed === 'object') {
       renderHostSpeech(parsed.speech || res.text, parsed.action || '看向你的弹幕');
     } else {
       renderHostSpeech(res.text, '看向公屏');
@@ -1296,10 +1334,10 @@ async function sendGift(name, cost) {
         instruction: `【${uInfo.tag}】${uInfo.name}送了 ${qty} 个【${name}】（总价值 ${totalCost} LUMA 币）给主播`
       });
       const parsed = window.extractJsonFromText(res.text);
-      if (parsed) {
+      if (parsed && typeof parsed === 'object') {
         renderHostSpeech(parsed.speech || res.text, parsed.action || '激动地感谢');
       } else {
-        renderHostSpeech(`哇！感谢【${uInfo.tag}】${uInfo.name}送出的 ${qty} 个【${name}】，太给力了！`, '双手合十感谢');
+        renderHostSpeech(res.text, '双手合十感谢');
       }
     } catch (e) {
       renderHostSpeech(`哇！感谢【${uInfo.tag}】${uInfo.name}送出的 ${qty} 个【${name}】，太给力了！`, '双手合十感谢');
