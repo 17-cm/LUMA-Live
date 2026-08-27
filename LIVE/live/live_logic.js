@@ -80,7 +80,18 @@ function getCanonicalSubCategory(sessionOrCategory, maybeSubTag, identityHint) {
   }
   return validList[hash % validList.length] || '日常唠嗑';
 }
+
 window.getCanonicalSubCategory = getCanonicalSubCategory;
+
+// 简单随机选分类：先随机一级分类，再在其下随机二级频道（开播时用）
+function pickRandomLiveCategory() {
+  const mainKeys = Object.keys(SUB_CATEGORIES).filter(k => k !== 'all');
+  const mainCat = mainKeys[Math.floor(Math.random() * mainKeys.length)];
+  const subList = (SUB_CATEGORIES[mainCat] || []).filter(item => item !== '全部' && item !== '全部推荐');
+  const subCat = subList[Math.floor(Math.random() * subList.length)] || '日常唠嗑';
+  return { mainCat, subCat };
+}
+window.pickRandomLiveCategory = pickRandomLiveCategory;
 
 function getLiveSessionViewers(session) {
   if (!session) return 1200;
