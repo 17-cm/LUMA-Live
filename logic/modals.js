@@ -441,41 +441,6 @@
       </button>
     </div>
   </div>
-<div id="imageSaveModal" class="hidden center-modal-backdrop" onclick="if(event.target === this) closeImageSaveModal()">
-    <div class="center-modal-card p-4 space-y-3 max-w-sm" onclick="event.stopPropagation()">
-      <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-        <div class="flex items-center gap-2">
-          <div class="w-7 h-7 rounded-xl bg-rose-50 flex items-center justify-center text-rose-500 font-black text-xs">🖼️</div>
-          <div>
-            <h3 class="text-xs font-black text-slate-900">保存图片至相册</h3>
-            <p class="text-[9px] text-slate-400">已触发下载 · 手机端可长按直接存图</p>
-          </div>
-        </div>
-        <button onclick="closeImageSaveModal()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs text-slate-500 font-bold active:scale-90 transition">✕</button>
-      </div>
-
-      <div class="relative rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center max-h-[50vh] border border-slate-200/60 shadow-inner">
-        <img id="imageSavePreviewImg" src="" alt="保存图片" class="max-h-[48vh] w-auto object-contain select-auto pointer-events-auto" style="-webkit-touch-callout: default !important; -webkit-user-select: auto !important; user-select: auto !important;">
-      </div>
-
-      <div class="bg-amber-50/80 border border-amber-200/60 rounded-xl p-2.5 flex items-start gap-2">
-        <span class="text-xs">💡</span>
-        <p class="text-[10px] text-amber-900/80 leading-relaxed">
-          <span class="font-bold text-amber-900">保存提示：</span>系统已尝试自动调用浏览器下载。若在手机浏览器中，请<span class="font-bold text-rose-600 underline">长按上方图片</span>选择【存储图像】或【保存到相册】即可直接保存！
-        </p>
-      </div>
-
-      <div class="grid grid-cols-2 gap-2 pt-1">
-        <button id="imageSaveDirectDownloadBtn" onclick="triggerDirectSaveCurrentModalImage()" class="btn-brand py-2.5 justify-center text-xs font-bold shadow">
-          <span>⬇️ 再次触发下载</span>
-        </button>
-        <button onclick="closeImageSaveModal()" class="btn-action py-2.5 justify-center text-xs font-bold text-slate-700 bg-slate-100 border-slate-200">
-          <span>完成</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
   <div id="opsLogModal" class="fixed inset-0 z-[99998] hidden items-center justify-center bg-black/50 p-4" onclick="if(event.target===this)closeOpsLogViewer()">
     <div class="bg-white rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
       <div class="flex items-center justify-between p-4 border-b border-slate-100">

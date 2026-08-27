@@ -176,137 +176,92 @@ function renderPostDetailView(post) {
   box.innerHTML = html;
 }
 
-// 当前待保存/下载的全局图片缓存
-let currentModalImageBlobUrl = '';
-let currentModalImageFileName = '';
+// 真实下载图片到本地：统一将图片来源（data URL / http(s)）转成 Blob 后走浏览器对象 URL 下载，
+// 兼容 AI 生成的 base64 大图与外部 URL 图片，无弹窗直接触发真实下载。
+function downloadImageToLocal(src, fileName) {
+  const name = fileName || `luma_image_${Date.now()}.png`;
+  const finish = (url) => {
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        try { URL.revokeObjectURL(url); } catch (e) {}
+      }, 1000);
+      return true;
+    } catch (e) {
+      console.warn("[downloadImageToLocal] 触发下载失败:", e);
+      return false;
+    }
+  };
 
-// 显示相册保存与下载确认弹窗
-function showImageSaveModal(imgSrc, fileName) {
-  currentModalImageBlobUrl = imgSrc;
-  currentModalImageFileName = fileName || `luma_post_${Date.now()}.png`;
-
-  const modal = document.getElementById('imageSaveModal');
-  const imgEl = document.getElementById('imageSavePreviewImg');
-  if (imgEl) {
-    imgEl.src = imgSrc;
+  // 1. data URL（AI 生图/Canvas 切片）：base64 转 Blob 后下载，避免大体积 data URL 在 webview 中下载失败
+  if (String(src).startsWith('data:')) {
+    try {
+      const parts = String(src).split(',');
+      const mime = (parts[0].match(/data:([^;]+)/) || [])[1] || 'image/png';
+      const bin = atob(parts[1]);
+      const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      const blob = new Blob([arr], { type: mime });
+      finish(URL.createObjectURL(blob));
+      return true;
+    } catch (e) {
+      console.warn("[downloadImageToLocal] data URL 转 Blob 失败，回退直接触发:", e);
+      return finish(src);
+    }
   }
-  if (modal) {
-    modal.classList.remove('hidden');
-  }
-}
-window.showImageSaveModal = showImageSaveModal;
 
-function closeImageSaveModal() {
-  const modal = document.getElementById('imageSaveModal');
-  if (modal) {
-    modal.classList.add('hidden');
-  }
-}
-window.closeImageSaveModal = closeImageSaveModal;
-
-function triggerDirectSaveCurrentModalImage() {
-  if (!currentModalImageBlobUrl) return;
+  // 2. http(s) 外部图片：fetch 获取 Blob 后下载
   try {
-    const a = document.createElement('a');
-    a.href = currentModalImageBlobUrl;
-    a.download = currentModalImageFileName || `luma_image_${Date.now()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    if (window.api?.ui?.toast) window.api.ui.toast("已触发图片下载！");
+    fetch(src, { mode: 'cors' })
+      .then(r => { if (r.ok) return r.blob(); throw new Error('fetch fail'); })
+      .then(blob => finish(URL.createObjectURL(blob)))
+      .catch(() => {
+        // 3. fetch 跨域受限时用 Canvas 兜底重绘后下载
+        try {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = function () {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.naturalWidth || img.width;
+              canvas.height = img.naturalHeight || img.height;
+              canvas.getContext('2d').drawImage(img, 0, 0);
+              canvas.toBlob(blob => {
+                if (blob) finish(URL.createObjectURL(blob));
+                else finish(src);
+              }, 'image/png');
+            } catch (e) {
+              finish(src);
+            }
+          };
+          img.onerror = function () {
+            finish(src);
+          };
+          img.src = src;
+        } catch (e) {
+          finish(src);
+        }
+      });
   } catch (e) {
-    console.warn("直接下载触发失败:", e);
+    finish(src);
   }
+  return true;
 }
-window.triggerDirectSaveCurrentModalImage = triggerDirectSaveCurrentModalImage;
 
-// 真实下载动态图片到本地文件 / 存储至相册
-async function downloadPostImageToLocal(post) {
+// 下载帖子图片
+function downloadPostImageToLocal(post) {
   const imageUrl = post.image;
   const fileName = `luma_post_${post.id || Date.now()}.png`;
 
   if (imageUrl) {
-    // 1. 若为 base64 数据
-    if (imageUrl.startsWith('data:')) {
-      try {
-        const a = document.createElement('a');
-        a.href = imageUrl;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        showImageSaveModal(imageUrl, fileName);
-        if (window.api?.ui?.toast) window.api.ui.toast("已开始下载！手机端可长按直接存入相册");
-        return;
-      } catch (e) {
-        console.warn("base64直接下载异常:", e);
-      }
-    }
-
-    // 2. 尝试使用 fetch 获取 blob
-    try {
-      const response = await fetch(imageUrl, { mode: 'cors' });
-      if (response.ok) {
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        showImageSaveModal(blobUrl, fileName);
-        if (window.api?.ui?.toast) window.api.ui.toast("已开始下载！手机端可长按直接存入相册");
-        return;
-      }
-    } catch (fetchErr) {
-      console.log("Fetch 跨域限制，切换至 Canvas/直接链接兼容下载:", fetchErr);
-    }
-
-    // 3. Canvas 兼容模式
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = function () {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth || img.width || 800;
-        canvas.height = img.naturalHeight || img.height || 450;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        canvas.toBlob(function (blob) {
-          if (blob) {
-            const blobUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            showImageSaveModal(blobUrl, fileName);
-            if (window.api?.ui?.toast) window.api.ui.toast("已开始下载！手机端可长按直接存入相册");
-          } else {
-            showImageSaveModal(imageUrl, fileName);
-          }
-        }, 'image/png');
-      } catch (canvasErr) {
-        // 直接触发
-        const a = document.createElement('a');
-        a.href = imageUrl;
-        a.download = fileName;
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        showImageSaveModal(imageUrl, fileName);
-        if (window.api?.ui?.toast) window.api.ui.toast("已打开图片！长按可保存至相册");
-      }
-    };
-    img.onerror = function () {
-      // 容错展示图片弹窗供用户长按保存
-      showImageSaveModal(imageUrl, fileName);
-      if (window.api?.ui?.toast) window.api.ui.toast("长按弹窗图片即可直接存入手机相册");
-    };
-    img.src = imageUrl;
+    downloadImageToLocal(imageUrl, fileName);
+    if (window.api?.ui?.toast) window.api.ui.toast("已开始下载！");
   } else {
     // 动态无附图时，生成动态卡片海报并直接保存为本地图片
     generateAndDownloadPostPoster(post, fileName);
@@ -406,9 +361,11 @@ function generateAndDownloadPostPoster(post, fileName) {
       a.download = fileName;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      showImageSaveModal(blobUrl, fileName);
-      if (window.api?.ui?.toast) window.api.ui.toast("已生成海报！手机端可长按存入相册");
+      setTimeout(() => {
+        document.body.removeChild(a);
+        try { URL.revokeObjectURL(blobUrl); } catch (e) {}
+      }, 1000);
+      if (window.api?.ui?.toast) window.api.ui.toast("已生成海报！");
     }, 'image/png');
   } catch (e) {
     if (window.api?.ui?.toast) window.api.ui.toast("动态保存完成");
