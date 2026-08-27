@@ -96,38 +96,27 @@
           <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
         </button>
       </div>
-    </div>
 
-      <!-- 从底部滑出的操作抽屉 (底栏弹出方式) -->
+      <!-- 从加号正下方依次弹出的操作菜单 (啵啵啵向下依次展开) -->
       <div id="plusDrawerSheet" class="plus-drawer-bottom-sheet">
-        <button onclick="handleDrawerAction('share')" class="bottom-drawer-btn" title="分享直播">
-          <div class="bottom-drawer-icon-wrap">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-          </div>
+        <button onclick="handleDrawerAction('share')" class="bottom-drawer-btn" title="分享直播" style="--i:0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
           <span>分享动态</span>
         </button>
-        <button onclick="handleDrawerAction('gift')" class="bottom-drawer-btn" title="赠送礼物">
-          <div class="bottom-drawer-icon-wrap">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect x="2" y="7" width="20" height="5"></rect><line x1="12" y1="22" x2="12" y2="7"></line><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg>
-          </div>
+        <button onclick="handleDrawerAction('gift')" class="bottom-drawer-btn" title="赠送礼物" style="--i:1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect x="2" y="7" width="20" height="5"></rect><line x1="12" y1="22" x2="12" y2="7"></line><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg>
           <span>送出礼物</span>
         </button>
-        <button onclick="handleDrawerAction('quality')" class="bottom-drawer-btn" title="画质调节">
-          <div class="bottom-drawer-icon-wrap">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-          </div>
+        <button onclick="handleDrawerAction('quality')" class="bottom-drawer-btn" title="画质调节" style="--i:2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
           <span>画质调节</span>
         </button>
-        <button onclick="handleDrawerAction('call')" class="bottom-drawer-btn" title="连麦互动">
-          <div class="bottom-drawer-icon-wrap">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
-          </div>
+        <button onclick="handleDrawerAction('call')" class="bottom-drawer-btn" title="连麦互动" style="--i:3">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
           <span>连麦互动</span>
         </button>
-        <button onclick="handleDrawerAction('clear')" class="bottom-drawer-btn" title="清空弹幕">
-          <div class="bottom-drawer-icon-wrap">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-          </div>
+        <button onclick="handleDrawerAction('clear')" class="bottom-drawer-btn" title="清空公屏" style="--i:4">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
           <span>清空公屏</span>
         </button>
       </div>
