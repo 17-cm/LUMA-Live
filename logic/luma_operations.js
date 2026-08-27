@@ -405,11 +405,18 @@ const lumaOpsGateway = {
     const end = start + dur * 60 * 1000;
 
     let coverUrl = character?.cover || character?.avatar || '';
-    let rawCat = category || (character?.tags ? character.tags[0] : '随性杂谈');
-    let chosenCat = (typeof normalizeCategory === 'function') ? normalizeCategory(rawCat) : rawCat;
-    let chosenSubTag = (typeof getCanonicalSubCategory === 'function')
-      ? getCanonicalSubCategory(chosenCat, (character?.tags && character.tags[1]) || (rawCat !== chosenCat ? rawCat : ''), characterId)
-      : '日常唠嗑';
+    // 分类选取：显式指定则用指定的，否则完全随机（先一级再二级）
+    let chosenCat, chosenSubTag;
+    if (category) {
+      chosenCat = (typeof normalizeCategory === 'function') ? normalizeCategory(category) : category;
+      chosenSubTag = (typeof getCanonicalSubCategory === 'function')
+        ? getCanonicalSubCategory(chosenCat, '', characterId)
+        : '日常唠嗑';
+    } else {
+      const picked = (typeof pickRandomLiveCategory === 'function') ? pickRandomLiveCategory() : { mainCat: '随性杂谈', subCat: '日常唠嗑' };
+      chosenCat = picked.mainCat;
+      chosenSubTag = picked.subCat;
+    }
     let chosenTopic = '';
     if (source === 'tool' || source === 'ai' || source === 'char' || source === 'chat_tool' || source === 'manual' || String(source).includes('tool') || String(source).includes('ai')) {
       // char 调用 AI / 工具开播起名
@@ -703,11 +710,10 @@ async function bootstrapWorldInitialState(allChars, params = {}) {
       const endTime = startTime + plannedDurationMins * 60000;
 
       const coverUrl = c.cover || c.avatar || '';
-      const rawCat = c.tags ? c.tags[0] : '随性杂谈';
-      const chosenCat = (typeof normalizeCategory === 'function') ? normalizeCategory(rawCat) : rawCat;
-      const chosenSubTag = (typeof getCanonicalSubCategory === 'function')
-        ? getCanonicalSubCategory(chosenCat, (c.tags && c.tags[1]) || (rawCat !== chosenCat ? rawCat : ''), c.id)
-        : '日常唠嗑';
+      // 分类选取：完全随机（先一级再二级）
+      const picked = (typeof pickRandomLiveCategory === 'function') ? pickRandomLiveCategory() : { mainCat: '随性杂谈', subCat: '日常唠嗑' };
+      const chosenCat = picked.mainCat;
+      const chosenSubTag = picked.subCat;
 
       const newSession = {
         characterId: c.id,
