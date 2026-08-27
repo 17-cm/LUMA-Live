@@ -296,8 +296,15 @@ function getHeroData() {
   return cachedHeroData || { ...DEFAULT_HERO_DATA };
 }
 
-function saveHeroData(data) {
-  try { localStorage.setItem(HERO_STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
+async function saveHeroData(data) {
+  try {
+    if (window.api && api.db) {
+      await dbUpsert('app_config', 'hero_hot_search', data);
+    }
+    localStorage.setItem(HERO_STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn("[saveHeroData] failed:", e);
+  }
 }
 
 // 置顶热搜编辑模式
@@ -315,7 +322,7 @@ function cancelHeroEdit() {
 }
 window.cancelHeroEdit = cancelHeroEdit;
 
-function saveHeroEdit() {
+async function saveHeroEdit() {
   const titleEl = document.getElementById('heroEditTitle');
   const heatEl = document.getElementById('heroEditHeat');
   const discEl = document.getElementById('heroEditDisc');
@@ -326,7 +333,7 @@ function saveHeroEdit() {
     discussions: discEl ? discEl.value.trim() || DEFAULT_HERO_DATA.discussions : DEFAULT_HERO_DATA.discussions,
     image: imgEl ? imgEl.src : DEFAULT_HERO_DATA.image
   };
-  saveHeroData(data);
+  await saveHeroData(data);
   heroEditMode = false;
   renderHotSearchRanking();
   if (window.api && api.ui && api.ui.toast) api.ui.toast('置顶热搜已保存');
@@ -482,6 +489,7 @@ window.renderHotSearchRanking = renderHotSearchRanking;
 
 // 切换热搜编辑模式
 function toggleHotSearchEdit() {
+  const wasEditMode = hotSearchEditMode;
   hotSearchEditMode = !hotSearchEditMode;
   renderHotSearchRanking();
   // 铅笔图标样式切换
@@ -496,6 +504,11 @@ function toggleHotSearchEdit() {
       btn.style.color = 'inherit';
       btn.style.transform = 'rotate(0)';
     }
+  }
+  // 退出编辑模式时主动保存词条和分类
+  if (wasEditMode && !hotSearchEditMode) {
+    if (typeof saveHotSearchItems === 'function') saveHotSearchItems();
+    if (typeof saveHotCategories === 'function') saveHotCategories();
   }
   if (window.api && api.ui && api.ui.toast) {
     api.ui.toast(hotSearchEditMode ? '编辑模式：点击词条可修改' : '热搜已保存');
