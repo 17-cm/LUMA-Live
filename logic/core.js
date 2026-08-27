@@ -309,10 +309,14 @@ var api = window.api;
 async function dbUpsert(collection, id, data) {
   if (!api || !api.db) return null;
   try {
-    const updated = await api.db.update(collection, id, data);
-    if (updated) return updated;
-    return await api.db.create(collection, { id, ...data });
+    const existing = await api.db.get(collection, id).catch(() => null);
+    if (existing) {
+      return await api.db.update(collection, id, data);
+    } else {
+      return await api.db.create(collection, { id, ...data });
+    }
   } catch (e) {
+    console.warn("[dbUpsert] failed:", collection, id, e);
     return null;
   }
 }
