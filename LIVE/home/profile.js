@@ -32,6 +32,31 @@ function syncFollowCountDisplay() {
 }
 window.syncFollowCountDisplay = syncFollowCountDisplay;
 async function syncUserProfile() {
+  // 从数据库读取保存的用户资料
+  try {
+    if (api.db && api.db.get) {
+      const saved = await api.db.get('app_profile', 'user_profile').catch(() => null);
+      if (saved) {
+        if (saved.uid !== undefined) userProfileData.uid = saved.uid;
+        if (saved.ip !== undefined) userProfileData.ip = saved.ip;
+        if (saved.tag !== undefined) userProfileData.tag = saved.tag;
+        if (saved.bio !== undefined) userProfileData.bio = saved.bio;
+        if (saved.fans !== undefined) userProfileData.fans = saved.fans;
+        if (saved.likes !== undefined) userProfileData.likes = saved.likes;
+        if (saved.medals !== undefined) userProfileData.medals = saved.medals;
+      }
+    }
+  } catch (e) {}
+  // 更新页面显示
+  const uidEl = document.getElementById('displayUserUID');
+  const ipEl = document.getElementById('displayUserIP');
+  const tagEl = document.getElementById('displayUserTag');
+  const bioEl = document.getElementById('userBioText');
+  if (uidEl) uidEl.textContent = userProfileData.uid;
+  if (ipEl) ipEl.textContent = userProfileData.ip;
+  if (tagEl) tagEl.textContent = userProfileData.tag;
+  if (bioEl) bioEl.textContent = `“${userProfileData.bio}”`;
+  
   try {
     const u = await api.user.getProfile();
     if (u) {
@@ -99,13 +124,6 @@ async function saveUserProfileEdits() {
   closeEditProfileModal();
   await dbUpsert("app_profile", "user_profile", userProfileData);
   api.ui.toast("个人资料已保存！");
-
-  // 保存到 api.db
-  try {
-    if (window.api && api.db && api.db.set) {
-      await api.db.set('app_profile', 'user_profile', userProfileData);
-    }
-  } catch (e) {}
 }
 window.saveUserProfileEdits = saveUserProfileEdits;
 function openFollowListPageView() {
