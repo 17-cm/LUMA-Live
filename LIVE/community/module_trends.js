@@ -539,10 +539,12 @@ window.clearHotSearchFilter = clearHotSearchFilter;
 
 // 单条动态卡片 HTML（样板 .post-card 结构，内联文本流）
 function getPostCardHtml(post) {
-  // 头像：优先用 getAvatar
-  const avatarSrc = (typeof window.getAvatar === 'function')
-    ? window.getAvatar(post.author.name, 'emoji')
-    : (post.author.avatar || '');
+  // 头像：统一走 getPostAuthorAvatar，优先展示存储的规范头像（角色/用户/随机人物各自独立），保证与详情页一致
+  const avatarSrc = (typeof window.getPostAuthorAvatar === 'function')
+    ? window.getPostAuthorAvatar(post)
+    : ((typeof window.getAvatar === 'function')
+        ? window.getAvatar(post.author.name, 'emoji')
+        : (post.author.avatar || ''));
   // 手机型号：Float
   const deviceTag = (typeof window.getFloatClientTag === 'function')
     ? window.getFloatClientTag(true)

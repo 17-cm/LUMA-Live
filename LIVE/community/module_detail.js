@@ -46,13 +46,18 @@ function renderPostDetailView(post) {
   const box = document.getElementById('trendDetailContent');
   if (!box) return;
 
+  // 头像统一解析，保证与热搜卡片展示一致
+  const authorAvatar = (typeof window.getPostAuthorAvatar === 'function')
+    ? window.getPostAuthorAvatar(post)
+    : (post.author.avatar || (typeof window.getAvatar === 'function' ? window.getAvatar(post.author.name, 'emoji') : ''));
+
   let html = `
     <!-- 帖子主正文卡片 -->
     <div class="luxe-card p-4 space-y-3.5 bg-white shadow-xs">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2.5">
           <div class="relative">
-            <img src="${post.author.avatar}" class="w-10 h-10 rounded-full object-cover border border-slate-200">
+            <img src="${authorAvatar}" class="w-10 h-10 rounded-full object-cover border border-slate-200">
             ${post.author.verified ? `<span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center text-[8px] text-white font-black">V</span>` : ''}
           </div>
           <div>
@@ -84,8 +89,8 @@ function renderPostDetailView(post) {
       ` : ''}
 
       ${post.image ? `
-        <div class="rounded-2xl overflow-hidden aspect-video bg-slate-950 shadow-inner">
-          <img src="${post.image}" class="w-full h-full object-cover">
+        <div class="rounded-2xl overflow-hidden bg-slate-950 shadow-inner">
+          <img src="${post.image}" class="w-full h-auto object-contain block">
         </div>
       ` : ''}
 

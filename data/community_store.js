@@ -9,6 +9,18 @@
 
 var api = window.api || {};
 
+// 帖子作者头像统一解析：优先使用存储的规范头像（角色=角色头像、用户=用户头像、随机人物=随机头像），
+// 无存储头像时才按名字生成确定性随机头像，保证热搜卡片与详情页展示一致。
+window.getPostAuthorAvatar = function(post) {
+  if (post && post.author) {
+    if (post.author.avatar) return post.author.avatar;
+    if (typeof window.getAvatar === 'function') {
+      return window.getAvatar(post.author.name, 'emoji');
+    }
+  }
+  return '';
+};
+
 // 1. 基础预置帖子数据
 window.weiboPosts = window.weiboPosts || [
   {
