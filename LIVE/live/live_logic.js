@@ -930,8 +930,8 @@ function playSpeechMarquee(text) {
   textEl.textContent = text;
   track.style.transition = 'none';
   track.style.opacity = '0';
+  track.style.transform = 'translateX(0)';
 
-  // 等文字宽度稳定
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       const viewportWidth = viewport.clientWidth;
@@ -942,27 +942,24 @@ function playSpeechMarquee(text) {
       // 短文字（不超过容器）：居中显示，不滚
       if (textWidth <= viewportWidth) {
         track.style.transform = 'translateX(0)';
-        setTimeout(() => {
-          finishSpeechMarquee();
-        }, SPEECH_MARQUEE_HOLD_MS);
+        setTimeout(() => finishSpeechMarquee(), SPEECH_MARQUEE_HOLD_MS);
         return;
       }
 
-      // 长文字：居中滚动，从右往左慢速滚动，滚到刚好末尾对齐左边停止
-      const startX = (viewportWidth - textWidth) / 2;
-      const endX = (viewportWidth - textWidth) / 2 - (textWidth - viewportWidth);
-      const distance = Math.abs(startX - endX);
+      // 长文字：从右往左匀速滚动，保证每个字都从右侧进入、从左侧离开
+      // 起点：文字左边缘对齐视口右边缘（textX = viewportWidth）
+      // 终点：文字右边缘对齐视口左边缘（textX = -textWidth）
+      const startX = viewportWidth;
+      const endX = -textWidth;
+      const distance = startX - endX;
       const duration = (distance / SPEECH_MARQUEE_SPEED) * 1000;
 
       track.style.transform = `translateX(${startX}px)`;
-      // 强制 reflow
       void track.offsetWidth;
       track.style.transition = `transform ${duration}ms linear, opacity ${SPEECH_MARQUEE_FADE_IN_MS}ms ease-out`;
       track.style.transform = `translateX(${endX}px)`;
 
-      setTimeout(() => {
-        finishSpeechMarquee();
-      }, duration);
+      setTimeout(() => finishSpeechMarquee(), duration);
     });
   });
 }
