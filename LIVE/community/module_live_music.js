@@ -15,7 +15,6 @@
   // ---- 数据层 ---------------------------------------------------------
   var TOOLS_KEY = 'live_music_tools';
   var SONGS_KEY = 'live_music_songs';
-  var KEYWORD_PLACEHOLDER = '__KEYWORD__';
 
   window.liveMusicTools = window.liveMusicTools || [];
   window.liveMusicCurrentToolId = window.liveMusicCurrentToolId || null;
@@ -318,7 +317,6 @@
                'class="w-full h-10 pl-10 pr-4 rounded-2xl bg-white border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100 transition" />' +
         '<button id="liveMusicSearchBtn" class="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 px-3 rounded-xl bg-slate-900 text-white text-[10px] font-black active:scale-95 transition">搜索</button>' +
       '</div>' +
-      '<p class="text-[10px] text-slate-400 mb-4 leading-relaxed">提示：工具参数中用 <code class="px-1 py-0.5 rounded bg-slate-100 text-slate-700 font-mono">__KEYWORD__</code> 表示搜索框内容</p>' +
 
       // 唯一显示区
       '<div id="liveMusicDisplayArea" class="min-h-[200px]">' + renderDisplayHTML() + '</div>';
@@ -448,20 +446,27 @@
     });
   }
 
-  // 把工具的 url+params 组装成 fetch 请求，__KEYWORD__ 替换为搜索词
+  // 把工具的 url+params 组装成 fetch 请求
+  // 规则：搜索框的值补在「最后一个有 key 的参数」的 value 上（其他参数按字面值）
   function buildRequest(tool, keyword) {
     var url = tool.url || '';
     var method = (tool.method || 'GET').toUpperCase();
     var params = Array.isArray(tool.params) ? tool.params : [];
 
+    // 过滤出有 key 的参数（按工具里写的顺序）
+    var keyed = params.filter(function (p) { return p && p.key; });
+    var lastKeyedIdx = keyed.length - 1;
+
+    function buildOne(p, idx, isLast) {
+      var v = p.value || '';
+      if (isLast) v = keyword != null ? String(keyword) : v;
+      return encodeURIComponent(p.key) + '=' + encodeURIComponent(v);
+    }
+
     // GET：参数拼到 query
-    var qs = params
-      .filter(function (p) { return p && (p.key || p.value); })
-      .map(function (p) {
-        var v = (p.value || '').replace(new RegExp(KEYWORD_PLACEHOLDER, 'g'), keyword);
-        return encodeURIComponent(p.key) + '=' + encodeURIComponent(v);
-      })
-      .join('&');
+    var qs = keyed.map(function (p, idx) {
+      return buildOne(p, idx, idx === lastKeyedIdx);
+    }).join('&');
 
     var fullUrl = url;
     if (qs) {
@@ -470,13 +475,9 @@
 
     var options = { method: method, headers: {} };
     if (method === 'POST') {
-      // POST 同时发 form body 兼容旧 API
-      var form = params
-        .filter(function (p) { return p && (p.key || p.value); })
-        .map(function (p) {
-          return encodeURIComponent(p.key) + '=' + encodeURIComponent((p.value || '').replace(new RegExp(KEYWORD_PLACEHOLDER, 'g'), keyword));
-        })
-        .join('&');
+      var form = keyed.map(function (p, idx) {
+        return buildOne(p, idx, idx === lastKeyedIdx);
+      }).join('&');
       options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
       options.body = form;
     }
@@ -768,6 +769,58 @@
     var songs = window.__liveMusicLastResult;
     if (!songs || !songs[i]) return;
     var s = songs[i];
+    var tool = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
+
+    // 如果已有 URL / 封面 → 直接 push
+    if (s.playUrl) {
+      pushSongToLibrary(s, tool);
+      return;
+    }
+
+    // 没 URL → 用歌名再搜一次（"江辰" 这种 title+artist 重新走 buildRequest 详情接口）
+    if (!tool) {
+      if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('未选工具，无法获取 URL');
+      return;
+    }
+    var query = s.title || (s.title + ' ' + s.artist);
+    if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('正在获取「' + query + '」播放链接…');
+
+    buildRequest(tool, query).then(function (req) {
+      return fetch(req.url, req.options).then(function (resp) {
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.json();
+      }).then(function (json) {
+        var detail = parseSongsFromResponse(json);
+        var match = null;
+        if (detail && detail.length > 0) {
+          // 找与原歌最匹配的（title 相等优先，其次包含）
+          match = detail.find(function (d) { return d.title === s.title; }) || null;
+          if (!match) match = detail.find(function (d) { return d.title && s.title && d.title.indexOf(s.title) >= 0; }) || null;
+          if (!match) match = detail[0];
+        }
+        if (match) {
+          // 补上原歌的 rawId / 标题（如果 detail 拿到更准的 URL/封面就用 detail 的）
+          pushSongToLibrary({
+            rawId: s.rawId || match.rawId,
+            title: match.title || s.title,
+            artist: match.artist || s.artist,
+            pic: match.pic || s.pic,
+            playUrl: match.playUrl || s.playUrl
+          }, tool);
+        } else {
+          // 还是没拿到 → 仍加入，但 URL 留空（用户可手动填）
+          pushSongToLibrary(s, tool, true);
+        }
+      });
+    }).catch(function (e) {
+      console.warn('[liveMusic] 获取 URL 失败:', e);
+      if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('获取失败，已加入但无 URL');
+      pushSongToLibrary(s, tool, true);
+    });
+  };
+
+  // 实际写入歌曲库 + UI 刷新
+  function pushSongToLibrary(s, tool, skipUrlCheck) {
     // 去重：同 rawId 或同 title+artist
     var exists = (window.liveMusicSongs || []).some(function (x) {
       if (s.rawId && x.rawId && s.rawId === x.rawId) return true;
@@ -775,9 +828,9 @@
     });
     if (exists) {
       if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('已在歌曲库中');
+      refreshAfterAdd();
       return;
     }
-    var tool = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
     window.liveMusicSongs.push({
       id: uid(),
       rawId: s.rawId,
@@ -789,15 +842,23 @@
       addedAt: Date.now()
     });
     saveSongs();
-    if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('已加入歌曲库');
-    // 如果当前显示的是搜索结果，保留 mode 不重渲染整页（避免输入框失焦）
+    if (window.api && window.api.ui && window.api.ui.toast) {
+      if (skipUrlCheck || !s.playUrl) {
+        window.api.ui.toast('已加入（无 URL）');
+      } else {
+        window.api.ui.toast('已加入歌曲库');
+      }
+    }
+    refreshAfterAdd();
+  }
+  function refreshAfterAdd() {
     if (window.__liveMusicDisplayMode === 'search') {
       var area = document.getElementById('liveMusicDisplayArea');
       if (area) area.innerHTML = renderSearchResultHTML(window.__liveMusicLastResult);
     } else {
       renderLiveMusicPage();
     }
-  };
+  }
 
   // ---- ➕ 弹窗（新增 / 编辑，编辑时传 editTool 预填） -----------------
   function openLiveMusicAddModal(editTool) {
@@ -864,7 +925,7 @@
         return '<div class="flex items-center gap-2 mb-2" data-param-row="' + i + '">' +
           '<input type="text" data-param-key placeholder="参数名" value="' + escapeHtml(r.key) + '" ' +
                  'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-          '<input type="text" data-param-value placeholder="值(可用 __KEYWORD__)" value="' + escapeHtml(r.value) + '" ' +
+          '<input type="text" data-param-value placeholder="值" value="' + escapeHtml(r.value) + '" ' +
                  'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
           (paramRows.length > 1 ?
             '<button data-param-remove="' + i + '" class="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0 active:scale-90 transition" aria-label="删除该参数">' +
