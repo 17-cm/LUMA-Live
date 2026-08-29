@@ -150,12 +150,15 @@
   window.closeLiveMusicSubPage = closeLiveMusicSubPage;
 
   // ---- 主渲染 ---------------------------------------------------------
+  // 当前显示区模式：null=空 | 'search' | 'songs' | 'tools' | 'char_playlist'
+  window.__liveMusicDisplayMode = window.__liveMusicDisplayMode || null;
+
   function renderLiveMusicPage() {
     var box = document.getElementById('liveMusicContent');
     if (!box) return;
 
     var currentTool = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
-    var placeholder = currentTool ? ('搜索 · 当前工具：' + (currentTool.name || '未命名')) : '请先在下方"我的工具"选中一个工具';
+    var placeholder = currentTool ? ('搜索 · 当前工具：' + (currentTool.name || '未命名')) : '请先在"我的工具"中选中一个工具';
 
     box.innerHTML =
       // 顶部状态卡
@@ -184,21 +187,22 @@
         '</div>' +
       '</div>' +
 
-      // 快捷入口 3 卡
+      // 快捷入口 3 卡（点击切换显示区）
       '<div class="grid grid-cols-3 gap-2 mb-4">' +
         [
-          { icon: '<line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line>', label: '歌曲列表' },
-          { icon: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>', label: '为 char 建造歌单' },
-          { icon: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>', label: '我的工具' }
+          { key: 'songs', icon: '<line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line>', label: '歌曲列表' },
+          { key: 'char_playlist', icon: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>', label: '为 char 建造歌单' },
+          { key: 'tools', icon: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>', label: '我的工具' }
         ].map(function (it) {
-          return '<button class="flex flex-col items-center gap-1.5 py-3 rounded-2xl bg-white border border-slate-200 active:scale-95 transition">' +
-            '<svg class="w-5 h-5 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + it.icon + '</svg>' +
-            '<span class="text-[10px] text-slate-700 font-bold">' + it.label + '</span>' +
+          var active = window.__liveMusicDisplayMode === it.key;
+          return '<button onclick="switchLiveMusicDisplay(\'' + it.key + '\')" class="flex flex-col items-center gap-1.5 py-3 rounded-2xl border transition ' + (active ? 'bg-fuchsia-50 border-fuchsia-300' : 'bg-white border-slate-200') + ' active:scale-95">' +
+            '<svg class="w-5 h-5 ' + (active ? 'text-fuchsia-600' : 'text-slate-700') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + it.icon + '</svg>' +
+            '<span class="text-[10px] font-black ' + (active ? 'text-fuchsia-700' : 'text-slate-700') + '">' + it.label + '</span>' +
           '</button>';
         }).join('') +
       '</div>' +
 
-      // 搜索框
+      // 搜索框（始终可见）
       '<div class="relative mb-3">' +
         '<svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>' +
         '<input id="liveMusicSearchInput" type="text" placeholder="' + escapeHtml(placeholder) + '" ' +
@@ -207,30 +211,61 @@
       '</div>' +
       '<p class="text-[10px] text-slate-400 mb-4 leading-relaxed">提示：工具参数中用 <code class="px-1 py-0.5 rounded bg-slate-100 text-slate-700 font-mono">__KEYWORD__</code> 表示搜索框内容</p>' +
 
-      // 搜索结果区
-      '<div class="flex items-center justify-between mb-2.5 px-1">' +
-        '<h4 class="text-xs font-black text-slate-900 tracking-wide">搜索结果</h4>' +
-        '<span id="liveMusicResultCount" class="text-[10px] text-slate-400 font-medium">0 条</span>' +
-      '</div>' +
-      '<div id="liveMusicResultArea" class="space-y-2 mb-6 min-h-[40px]">' +
-        '<div class="text-center py-6 text-[11px] text-slate-400">输入关键词开始搜索</div>' +
-      '</div>' +
-
-      // 工具区
-      '<div class="flex items-center justify-between mb-2.5 px-1">' +
-        '<h4 class="text-xs font-black text-slate-900 tracking-wide">我的工具</h4>' +
-        '<span class="text-[10px] text-slate-400 font-medium">' + (window.liveMusicTools || []).length + ' 个</span>' +
-      '</div>' +
-      '<div id="liveMusicToolList" class="space-y-2 mb-6">' + renderToolListHTML() + '</div>' +
-
-      // 歌曲库区
-      '<div class="flex items-center justify-between mb-2.5 px-1">' +
-        '<h4 class="text-xs font-black text-slate-900 tracking-wide">歌曲库</h4>' +
-        '<span class="text-[10px] text-slate-400 font-medium">' + (window.liveMusicSongs || []).length + ' 首</span>' +
-      '</div>' +
-      '<div id="liveMusicSongList" class="space-y-2">' + renderSongListHTML() + '</div>';
+      // 唯一显示区
+      '<div id="liveMusicDisplayArea" class="min-h-[200px]">' + renderDisplayHTML() + '</div>';
   }
   window.renderLiveMusicPage = renderLiveMusicPage;
+
+  // 显示区内容（互斥：搜索结果/歌曲库/工具/空）
+  function renderDisplayHTML() {
+    var mode = window.__liveMusicDisplayMode;
+    if (!mode) return ''; // 空
+    if (mode === 'search') {
+      if (window.__liveMusicLastResult && window.__liveMusicLastResult.length > 0) return renderSearchResultHTML(window.__liveMusicLastResult);
+      return '<div class="text-center py-12 text-[11px] text-slate-400">输入关键词开始搜索</div>';
+    }
+    if (mode === 'songs') return renderSongListHTML();
+    if (mode === 'tools') return renderToolListHTML();
+    if (mode === 'char_playlist') return renderCharPlaylistHTML();
+    return '';
+  }
+  window.renderDisplayHTML = renderDisplayHTML;
+
+  function renderCharPlaylistHTML() {
+    return '<div class="flex flex-col items-center justify-center py-12 px-6 rounded-3xl bg-white border-2 border-dashed border-slate-200">' +
+      '<div class="w-14 h-14 rounded-full bg-gradient-to-br from-fuchsia-100 to-blue-100 flex items-center justify-center mb-3">' +
+        '<svg class="w-6 h-6 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>' +
+      '</div>' +
+      '<p class="text-sm font-black text-slate-900">为 char 建造歌单</p>' +
+      '<p class="text-[11px] text-slate-500 mt-1.5 text-center">等后续接入</p>' +
+    '</div>';
+  }
+
+  // 切换显示区
+  window.switchLiveMusicDisplay = function (key) {
+    window.__liveMusicDisplayMode = (window.__liveMusicDisplayMode === key) ? null : key;
+    renderLiveMusicPage();
+  };
+
+  function renderSearchResultHTML(songs) {
+    if (!songs || songs.length === 0) return '<div class="text-center py-12 text-[11px] text-slate-400">没有匹配的歌曲</div>';
+    return songs.map(function (s, i) {
+      var pic = s.pic;
+      var cover = pic
+        ? '<img src="' + escapeHtml(pic) + '" class="w-full h-full object-cover" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div class="w-full h-full hidden items-center justify-center bg-gradient-to-br from-fuchsia-100 to-blue-100"><svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>'
+        : '<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-fuchsia-100 to-blue-100"><svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>';
+      return '<div class="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200 mb-2">' +
+        '<div class="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">' + cover + '</div>' +
+        '<div class="flex-1 min-w-0">' +
+          '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(s.title) + '</div>' +
+          '<div class="text-[10px] text-slate-500 mt-0.5 truncate">' + escapeHtml(s.artist) + '</div>' +
+        '</div>' +
+        '<button onclick="addLiveMusicSong(' + i + ')" class="w-9 h-9 rounded-full bg-gradient-to-br from-fuchsia-500 to-pink-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm active:scale-90 transition" aria-label="添加到歌曲库" title="添加">' +
+          '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+        '</button>' +
+      '</div>';
+    }).join('');
+  }
 
   // ---- 搜索框绑定 -----------------------------------------------------
   function bindSearchInput() {
@@ -241,7 +276,7 @@
     function doSearch() {
       var kw = (input.value || '').trim();
       if (kw === lastKw && window.__liveMusicLastResult) {
-        renderSearchResult(window.__liveMusicLastResult);
+        showSearchResult(window.__liveMusicLastResult);
         return;
       }
       lastKw = kw;
@@ -255,25 +290,22 @@
 
   // 用当前选中的工具跑请求
   function runToolSearch(keyword) {
-    var area = document.getElementById('liveMusicResultArea');
-    var countEl = document.getElementById('liveMusicResultCount');
+    var area = document.getElementById('liveMusicDisplayArea');
     if (!area) return;
     if (!keyword) {
-      area.innerHTML = '<div class="text-center py-6 text-[11px] text-slate-400">输入关键词开始搜索</div>';
-      if (countEl) countEl.textContent = '0 条';
+      area.innerHTML = '<div class="text-center py-12 text-[11px] text-slate-400">输入关键词开始搜索</div>';
       window.__liveMusicLastResult = null;
       return;
     }
     var tool = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
     if (!tool) {
-      area.innerHTML = '<div class="text-center py-6 text-[11px] text-rose-500">请先在下方选中一个工具</div>';
-      if (countEl) countEl.textContent = '0 条';
+      area.innerHTML = '<div class="text-center py-12 text-[11px] text-rose-500">请先在"我的工具"中选中一个工具</div>';
+      window.__liveMusicLastResult = null;
       return;
     }
-    area.innerHTML = '<div class="text-center py-6 text-[11px] text-slate-400 flex items-center justify-center gap-2">' +
+    area.innerHTML = '<div class="text-center py-12 text-[11px] text-slate-400 flex items-center justify-center gap-2">' +
       '<svg class="w-4 h-4 animate-spin text-fuchsia-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>' +
       '正在搜索…</div>';
-    if (countEl) countEl.textContent = '...';
 
     buildRequest(tool, keyword).then(function (req) {
       return fetch(req.url, req.options).then(function (resp) {
@@ -282,12 +314,11 @@
       }).then(function (json) {
         var songs = parseSongsFromResponse(json);
         window.__liveMusicLastResult = songs;
-        renderSearchResult(songs);
+        showSearchResult(songs);
       });
     }).catch(function (e) {
       console.warn('[liveMusic] 搜索失败:', e);
-      area.innerHTML = '<div class="text-center py-6 text-[11px] text-rose-500">请求失败：' + escapeHtml(e && e.message ? e.message : String(e)) + '<br/><span class="text-slate-400">检查 URL / 参数 / CORS</span></div>';
-      if (countEl) countEl.textContent = '0 条';
+      area.innerHTML = '<div class="text-center py-12 text-[11px] text-rose-500">请求失败：' + escapeHtml(e && e.message ? e.message : String(e)) + '<br/><span class="text-slate-400">检查 URL / 参数 / CORS</span></div>';
       window.__liveMusicLastResult = null;
     });
   }
@@ -327,33 +358,13 @@
     return Promise.resolve({ url: fullUrl, options: options });
   }
 
-  // 渲染搜索结果
-  function renderSearchResult(songs) {
-    var area = document.getElementById('liveMusicResultArea');
-    var countEl = document.getElementById('liveMusicResultCount');
+  // 搜索结果写入唯一显示区（不重渲染整个页面，保留输入框焦点）
+  function showSearchResult(songs) {
+    window.__liveMusicLastResult = songs;
+    window.__liveMusicDisplayMode = 'search';
+    var area = document.getElementById('liveMusicDisplayArea');
     if (!area) return;
-    if (!songs || songs.length === 0) {
-      area.innerHTML = '<div class="text-center py-6 text-[11px] text-slate-400">没有匹配的歌曲</div>';
-      if (countEl) countEl.textContent = '0 条';
-      return;
-    }
-    if (countEl) countEl.textContent = songs.length + ' 条';
-    area.innerHTML = songs.map(function (s, i) {
-      var pic = s.pic;
-      var cover = pic
-        ? '<img src="' + escapeHtml(pic) + '" class="w-full h-full object-cover" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div class="w-full h-full hidden items-center justify-center bg-gradient-to-br from-fuchsia-100 to-blue-100"><svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>'
-        : '<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-fuchsia-100 to-blue-100"><svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>';
-      return '<div class="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200">' +
-        '<div class="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">' + cover + '</div>' +
-        '<div class="flex-1 min-w-0">' +
-          '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(s.title) + '</div>' +
-          '<div class="text-[10px] text-slate-500 mt-0.5 truncate">' + escapeHtml(s.artist) + '</div>' +
-        '</div>' +
-        '<button onclick="addLiveMusicSong(' + i + ')" class="w-9 h-9 rounded-full bg-gradient-to-br from-fuchsia-500 to-pink-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm active:scale-90 transition" aria-label="添加到歌曲库" title="添加">' +
-          '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
-        '</button>' +
-      '</div>';
-    }).join('');
+    area.innerHTML = renderSearchResultHTML(songs);
   }
 
   // ---- 工具 / 歌曲 列表渲染 ------------------------------------------
@@ -449,7 +460,13 @@
     });
     saveSongs();
     if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('已加入歌曲库');
-    renderLiveMusicPage();
+    // 如果当前显示的是搜索结果，保留 mode 不重渲染整页（避免输入框失焦）
+    if (window.__liveMusicDisplayMode === 'search') {
+      var area = document.getElementById('liveMusicDisplayArea');
+      if (area) area.innerHTML = renderSearchResultHTML(window.__liveMusicLastResult);
+    } else {
+      renderLiveMusicPage();
+    }
   };
 
   // ---- ➕ 弹窗（同上版本，方法切换 className replace） -----------------
