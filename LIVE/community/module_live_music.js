@@ -77,7 +77,7 @@
     title:   ['name', 'title', 'songName', 'song_name', 'trackName', 'song', 'musicName', 'music_name'],
     artist:  ['artists', 'singer', 'ar_name', 'artist', 'singerName', 'author', 'singer_name', 'artist_name'],
     pic:     ['picUrl', 'pic', 'cover', 'pic_img', 'album_pic', 'picurl', 'coverUrl', 'coverImgUrl', 'image', 'pic_url'],
-    playUrl: ['url', 'playUrl', 'play_url', 'mp3Url', 'mp3_url', 'src', 'audioUrl', 'audio']
+    playUrl: ['url', 'playUrl', 'play_url', 'mp3Url', 'mp3_url', 'src', 'audioUrl', 'audio', 'music_url', 'link']
   };
   function pickField(obj, candidates) {
     if (!obj || typeof obj !== 'object') return '';
@@ -105,24 +105,119 @@
     return null;
   }
 
-  // 启发式把 API 返回解析成歌曲数组 [{title, artist, pic, playUrl, rawId}]
+  // 解析 JSONPath 点路径：'data.music_url' → obj.data.music_url
+  function pickByPath(obj, path) {
+    if (!obj || !path) return '';
+    var parts = String(path).split('.');
+    var cur = obj;
+    for (var i = 0; i < parts.length; i++) {
+      if (cur == null) return '';
+      cur = cur[parts[i]];
+    }
+    return (cur == null) ? '' : String(cur);
+  }
+
+  // 解析用户在"返回格式"里填的多行 '字段=路径'
+  // 例：
+  //   title=data.name
+  //   artist=data.singer
+  //   pic=data.cover
+  //   playUrl=data.music_url
+  function parseFormatMap(formatStr) {
+    var map = {};
+    if (!formatStr) return map;
+    var lines = String(formatStr).split(/[\r\n]+/);
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (!line) continue;
+      var idx = line.indexOf('=');
+      if (idx <= 0) continue;
+      var key = line.slice(0, idx).trim();
+      var val = line.slice(idx + 1).trim();
+      if (key && val) map[key] = val;
+    }
+    return map;
+  }
+
+  // 从工具读取返回格式配置。空 → 启发式
+  function getCurrentFormatMap() {
+    var tool = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
+    if (!tool) return {};
+    return parseFormatMap(tool.format);
+  }
+
+  // 把 API 返回解析成歌曲数组 [{title, artist, pic, playUrl, rawId}]
+  // 优先用工具的"返回格式"配置；空 → 启发式
   function parseSongsFromResponse(json) {
-    var arr = findFirstArray(json);
-    if (!arr) return [];
+    if (json == null) return [];
+    var fmtMap = getCurrentFormatMap();
+    var useCustom = Object.keys(fmtMap).length > 0;
+
     var out = [];
-    for (var i = 0; i < arr.length; i++) {
-      var it = arr[i];
-      if (!it || typeof it !== 'object') continue;
-      var title = pickField(it, FIELD_GUESS.title);
-      if (!title) continue;
+
+    if (useCustom) {
+      // 自定义 JSONPath：先看 json 本身是数组 / 是单个对象 / 数组在某个路径下
+      var arr = pickByPath(json, fmtMap.__array || '');
+      if (arr) {
+        for (var j = 0; j < arr.length; j++) {
+          var it0 = arr[j];
+          if (!it0 || typeof it0 !== 'object') continue;
+          var t0 = pickByPath(it0, fmtMap.title) || pickField(it0, FIELD_GUESS.title);
+          if (!t0) continue;
+          out.push({
+            rawId: pickByPath(it0, fmtMap.rawId) || pickField(it0, ['id','songId','song_id','mid','trackId']) || '',
+            title: t0,
+            artist: pickByPath(it0, fmtMap.artist) || pickField(it0, FIELD_GUESS.artist) || '未知歌手',
+            pic: pickByPath(it0, fmtMap.pic) || pickField(it0, FIELD_GUESS.pic) || '',
+            playUrl: pickByPath(it0, fmtMap.playUrl) || pickField(it0, FIELD_GUESS.playUrl) || ''
+          });
+          if (out.length >= 50) break;
+        }
+        return out;
+      }
+      // 没在路径里找到数组 → 把整个 json 当单首
+      var t1 = pickByPath(json, fmtMap.title) || pickField(json, FIELD_GUESS.title);
+      if (t1) {
+        out.push({
+          rawId: pickByPath(json, fmtMap.rawId) || pickField(json, ['id','songId','song_id','mid','trackId']) || '',
+          title: t1,
+          artist: pickByPath(json, fmtMap.artist) || pickField(json, FIELD_GUESS.artist) || '未知歌手',
+          pic: pickByPath(json, fmtMap.pic) || pickField(json, FIELD_GUESS.pic) || '',
+          playUrl: pickByPath(json, fmtMap.playUrl) || pickField(json, FIELD_GUESS.playUrl) || ''
+        });
+      }
+      return out;
+    }
+
+    // 启发式：找第一个数组 / 兜底把 json 当单首
+    var arr2 = findFirstArray(json);
+    if (arr2) {
+      for (var k = 0; k < arr2.length; k++) {
+        var it1 = arr2[k];
+        if (!it1 || typeof it1 !== 'object') continue;
+        var title = pickField(it1, FIELD_GUESS.title);
+        if (!title) continue;
+        out.push({
+          rawId: pickField(it1, ['id', 'songId', 'song_id', 'mid', 'trackId']) || '',
+          title: title,
+          artist: pickField(it1, FIELD_GUESS.artist) || '未知歌手',
+          pic: pickField(it1, FIELD_GUESS.pic) || '',
+          playUrl: pickField(it1, FIELD_GUESS.playUrl) || ''
+        });
+        if (out.length >= 50) break;
+      }
+      return out;
+    }
+    // 单对象兜底：把 json 当一首
+    var singleTitle = pickField(json, FIELD_GUESS.title);
+    if (singleTitle) {
       out.push({
-        rawId: pickField(it, ['id', 'songId', 'song_id', 'mid', 'trackId']) || '',
-        title: title,
-        artist: pickField(it, FIELD_GUESS.artist) || '未知歌手',
-        pic: pickField(it, FIELD_GUESS.pic) || '',
-        playUrl: pickField(it, FIELD_GUESS.playUrl) || ''
+        rawId: pickField(json, ['id', 'songId', 'song_id', 'mid', 'trackId']) || '',
+        title: singleTitle,
+        artist: pickField(json, FIELD_GUESS.artist) || '未知歌手',
+        pic: pickField(json, FIELD_GUESS.pic) || '',
+        playUrl: pickField(json, FIELD_GUESS.playUrl) || ''
       });
-      if (out.length >= 50) break;
     }
     return out;
   }
@@ -670,7 +765,7 @@
             '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">返回格式（可选）</label>' +
             '<input id="lmToolFormat" type="text" placeholder="留空则用启发式（自动找第一个数组）" value="' + escapeHtml(editTool ? (editTool.format || '') : '') + '" ' +
                    'class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-            '<p class="text-[10px] text-slate-400 mt-1.5 leading-relaxed">不填 = 自动从返回 JSON 找第一个数组，按 name/artists/picUrl/url 等字段名启发式匹配歌名/歌手/封面/链接</p>' +
+            '<p class="text-[10px] text-slate-400 mt-1.5 leading-relaxed">不填 = 自动从返回 JSON 找第一个数组，按 name/singer/cover/music_url 等字段名启发式匹配歌名/歌手/封面/链接。<br/>支持多行 <b>字段=路径</b>，路径以返回 JSON 根为起点：<br/><span class="text-slate-500">title=data.name<br/>artist=data.singer<br/>pic=data.cover<br/>playUrl=data.music_url</span></p>' +
           '</div>' +
         '</div>';
 
