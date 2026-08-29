@@ -151,8 +151,13 @@
   }
 
   async function saveVideoGallery(charId, data) {
-    if (window.api && window.api.db && window.api.db.set) {
-      await window.api.db.set(LIVE_SETTINGS_KEY, charId, data);
+    if (window.api && window.api.db) {
+      var existing = await window.api.db.get(LIVE_SETTINGS_KEY, charId).catch(function () { return null; });
+      if (existing) {
+        await window.api.db.update(LIVE_SETTINGS_KEY, charId, data);
+      } else {
+        await window.api.db.create(LIVE_SETTINGS_KEY, { id: charId, videos: data.videos || [] });
+      }
     }
   }
 
