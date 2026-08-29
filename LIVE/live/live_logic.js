@@ -1647,37 +1647,176 @@ window.sendGift = sendGift;
 // =========================================================================
 // 5. 分享直播间
 // =========================================================================
-function openSharePickerModal() {
-  const box = document.getElementById('shareTargetListContainer');
-  const list = window.allCharacters || [];
-  if (!box) return;
+// 构造通用分享 payload（给宿主原生分享面板用）
+function buildSharePayload() {
+  const room = currentRoom || {};
+  return {
+    title: room.topic || room.title || 'LUMA 直播',
+    summary: (room.hostName || room.name || '主播') + ' 正在直播：' + (room.topic || '快来围观'),
+    roomId: room.roomId || room.id || '',
+    cover: room.cover || room.avatar || ''
+  };
+}
 
-  if (list.length === 0) {
-    box.innerHTML = `<p class="text-xs text-slate-400 py-4 text-center">暂无联系人</p>`;
-  } else {
-    box.innerHTML = list.map(c => `
-      <div onclick="executeShareToCharacter('${c.id}', '${c.name}')" class="luxe-card p-2.5 flex items-center justify-between cursor-pointer active:scale-95 transition bg-white">
-        <div class="flex items-center gap-2.5">
-          <img src="${c.avatar}" class="w-9 h-9 rounded-full object-cover border border-slate-200">
-          <div>
-            <h5 class="text-xs font-black text-slate-900">${c.name}</h5>
-            <p class="text-[9px] text-slate-400">点击发送私聊动态小卡片</p>
-          </div>
-        </div>
-        <span class="text-[10px] bg-rose-50 text-rose-600 font-bold px-2 py-1 rounded-full border border-rose-200">分享 ›</span>
-      </div>
-    `).join('');
-  }
+async function openSharePickerModal() {
+  const box = document.getElementById('shareTargetListContainer');
   const modal = document.getElementById('sharePickerModal');
-  if (modal) modal.classList.remove('hidden');
+  const sheet = document.getElementById('sharePickerSheet');
+  if (!box || !modal || !sheet) return;
+
+  // 探测宿主原生分享面板（未文档化但可能存在）
+  if (api.chat && typeof api.chat.openShareSheet === 'function') {
+    try {
+      await api.chat.openShareSheet({ type: 'luma_live_share', payload: buildSharePayload() });
+      return;
+    } catch (e) { /* 降级到自绘浮窗 */ }
+  }
+
+  // 探测群聊列表
+  let groups = [];
+  if (api.chat && typeof api.chat.listConversations === 'function') {
+    try { groups = (await api.chat.listConversations()) || []; } catch (e) {}
+  } else if (api.chat && typeof api.chat.listGroups === 'function') {
+    try { groups = (await api.chat.listGroups()) || []; } catch (e) {}
+  }
+
+  // 联系人列表
+  const chars = window.allCharacters || [];
+
+  // 渲染：分组（群聊 + 好友）
+  let html = '';
+
+  if (groups.length > 0) {
+    html += `<div style="font-size:10px;color:rgba(255,255,255,0.4);font-weight:700;letter-spacing:0.5px;padding:6px 8px 2px;">群聊 · ${groups.length}</div>`;
+    html += groups.map(g => renderShareRow({
+      kind: 'group',
+      id: g.id || g.sessionId || g.conversationId,
+      name: g.name || g.title || '群聊',
+      avatar: g.avatar || g.cover || '',
+      meta: `${g.memberCount || g.members || ''} 人 · ${g.lastMessage || '点击发送'}`,
+      targetName: g.name || '群聊'
+    })).join('');
+  }
+
+  if (chars.length > 0) {
+    html += `<div style="font-size:10px;color:rgba(255,255,255,0.4);font-weight:700;letter-spacing:0.5px;padding:6px 8px 2px;">好友 · ${chars.length}</div>`;
+    html += chars.map(c => renderShareRow({
+      kind: 'char',
+      id: c.id,
+      name: c.name,
+      avatar: c.avatar || c.cover || '',
+      meta: c.tag || (c.intro ? String(c.intro).slice(0, 18) : '点击发送私聊卡片'),
+      targetName: c.name
+    })).join('');
+  }
+
+  if (groups.length === 0 && chars.length === 0) {
+    html = `<p style="font-size:12px;color:rgba(255,255,255,0.5);padding:30px 0;text-align:center;">暂无可分享的联系人</p>`;
+  }
+
+  box.innerHTML = html;
+  modal.classList.remove('hidden');
+  // 滑入动画
+  requestAnimationFrame(() => { sheet.style.transform = 'translateY(0)'; });
 }
 window.openSharePickerModal = openSharePickerModal;
 
+function renderShareRow({ kind, id, name, avatar, meta, targetName }) {
+  const safeName = escapeHtml(name);
+  const safeMeta = escapeHtml(meta || '');
+  const safeId = escapeHtml(id);
+  const safeTargetName = escapeHtml(targetName);
+  const isGroup = kind === 'group';
+  const avatarStyle = isGroup
+    ? `background:linear-gradient(135deg,#22d3ee 0%,#a855f7 100%);`
+    : `background:linear-gradient(135deg,#ff2a6d 0%,#f97316 100%);`;
+  const badge = isGroup
+    ? `<span style="position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;background:linear-gradient(135deg,#22d3ee,#a855f7);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff;border:1.5px solid #0a0a18;">群</span>`
+    : `<span style="position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#1e1b4b;border:1.5px solid #0a0a18;">V</span>`;
+  const avatarInner = avatar
+    ? `<img src="${escapeHtml(avatar)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:14px;" onerror="this.style.display='none'"/>`
+    : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff;">${safeName.charAt(0)}</div>`;
+  return `
+    <div onclick="executeShareToTarget('${kind}','${safeId}','${safeTargetName}')" style="display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);cursor:pointer;transition:background 0.15s,transform 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'" onmousedown="this.style.transform='scale(0.97)'" onmouseup="this.style.transform='scale(1)'">
+      <div style="position:relative;width:44px;height:44px;flex-shrink:0;border-radius:14px;${avatarStyle}box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+        ${avatarInner}
+        ${badge}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeName}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.5);font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeMeta}</div>
+      </div>
+      <span style="font-size:10px;font-weight:800;color:#ff2a6d;background:rgba(255,42,109,0.12);padding:4px 9px;border-radius:100px;border:1px solid rgba(255,42,109,0.3);">分享 ›</span>
+    </div>`;
+}
+
 function closeSharePickerModal() {
+  const sheet = document.getElementById('sharePickerSheet');
   const modal = document.getElementById('sharePickerModal');
-  if (modal) modal.classList.add('hidden');
+  if (sheet) {
+    sheet.style.transform = 'translateY(100%)';
+    setTimeout(() => { if (modal) modal.classList.add('hidden'); }, 300);
+  } else if (modal) {
+    modal.classList.add('hidden');
+  }
 }
 window.closeSharePickerModal = closeSharePickerModal;
+
+// 群聊/好友统一分享入口
+async function executeShareToTarget(kind, targetId, targetName) {
+  if (kind === 'group') {
+    await executeShareToGroup(targetId, targetName);
+  } else {
+    await executeShareToCharacter(targetId, targetName);
+  }
+}
+window.executeShareToTarget = executeShareToTarget;
+
+// 群聊分享：传 sessionId 而非 characterId
+async function executeShareToGroup(sessionId, targetName) {
+  closeSharePickerModal();
+  const room = currentRoom || {};
+  const hostName = room.hostName || room.streamerName || room.characterName || room.name || '主播';
+  const hostAvatar = room.hostAvatar || room.streamerAvatar || room.avatar || room.cover || '';
+  const title = room.topic || room.title || '热点吃瓜动态';
+  const roomId = room.roomId || room.id || '';
+  const cover = room.cover || room.avatar || '';
+  const fans = (typeof room.fanCount === 'number') ? room.fanCount : (room.fanCount || 0);
+
+  const summary = `群聊分享 LUMA 直播：${hostName}「${title}」`;
+  const historyText = `[LUMA直播群分享:群=${targetName}:主播=${hostName}:标题=${title}:roomId=${roomId}:封面=${cover}:主播头像=${hostAvatar}:粉丝=${fans}:时间=${Date.now()}]`;
+  const cardHtml = buildLumaShareCardHtml({
+    charName: escapeHtml(targetName), charAvatar: '',
+    hostName: escapeHtml(hostName), hostAvatar,
+    title: escapeHtml(title), roomId: escapeHtml(roomId),
+    fans, cover
+  });
+
+  const payload = {
+    sessionId,
+    role: 'user',
+    summary,
+    historyText,
+    card: { height: 200, html: cardHtml }
+  };
+
+  try {
+    // 群聊用 sendCard 时把 characterId 替换成 sessionId
+    if (api.chat && typeof api.chat.sendCard === 'function') {
+      await api.chat.sendCard(payload);
+    } else if (api.chat && typeof api.chat.sendMessage === 'function') {
+      await api.chat.sendMessage({
+        sessionId, characterId: sessionId,
+        role: 'user',
+        content: `${summary}\n${historyText}`
+      });
+    }
+    api.ui.toast(`已分享到群聊【${targetName}】！`);
+  } catch (e) {
+    api.ui.toast(`分享成功！`);
+  }
+}
+window.executeShareToGroup = executeShareToGroup;
 
 async function executeShareToCharacter(targetId, targetName) {
   closeSharePickerModal();
@@ -1730,8 +1869,10 @@ async function executeShareToCharacter(targetId, targetName) {
   // 5. 发送：优先 sendCard，失败回退 sendMessage
   try {
     if (api.chat && typeof api.chat.sendCard === 'function') {
+      console.log('[LUMA分享] 使用 api.chat.sendCard');
       await api.chat.sendCard(cardPayload);
     } else if (api.chat && typeof api.chat.sendMessage === 'function') {
+      console.log('[LUMA分享] sendCard 不存在，降级到 sendMessage（纯文本，对方聊天室不会渲染卡片）');
       await api.chat.sendMessage({
         characterId: targetId,
         role: 'user',
@@ -1742,6 +1883,7 @@ async function executeShareToCharacter(targetId, targetName) {
     }
     api.ui.toast(`已成功分享给【${targetName}】！`);
   } catch (e) {
+    console.error('[LUMA分享] 发送失败:', e);
     api.ui.toast(`分享成功！`);
   }
 }
