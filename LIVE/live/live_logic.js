@@ -1682,7 +1682,17 @@ window.closeSharePickerModal = closeSharePickerModal;
 async function executeShareToCharacter(targetId, targetName) {
   closeSharePickerModal();
   const room = currentRoom || {};
-  // 兼容多种字段命名：hostName/streamerName/characterName 都行
+  // 1. 取分享对象 char 的最新信息（按 5.12 sendCard 标准做法）
+  let targetChar = null;
+  try {
+    if (api.characters && typeof api.characters.get === 'function') {
+      targetChar = await api.characters.get(targetId);
+    }
+  } catch (e) { /* fallback 用传入的 targetName */ }
+  const charName = (targetChar && (targetChar.name || targetChar.displayName)) || targetName || '对方';
+  const charAvatar = (targetChar && (targetChar.avatar || targetChar.cover)) || '';
+
+  // 2. 直播间信息
   const hostName = room.hostName || room.streamerName || room.characterName || room.name || '主播';
   const hostAvatar = room.hostAvatar || room.streamerAvatar || room.avatar || room.cover || '';
   const title = room.topic || room.title || '热点吃瓜动态';
@@ -1690,21 +1700,308 @@ async function executeShareToCharacter(targetId, targetName) {
   const cover = room.cover || room.avatar || '';
   const fans = (typeof room.fanCount === 'number') ? room.fanCount : (room.fanCount || 0);
 
-  // 文本格式按 regex.json 规则匹配，渲染端正则提取成卡片
-  // 5.12 sendCard 风格的 summary + historyText 思路：summary=卡片可见内容，historyText=AI 看到的事实
-  const summary = `【${hostName}】正在直播：「${title}」`;
-  const historyText = `[LUMA直播:来源=${hostName}:标题=${title}:roomId=${roomId}:cover=${cover}:hostName=${hostName}:hostAvatar=${hostAvatar}:粉丝=${fans}]`;
+  // 3. 5.12 sendCard 字段
+  const summary = `${charName} 给你转发了 LUMA LIVE 直播：${hostName}「${title}」`;
+  const historyText = `[LUMA直播转发:分享者=${charName}:主播=${hostName}:标题=${title}:roomId=${roomId}:封面=${cover}:主播头像=${hostAvatar}:粉丝=${fans}:时间=${Date.now()}]`;
 
+  // 4. 霓虹动态卡片 HTML（宿主 sandbox 渲染，不执行脚本）
+  const safeName = escapeHtml(charName);
+  const safeHostName = escapeHtml(hostName);
+  const safeTitle = escapeHtml(title);
+  const safeRoomId = escapeHtml(roomId);
+  const cardHtml = buildLumaShareCardHtml({
+    charName: safeName, charAvatar,
+    hostName: safeHostName, hostAvatar,
+    title: safeTitle, roomId: safeRoomId,
+    fans, cover
+  });
+
+  const cardPayload = {
+    characterId: targetId,
+    role: 'user',
+    summary,
+    historyText,
+    card: {
+      height: 200,
+      html: cardHtml
+    }
+  };
+
+  // 5. 发送：优先 sendCard，失败回退 sendMessage
   try {
-    await api.chat.sendMessage({
-      characterId: targetId,
-      role: 'user',
-      content: `${summary}\n${historyText}`
-    });
+    if (api.chat && typeof api.chat.sendCard === 'function') {
+      await api.chat.sendCard(cardPayload);
+    } else if (api.chat && typeof api.chat.sendMessage === 'function') {
+      await api.chat.sendMessage({
+        characterId: targetId,
+        role: 'user',
+        content: `${summary}\n${historyText}`
+      });
+    } else {
+      throw new Error('no chat api');
+    }
     api.ui.toast(`已成功分享给【${targetName}】！`);
   } catch (e) {
     api.ui.toast(`分享成功！`);
   }
+}
+
+// 构造 LUMA 直播分享卡片 HTML（霓虹动态风）
+function buildLumaShareCardHtml({ charName, charAvatar, hostName, hostAvatar, title, roomId, fans, cover }) {
+  const fansText = fans >= 10000 ? (fans / 10000).toFixed(1) + 'w' : String(fans || 0);
+  const safeHostAvatar = escapeHtml(hostAvatar || '');
+  return `
+<style>
+  .luma-card {
+    position: relative;
+    min-height: 200px;
+    padding: 14px 14px 12px;
+    color: #fff;
+    font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background:
+      radial-gradient(ellipse at top left, rgba(255, 42, 109, 0.22), transparent 60%),
+      radial-gradient(ellipse at bottom right, rgba(34, 211, 238, 0.22), transparent 60%),
+      linear-gradient(135deg, #0a0a18 0%, #14102b 50%, #0a0a18 100%);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 1px rgba(255, 42, 109, 0.4),
+      0 0 14px rgba(255, 42, 109, 0.35),
+      0 0 28px rgba(34, 211, 238, 0.18),
+      0 14px 40px rgba(0, 0, 0, 0.55);
+    animation: lumaCardBreath 3.6s ease-in-out infinite;
+  }
+  @keyframes lumaCardBreath {
+    0%, 100% {
+      box-shadow:
+        0 0 0 1px rgba(255, 42, 109, 0.4),
+        0 0 14px rgba(255, 42, 109, 0.35),
+        0 0 28px rgba(34, 211, 238, 0.18),
+        0 14px 40px rgba(0, 0, 0, 0.55);
+    }
+    50% {
+      box-shadow:
+        0 0 0 1px rgba(34, 211, 238, 0.5),
+        0 0 22px rgba(34, 211, 238, 0.45),
+        0 0 36px rgba(255, 42, 109, 0.25),
+        0 14px 40px rgba(0, 0, 0, 0.55);
+    }
+  }
+  .luma-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 18px;
+    padding: 1.5px;
+    background: linear-gradient(135deg, #ff2a6d 0%, #f97316 30%, #22d3ee 60%, #a855f7 100%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    background-size: 300% 300%;
+    animation: lumaBorderFlow 4.5s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes lumaBorderFlow {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 300% 50%; }
+  }
+  .luma-card-row { display: flex; align-items: center; gap: 8px; }
+  .luma-logo {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+    background: linear-gradient(90deg, #ff2a6d, #f97316, #22d3ee, #a855f7, #ff2a6d);
+    background-size: 300% 100%;
+    -webkit-background-clip: text;
+            background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: lumaLogoShimmer 3.5s linear infinite;
+    text-shadow: 0 0 8px rgba(255, 42, 109, 0.3);
+  }
+  @keyframes lumaLogoShimmer {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 300% 50%; }
+  }
+  .luma-live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    background: linear-gradient(90deg, #ff2a6d, #f43f5e);
+    color: #fff;
+    padding: 2px 7px;
+    border-radius: 6px;
+    box-shadow: 0 0 8px rgba(255, 42, 109, 0.6);
+  }
+  .luma-live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 6px #fff;
+    animation: lumaDotBlink 1.2s ease-in-out infinite;
+  }
+  @keyframes lumaDotBlink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.25; }
+  }
+  .luma-avatar-wrap {
+    position: relative;
+    width: 44px; height: 44px;
+    flex-shrink: 0;
+  }
+  .luma-avatar-ring {
+    position: absolute; inset: -2px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, #ff2a6d, #f97316, #22d3ee, #a855f7, #ff2a6d);
+    animation: lumaRingSpin 4s linear infinite;
+  }
+  @keyframes lumaRingSpin {
+    to { transform: rotate(360deg); }
+  }
+  .luma-avatar-img {
+    position: absolute; inset: 2px;
+    width: calc(100% - 4px); height: calc(100% - 4px);
+    border-radius: 50%;
+    object-fit: cover;
+    background: #1f1635;
+    border: 1.5px solid #0a0a18;
+  }
+  .luma-vbadge {
+    position: absolute; right: -2px; bottom: -2px;
+    width: 16px; height: 16px;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #1e1b4b;
+    border-radius: 50%;
+    font-size: 9px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+    border: 1.5px solid #0a0a18;
+    box-shadow: 0 0 6px rgba(251, 191, 36, 0.6);
+  }
+  .luma-host-name {
+    font-size: 13px; font-weight: 800;
+    color: #fff;
+    text-shadow: 0 0 6px rgba(34, 211, 238, 0.4);
+  }
+  .luma-meta {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.55);
+    font-weight: 600;
+    margin-top: 2px;
+  }
+  .luma-meta-bullet {
+    display: inline-block;
+    width: 3px; height: 3px;
+    border-radius: 50%;
+    background: #22d3ee;
+    margin: 0 5px;
+    vertical-align: middle;
+    box-shadow: 0 0 4px #22d3ee;
+  }
+  .luma-title {
+    position: relative;
+    margin-top: 10px;
+    padding: 9px 11px;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, 0.95);
+    background: rgba(0, 0, 0, 0.32);
+    border-radius: 10px;
+    border: 1px solid rgba(34, 211, 238, 0.18);
+    overflow: hidden;
+  }
+  .luma-title::before {
+    content: '';
+    position: absolute;
+    left: -30%; top: 0; bottom: 0;
+    width: 30%;
+    background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.22), transparent);
+    animation: lumaTitleSweep 2.8s linear infinite;
+  }
+  @keyframes lumaTitleSweep {
+    0%   { left: -30%; }
+    100% { left: 130%; }
+  }
+  .luma-quote {
+    color: #22d3ee;
+    font-size: 14px;
+    margin-right: 3px;
+    text-shadow: 0 0 6px rgba(34, 211, 238, 0.6);
+  }
+  .luma-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 9px;
+    border-top: 1px dashed rgba(34, 211, 238, 0.22);
+  }
+  .luma-room-tag {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.45);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .luma-room-id {
+    font-size: 11px;
+    color: #fff;
+    font-weight: 800;
+    font-family: 'SF Mono', Consolas, monospace;
+    margin-left: 5px;
+    text-shadow: 0 0 6px rgba(255, 42, 109, 0.5);
+  }
+  .luma-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 10.5px;
+    font-weight: 900;
+    color: #fff;
+    background: linear-gradient(90deg, #ff2a6d, #f97316);
+    padding: 5px 11px;
+    border-radius: 100px;
+    box-shadow: 0 0 10px rgba(255, 42, 109, 0.5);
+    animation: lumaCtaPulse 1.8s ease-in-out infinite;
+  }
+  @keyframes lumaCtaPulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 10px rgba(255, 42, 109, 0.5); }
+    50%      { transform: scale(1.04); box-shadow: 0 0 18px rgba(255, 42, 109, 0.85); }
+  }
+  .luma-from {
+    font-size: 8.5px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 8px;
+    text-align: right;
+  }
+</style>
+<div class="luma-card">
+  <div class="luma-card-row" style="justify-content: space-between;">
+    <span class="luma-logo">LUMA · LIVE</span>
+    <span class="luma-live-badge"><span class="luma-live-dot"></span>LIVE</span>
+  </div>
+  <div class="luma-card-row" style="margin-top: 11px;">
+    <div class="luma-avatar-wrap">
+      <div class="luma-avatar-ring"></div>
+      <img class="luma-avatar-img" src="${safeHostAvatar}" onerror="this.style.background='linear-gradient(135deg,#a855f7,#22d3ee)'" />
+      <div class="luma-vbadge">V</div>
+    </div>
+    <div style="flex:1; min-width:0;">
+      <div class="luma-host-name">${hostName}</div>
+      <div class="luma-meta">签约主播<span class="luma-meta-bullet"></span>${fansText} 粉丝<span class="luma-meta-bullet"></span>正在直播</div>
+    </div>
+  </div>
+  <div class="luma-title"><span class="luma-quote">"</span>${title}</div>
+  <div class="luma-footer">
+    <div>
+      <span class="luma-room-tag">ROOM</span>
+      <span class="luma-room-id">${roomId || '—'}</span>
+    </div>
+    <span class="luma-cta">立即围观 ›</span>
+  </div>
+  <div class="luma-from">from ${charName}</div>
+</div>`;
 }
 window.executeShareToCharacter = executeShareToCharacter;
 

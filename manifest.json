@@ -19,6 +19,7 @@
     "wallet.read",
     "wallet.pay",
     "chat.sendMessage",
+    "chat.sendCard",
     "world.read",
     "media.pick",
     "media.save",
