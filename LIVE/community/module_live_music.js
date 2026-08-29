@@ -164,7 +164,7 @@
           var t0 = pickByPath(it0, fmtMap.title) || pickField(it0, FIELD_GUESS.title);
           if (!t0) continue;
           out.push({
-            rawId: pickByPath(it0, fmtMap.rawId) || pickField(it0, ['id','songId','song_id','mid','trackId']) || '',
+            rawId: pickByPath(it0, fmtMap.rawId) || pickField(it0, ['n','id','songId','song_id','mid','trackId']) || '',
             title: t0,
             artist: pickByPath(it0, fmtMap.artist) || pickField(it0, FIELD_GUESS.artist) || '未知歌手',
             pic: pickByPath(it0, fmtMap.pic) || pickField(it0, FIELD_GUESS.pic) || '',
@@ -178,7 +178,7 @@
       var t1 = pickByPath(json, fmtMap.title) || pickField(json, FIELD_GUESS.title);
       if (t1) {
         out.push({
-          rawId: pickByPath(json, fmtMap.rawId) || pickField(json, ['id','songId','song_id','mid','trackId']) || '',
+          rawId: pickByPath(json, fmtMap.rawId) || pickField(json, ['n','id','songId','song_id','mid','trackId']) || '',
           title: t1,
           artist: pickByPath(json, fmtMap.artist) || pickField(json, FIELD_GUESS.artist) || '未知歌手',
           pic: pickByPath(json, fmtMap.pic) || pickField(json, FIELD_GUESS.pic) || '',
@@ -197,7 +197,7 @@
         var title = pickField(it1, FIELD_GUESS.title);
         if (!title) continue;
         out.push({
-          rawId: pickField(it1, ['id', 'songId', 'song_id', 'mid', 'trackId']) || '',
+          rawId: pickField(it1, ['n', 'id', 'songId', 'song_id', 'mid', 'trackId']) || '',
           title: title,
           artist: pickField(it1, FIELD_GUESS.artist) || '未知歌手',
           pic: pickField(it1, FIELD_GUESS.pic) || '',
@@ -211,7 +211,7 @@
     var singleTitle = pickField(json, FIELD_GUESS.title);
     if (singleTitle) {
       out.push({
-        rawId: pickField(json, ['id', 'songId', 'song_id', 'mid', 'trackId']) || '',
+        rawId: pickField(json, ['n', 'id', 'songId', 'song_id', 'mid', 'trackId']) || '',
         title: singleTitle,
         artist: pickField(json, FIELD_GUESS.artist) || '未知歌手',
         pic: pickField(json, FIELD_GUESS.pic) || '',
@@ -224,7 +224,7 @@
       var innerTitle = pickField(json.data, FIELD_GUESS.title);
       if (innerTitle) {
         out.push({
-          rawId: pickField(json.data, ['id', 'songId', 'song_id', 'mid', 'trackId']) || '',
+          rawId: pickField(json.data, ['n', 'id', 'songId', 'song_id', 'mid', 'trackId']) || '',
           title: innerTitle,
           artist: pickField(json.data, FIELD_GUESS.artist) || '未知歌手',
           pic: pickField(json.data, FIELD_GUESS.pic) || '',
@@ -777,47 +777,46 @@
       return;
     }
 
-    // 没 URL → 用歌名再搜一次（"江辰" 这种 title+artist 重新走 buildRequest 详情接口）
+    // 没 URL → 用歌名再走一次接口（很多 API 第二次搜同名能直接给单对象详情）
     if (!tool) {
       if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('未选工具，无法获取 URL');
       return;
     }
-    var query = s.title || (s.title + ' ' + s.artist);
-    if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('正在获取「' + query + '」播放链接…');
+    if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('正在获取「' + s.title + '」详情…');
+    fetchByTool(tool, s.title).then(function (json) {
+      var detail = parseSongsFromResponse(json);
+      var match = pickBestMatch(detail, s);
+      if (match && (match.playUrl || match.pic)) {
+        pushSongToLibrary(mergeSong(s, match), tool);
+      } else {
+        pushSongToLibrary(s, tool, true);
+      }
+    }).catch(function () { pushSongToLibrary(s, tool, true); });
+  };
 
-    buildRequest(tool, query).then(function (req) {
+  function fetchByTool(tool, keyword) {
+    return buildRequest(tool, keyword).then(function (req) {
       return fetch(req.url, req.options).then(function (resp) {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.json();
-      }).then(function (json) {
-        var detail = parseSongsFromResponse(json);
-        var match = null;
-        if (detail && detail.length > 0) {
-          // 找与原歌最匹配的（title 相等优先，其次包含）
-          match = detail.find(function (d) { return d.title === s.title; }) || null;
-          if (!match) match = detail.find(function (d) { return d.title && s.title && d.title.indexOf(s.title) >= 0; }) || null;
-          if (!match) match = detail[0];
-        }
-        if (match) {
-          // 补上原歌的 rawId / 标题（如果 detail 拿到更准的 URL/封面就用 detail 的）
-          pushSongToLibrary({
-            rawId: s.rawId || match.rawId,
-            title: match.title || s.title,
-            artist: match.artist || s.artist,
-            pic: match.pic || s.pic,
-            playUrl: match.playUrl || s.playUrl
-          }, tool);
-        } else {
-          // 还是没拿到 → 仍加入，但 URL 留空（用户可手动填）
-          pushSongToLibrary(s, tool, true);
-        }
       });
-    }).catch(function (e) {
-      console.warn('[liveMusic] 获取 URL 失败:', e);
-      if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('获取失败，已加入但无 URL');
-      pushSongToLibrary(s, tool, true);
     });
-  };
+  }
+  function pickBestMatch(detail, s) {
+    if (!detail || detail.length === 0) return null;
+    return detail.find(function (d) { return d.title === s.title; }) ||
+           detail.find(function (d) { return d.title && s.title && d.title.indexOf(s.title) >= 0; }) ||
+           detail[0];
+  }
+  function mergeSong(s, m) {
+    return {
+      rawId: s.rawId || m.rawId,
+      title: m.title || s.title,
+      artist: m.artist || s.artist,
+      pic: m.pic || s.pic,
+      playUrl: m.playUrl || s.playUrl
+    };
+  }
 
   // 实际写入歌曲库 + UI 刷新
   function pushSongToLibrary(s, tool, skipUrlCheck) {
