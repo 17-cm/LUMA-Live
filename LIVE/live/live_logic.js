@@ -1736,14 +1736,14 @@ async function executeShareToCharacter(targetId, targetName) {
   const fansText = fans >= 10000 ? (fans / 10000).toFixed(1) + 'w' : String(fans || 0);
 
   // 5) summary（UI 标题）+ historyText（AI 看的历史）
-  const summary = `${userName}给${charName}分享了 LUMA LIVE 直播：${hostName}「${title}」`;
-  const historyText = `[LUMA直播分享:分享者=${userName}:对象=${charName}:主播=${hostName}:标题=${title}:房间号=${roomId}:粉丝=${fansText}:时间=${Date.now()}]`;
+  const summary = `LUMA LIVE 直播中：${hostName}`;
+  const historyText = `[LUMA直播分享:主播=${hostName}:房间号=${roomId}:粉丝=${fansText}:时间=${Date.now()}]`;
 
   // 6) 按官方 5.12 结构化 card 字段（不用 html，宿主按 sections/rows 渲染）
   const cardPayload = {
     appLabel: 'LUMA LIVE',
-    title: title,
-    subtitle: '直播分享 · LIVE CARD',
+    title: '直播分享 · LIVE CARD',
+    subtitle: '直播中',
     status: '直播中',
     accentColor: '#ff2a6d',
     sections: [
@@ -1752,19 +1752,11 @@ async function executeShareToCharacter(targetId, targetName) {
         rows: [
           { label: '主播', value: hostName },
           { label: '粉丝', value: fansText },
-          { label: '状态', value: '直播中 · 立即围观' }
-        ]
-      },
-      {
-        title: '房间信息',
-        rows: [
-          { label: '房间号', value: roomId || '—' },
-          { label: '分享者', value: userName },
-          { label: '分享对象', value: charName }
+          { label: '房间号', value: roomId || '—' }
         ]
       }
     ],
-    actions: [{ label: '立即围观直播间' }]
+    actions: [{ label: '进入直播间' }]
   };
 
   try {
