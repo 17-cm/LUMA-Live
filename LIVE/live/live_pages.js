@@ -4,16 +4,6 @@
   document.getElementById('fullscreen-root').insertAdjacentHTML('beforeend', `
   <div id="liveRoomModal" class="full-page-view hidden">
     
-    <!-- 【全屏视频背景层：替换整个直播间底层背景，z-index 低于所有区域】 -->
-    <div id="stageLiveBg" class="stage-live-bg">
-      <!-- 模式1：1:1 头像区（z-index 1） + 公屏模糊底图 -->
-      <!-- 模式2：全屏视频（z-index 1） -->
-    </div>
-    <div id="stageVideoLoading" class="stage-video-loading hidden">
-      <div class="stage-video-loading-spinner"></div>
-      <span class="stage-video-loading-text">正在切换背景视频…</span>
-    </div>
-
     <!-- 【区域一：1:1 纯正方形主播立绘（100% 完整无遮挡）】 -->
     <div class="stage-avatar-zone" id="stageMain">
       <img id="stageHostPortrait" src="" class="stage-portrait-main">
