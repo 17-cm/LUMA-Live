@@ -1681,15 +1681,25 @@ window.closeSharePickerModal = closeSharePickerModal;
 
 async function executeShareToCharacter(targetId, targetName) {
   closeSharePickerModal();
-  const title = currentRoom ? currentRoom.topic : '热点吃瓜动态';
-  const name = currentRoom ? currentRoom.name : '今日社区';
-  const roomId = currentRoom ? (currentRoom.roomId || '') : '';
+  const room = currentRoom || {};
+  // 兼容多种字段命名：hostName/streamerName/characterName 都行
+  const hostName = room.hostName || room.streamerName || room.characterName || room.name || '主播';
+  const hostAvatar = room.hostAvatar || room.streamerAvatar || room.avatar || room.cover || '';
+  const title = room.topic || room.title || '热点吃瓜动态';
+  const roomId = room.roomId || room.id || '';
+  const cover = room.cover || room.avatar || '';
+  const fans = (typeof room.fanCount === 'number') ? room.fanCount : (room.fanCount || 0);
+
+  // 文本格式按 regex.json 规则匹配，渲染端正则提取成卡片
+  // 5.12 sendCard 风格的 summary + historyText 思路：summary=卡片可见内容，historyText=AI 看到的事实
+  const summary = `【${hostName}】正在直播：「${title}」`;
+  const historyText = `[LUMA直播:来源=${hostName}:标题=${title}:roomId=${roomId}:cover=${cover}:hostName=${hostName}:hostAvatar=${hostAvatar}:粉丝=${fans}]`;
 
   try {
     await api.chat.sendMessage({
       characterId: targetId,
       role: 'user',
-      content: `[分享动态:来源=${name}:标题=${title}:roomId=${roomId}]`
+      content: `${summary}\n${historyText}`
     });
     api.ui.toast(`已成功分享给【${targetName}】！`);
   } catch (e) {
