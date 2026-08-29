@@ -67,15 +67,17 @@ async function recordLiveHistory(type, senderName, text, extra) {
 }
 
 // 构造进房时首次 AI 调用的历史上下文（多轮 messages + 纯文本）
-async function buildLiveHistoryPayload() {
+// limit：注入 AI 的历史条数上限，存储仍保留 HISTORY_MAX(200) 条，上下文只取最近 limit 条避免 token 溢出
+async function buildLiveHistoryPayload(limit = 80) {
   const roomId = currentRoomStoreId();
   if (!roomId || !window.LiveRoomStore) return { history: [], historyText: '' };
   const hist = await window.LiveRoomStore.getHistory(roomId);
-  const history = hist.map(h => ({
+  const slice = hist.slice(-limit);
+  const history = slice.map(h => ({
     role: h.type === 'char' ? 'assistant' : 'user',
     content: `${h.sender ? h.sender + ': ' : ''}${h.text || ''}`
   }));
-  const historyText = await window.LiveRoomStore.buildHistoryContextText(roomId);
+  const historyText = await window.LiveRoomStore.buildHistoryContextText(roomId, limit);
   return { history, historyText };
 }
 
@@ -597,6 +599,25 @@ window.toggleFollowRoomHost = toggleFollowRoomHost;
 // =========================================================================
 // 上次打包请求时间（用于请求冷却）
 let lastPackageRequestTime = 0;
+// 待主播回应的观众互动队列（user 发言 / 送礼），下次批量调用时统一回应，不插队
+let pendingUserReplies = [];
+
+function queueUserReply(text) {
+  pendingUserReplies.push(text);
+  if (pendingUserReplies.length > 10) pendingUserReplies.shift();
+}
+
+// 冷却已过则立即触发一次批量调用；冷却未过则不插队，等待 drip 定时器自然触发
+function requestLivePackageIfCooled() {
+  if (!currentRoom || isFetchingBatchPackage) return;
+  const intervalMinutes = (typeof window.getApiRequestIntervalMinutes === 'function')
+    ? window.getApiRequestIntervalMinutes()
+    : 5;
+  const minIntervalMs = intervalMinutes * 60 * 1000;
+  if (Date.now() - lastPackageRequestTime >= minIntervalMs) {
+    fetchBatchLivePackage(true);
+  }
+}
 
 async function fetchBatchLivePackage(force = false) {
   if (!currentRoom || isFetchingBatchPackage) return;
@@ -623,9 +644,16 @@ async function fetchBatchLivePackage(force = false) {
       const recentGifts = currentRoom.giftHistory.slice(-5); // 最近5条
       giftHistoryText = '\n最近观众送礼记录：' + recentGifts.map(g => `${g.giftName}x${g.count}`).join('、') + '，请在台词里自然地感谢这些送礼。';
     }
-    
-    // 动态上下文：赛道频道、标题与最近送礼
-    const dynamicContext = `当前赛道：${currentRoom.category}（${currentRoom.subTag || '日常'}），标题：《${currentRoom.topic}》${giftHistoryText}`;
+
+    // 待回应的观众互动（user 发言 / 送礼）：统一在下一次批量调用里回应，不插队
+    let userReplyText = '';
+    if (pendingUserReplies.length > 0) {
+      userReplyText = '\n观众发来了互动消息，请在台词中自然地回应（可合并多条）：' + pendingUserReplies.join('；');
+      pendingUserReplies = [];
+    }
+
+    // 动态上下文：赛道频道、标题、最近送礼与待回应互动
+    const dynamicContext = `当前赛道：${currentRoom.category}（${currentRoom.subTag || '日常'}），标题：《${currentRoom.topic}》${giftHistoryText}${userReplyText}`;
 
     // 注入直播间历史上下文（不可见层）：进房首次调用带全部历史，之后随新记录继续累积
     const liveHistory = await buildLiveHistoryPayload();
@@ -880,28 +908,9 @@ async function sendUserDanmaku() {
   pushDanmakuToScreen(uInfo, val, 'user');
   input.value = '';
 
-  // 记录用户发言到直播间历史（不可见层）
-  recordLiveHistory('user', uInfo.name, val);
-
-  try {
-    const liveHistory = await buildLiveHistoryPayload();
-    const res = await window.aiGenerate({
-      characterId: currentRoom.characterId,
-      appTags: ['live', 'reply'],
-      instruction: `【${uInfo.tag}】${uInfo.name}发言：“${val}”`,
-      history: liveHistory.history,
-      historyText: liveHistory.historyText
-    });
-
-    const parsed = window.extractJsonFromText(res.text);
-    if (parsed && typeof parsed === 'object') {
-      renderHostSpeech(parsed.speech || res.text, parsed.action || '看向你的弹幕');
-    } else {
-      renderHostSpeech(res.text, '看向公屏');
-    }
-  } catch (e) {
-    renderHostSpeech(`哈哈，看到了【${uInfo.tag}】${uInfo.name}的发言，谢谢支持！`, '微笑着看向公屏');
-  }
+  // 写入历史由 pushDanmakuToScreen 统一完成；此处仅排队等待主播按间隔回应，不插队调用 API
+  queueUserReply(`【${uInfo.tag}】${uInfo.name}发言：“${val}”`);
+  requestLivePackageIfCooled();
 }
 window.sendUserDanmaku = sendUserDanmaku;
 
@@ -1422,8 +1431,9 @@ async function sendGift(name, cost) {
     showGrandGiftBanner(uInfo, name, qty);
     pushDanmakuToScreen(uInfo, `送了 ${qty} 个【${name}】给【${streamerName}】✨`, 'gift');
 
-    // 记录送礼消息到直播间历史（不可见层）
-    recordLiveHistory('gift', uInfo.name, `送了 ${qty} 个【${name}】给【${streamerName}】`, { giftName: name, count: qty, cost: totalCost });
+    // 送礼历史由 pushDanmakuToScreen 统一写入；主播感谢统一排队等待按间隔回应，不插队调用 API
+    queueUserReply(`【${uInfo.tag}】${uInfo.name}送了 ${qty} 个【${name}】（总价值 ${totalCost} LUMA 币）给主播`);
+    requestLivePackageIfCooled();
 
     // 启动连击倒计时圆圈
     startComboTimer();
@@ -1431,25 +1441,6 @@ async function sendGift(name, cost) {
     // 如果是后6个豪华礼物，触发全屏特效
     if (LUXURY_GIFT_MAP[name]) {
       triggerGiftFullScreenFx(name);
-    }
-
-    try {
-      const liveHistory = await buildLiveHistoryPayload();
-      const res = await window.aiGenerate({
-        characterId: currentRoom.characterId,
-        appTags: ['live', 'reply'],
-        instruction: `【${uInfo.tag}】${uInfo.name}送了 ${qty} 个【${name}】（总价值 ${totalCost} LUMA 币）给主播`,
-        history: liveHistory.history,
-        historyText: liveHistory.historyText
-      });
-      const parsed = window.extractJsonFromText(res.text);
-      if (parsed && typeof parsed === 'object') {
-        renderHostSpeech(parsed.speech || res.text, parsed.action || '激动地感谢');
-      } else {
-        renderHostSpeech(res.text, '双手合十感谢');
-      }
-    } catch (e) {
-      renderHostSpeech(`哇！感谢【${uInfo.tag}】${uInfo.name}送出的 ${qty} 个【${name}】，太给力了！`, '双手合十感谢');
     }
 
     if (totalCost >= 100 && currentRoom && !currentRoom.isNPC) {
