@@ -189,7 +189,7 @@
       return out;
     }
 
-    // 启发式：找第一个数组 / 兜底把 json 当单首
+    // 启发式：找第一个数组
     var arr2 = findFirstArray(json);
     if (arr2) {
       for (var k = 0; k < arr2.length; k++) {
@@ -208,7 +208,7 @@
       }
       return out;
     }
-    // 单对象兜底：把 json 当一首
+    // 启发式兜底：把整个 json 当单首（你 API 格式就是这样：{code, data:{name,singer,...}, msg}）
     var singleTitle = pickField(json, FIELD_GUESS.title);
     if (singleTitle) {
       out.push({
@@ -218,6 +218,20 @@
         pic: pickField(json, FIELD_GUESS.pic) || '',
         playUrl: pickField(json, FIELD_GUESS.playUrl) || ''
       });
+      return out;
+    }
+    // 终极兜底：json 里有 code/data/msg 这种 wrapper，剥掉 wrapper 再来一次
+    if (json.data && typeof json.data === 'object' && !Array.isArray(json.data)) {
+      var innerTitle = pickField(json.data, FIELD_GUESS.title);
+      if (innerTitle) {
+        out.push({
+          rawId: pickField(json.data, ['id', 'songId', 'song_id', 'mid', 'trackId']) || '',
+          title: innerTitle,
+          artist: pickField(json.data, FIELD_GUESS.artist) || '未知歌手',
+          pic: pickField(json.data, FIELD_GUESS.pic) || '',
+          playUrl: pickField(json.data, FIELD_GUESS.playUrl) || ''
+        });
+      }
     }
     return out;
   }
@@ -407,7 +421,13 @@
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.json();
       }).then(function (json) {
+        window.__liveMusicLastRawJson = json;
         var songs = parseSongsFromResponse(json);
+        if (!songs || songs.length === 0) {
+          // 启发式+自定义都拿不到 → 兜底展示原始 JSON 让你看到 API 实际返回了什么
+          area.innerHTML = renderRawJsonFallback(json);
+          return;
+        }
         window.__liveMusicLastResult = songs;
         showSearchResult(songs);
       });
@@ -461,6 +481,118 @@
     if (!area) return;
     area.innerHTML = renderSearchResultHTML(songs);
   }
+
+  // 解析器拿不到任何歌曲时的兜底：直接把 API 原始 JSON 列出来
+  // 标题/歌手/封面/链接四个字段，每行可点选哪个 JSON 字段 = 哪个
+  // 选完点"应用映射"就把工具的 format 字段自动填好
+  function renderRawJsonFallback(json) {
+    // 收集所有 key 和 value（递归拍平）
+    var flat = collectJsonPaths(json, '');
+    if (flat.length === 0) {
+      return '<div class="text-center py-12 text-[11px] text-slate-400">返回为空</div>';
+    }
+    // 字段名映射（按通用程度排序）
+    var fieldRows = [
+      { field: 'title',   label: '歌名',   guess: pickGuessFor(flat, FIELD_GUESS.title) },
+      { field: 'artist',  label: '歌手',   guess: pickGuessFor(flat, FIELD_GUESS.artist) },
+      { field: 'pic',     label: '封面',   guess: pickGuessFor(flat, FIELD_GUESS.pic) },
+      { field: 'playUrl', label: '音频',   guess: pickGuessFor(flat, FIELD_GUESS.playUrl) }
+    ];
+    var header = '<div class="rounded-2xl bg-amber-50 border border-amber-200 p-3 mb-3">' +
+      '<div class="text-xs font-black text-amber-900">未识别为歌曲列表</div>' +
+      '<p class="text-[10px] text-amber-800 mt-1 leading-relaxed">API 返回了 JSON，但解析器没拿到歌曲。下面是返回的所有字段，挑 4 个对应到「歌名/歌手/封面/音频」，点「应用映射」保存到工具。</p>' +
+    '</div>';
+
+    var rows = fieldRows.map(function (r, idx) {
+      var opts = '<option value="">— 选字段 —</option>' +
+        flat.map(function (f) {
+          var sel = (f.path === r.guess) ? ' selected' : '';
+          return '<option value="' + escapeHtml(f.path) + '"' + sel + '>' + escapeHtml(f.path) + ' · ' + escapeHtml(f.sample) + '</option>';
+        }).join('');
+      return '<div class="flex items-center gap-2 mb-2">' +
+        '<div class="w-14 text-[11px] font-black text-slate-700 flex-shrink-0">' + r.label + '</div>' +
+        '<select data-field="' + r.field + '" class="flex-1 min-w-0 h-9 px-2 rounded-xl bg-white border border-slate-200 text-[11px] text-slate-700 focus:outline-none focus:border-fuchsia-400">' + opts + '</select>' +
+      '</div>';
+    }).join('');
+
+    var apply = '<button onclick="applyLiveMusicFormatFromFallback()" class="w-full mt-2 h-10 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-pink-500 text-white text-xs font-black shadow-sm active:scale-95 transition">应用映射</button>';
+
+    var dump = '<details class="mt-3 rounded-2xl bg-slate-50 border border-slate-200 p-3">' +
+      '<summary class="text-[11px] font-black text-slate-600 cursor-pointer">查看原始 JSON</summary>' +
+      '<pre class="text-[10px] text-slate-700 mt-2 whitespace-pre-wrap break-all leading-relaxed font-mono">' + escapeHtml(JSON.stringify(json, null, 2).slice(0, 3000)) + '</pre>' +
+    '</details>';
+
+    return header + '<div class="rounded-2xl bg-white border border-slate-200 p-3">' + rows + apply + '</div>' + dump;
+  }
+  // 拍平 JSON：{path, sample, type}
+  function collectJsonPaths(node, prefix) {
+    var out = [];
+    if (node == null) return out;
+    if (Array.isArray(node)) {
+      if (node.length === 0) return out;
+      // 数组里看第一个元素的字段
+      var first = node[0];
+      if (first && typeof first === 'object' && !Array.isArray(first)) {
+        var sub = collectJsonPaths(first, prefix);
+        out = out.concat(sub);
+      } else {
+        out.push({ path: prefix, sample: String(first), type: typeof first });
+      }
+      return out;
+    }
+    if (typeof node !== 'object') {
+      out.push({ path: prefix, sample: String(node).slice(0, 30), type: typeof node });
+      return out;
+    }
+    for (var k in node) {
+      if (!Object.prototype.hasOwnProperty.call(node, k)) continue;
+      var v = node[k];
+      var p = prefix ? (prefix + '.' + k) : k;
+      if (v == null) continue;
+      if (typeof v === 'object') {
+        var inner = collectJsonPaths(v, p);
+        if (inner.length > 0) out = out.concat(inner);
+        else out.push({ path: p, sample: '{}', type: 'object' });
+      } else {
+        out.push({ path: p, sample: String(v).slice(0, 30), type: typeof v });
+      }
+    }
+    return out;
+  }
+  function pickGuessFor(flat, candidates) {
+    for (var i = 0; i < candidates.length; i++) {
+      var c = candidates[i];
+      for (var j = 0; j < flat.length; j++) {
+        // 路径最后一节匹配
+        var lastSeg = flat[j].path.split('.').pop();
+        if (lastSeg === c) return flat[j].path;
+      }
+    }
+    return '';
+  }
+  // 点"应用映射" → 把 4 个 select 拼成多行字符串，写入当前工具的 format
+  window.applyLiveMusicFormatFromFallback = function () {
+    var tool = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
+    if (!tool) {
+      if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('请先选中工具');
+      return;
+    }
+    var sels = document.querySelectorAll('#liveMusicDisplayArea select[data-field]');
+    if (sels.length === 0) return;
+    var lines = [];
+    sels.forEach(function (sel) {
+      var f = sel.getAttribute('data-field');
+      var v = sel.value;
+      if (v) lines.push(f + '=' + v);
+    });
+    if (lines.length === 0) {
+      if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('请至少选一个字段');
+      return;
+    }
+    tool.format = lines.join('\n');
+    saveTools();
+    if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('已保存映射，请重新搜索');
+  };
 
   // ---- 工具 / 歌曲 列表渲染 ------------------------------------------
   function renderToolListHTML() {
