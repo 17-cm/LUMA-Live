@@ -595,10 +595,10 @@ input:checked + .switch-slider:before {
   z-index: 15;
   width: 100%;
   min-height: 72px;
-  background: rgba(0, 0, 0, 0.38);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   padding: 10px 14px;
   display: flex;
   align-items: center;
@@ -724,10 +724,10 @@ input:checked + .switch-slider:before {
   max-width: 92%;
   padding: 4px 10px 4px 4px;
   border-radius: 100px;
-  background: rgba(0, 0, 0, 0.40);
+  background: rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
   font-size: 11.5px;
   line-height: 1.35;
@@ -738,12 +738,12 @@ input:checked + .switch-slider:before {
   gap: 5px;
 }
 .danmaku-bubble.user-sent {
-  background: rgba(255, 42, 109, 0.24);
-  border-color: rgba(255, 42, 109, 0.45);
+  background: rgba(255, 42, 109, 0.16);
+  border-color: rgba(255, 42, 109, 0.32);
 }
 .danmaku-bubble.gift-sent {
-  background: rgba(245, 158, 11, 0.22);
-  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.32);
 }
 .danmaku-avatar-wrap {
   width: 22px;
@@ -2839,56 +2839,122 @@ input:checked + .switch-slider:before {
    【直播背景视频】
    ========================================================================= */
 
-/* 全屏视频元素：动态插入 liveRoomModal 的最底层 */
-.bg-fullscreen-video {
+/* 视频元素：铺满 #liveRoomModal，作为背景层 */
+.live-bg-fullscreen-video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  z-index: -1;
+  z-index: 0;
   display: block;
+  background: #000;
 }
 
-/* 加载层 */
-.bg-video-loading {
+/* video-bg-mode：打开时调整层级与头像区 */
+#liveRoomModal.video-bg-mode {
+  background: #000;
+}
+/* 模式2：小头像胶囊移到返回键右边 */
+#liveRoomModal.video-bg-mode .host-capsule-bottom {
+  top: max(var(--safe-top), 14px);
+  left: calc(14px + 38px + 8px);
+  bottom: auto;
+  transform: translateY(0);
+}
+/* 模式2：在线看人数移到 REC 时长下方 */
+#liveRoomModal.video-bg-mode .viewer-capsule-bottom {
+  top: calc(max(var(--safe-top), 14px) + 40px);
+  right: 14px;
+  bottom: auto;
+}
+/* 视频模式下只隐藏主播立绘图，保留头像区容器让控件继续显示 */
+#liveRoomModal.video-bg-mode .stage-portrait-main {
+  display: none;
+}
+/* 头像区背景透明，让视频透出 */
+#liveRoomModal.video-bg-mode .stage-avatar-zone {
+  background: transparent;
+}
+#liveRoomModal.video-bg-mode .stage-chat-zone {
+  background: transparent;
+}
+#liveRoomModal.video-bg-mode .pure-ambient-bleed-bg {
+  visibility: hidden;
+}
+
+/* 模式2：顶部玻璃栏，让控件形成整体感 */
+#liveRoomModal.video-bg-mode::before {
+  content: "";
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 5;
-  background: rgba(0,0,0,0.65);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(max(var(--safe-top), 14px) + 48px);
   pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.45),
+    rgba(0, 0, 0, 0)
+  );
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
 }
-.bg-video-loading-spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid rgba(255,255,255,0.2);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: bgVideoSpin 0.8s linear infinite;
-}
-@keyframes bgVideoSpin {
-  to { transform: rotate(360deg); }
-}
-.bg-video-loading-text {
-  font-size: 11px;
-  font-weight: 700;
-  color: rgba(255,255,255,0.8);
-  letter-spacing: 0.5px;
+/* 弹幕流背景透明 */
+#liveRoomModal.video-bg-mode .danmaku-stream-viewport {
+  background: transparent;
 }
 
-/* 视频全屏背景时控件的描边发光高亮 */
-.live-bg-video .stage-portrait-main {
-  visibility: hidden;
+/* 视频模式下控件高亮（描边/阴影） */
+#liveRoomModal.video-bg-mode .stage-back-btn,
+#liveRoomModal.video-bg-mode .stage-rec-indicator,
+#liveRoomModal.video-bg-mode .host-capsule-bottom,
+#liveRoomModal.video-bg-mode .viewer-capsule-bottom,
+#liveRoomModal.video-bg-mode .ui-plus-btn-sub,
+#liveRoomModal.video-bg-mode .live-combo-circle-btn,
+#liveRoomModal.video-bg-mode .ui-input-bar-float,
+#liveRoomModal.video-bg-mode .zb-send-btn-bw,
+#liveRoomModal.video-bg-mode .host-speech-bar-top {
+  filter: drop-shadow(0 0 6px rgba(0,0,0,0.7));
 }
-.live-bg-video .pure-ambient-bleed-bg {
-  visibility: hidden;
+#liveRoomModal.video-bg-mode .stage-back-btn {
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55), 0 2px 12px rgba(0,0,0,0.5);
+}
+#liveRoomModal.video-bg-mode .stage-rec-indicator {
+  box-shadow: 0 0 0 1.2px rgba(255,255,255,0.45), 0 2px 10px rgba(0,0,0,0.4);
+}
+#liveRoomModal.video-bg-mode .ui-plus-btn-sub {
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55), 0 2px 12px rgba(0,0,0,0.5);
+}
+#liveRoomModal.video-bg-mode .live-combo-circle-btn {
+  box-shadow: 0 0 0 1.2px rgba(255,255,255,0.4), 0 0 16px rgba(0,0,0,0.5);
+}
+#liveRoomModal.video-bg-mode .ui-input-bar-float {
+  box-shadow: 0 -1px 0 rgba(255,255,255,0.15), 0 2px 16px rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+#liveRoomModal.video-bg-mode .zb-send-btn-bw {
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55);
+}
+#liveRoomModal.video-bg-mode .host-speech-bar-top {
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.2), 0 2px 12px rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* 旧模式2的 #liveRoomVideoBgView（保留但停用） */
+#liveRoomVideoBgView {
+  display: none !important;
+}
+.bg-fullscreen-video,
+.bg-video-loading,
+.bg-video-loading-spinner,
+.bg-video-loading-text {
+  display: none !important;
 }
 
 /* 全屏视频元素 */

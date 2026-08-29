@@ -161,7 +161,7 @@
           <button onclick="selectGiftQuantity(1314)" id="gift-qty-1314" class="gift-qty-btn">1314</button>
         </div>
 
-        <div class="gift-scroll-grid" id="giftScrollGrid"></div>
+<div class="gift-scroll-grid" id="giftScrollGrid"></div>
       </div>
   </div>
 

@@ -518,7 +518,7 @@ function closeLiveRoom() {
   clearInterval(hostSpeechDripTimer);
   clearInterval(viewerCountInterval);
   if (api.voice?.stopPlayback) api.voice.stopPlayback({ channel: "voice" });
-  if (typeof window.clearVideoBg === 'function') window.clearVideoBg();
+  if (typeof window.clearVideoBackground === 'function') window.clearVideoBackground();
 
   document.getElementById('giftTrayModal')?.classList.remove('open');
   closePlusDrawer();
@@ -527,6 +527,8 @@ function closeLiveRoom() {
   } else {
     const roomModal = document.getElementById('liveRoomModal');
     if (roomModal) roomModal.classList.add('hidden');
+    const roomBgView = document.getElementById('liveRoomVideoBgView');
+    if (roomBgView) roomBgView.classList.add('hidden');
   }
   currentRoom = null;
   window.currentRoom = null;
@@ -944,8 +946,8 @@ function handleDrawerAction(action) {
   } else if (action === 'quality') {
     closePlusDrawer();
     var bgCharId = currentRoom && currentRoom.characterId;
-    if (bgCharId && typeof window.switchBackgroundMode === 'function') {
-      window.switchBackgroundMode(bgCharId);
+    if (bgCharId && typeof window.toggleVideoBackground === 'function') {
+      window.toggleVideoBackground(bgCharId);
     } else {
       api.ui.toast("画质与画布比例调节（即将支持 1:1、9:16 及原画切换）");
     }

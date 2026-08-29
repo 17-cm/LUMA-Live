@@ -1,88 +1,85 @@
 (function () {
   'use strict';
 
-  var videoMode = false;
+  var currentVideoEl = null;
 
-  window.switchBackgroundMode = async function (charId) {
-    if (videoMode) {
-      exitVideoMode();
+  window.toggleVideoBackground = async function (charId) {
+    var room = document.getElementById('liveRoomModal');
+    if (!room) return;
+
+    if (room.classList.contains('video-bg-mode')) {
+      // 关掉
+      room.classList.remove('video-bg-mode');
+      if (currentVideoEl) {
+        currentVideoEl.pause();
+        currentVideoEl.remove();
+        currentVideoEl = null;
+      }
       return;
     }
-    await enterVideoMode(charId);
-  };
 
-  function getRoom() {
-    return document.getElementById('liveRoomModal');
-  }
-
-  function getVideo() {
-    return document.getElementById('bgFullscreenVideo');
-  }
-
-  function exitVideoMode() {
-    var v = getVideo();
-    if (v) { v.pause(); v.remove(); }
-    getRoom() && getRoom().classList.remove('live-bg-video');
-    videoMode = false;
-  }
-
-  async function enterVideoMode(charId) {
-    var data = window.getLiveSettingsVideoGallery ? await window.getLiveSettingsVideoGallery(charId) : null;
-    if (!data || !data.videos || data.videos.length === 0) {
+    var videoItem = await getRandomBgVideo(charId);
+    if (!videoItem || !videoItem.ref) {
       if (window.api && window.api.ui && window.api.ui.toast) {
         window.api.ui.toast('请先在社区-直播设置上传视频');
       }
       return;
     }
 
-    // 创建加载状态
-    var loading = createLoadingEl();
-    getRoom().appendChild(loading);
+    var media = window.api && window.api.media && window.api.media.get
+      ? await window.api.media.get({ ref: videoItem.ref })
+      : null;
 
-    try {
-      var idx = Math.floor(Math.random() * data.videos.length);
-      var item = data.videos[idx];
-      var media = window.api && window.api.media && window.api.media.get ? await window.api.media.get({ ref: item.ref }) : null;
-      if (!media || !media.dataUrl) throw new Error('media.get failed');
-
-      var video = document.createElement('video');
-      video.id = 'bgFullscreenVideo';
-      video.className = 'bg-fullscreen-video';
-      video.muted = true;
-      video.loop = true;
-      video.playsinline = true;
-      video.src = media.dataUrl;
-      video.currentTime = 0;
-
-      video.onloadeddata = function () {
-        loading.remove();
-        getRoom().appendChild(video);
-        getRoom().classList.add('live-bg-video');
-        videoMode = true;
-        video.play().catch(function () {});
-      };
-      video.onerror = function () { loading.remove(); };
-      setTimeout(function () {
-        if (loading.parentNode) loading.remove();
-      }, 6000);
-    } catch (e) {
-      loading.remove();
+    var src = (media && (media.url || media.dataUrl)) || null;
+    if (!src) {
       if (window.api && window.api.ui && window.api.ui.toast) {
         window.api.ui.toast('视频加载失败');
       }
+      return;
+    }
+
+    var video = document.createElement('video');
+    video.className = 'live-bg-fullscreen-video';
+    video.autoplay = true;
+    video.muted = true;
+    video.loop = true;
+    video.playsInline = true;
+    video.src = src;
+
+    room.insertBefore(video, room.firstChild);
+    currentVideoEl = video;
+
+    room.classList.add('video-bg-mode');
+
+    video.onerror = function () {
+      if (window.api && window.api.ui && window.api.ui.toast) {
+        window.api.ui.toast('视频播放失败');
+      }
+      room.classList.remove('video-bg-mode');
+      if (currentVideoEl) { currentVideoEl.remove(); currentVideoEl = null; }
+    };
+  };
+
+  window.clearVideoBackground = function () {
+    var room = document.getElementById('liveRoomModal');
+    if (room) room.classList.remove('video-bg-mode');
+    if (currentVideoEl) {
+      currentVideoEl.pause();
+      currentVideoEl.remove();
+      currentVideoEl = null;
+    }
+  };
+
+  async function getRandomBgVideo(charId) {
+    try {
+      var data = window.getLiveSettingsVideoGallery
+        ? await window.getLiveSettingsVideoGallery(charId)
+        : null;
+      if (!data || !data.videos || data.videos.length === 0) return null;
+      var idx = Math.floor(Math.random() * data.videos.length);
+      return data.videos[idx];
+    } catch (e) {
+      return null;
     }
   }
-
-  function createLoadingEl() {
-    var el = document.createElement('div');
-    el.className = 'bg-video-loading';
-    el.innerHTML =
-      '<div class="bg-video-loading-spinner"></div>' +
-      '<span class="bg-video-loading-text">正在切换背景视频…</span>';
-    return el;
-  }
-
-  window.clearVideoBg = function () {
-    exitVideoMode();
-  };
 })();
