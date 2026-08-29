@@ -4,9 +4,14 @@
   document.getElementById('fullscreen-root').insertAdjacentHTML('beforeend', `
   <div id="liveRoomModal" class="full-page-view hidden">
     
-    <!-- 【区域一：1:1 纯正方形主播立绘（100% 完整无遮挡）】 -->
+    <!-- 【区域一：1:1 纯正方形主播立绘/视频（100% 完整无遮挡）】 -->
     <div class="stage-avatar-zone" id="stageMain">
       <img id="stageHostPortrait" src="" class="stage-portrait-main">
+      <video id="stageHostVideo" class="stage-portrait-main hidden" muted loop playsinline></video>
+      <div id="stageVideoLoading" class="stage-video-loading hidden">
+        <div class="stage-video-loading-spinner"></div>
+        <span class="stage-video-loading-text">正在切换背景视频…</span>
+      </div>
 
       <!-- 顶部左侧：独立大退出键 (带精致磨砂边框) -->
       <button onclick="closeLiveRoom()" class="stage-back-btn" title="退出直播间">

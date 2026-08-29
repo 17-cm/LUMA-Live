@@ -140,51 +140,14 @@
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </button>
       <div class="text-center">
-        <h3 class="text-xs font-black text-slate-900 leading-none">直播设置 · 开播前瞻</h3>
-        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">STREAMER STUDIO PREVIEW</span>
+        <h3 class="text-xs font-black text-slate-900 leading-none">直播设置</h3>
+        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">STREAMER STUDIO</span>
       </div>
       <div class="w-8"></div>
     </div>
 
-    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-4">
-      <div class="p-4 bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 rounded-3xl text-white shadow-md space-y-2">
-        <div class="flex items-center gap-2">
-          <span class="text-base">🎥</span>
-          <h4 class="text-sm font-black">主播控制台 · 开播前瞻</h4>
-        </div>
-        <p class="text-xs text-cyan-100 leading-relaxed">此处用于玩家自定义开播参数、推流清晰度、直播间封面与弹幕过滤。功能正在深度筹备中，参数已与沙盒底层连接！</p>
-      </div>
-
-      <div class="luxe-card p-4 space-y-3 bg-white">
-        <h5 class="text-xs font-black text-slate-900">开播预设偏好</h5>
-        <div class="space-y-2 text-xs">
-          <div>
-            <label class="text-[10px] font-bold text-slate-500">默认直播间标题</label>
-            <input value="【塞博漫游】今晚不破防不开麦！" class="input-ins mt-1">
-          </div>
-          <div>
-            <label class="text-[10px] font-bold text-slate-500">开播所属分区</label>
-            <select class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 outline-none font-bold mt-1">
-              <option>电竞竞技</option>
-              <option>声动音律</option>
-              <option>次元才艺</option>
-              <option>随性杂谈</option>
-              <option>探索开箱</option>
-            </select>
-          </div>
-          <div>
-            <label class="text-[10px] font-bold text-slate-500">推流分辨率模拟</label>
-            <div class="grid grid-cols-3 gap-2 mt-1">
-              <div class="p-2 rounded-xl border border-rose-400 bg-rose-50/50 text-center font-bold text-rose-600">4K 超清</div>
-              <div class="p-2 rounded-xl border border-slate-200 bg-slate-50 text-center font-bold text-slate-600">1080P 60帧</div>
-              <div class="p-2 rounded-xl border border-slate-200 bg-slate-50 text-center font-bold text-slate-600">720P 极速</div>
-            </div>
-          </div>
-        </div>
-        <button onclick="api.ui.toast('开播偏好参数已保存！')" class="btn-brand w-full py-2.5 justify-center text-xs font-bold shadow-md">
-          保存开播参数
-        </button>
-      </div>
+    <div id="liveSettingsModuleArea" class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-4">
+      <!-- 各模块由模块文件动态渲染 -->
     </div>
   </div>
 

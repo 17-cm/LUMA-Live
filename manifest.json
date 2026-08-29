@@ -20,6 +20,8 @@
     "wallet.pay",
     "chat.sendMessage",
     "world.read",
+    "media.pick",
+    "media.save",
     "ui.toast",
     "memory.write",
     "network.fetch",

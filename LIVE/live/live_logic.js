@@ -518,6 +518,7 @@ function closeLiveRoom() {
   clearInterval(hostSpeechDripTimer);
   clearInterval(viewerCountInterval);
   if (api.voice?.stopPlayback) api.voice.stopPlayback({ channel: "voice" });
+  if (typeof window.clearVideoBg === 'function') window.clearVideoBg();
 
   document.getElementById('giftTrayModal')?.classList.remove('open');
   closePlusDrawer();
@@ -942,7 +943,12 @@ function handleDrawerAction(action) {
     toggleGiftTray();
   } else if (action === 'quality') {
     closePlusDrawer();
-    api.ui.toast("画质与画布比例调节（即将支持 1:1、9:16 及原画切换）");
+    var bgCharId = currentRoom && currentRoom.characterId;
+    if (bgCharId && typeof window.switchToRandomVideoBg === 'function') {
+      window.switchToRandomVideoBg(bgCharId);
+    } else {
+      api.ui.toast("画质与画布比例调节（即将支持 1:1、9:16 及原画切换）");
+    }
   } else if (action === 'call') {
     closePlusDrawer();
     api.ui.toast("连麦互动模式（专属连麦互动功能即将上线）");

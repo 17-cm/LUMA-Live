@@ -2834,3 +2834,91 @@ input:checked + .switch-slider:before {
   background:linear-gradient(135deg, #FF6B9D, #C44569);
   color:#FFFFFF;
 }
+
+/* =========================================================================
+   【直播背景视频】
+   ========================================================================= */
+.stage-video-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(0,0,0,0.65);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.stage-video-loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255,255,255,0.2);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: stageVideoSpin 0.8s linear infinite;
+}
+@keyframes stageVideoSpin {
+  to { transform: rotate(360deg); }
+}
+.stage-video-loading-text {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.8);
+  letter-spacing: 0.5px;
+}
+
+/* 视频全屏背景时控件的描边发光高亮 */
+.live-bg-video .stage-back-btn {
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55), 0 2px 12px rgba(0,0,0,0.5);
+}
+.live-bg-video .stage-rec-indicator {
+  box-shadow: 0 0 0 1.2px rgba(255,255,255,0.45), 0 2px 10px rgba(0,0,0,0.4);
+  border-radius: 8px;
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.live-bg-video .host-capsule-bottom {
+  filter: drop-shadow(0 0 6px rgba(0,0,0,0.6));
+}
+.live-bg-video .viewer-capsule-bottom {
+  filter: drop-shadow(0 0 6px rgba(0,0,0,0.6));
+}
+.live-bg-video .ui-plus-btn-sub {
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55), 0 2px 12px rgba(0,0,0,0.5);
+}
+.live-bg-video .live-combo-circle-btn {
+  box-shadow: 0 0 0 1.2px rgba(255,255,255,0.4), 0 0 16px rgba(0,0,0,0.5);
+}
+.live-bg-video .ui-input-bar-float {
+  box-shadow: 0 -1px 0 rgba(255,255,255,0.15), 0 2px 16px rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 28px;
+}
+.live-bg-video .zb-send-btn-bw {
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55);
+}
+.live-bg-video .host-speech-bar-top {
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.2), 0 2px 12px rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* 相册视频播放模态 */
+#spVideoModalOverlay video {
+  max-width: 100vw;
+  max-height: 100vh;
+}
+
+/* 直播设置上传弹窗动画 */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slideUp 0.25s ease-out;
+}

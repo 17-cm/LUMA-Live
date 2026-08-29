@@ -80,6 +80,9 @@ function openCommunitySubPage(pageKey, targetCharId = null) {
     }
   } else if (pageKey === 'live_settings') {
     targetModalId = 'communityLiveSettingsView';
+    if (typeof window.renderLiveSettings === 'function') {
+      setTimeout(function () { window.renderLiveSettings(); }, 80);
+    }
   } else if (pageKey === 'forum') {
     targetModalId = 'communityForumView';
     if (typeof checkAndOpenForum === 'function') {

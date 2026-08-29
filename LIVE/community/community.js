@@ -107,7 +107,7 @@
               <div class="new-key-text">
                 <span class="new-key-name">直播设置</span>
                 <svg class="new-key-hook" viewBox="0 0 80 14"><path d="M 2 8 C 20 2 50 2 72 8 C 78 11 74 14 70 12"/></svg>
-                <span class="new-key-sub">开播偏好 · 筹备中</span>
+                <span class="new-key-sub">画面素材 · 背景视频</span>
               </div>
               <div class="new-key-arrow"><span>›</span></div>
             </div>

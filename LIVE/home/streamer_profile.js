@@ -687,14 +687,59 @@ function renderSpGallery() {
   if (!box || !window.currentViewingProfile) return;
   const p = window.currentViewingProfile;
   
+  // 先在相册里放好原图骨架 + 视频占位
   box.innerHTML = `
-    <div class="gallery-grid-3">
+    <div class="gallery-grid-3" id="spGalleryGrid">
       ${p.gallery.filter(img => img).map(img => `
         <img src="${img}" onclick="api.ui.toast('已查看高清大图')" class="rounded-xl shadow-xs">
       `).join('')}
     </div>
+    <div id="spGalleryVideos" class="gallery-grid-3 mt-3"></div>
   `;
+
+  // 异步加载视频 gallery
+  const charId = p.characterId;
+  if (charId && typeof window.getLiveSettingsVideoGallery === 'function') {
+    window.getLiveSettingsVideoGallery(charId).then(function (data) {
+      const vids = data && data.videos ? data.videos : [];
+      const container = document.getElementById('spGalleryVideos');
+      if (!container) return;
+      if (vids.length === 0) { container.innerHTML = ''; return; }
+
+      // 逐个 media.get 换 dataUrl 后渲染，Promise.all 等全部
+      Promise.all(vids.map(function (v) {
+        if (!v.ref) return null;
+        return (window.api && window.api.media && window.api.media.get ? window.api.media.get({ ref: v.ref }).then(function (m) {
+          return { ref: v.ref, dataUrl: m ? m.dataUrl : null };
+        }).catch(function () { return null; }) : null);
+      })).then(function (results) {
+        container.innerHTML = results.filter(Boolean).map(function (r) {
+          return '<div class="relative aspect-video rounded-xl bg-slate-100 overflow-hidden cursor-pointer" onclick="openVideoModal(\'' + r.dataUrl.replace(/'/g, "\\'") + '\')">' +
+            '<video src="' + r.dataUrl + '" class="w-full h-full object-cover" muted preload="metadata"></video>' +
+            '<div class="absolute inset-0 flex items-center justify-center pointer-events-none">' +
+              '<svg class="w-8 h-8 text-white drop-shadow-lg" viewBox="0 0 24 24" fill="white"><polygon points="8 5 19 12 8 19 8 5"></polygon></svg>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+        if (container.innerHTML === '') container.innerHTML = '';
+      });
+    }).catch(function () {});
+  }
 }
+
+window.openVideoModal = function (dataUrl) {
+  if (!dataUrl) return;
+  var overlay = document.getElementById('spVideoModalOverlay');
+  if (overlay) overlay.remove();
+
+  overlay = document.createElement('div');
+  overlay.id = 'spVideoModalOverlay';
+  overlay.className = 'fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center';
+  overlay.innerHTML =
+    '<video src="' + dataUrl.replace(/'/g, "\\'") + '" class="w-full h-full object-contain" controls autoplay></video>' +
+    '<button onclick="this.parentElement.remove()" class="absolute top-14 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center text-lg font-black active:scale-90 transition z-10">&#x2715;</button>';
+  document.body.appendChild(overlay);
+};
 
 function renderSpGuestbook() {
   const box = document.getElementById('spaceGuestbookList');
