@@ -713,7 +713,7 @@ function renderSpGallery() {
         }).catch(function () { return null; }) : null);
       })).then(function (results) {
         container.innerHTML = results.filter(Boolean).map(function (r) {
-          return '<div class="relative aspect-square rounded-xl bg-slate-100 overflow-hidden cursor-pointer" onclick="openVideoModal(\'' + r.dataUrl.replace(/'/g, "\\'") + '\')">' +
+          return '<div class="relative aspect-square rounded-xl bg-slate-100 overflow-hidden cursor-pointer" onclick="openVideoModal(\'' + r.ref.replace(/'/g, "\\'") + '\', \'' + (r.dataUrl ? r.dataUrl.replace(/'/g, "\\'") : '') + '\')">' +
             '<video src="' + r.dataUrl + '" class="w-full h-full object-cover" muted preload="metadata"></video>' +
             '<div class="absolute inset-0 flex items-center justify-center pointer-events-none">' +
               '<svg class="w-8 h-8 text-white drop-shadow-lg" viewBox="0 0 24 24" fill="white"><polygon points="8 5 19 12 8 19 8 5"></polygon></svg>' +
@@ -726,19 +726,107 @@ function renderSpGallery() {
   }
 }
 
-window.openVideoModal = function (dataUrl) {
+window.openVideoModal = function (ref, dataUrl) {
   if (!dataUrl) return;
   var overlay = document.getElementById('spVideoModalOverlay');
   if (overlay) overlay.remove();
 
   overlay = document.createElement('div');
   overlay.id = 'spVideoModalOverlay';
-  overlay.className = 'fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center';
+  overlay.className = 'fixed inset-0 z-[9999] bg-black/95 flex flex-col';
   overlay.innerHTML =
-    '<video src="' + dataUrl.replace(/'/g, "\\'") + '" class="w-full h-full object-contain" controls autoplay></video>' +
-    '<button onclick="this.parentElement.remove()" class="absolute top-14 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center text-lg font-black active:scale-90 transition z-10">&#x2715;</button>';
+    '<div class="flex items-center justify-between px-4 pt-3 pb-2 z-20">' +
+      '<button id="spVideoBackBtn" class="w-10 h-10 rounded-full bg-white/15 text-white flex items-center justify-center active:scale-90 transition" aria-label="返回">' +
+        '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>' +
+      '</button>' +
+      '<button id="spVideoDeleteBtn" class="px-3 h-9 rounded-full bg-rose-500/90 text-white text-xs font-bold flex items-center gap-1.5 active:scale-95 transition" aria-label="删除视频">' +
+        '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path></svg>' +
+        '<span>删除</span>' +
+      '</button>' +
+    '</div>' +
+    '<div class="flex-1 flex items-center justify-center">' +
+      '<video id="spVideoPlayer" src="' + dataUrl.replace(/'/g, "\\'") + '" class="max-w-full max-h-full object-contain" controls autoplay></video>' +
+    '</div>';
   document.body.appendChild(overlay);
+
+  document.getElementById('spVideoBackBtn').onclick = function () { closeVideoModal(); };
+  document.getElementById('spVideoDeleteBtn').onclick = function () { confirmDeleteVideo(ref, overlay); };
 };
+
+function closeVideoModal() {
+  var overlay = document.getElementById('spVideoModalOverlay');
+  if (!overlay) return;
+  var v = document.getElementById('spVideoPlayer');
+  if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {} }
+  overlay.remove();
+  if (window.api && window.api.ui && window.api.ui.toast) {
+    window.api.ui.toast('已退出播放');
+  }
+}
+window.closeVideoModal = closeVideoModal;
+
+function confirmDeleteVideo(ref, overlay) {
+  if (!ref) {
+    if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('视频标识缺失，无法删除');
+    return;
+  }
+  if (!window.currentViewingProfile) return;
+  var charId = window.currentViewingProfile.characterId;
+  showDeleteConfirmModal(ref, charId);
+}
+window.confirmDeleteVideo = confirmDeleteVideo;
+
+function showDeleteConfirmModal(ref, charId) {
+  var existing = document.getElementById('spVideoDeleteConfirm');
+  if (existing) existing.remove();
+
+  var dlg = document.createElement('div');
+  dlg.id = 'spVideoDeleteConfirm';
+  dlg.className = 'fixed inset-0 z-[10000] flex items-center justify-center px-6';
+  dlg.style.backgroundColor = 'rgba(0,0,0,0.55)';
+  dlg.innerHTML =
+    '<div class="w-full max-w-[320px] bg-white rounded-3xl px-6 pt-6 pb-5 shadow-2xl text-center">' +
+      '<div class="w-12 h-12 mx-auto rounded-full bg-rose-50 flex items-center justify-center mb-3">' +
+        '<svg class="w-6 h-6 text-rose-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path></svg>' +
+      '</div>' +
+      '<h4 class="text-base font-black text-slate-900">删除这个视频？</h4>' +
+      '<p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">删除后无法恢复，且会影响直播间画面切换。</p>' +
+      '<div class="flex gap-2.5 mt-5">' +
+        '<button id="spDelCancelBtn" class="flex-1 py-2.5 rounded-2xl bg-slate-100 text-slate-600 text-xs font-bold active:scale-95 transition">取消</button>' +
+        '<button id="spDelConfirmBtn" class="flex-1 py-2.5 rounded-2xl bg-rose-500 text-white text-xs font-bold shadow-sm active:scale-95 transition">删除</button>' +
+      '</div>' +
+    '</div>';
+  dlg.onclick = function (e) { if (e.target === dlg) dlg.remove(); };
+  document.body.appendChild(dlg);
+
+  document.getElementById('spDelCancelBtn').onclick = function () { dlg.remove(); };
+  document.getElementById('spDelConfirmBtn').onclick = function () {
+    dlg.remove();
+    doDeleteVideo(ref, charId);
+  };
+}
+
+function doDeleteVideo(ref, charId) {
+  Promise.all([
+    window.api && window.api.media && window.api.media.delete ? window.api.media.delete({ ref: ref }).catch(function () { return null; }) : Promise.resolve(null)
+  ]).then(function () {
+    return window.getLiveSettingsVideoGallery(charId).then(function (data) {
+      data.videos = (data.videos || []).filter(function (v) { return v.ref !== ref; });
+      return window.api && window.api.db ? window.api.db.update('live_video_gallery', charId, data).catch(function () { return null; }) : null;
+    });
+  }).then(function () {
+    closeVideoModal();
+    if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('视频已删除');
+    if (window.currentViewingProfile) {
+      var btn = document.getElementById('spTabGallery');
+      if (btn) btn.click();
+      else switchSpTab('gallery');
+    }
+  }).catch(function (e) {
+    console.error('[openVideoModal] delete error:', e);
+    if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('删除失败，请重试');
+  });
+}
 
 function renderSpGuestbook() {
   const box = document.getElementById('spaceGuestbookList');

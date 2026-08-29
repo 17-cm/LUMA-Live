@@ -59,16 +59,16 @@
 
     overlay = document.createElement('div');
     overlay.id = 'liveSettingsUploadSheet';
-    overlay.className = 'fixed inset-0 z-[9999] flex items-end justify-center';
-    overlay.style.backgroundColor = 'rgba(0,0,0,0.4)';
+    overlay.className = 'fixed inset-0 z-[9999] flex items-center justify-center px-4';
+    overlay.style.backgroundColor = 'rgba(0,0,0,0.45)';
     overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
 
     var sheet = document.createElement('div');
-    sheet.className = 'w-full max-w-[430px] bg-white rounded-t-3xl px-5 pt-6 pb-8 space-y-4 animate-slide-up';
+    sheet.className = 'w-full max-w-[400px] bg-white rounded-3xl px-6 pt-6 pb-7 space-y-4 shadow-2xl';
     sheet.innerHTML =
-      '<h4 class="text-sm font-black text-slate-900 text-center">为 ' + charName + ' 上传视频</h4>' +
+      '<h4 class="text-base font-black text-slate-900 text-center">为 ' + charName + ' 上传视频</h4>' +
       '<p class="text-[11px] text-slate-500 text-center leading-relaxed">请选择一段不超过 30 秒的视频作为直播间全屏背景</p>' +
-      '<div class="flex gap-3 pt-1">' +
+      '<div class="flex gap-3 pt-2">' +
         '<button id="lsUploadCancelBtn" class="flex-1 py-3 rounded-2xl bg-slate-100 text-slate-600 text-xs font-bold active:scale-95 transition">取消</button>' +
         '<button id="lsUploadConfirmBtn" class="flex-1 py-3 rounded-2xl bg-gradient-to-r from-violet-500 to-indigo-600 text-white text-xs font-bold shadow-md active:scale-95 transition">上传</button>' +
       '</div>';
