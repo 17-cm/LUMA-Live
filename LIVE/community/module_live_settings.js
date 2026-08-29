@@ -26,6 +26,26 @@
       '<div class="flex gap-2 overflow-x-auto no-scrollbar pb-1" id="liveSettingsCharList"><div class="text-[11px] text-slate-400 py-4 text-center w-full">加载中…</div></div>';
     area.appendChild(charSection);
 
+    // 直播间音乐 入口卡
+    var musicCard = document.createElement('div');
+    musicCard.className = 'luxe-card p-3 bg-white active:scale-[0.99] transition cursor-pointer';
+    musicCard.onclick = function () { if (typeof window.openLiveMusicSubPage === 'function') window.openLiveMusicSubPage(); };
+    musicCard.innerHTML =
+      '<div class="flex items-center gap-3">' +
+        '<div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-fuchsia-500 via-pink-500 to-rose-500 flex items-center justify-center shadow-md flex-shrink-0">' +
+          '<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>' +
+        '</div>' +
+        '<div class="flex-1 min-w-0">' +
+          '<div class="flex items-center gap-1.5">' +
+            '<h4 class="text-sm font-black text-slate-900">直播间音乐</h4>' +
+            '<span class="text-[9px] bg-fuchsia-100 text-fuchsia-700 px-1.5 py-0.5 rounded-full font-bold">BETA</span>' +
+          '</div>' +
+          '<p class="text-[11px] text-slate-500 mt-0.5">管理歌单，让直播更有氛围</p>' +
+        '</div>' +
+        '<svg class="w-4 h-4 text-slate-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
+      '</div>';
+    area.appendChild(musicCard);
+
     try {
       var chars = window.api && window.api.characters && window.api.characters.list ? await window.api.characters.list() : [];
       renderCharList(chars);

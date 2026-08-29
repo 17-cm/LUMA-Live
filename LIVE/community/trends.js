@@ -52,6 +52,7 @@ function openCommunitySubPage(pageKey, targetCharId = null) {
     'communitySuperTopicView',
     'communityRankView',
     'communityLiveSettingsView',
+    'communityLiveMusicView',
     'communityForumView',
     'communityMyTopicView'
   ];
@@ -125,6 +126,7 @@ function closeCommunitySubPage() {
       'communitySuperTopicView',
       'communityRankView',
       'communityLiveSettingsView',
+      'communityLiveMusicView',
       'communityForumView',
       'communityMyTopicView'
     ];
@@ -180,6 +182,7 @@ if (window.PageStack) {
     'communitySuperTopicView',
     'communityRankView',
     'communityLiveSettingsView',
+    'communityLiveMusicView',
     'communityForumView',
     'communityMyTopicView',
   ];

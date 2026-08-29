@@ -3092,3 +3092,9 @@ input:checked + .switch-slider:before {
 .animate-slide-up {
   animation: slideUp 0.25s ease-out;
 }
+
+/* 直播间音乐·频谱条动画 */
+@keyframes lumaBar {
+  from { transform: scaleY(0.3); opacity: 0.6; }
+  to { transform: scaleY(1); opacity: 1; }
+}
