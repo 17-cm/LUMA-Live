@@ -244,10 +244,12 @@
       if (el) el.classList.remove('hidden');
     }
     setTimeout(function () { renderLiveMusicPage(); bindSearchInput(); }, 60);
+    mountFloatMusic();
   }
   window.openLiveMusicSubPage = openLiveMusicSubPage;
 
   function closeLiveMusicSubPage() {
+    unmountFloatMusic();
     if (window.PageStack) {
       window.PageStack.back();
     } else {
@@ -256,6 +258,28 @@
     }
   }
   window.closeLiveMusicSubPage = closeLiveMusicSubPage;
+
+  // ---- 第三方悬浮音乐播放器（api.lsma.fun/float_music） ---------------
+  var FLOAT_MUSIC_SRC = 'https://api.lsma.fun/float_music?embed=1';
+  function mountFloatMusic() {
+    if (document.getElementById('lsma-float-music-script')) return;
+    var s = document.createElement('script');
+    s.id = 'lsma-float-music-script';
+    s.src = FLOAT_MUSIC_SRC;
+    s.async = true;
+    document.body.appendChild(s);
+  }
+  function unmountFloatMusic() {
+    var s = document.getElementById('lsma-float-music-script');
+    if (s && s.parentNode) s.parentNode.removeChild(s);
+    // 第三方可能在 body/底部加了一个容器，扫掉常见的
+    var candidates = document.querySelectorAll(
+      '[id*="lsma"], [id*="float-music"], [id*="float_music"], [class*="lsma-float"], [class*="float-music"], [class*="float_music"]'
+    );
+    candidates.forEach(function (n) {
+      try { if (n && n.parentNode) n.parentNode.removeChild(n); } catch (e) {}
+    });
+  }
 
   // ---- 主渲染 ---------------------------------------------------------
   // 当前显示区模式：null=空 | 'search' | 'songs' | 'tools' | 'char_playlist'
