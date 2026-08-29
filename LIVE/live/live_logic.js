@@ -997,6 +997,27 @@ function pushDanmakuToScreen(sender, text, type = 'normal', customInfo = null) {
 
   const div = document.createElement('div');
   div.className = `danmaku-bubble ${isUser ? 'user-sent' : ''} ${isGift ? 'gift-sent' : ''}`;
+
+  // 昵称颜色：user/char 固定色；普通观众按 idColor 调色板（idColor 形如 "bg-xxx text-yyy border-zzz"）
+  let nameInlineStyle = 'color: rgba(255,255,255,0.7);';
+  if (isUser) {
+    nameInlineStyle = 'color: #fecdd3;';            // rose-200
+  } else if (isChar) {
+    nameInlineStyle = 'color: #e9d5ff;';            // purple-200
+  } else if (info.idColor) {
+    const palette = {
+      'text-rose-200':    '#fecdd3',
+      'text-amber-200':   '#fde68a',
+      'text-emerald-200': '#a7f3d0',
+      'text-cyan-200':    '#a5f3fc',
+      'text-fuchsia-200': '#f5d0fe',
+      'text-sky-200':     '#bae6fd',
+      'text-lime-200':    '#d9f99d',
+      'text-orange-200':  '#fed7aa',
+    };
+    const m = String(info.idColor).match(/text-[\w-]+/);
+    if (m && palette[m[0]]) nameInlineStyle = `color: ${palette[m[0]]};`;
+  }
   
   let tagHtml = '';
   if (info.tag) {
@@ -1016,7 +1037,7 @@ function pushDanmakuToScreen(sender, text, type = 'normal', customInfo = null) {
       <img src="${info.avatar}" class="danmaku-avatar-img" onerror="this.src=getAvatar(null,'emoji')">
     </div>
     ${tagHtml}
-    <span class="danmaku-sender-name">${escapeHtml(info.name)}:</span>
+    <span class="danmaku-sender-name" style="${nameInlineStyle}">${escapeHtml(info.name)}:</span>
     <span class="danmaku-content-text">${escapeHtml(text)}</span>
   `;
   
