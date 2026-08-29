@@ -380,7 +380,7 @@
     }
     return window.liveMusicTools.map(function (t) {
       var isCurrent = t.id === window.liveMusicCurrentToolId;
-      return '<div class="flex items-center gap-3 p-3 rounded-2xl bg-white border ' + (isCurrent ? 'border-fuchsia-300 ring-2 ring-fuchsia-100' : 'border-slate-200') + '">' +
+      return '<div onclick="openLiveMusicToolMenu(\'' + t.id + '\')" class="flex items-center gap-3 p-3 rounded-2xl bg-white border ' + (isCurrent ? 'border-fuchsia-300 ring-2 ring-fuchsia-100' : 'border-slate-200') + ' active:scale-[0.98] transition cursor-pointer">' +
         '<div class="w-9 h-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-pink-500 flex items-center justify-center flex-shrink-0">' +
           '<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>' +
         '</div>' +
@@ -388,7 +388,7 @@
           '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(t.name) + '</div>' +
           '<div class="text-[10px] text-slate-500 mt-0.5 truncate">' + escapeHtml(t.method || 'GET') + ' · ' + escapeHtml(t.url || '') + '</div>' +
         '</div>' +
-        '<button onclick="toggleLiveMusicTool(\'' + t.id + '\')" class="flex-shrink-0 w-11 h-6 rounded-full transition relative ' + (isCurrent ? 'bg-fuchsia-500' : 'bg-slate-200') + '" aria-label="选中此工具">' +
+        '<button onclick="event.stopPropagation();toggleLiveMusicTool(\'' + t.id + '\')" class="flex-shrink-0 w-11 h-6 rounded-full transition relative ' + (isCurrent ? 'bg-fuchsia-500' : 'bg-slate-200') + '" aria-label="选中此工具">' +
           '<span class="absolute top-0.5 ' + (isCurrent ? 'left-[22px]' : 'left-0.5') + ' w-5 h-5 rounded-full bg-white shadow-sm transition-all"></span>' +
         '</button>' +
       '</div>';
@@ -399,6 +399,99 @@
     saveTools();
     renderLiveMusicPage();
   };
+
+  // 点工具行 → 居中弹窗：编辑 / 删除
+  window.openLiveMusicToolMenu = function (id) {
+    var tool = (window.liveMusicTools || []).find(function (t) { return t.id === id; });
+    if (!tool) return;
+    if (document.getElementById('liveMusicToolMenu')) return;
+    var dlg = document.createElement('div');
+    dlg.id = 'liveMusicToolMenu';
+    dlg.className = 'fixed inset-0 z-[10000] flex items-center justify-center px-6';
+    dlg.style.backgroundColor = 'rgba(0,0,0,0.5)';
+    dlg.style.paddingTop = 'var(--ai-phone-app-safe-top, 88px)';
+    dlg.style.paddingBottom = 'var(--ai-phone-app-safe-bottom, 24px)';
+    dlg.innerHTML =
+      '<div class="w-full max-w-[320px] bg-white rounded-3xl shadow-2xl overflow-hidden">' +
+        '<div class="px-5 pt-5 pb-3">' +
+          '<div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-br from-fuchsia-500 to-pink-500 flex items-center justify-center mb-2.5 shadow-md">' +
+            '<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>' +
+          '</div>' +
+          '<h4 class="text-base font-black text-slate-900 text-center truncate">' + escapeHtml(tool.name) + '</h4>' +
+          '<p class="text-[11px] text-slate-500 text-center mt-1 truncate">' + escapeHtml(tool.method || 'GET') + ' · ' + escapeHtml(tool.url || '') + '</p>' +
+        '</div>' +
+        '<div class="px-3 pb-3 space-y-1">' +
+          '<button id="lmToolEditBtn" class="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 active:scale-[0.98] transition text-left">' +
+            '<div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">' +
+              '<svg class="w-4 h-4 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>' +
+            '</div>' +
+            '<div class="flex-1">' +
+              '<div class="text-xs font-black text-slate-900">编辑</div>' +
+              '<div class="text-[10px] text-slate-500 mt-0.5">修改备注、URL、参数</div>' +
+            '</div>' +
+          '</button>' +
+          '<button id="lmToolDeleteBtn" class="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-rose-50 active:scale-[0.98] transition text-left">' +
+            '<div class="w-9 h-9 rounded-xl bg-rose-50 flex items-center justify-center flex-shrink-0">' +
+              '<svg class="w-4 h-4 text-rose-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg>' +
+            '</div>' +
+            '<div class="flex-1">' +
+              '<div class="text-xs font-black text-rose-500">删除</div>' +
+              '<div class="text-[10px] text-rose-400 mt-0.5">永久移除该工具</div>' +
+            '</div>' +
+          '</button>' +
+        '</div>' +
+        '<div class="px-3 pb-3 border-t border-slate-100 pt-3">' +
+          '<button id="lmToolCancelBtn" class="w-full py-2.5 rounded-2xl bg-slate-100 text-slate-600 text-xs font-bold active:scale-95 transition">取消</button>' +
+        '</div>' +
+      '</div>';
+    dlg.onclick = function (e) { if (e.target === dlg) dlg.remove(); };
+    document.body.appendChild(dlg);
+
+    dlg.querySelector('#lmToolCancelBtn').onclick = function () { dlg.remove(); };
+    dlg.querySelector('#lmToolEditBtn').onclick = function () {
+      dlg.remove();
+      openLiveMusicAddModal(tool);
+    };
+    dlg.querySelector('#lmToolDeleteBtn').onclick = function () {
+      dlg.remove();
+      confirmDeleteTool(id);
+    };
+  };
+
+  function confirmDeleteTool(id) {
+    var tool = (window.liveMusicTools || []).find(function (t) { return t.id === id; });
+    if (!tool) return;
+    if (document.getElementById('liveMusicToolDeleteConfirm')) return;
+    var dlg = document.createElement('div');
+    dlg.id = 'liveMusicToolDeleteConfirm';
+    dlg.className = 'fixed inset-0 z-[10001] flex items-center justify-center px-6';
+    dlg.style.backgroundColor = 'rgba(0,0,0,0.55)';
+    dlg.style.paddingTop = 'var(--ai-phone-app-safe-top, 88px)';
+    dlg.style.paddingBottom = 'var(--ai-phone-app-safe-bottom, 24px)';
+    dlg.innerHTML =
+      '<div class="w-full max-w-[320px] bg-white rounded-3xl shadow-2xl px-6 pt-6 pb-5 text-center">' +
+        '<div class="w-12 h-12 mx-auto rounded-full bg-rose-50 flex items-center justify-center mb-3">' +
+          '<svg class="w-6 h-6 text-rose-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg>' +
+        '</div>' +
+        '<h4 class="text-base font-black text-slate-900">删除工具？</h4>' +
+        '<p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">确定要删除「' + escapeHtml(tool.name) + '」吗？<br/>删除后无法恢复。</p>' +
+        '<div class="flex gap-2.5 mt-5">' +
+          '<button id="lmToolDelCancelBtn" class="flex-1 min-h-[44px] py-2.5 rounded-2xl bg-slate-100 text-slate-600 text-xs font-bold active:scale-95 transition">取消</button>' +
+          '<button id="lmToolDelConfirmBtn" class="flex-1 min-h-[44px] py-2.5 rounded-2xl bg-rose-500 text-white text-xs font-black shadow-sm active:scale-95 transition">删除</button>' +
+        '</div>' +
+      '</div>';
+    dlg.onclick = function (e) { if (e.target === dlg) dlg.remove(); };
+    document.body.appendChild(dlg);
+    dlg.querySelector('#lmToolDelCancelBtn').onclick = function () { dlg.remove(); };
+    dlg.querySelector('#lmToolDelConfirmBtn').onclick = function () {
+      window.liveMusicTools = (window.liveMusicTools || []).filter(function (t) { return t.id !== id; });
+      if (window.liveMusicCurrentToolId === id) window.liveMusicCurrentToolId = null;
+      saveTools();
+      dlg.remove();
+      if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('已删除');
+      renderLiveMusicPage();
+    };
+  }
 
   function renderSongListHTML() {
     if (!window.liveMusicSongs || window.liveMusicSongs.length === 0) {
@@ -469,9 +562,10 @@
     }
   };
 
-  // ---- ➕ 弹窗（同上版本，方法切换 className replace） -----------------
-  function openLiveMusicAddModal() {
+  // ---- ➕ 弹窗（新增 / 编辑，编辑时传 editTool 预填） -----------------
+  function openLiveMusicAddModal(editTool) {
     if (document.getElementById('liveMusicAddModal')) return;
+    var isEdit = !!editTool;
 
     var dlg = document.createElement('div');
     dlg.id = 'liveMusicAddModal';
@@ -483,7 +577,7 @@
     dlg.innerHTML =
       '<div class="w-full max-w-[400px] max-h-[80vh] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden">' +
         '<div class="px-5 pt-5 pb-3 flex items-center justify-between border-b border-slate-100">' +
-          '<h4 class="text-base font-black text-slate-900">添加工具</h4>' +
+          '<h4 class="text-base font-black text-slate-900">' + (isEdit ? '编辑工具' : '添加工具') + '</h4>' +
           '<button id="lmAddCloseBtn" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 active:scale-90 transition" aria-label="关闭">' +
             '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
           '</button>' +
@@ -503,8 +597,10 @@
     document.body.appendChild(dlg);
 
     var mode = 'api';
-    var currentMethod = 'GET';
-    var paramRows = [{ key: '', value: '' }];
+    var currentMethod = (editTool && editTool.method) || 'GET';
+    var paramRows = (editTool && Array.isArray(editTool.params) && editTool.params.length > 0)
+      ? editTool.params.map(function (p) { return { key: p.key || '', value: p.value || '' }; })
+      : [{ key: '', value: '' }];
 
     function renderMode() {
       var localBtn = dlg.querySelector('#lmModeLocalBtn');
@@ -546,12 +642,12 @@
         '<div class="space-y-3">' +
           '<div>' +
             '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">备注</label>' +
-            '<input id="lmToolName" type="text" placeholder="例：我的网易云歌单" ' +
+            '<input id="lmToolName" type="text" placeholder="例：我的网易云歌单" value="' + escapeHtml(editTool ? editTool.name : '') + '" ' +
                    'class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
           '</div>' +
           '<div>' +
             '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">请求地址</label>' +
-            '<input id="lmToolUrl" type="text" placeholder="https://api.example.com/api.php" ' +
+            '<input id="lmToolUrl" type="text" placeholder="https://api.example.com/api.php" value="' + escapeHtml(editTool ? editTool.url : '') + '" ' +
                    'class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
           '</div>' +
           '<div>' +
@@ -572,7 +668,7 @@
           '</div>' +
           '<div>' +
             '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">返回格式（可选）</label>' +
-            '<input id="lmToolFormat" type="text" placeholder="留空则用启发式（自动找第一个数组）" ' +
+            '<input id="lmToolFormat" type="text" placeholder="留空则用启发式（自动找第一个数组）" value="' + escapeHtml(editTool ? (editTool.format || '') : '') + '" ' +
                    'class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
             '<p class="text-[10px] text-slate-400 mt-1.5 leading-relaxed">不填 = 自动从返回 JSON 找第一个数组，按 name/artists/picUrl/url 等字段名启发式匹配歌名/歌手/封面/链接</p>' +
           '</div>' +
@@ -619,19 +715,29 @@
       var cleanParams = paramRows
         .filter(function (p) { return p.key.trim() || p.value.trim(); })
         .map(function (p) { return { key: p.key.trim(), value: p.value.trim() }; });
-      var tool = {
-        id: 'tool_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-        name: name,
-        url: url,
-        method: currentMethod,
-        params: cleanParams,
-        format: format,
-        createdAt: Date.now()
-      };
-      window.liveMusicTools.push(tool);
-      if (!window.liveMusicCurrentToolId) window.liveMusicCurrentToolId = tool.id;
+      if (isEdit) {
+        editTool.name = name;
+        editTool.url = url;
+        editTool.method = currentMethod;
+        editTool.params = cleanParams;
+        editTool.format = format;
+        editTool.updatedAt = Date.now();
+      } else {
+        var tool = {
+          id: 'tool_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          name: name,
+          url: url,
+          method: currentMethod,
+          params: cleanParams,
+          format: format,
+          createdAt: Date.now()
+        };
+        window.liveMusicTools.push(tool);
+        if (!window.liveMusicCurrentToolId) window.liveMusicCurrentToolId = tool.id;
+      }
       saveTools();
       dlg.remove();
+      if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast(isEdit ? '已保存' : '已添加工具');
       renderLiveMusicPage();
     };
 

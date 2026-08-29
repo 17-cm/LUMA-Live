@@ -161,9 +161,7 @@
         <h3 class="text-sm font-black text-slate-900 leading-none tracking-wide">直播间音乐</h3>
         <span class="text-[9px] text-slate-400 font-bold tracking-[0.18em] mt-1 block">LIVE MUSIC · PLAYLIST</span>
       </div>
-      <button onclick="openLiveMusicAddModal()" class="w-9 h-9 rounded-full bg-gradient-to-br from-fuchsia-500 to-pink-500 flex items-center justify-center text-white shadow-md active:scale-90 transition" aria-label="添加歌单" title="添加歌单">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-      </button>
+      <div class="w-9 h-9"></div>
     </div>
 
     <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24" id="liveMusicContent">
