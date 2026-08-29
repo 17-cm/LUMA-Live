@@ -57,23 +57,17 @@
       <!-- 铺满整个公屏区的同图大模糊晕染底图 -->
       <img id="stageAmbientBg" src="" class="pure-ambient-bleed-bg">
 
-      <!-- 公屏顶部的 1/5 磨砂台词条 (麦克风在左侧垂直居中、字多安全换行) -->
+      <!-- 公屏顶部的磨砂台词条 (麦克风 + 单行大字横向滚动 marquee) -->
       <div class="host-speech-bar-top">
         <div class="w-full flex items-center gap-2.5 px-1">
-          <!-- 麦克风放大在左侧垂直居中并保持呼吸闪烁 -->
           <div class="flex flex-col items-center justify-center flex-shrink-0">
             <svg class="mic-pulse-icon w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
             <span class="text-[7px] font-black text-white/60 uppercase tracking-widest mt-0.5">LIVE</span>
           </div>
-          <!-- 台词正文 -->
-          <div class="flex-1 min-w-0 flex flex-col justify-center">
-            <div class="flex items-center gap-1 mb-0.5">
-              <span class="text-[7px] font-bold text-amber-300 uppercase tracking-wider">ON AIR</span>
-              <span id="speechActionTag" class="text-[8px] text-white/70 font-medium truncate"></span>
-            </div>
-            <p id="speechContentText" class="text-xs font-medium text-white leading-relaxed max-h-12 overflow-y-auto no-scrollbar break-words">
-              欢迎来到直播间！
-            </p>
+          <div id="speechMarqueeViewport" class="flex-1 min-w-0 overflow-hidden relative h-6 flex items-center">
+            <span id="speechMarqueeTrack" class="speech-marquee-track">
+              <span id="speechContentText" class="speech-marquee-text">欢迎来到直播间！</span>
+            </span>
           </div>
         </div>
       </div>

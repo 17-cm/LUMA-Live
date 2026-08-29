@@ -22,6 +22,12 @@ let isFetchingBatchPackage = false;
 let viewerCountInterval = null;
 let currentWalletBalance = 0;
 
+// 说话框 marquee 状态
+let speechMarqueeRAF = null;
+let speechMarqueeCurrentText = '';
+let speechMarqueeQueue = [];
+let speechMarqueeBusy = false;
+
 let guestbookData = {};
 window.guestbookData = guestbookData;
 
@@ -519,6 +525,7 @@ function closeLiveRoom() {
   clearInterval(viewerCountInterval);
   if (api.voice?.stopPlayback) api.voice.stopPlayback({ channel: "voice" });
   if (typeof window.clearVideoBackground === 'function') window.clearVideoBackground();
+  if (typeof window.clearSpeechMarquee === 'function') window.clearSpeechMarquee();
 
   document.getElementById('giftTrayModal')?.classList.remove('open');
   closePlusDrawer();
@@ -705,6 +712,14 @@ async function fetchBatchLivePackage(force = false) {
 }
 window.fetchBatchLivePackage = fetchBatchLivePackage;
 
+// 校验/归一化礼物名：必须在 GIFT_LIST 中，否则从 GIFT_LIST 随机挑一个
+function normalizeGiftName(rawName) {
+  const list = (window.GiftSystem && window.GiftSystem.GIFT_LIST) || [];
+  if (rawName && list.some(g => g.name === rawName)) return rawName;
+  if (list.length === 0) return rawName || '';
+  return list[Math.floor(Math.random() * list.length)].name;
+}
+
 function startDanmakuDripFeed() {
   clearInterval(danmakuDripTimer);
   // 弹幕滴入间隔固定 4.5 秒，更接近真实直播节奏，减少消耗速度
@@ -714,10 +729,15 @@ function startDanmakuDripFeed() {
     if (danmakuPool.length > 0) {
       const item = danmakuPool.shift();
       const sInfo = getSenderLiveInfo(item.sender, item.type);
-      pushDanmakuToScreen(sInfo, item.text, item.type);
-      if (item.type === 'gift' || String(item.text).includes('送出了') || String(item.text).includes('送了')) {
+      const isGift = (item.type === 'gift' || String(item.text).includes('送出了') || String(item.text).includes('送了'));
+      if (isGift) {
         const txt = String(item.text);
-        const giftMatch = txt.match(/【(.*?)】/) || ['', '星光礼物'];
+        const giftMatch = txt.match(/【(.*?)】/);
+        // 归一化：必须在 GIFT_LIST 中，否则随机选一个
+        const giftName = normalizeGiftName(giftMatch ? giftMatch[1] : '');
+        // 弹幕气泡文字也同步成归一化后的礼物名
+        const displayText = giftName ? `送出了【${giftName}】` : item.text;
+        pushDanmakuToScreen(sInfo, displayText, 'gift');
         // 兼容多种送礼数量格式：「x10」「×10」「10个」等，避免横幅计数恒为 1
         let giftCount = 1;
         const xMatch = txt.match(/[x×]\s*(\d+)/i);
@@ -725,12 +745,14 @@ function startDanmakuDripFeed() {
         if (xMatch && xMatch[1]) giftCount = Number(xMatch[1]);
         else if (geMatch && geMatch[1]) giftCount = Number(geMatch[1]);
         if (!giftCount || giftCount < 1) giftCount = 1;
-        showGrandGiftBanner(sInfo, giftMatch[1], giftCount);
-        
+        showGrandGiftBanner(sInfo, giftName, giftCount);
+
         // 仅 char 赠送顶级礼物时触发全屏特效（随机观众不触发全屏特效）
-        if (sInfo.type === 'char' && LUXURY_GIFT_MAP[giftMatch[1]]) {
-          triggerGiftFullScreenFx(giftMatch[1]);
+        if (sInfo.type === 'char' && LUXURY_GIFT_MAP[giftName]) {
+          triggerGiftFullScreenFx(giftName);
         }
+      } else {
+        pushDanmakuToScreen(sInfo, item.text, item.type);
       }
     } else {
       fetchBatchLivePackage();
@@ -838,7 +860,13 @@ function renderHostSpeech(speech, action) {
   const contentEl = document.getElementById('speechContentText');
   const actionEl = document.getElementById('speechActionTag');
   if (contentEl) contentEl.textContent = displaySpeech || '……';
+  // actionEl 在 marquee 改造后已移除
   if (actionEl) actionEl.textContent = parsedAction ? `· ${parsedAction}` : '';
+
+  // 触发 marquee 横向滚动
+  if (contentEl && displaySpeech) {
+    enqueueSpeechMarquee(displaySpeech);
+  }
 
   // 记录主播台词到直播间历史（不可见层）
   if (displaySpeech && !isRestoringDanmaku) {
@@ -852,6 +880,95 @@ function renderHostSpeech(speech, action) {
   }
 }
 window.renderHostSpeech = renderHostSpeech;
+
+// =========================================================================
+// 【说话框 marquee 横向滚动】单行大字从右往左滚出，循环到下一句
+// 设计：每句台词从右往左完整滚过视野一次，停留 1.2s 后取下一句；
+//       新台词来时若当前正在滚，排队等当前动画结束无缝切换。
+// =========================================================================
+const SPEECH_MARQUEE_SPEED = 60;        // px/秒
+const SPEECH_MARQUEE_GAP = 60;          // 句末额外空白
+const SPEECH_MARQUEE_HOLD_MS = 1200;    // 完全滚出后停留
+const SPEECH_MARQUEE_FADE_IN_MS = 200;  // 淡入
+
+function enqueueSpeechMarquee(text) {
+  if (!text) return;
+  if (speechMarqueeBusy) {
+    speechMarqueeQueue.push(text);
+    return;
+  }
+  playSpeechMarquee(text);
+}
+
+function playSpeechMarquee(text) {
+  const track = document.getElementById('speechMarqueeTrack');
+  const textEl = document.getElementById('speechContentText');
+  const viewport = document.getElementById('speechMarqueeViewport');
+  if (!track || !textEl || !viewport) return;
+
+  speechMarqueeBusy = true;
+  speechMarqueeCurrentText = text;
+  textEl.textContent = text;
+  track.style.transition = 'none';
+  track.style.opacity = '0';
+
+  // 等文字宽度稳定
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const viewportWidth = viewport.clientWidth;
+      const textWidth = textEl.scrollWidth;
+      track.style.transition = `opacity ${SPEECH_MARQUEE_FADE_IN_MS}ms ease-out`;
+      track.style.opacity = '1';
+
+      // 短文字（不超过容器）：居中显示，不滚
+      if (textWidth <= viewportWidth) {
+        track.style.transform = 'translateX(0)';
+        setTimeout(() => {
+          finishSpeechMarquee();
+        }, SPEECH_MARQUEE_HOLD_MS);
+        return;
+      }
+
+      // 长文字：从右往左滚
+      const startX = viewportWidth;
+      const endX = -(textWidth + SPEECH_MARQUEE_GAP);
+      const distance = startX - endX;
+      const duration = (distance / SPEECH_MARQUEE_SPEED) * 1000;
+
+      track.style.transform = `translateX(${startX}px)`;
+      // 强制 reflow
+      void track.offsetWidth;
+      track.style.transition = `transform ${duration}ms linear, opacity ${SPEECH_MARQUEE_FADE_IN_MS}ms ease-out`;
+      track.style.transform = `translateX(${endX}px)`;
+
+      setTimeout(() => {
+        finishSpeechMarquee();
+      }, duration);
+    });
+  });
+}
+
+function finishSpeechMarquee() {
+  speechMarqueeBusy = false;
+  if (speechMarqueeQueue.length > 0) {
+    const next = speechMarqueeQueue.shift();
+    playSpeechMarquee(next);
+  }
+}
+
+function clearSpeechMarquee() {
+  if (speechMarqueeRAF) cancelAnimationFrame(speechMarqueeRAF);
+  speechMarqueeRAF = null;
+  speechMarqueeBusy = false;
+  speechMarqueeQueue = [];
+  const track = document.getElementById('speechMarqueeTrack');
+  if (track) {
+    track.style.transition = 'none';
+    track.style.opacity = '0';
+    track.style.transform = 'translateX(0)';
+  }
+}
+window.clearSpeechMarquee = clearSpeechMarquee;
 
 function pushDanmakuToScreen(sender, text, type = 'normal', customInfo = null) {
   const feed = document.getElementById('danmakuFeed');

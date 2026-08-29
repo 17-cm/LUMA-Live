@@ -594,12 +594,12 @@ input:checked + .switch-slider:before {
   position: relative;
   z-index: 15;
   width: 100%;
-  min-height: 72px;
+  min-height: 56px;
   background: rgba(0, 0, 0, 0.18);
   backdrop-filter: blur(20px) saturate(140%);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 10px 14px;
+  padding: 8px 14px;
   display: flex;
   align-items: center;
   flex-shrink: 0;
@@ -2855,12 +2855,26 @@ input:checked + .switch-slider:before {
 #liveRoomModal.video-bg-mode {
   background: #000;
 }
-/* 模式2：小头像胶囊移到返回键右边 */
+/* 模式2：隐藏主播小头像胶囊 */
 #liveRoomModal.video-bg-mode .host-capsule-bottom {
-  top: max(var(--safe-top), 14px);
-  left: calc(14px + 38px + 8px);
-  bottom: auto;
-  transform: translateY(0);
+  display: none;
+}
+
+/* 说话框 marquee：单行大字横向滚动 */
+.speech-marquee-track {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: 0.2px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+  will-change: transform;
+  transform: translateX(0);
+}
+.speech-marquee-text {
+  display: inline-block;
+  white-space: nowrap;
 }
 /* 模式2：在线看人数移到 REC 时长下方 */
 #liveRoomModal.video-bg-mode .viewer-capsule-bottom {
@@ -2939,11 +2953,16 @@ input:checked + .switch-slider:before {
 #liveRoomModal.video-bg-mode .zb-send-btn-bw {
   box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55);
 }
+/* 模式2说话框：模仿弹幕气泡，去模糊，圆角胶囊 */
 #liveRoomModal.video-bg-mode .host-speech-bar-top {
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.2), 0 2px 12px rgba(0,0,0,0.5);
-  background: rgba(0,0,0,0.45);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 100px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  padding: 6px 14px;
+  min-height: 0;
 }
 
 /* 旧模式2的 #liveRoomVideoBgView（保留但停用） */
