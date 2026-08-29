@@ -138,22 +138,18 @@
       </div>
     </div>
   </div>
-<!-- 分享底栏：模仿宿主聊天室的最小化浮窗 -->
-<div id="sharePickerModal" class="hidden" style="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;">
-  <div id="sharePickerSheet" style="width:100%;max-width:430px;max-height:78vh;background:linear-gradient(180deg,#15131f 0%,#0a0a18 100%);border-top-left-radius:22px;border-top-right-radius:22px;border:1px solid rgba(255,255,255,0.08);border-bottom:none;box-shadow:0 -16px 40px rgba(0,0,0,0.55);color:#fff;display:flex;flex-direction:column;overflow:hidden;transform:translateY(100%);transition:transform 0.32s cubic-bezier(0.16,1,0.3,1);">
-    <div style="display:flex;justify-content:center;padding:10px 0 4px;">
-      <span style="width:40px;height:4px;border-radius:100px;background:rgba(255,255,255,0.18);"></span>
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 18px 12px;border-bottom:1px solid rgba(255,255,255,0.06);">
-      <div>
-        <h3 style="font-size:14px;font-weight:800;letter-spacing:0.3px;color:#fff;">分享到聊天</h3>
-        <p style="font-size:10px;color:rgba(255,255,255,0.5);font-weight:600;margin-top:2px;">选择好友或群聊，立即发送 LUMA 直播卡片</p>
+<div id="sharePickerModal" class="hidden center-modal-backdrop">
+    <div class="center-modal-card p-5 space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+        <div>
+          <h3 class="text-xs font-black text-slate-900">分享给好友 / 群聊</h3>
+          <p class="text-[9px] text-slate-400">点击头像即可直接将小卡片发给 TA</p>
+        </div>
+        <button onclick="closeSharePickerModal()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs text-slate-500 font-bold">✕</button>
       </div>
-      <button onclick="closeSharePickerModal()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.7);font-size:14px;font-weight:700;border:none;cursor:pointer;">✕</button>
+      <div id="shareTargetListContainer" class="max-h-60 overflow-y-auto space-y-2 no-scrollbar pr-1"></div>
     </div>
-    <div id="shareTargetListContainer" style="flex:1;overflow-y:auto;padding:10px 12px 18px;display:flex;flex-direction:column;gap:8px;" class="no-scrollbar"></div>
   </div>
-</div>
 <div id="profileEditModal" class="hidden center-modal-backdrop">
     <div class="center-modal-card p-5 space-y-3 max-h-[85vh] overflow-y-auto no-scrollbar">
       <div class="flex items-center justify-between">

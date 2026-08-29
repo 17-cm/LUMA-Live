@@ -1647,503 +1647,54 @@ window.sendGift = sendGift;
 // =========================================================================
 // 5. 分享直播间
 // =========================================================================
-// 构造通用分享 payload（给宿主原生分享面板用）
-function buildSharePayload() {
-  const room = currentRoom || {};
-  return {
-    title: room.topic || room.title || 'LUMA 直播',
-    summary: (room.hostName || room.name || '主播') + ' 正在直播：' + (room.topic || '快来围观'),
-    roomId: room.roomId || room.id || '',
-    cover: room.cover || room.avatar || ''
-  };
-}
-
-async function openSharePickerModal() {
+function openSharePickerModal() {
   const box = document.getElementById('shareTargetListContainer');
+  const list = window.allCharacters || [];
+  if (!box) return;
+
+  if (list.length === 0) {
+    box.innerHTML = `<p class="text-xs text-slate-400 py-4 text-center">暂无联系人</p>`;
+  } else {
+    box.innerHTML = list.map(c => `
+      <div onclick="executeShareToCharacter('${c.id}', '${c.name}')" class="luxe-card p-2.5 flex items-center justify-between cursor-pointer active:scale-95 transition bg-white">
+        <div class="flex items-center gap-2.5">
+          <img src="${c.avatar}" class="w-9 h-9 rounded-full object-cover border border-slate-200">
+          <div>
+            <h5 class="text-xs font-black text-slate-900">${c.name}</h5>
+            <p class="text-[9px] text-slate-400">点击发送私聊动态小卡片</p>
+          </div>
+        </div>
+        <span class="text-[10px] bg-rose-50 text-rose-600 font-bold px-2 py-1 rounded-full border border-rose-200">分享 ›</span>
+      </div>
+    `).join('');
+  }
   const modal = document.getElementById('sharePickerModal');
-  const sheet = document.getElementById('sharePickerSheet');
-  if (!box || !modal || !sheet) return;
-
-  // 探测宿主原生分享面板（未文档化但可能存在）
-  if (api.chat && typeof api.chat.openShareSheet === 'function') {
-    try {
-      await api.chat.openShareSheet({ type: 'luma_live_share', payload: buildSharePayload() });
-      return;
-    } catch (e) { /* 降级到自绘浮窗 */ }
-  }
-
-  // 探测群聊列表
-  let groups = [];
-  if (api.chat && typeof api.chat.listConversations === 'function') {
-    try { groups = (await api.chat.listConversations()) || []; } catch (e) {}
-  } else if (api.chat && typeof api.chat.listGroups === 'function') {
-    try { groups = (await api.chat.listGroups()) || []; } catch (e) {}
-  }
-
-  // 联系人列表
-  const chars = window.allCharacters || [];
-
-  // 渲染：分组（群聊 + 好友）
-  let html = '';
-
-  if (groups.length > 0) {
-    html += `<div style="font-size:10px;color:rgba(255,255,255,0.4);font-weight:700;letter-spacing:0.5px;padding:6px 8px 2px;">群聊 · ${groups.length}</div>`;
-    html += groups.map(g => renderShareRow({
-      kind: 'group',
-      id: g.id || g.sessionId || g.conversationId,
-      name: g.name || g.title || '群聊',
-      avatar: g.avatar || g.cover || '',
-      meta: `${g.memberCount || g.members || ''} 人 · ${g.lastMessage || '点击发送'}`,
-      targetName: g.name || '群聊'
-    })).join('');
-  }
-
-  if (chars.length > 0) {
-    html += `<div style="font-size:10px;color:rgba(255,255,255,0.4);font-weight:700;letter-spacing:0.5px;padding:6px 8px 2px;">好友 · ${chars.length}</div>`;
-    html += chars.map(c => renderShareRow({
-      kind: 'char',
-      id: c.id,
-      name: c.name,
-      avatar: c.avatar || c.cover || '',
-      meta: c.tag || (c.intro ? String(c.intro).slice(0, 18) : '点击发送私聊卡片'),
-      targetName: c.name
-    })).join('');
-  }
-
-  if (groups.length === 0 && chars.length === 0) {
-    html = `<p style="font-size:12px;color:rgba(255,255,255,0.5);padding:30px 0;text-align:center;">暂无可分享的联系人</p>`;
-  }
-
-  box.innerHTML = html;
-  modal.classList.remove('hidden');
-  // 滑入动画
-  requestAnimationFrame(() => { sheet.style.transform = 'translateY(0)'; });
+  if (modal) modal.classList.remove('hidden');
 }
 window.openSharePickerModal = openSharePickerModal;
 
-function renderShareRow({ kind, id, name, avatar, meta, targetName }) {
-  const safeName = escapeHtml(name);
-  const safeMeta = escapeHtml(meta || '');
-  const safeId = escapeHtml(id);
-  const safeTargetName = escapeHtml(targetName);
-  const isGroup = kind === 'group';
-  const avatarStyle = isGroup
-    ? `background:linear-gradient(135deg,#22d3ee 0%,#a855f7 100%);`
-    : `background:linear-gradient(135deg,#ff2a6d 0%,#f97316 100%);`;
-  const badge = isGroup
-    ? `<span style="position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;background:linear-gradient(135deg,#22d3ee,#a855f7);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff;border:1.5px solid #0a0a18;">群</span>`
-    : `<span style="position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#1e1b4b;border:1.5px solid #0a0a18;">V</span>`;
-  const avatarInner = avatar
-    ? `<img src="${escapeHtml(avatar)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:14px;" onerror="this.style.display='none'"/>`
-    : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff;">${safeName.charAt(0)}</div>`;
-  return `
-    <div onclick="executeShareToTarget('${kind}','${safeId}','${safeTargetName}')" style="display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);cursor:pointer;transition:background 0.15s,transform 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'" onmousedown="this.style.transform='scale(0.97)'" onmouseup="this.style.transform='scale(1)'">
-      <div style="position:relative;width:44px;height:44px;flex-shrink:0;border-radius:14px;${avatarStyle}box-shadow:0 4px 12px rgba(0,0,0,0.3);">
-        ${avatarInner}
-        ${badge}
-      </div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeName}</div>
-        <div style="font-size:10px;color:rgba(255,255,255,0.5);font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeMeta}</div>
-      </div>
-      <span style="font-size:10px;font-weight:800;color:#ff2a6d;background:rgba(255,42,109,0.12);padding:4px 9px;border-radius:100px;border:1px solid rgba(255,42,109,0.3);">分享 ›</span>
-    </div>`;
-}
-
 function closeSharePickerModal() {
-  const sheet = document.getElementById('sharePickerSheet');
   const modal = document.getElementById('sharePickerModal');
-  if (sheet) {
-    sheet.style.transform = 'translateY(100%)';
-    setTimeout(() => { if (modal) modal.classList.add('hidden'); }, 300);
-  } else if (modal) {
-    modal.classList.add('hidden');
-  }
+  if (modal) modal.classList.add('hidden');
 }
 window.closeSharePickerModal = closeSharePickerModal;
 
-// 群聊/好友统一分享入口
-async function executeShareToTarget(kind, targetId, targetName) {
-  if (kind === 'group') {
-    await executeShareToGroup(targetId, targetName);
-  } else {
-    await executeShareToCharacter(targetId, targetName);
-  }
-}
-window.executeShareToTarget = executeShareToTarget;
-
-// 群聊分享：传 sessionId 而非 characterId
-async function executeShareToGroup(sessionId, targetName) {
-  closeSharePickerModal();
-  const room = currentRoom || {};
-  const hostName = room.hostName || room.streamerName || room.characterName || room.name || '主播';
-  const hostAvatar = room.hostAvatar || room.streamerAvatar || room.avatar || room.cover || '';
-  const title = room.topic || room.title || '热点吃瓜动态';
-  const roomId = room.roomId || room.id || '';
-  const cover = room.cover || room.avatar || '';
-  const fans = (typeof room.fanCount === 'number') ? room.fanCount : (room.fanCount || 0);
-
-  const summary = `群聊分享 LUMA 直播：${hostName}「${title}」`;
-  const historyText = `[LUMA直播群分享:群=${targetName}:主播=${hostName}:标题=${title}:roomId=${roomId}:封面=${cover}:主播头像=${hostAvatar}:粉丝=${fans}:时间=${Date.now()}]`;
-  const cardHtml = buildLumaShareCardHtml({
-    charName: escapeHtml(targetName), charAvatar: '',
-    hostName: escapeHtml(hostName), hostAvatar,
-    title: escapeHtml(title), roomId: escapeHtml(roomId),
-    fans, cover
-  });
-
-  const payload = {
-    sessionId,
-    role: 'user',
-    summary,
-    historyText,
-    card: { height: 200, html: cardHtml }
-  };
-
-  try {
-    // 群聊用 sendCard 时把 characterId 替换成 sessionId
-    if (api.chat && typeof api.chat.sendCard === 'function') {
-      await api.chat.sendCard(payload);
-    } else if (api.chat && typeof api.chat.sendMessage === 'function') {
-      await api.chat.sendMessage({
-        sessionId, characterId: sessionId,
-        role: 'user',
-        content: `${summary}\n${historyText}`
-      });
-    }
-    api.ui.toast(`已分享到群聊【${targetName}】！`);
-  } catch (e) {
-    api.ui.toast(`分享成功！`);
-  }
-}
-window.executeShareToGroup = executeShareToGroup;
-
 async function executeShareToCharacter(targetId, targetName) {
   closeSharePickerModal();
-  const room = currentRoom || {};
-  // 1. 取分享对象 char 的最新信息（按 5.12 sendCard 标准做法）
-  let targetChar = null;
+  const title = currentRoom ? currentRoom.topic : '热点吃瓜动态';
+  const name = currentRoom ? currentRoom.name : '今日社区';
+  const roomId = currentRoom ? (currentRoom.roomId || '') : '';
+
   try {
-    if (api.characters && typeof api.characters.get === 'function') {
-      targetChar = await api.characters.get(targetId);
-    }
-  } catch (e) { /* fallback 用传入的 targetName */ }
-  const charName = (targetChar && (targetChar.name || targetChar.displayName)) || targetName || '对方';
-  const charAvatar = (targetChar && (targetChar.avatar || targetChar.cover)) || '';
-
-  // 2. 直播间信息
-  const hostName = room.hostName || room.streamerName || room.characterName || room.name || '主播';
-  const hostAvatar = room.hostAvatar || room.streamerAvatar || room.avatar || room.cover || '';
-  const title = room.topic || room.title || '热点吃瓜动态';
-  const roomId = room.roomId || room.id || '';
-  const cover = room.cover || room.avatar || '';
-  const fans = (typeof room.fanCount === 'number') ? room.fanCount : (room.fanCount || 0);
-
-  // 3. 5.12 sendCard 字段
-  const summary = `${charName} 给你转发了 LUMA LIVE 直播：${hostName}「${title}」`;
-  const historyText = `[LUMA直播转发:分享者=${charName}:主播=${hostName}:标题=${title}:roomId=${roomId}:封面=${cover}:主播头像=${hostAvatar}:粉丝=${fans}:时间=${Date.now()}]`;
-
-  // 4. 霓虹动态卡片 HTML（宿主 sandbox 渲染，不执行脚本）
-  const safeName = escapeHtml(charName);
-  const safeHostName = escapeHtml(hostName);
-  const safeTitle = escapeHtml(title);
-  const safeRoomId = escapeHtml(roomId);
-  const cardHtml = buildLumaShareCardHtml({
-    charName: safeName, charAvatar,
-    hostName: safeHostName, hostAvatar,
-    title: safeTitle, roomId: safeRoomId,
-    fans, cover
-  });
-
-  const cardPayload = {
-    characterId: targetId,
-    role: 'user',
-    summary,
-    historyText,
-    card: {
-      height: 200,
-      html: cardHtml
-    }
-  };
-
-  // 5. 发送：优先 sendCard，失败回退 sendMessage
-  try {
-    if (api.chat && typeof api.chat.sendCard === 'function') {
-      console.log('[LUMA分享] 使用 api.chat.sendCard');
-      await api.chat.sendCard(cardPayload);
-    } else if (api.chat && typeof api.chat.sendMessage === 'function') {
-      console.log('[LUMA分享] sendCard 不存在，降级到 sendMessage（纯文本，对方聊天室不会渲染卡片）');
-      await api.chat.sendMessage({
-        characterId: targetId,
-        role: 'user',
-        content: `${summary}\n${historyText}`
-      });
-    } else {
-      throw new Error('no chat api');
-    }
+    await api.chat.sendMessage({
+      characterId: targetId,
+      role: 'user',
+      content: `[分享动态:来源=${name}:标题=${title}:roomId=${roomId}]`
+    });
     api.ui.toast(`已成功分享给【${targetName}】！`);
   } catch (e) {
-    console.error('[LUMA分享] 发送失败:', e);
     api.ui.toast(`分享成功！`);
   }
-}
-
-// 构造 LUMA 直播分享卡片 HTML（霓虹动态风）
-function buildLumaShareCardHtml({ charName, charAvatar, hostName, hostAvatar, title, roomId, fans, cover }) {
-  const fansText = fans >= 10000 ? (fans / 10000).toFixed(1) + 'w' : String(fans || 0);
-  const safeHostAvatar = escapeHtml(hostAvatar || '');
-  return `
-<style>
-  .luma-card {
-    position: relative;
-    min-height: 200px;
-    padding: 14px 14px 12px;
-    color: #fff;
-    font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-    background:
-      radial-gradient(ellipse at top left, rgba(255, 42, 109, 0.22), transparent 60%),
-      radial-gradient(ellipse at bottom right, rgba(34, 211, 238, 0.22), transparent 60%),
-      linear-gradient(135deg, #0a0a18 0%, #14102b 50%, #0a0a18 100%);
-    border-radius: 18px;
-    overflow: hidden;
-    box-shadow:
-      0 0 0 1px rgba(255, 42, 109, 0.4),
-      0 0 14px rgba(255, 42, 109, 0.35),
-      0 0 28px rgba(34, 211, 238, 0.18),
-      0 14px 40px rgba(0, 0, 0, 0.55);
-    animation: lumaCardBreath 3.6s ease-in-out infinite;
-  }
-  @keyframes lumaCardBreath {
-    0%, 100% {
-      box-shadow:
-        0 0 0 1px rgba(255, 42, 109, 0.4),
-        0 0 14px rgba(255, 42, 109, 0.35),
-        0 0 28px rgba(34, 211, 238, 0.18),
-        0 14px 40px rgba(0, 0, 0, 0.55);
-    }
-    50% {
-      box-shadow:
-        0 0 0 1px rgba(34, 211, 238, 0.5),
-        0 0 22px rgba(34, 211, 238, 0.45),
-        0 0 36px rgba(255, 42, 109, 0.25),
-        0 14px 40px rgba(0, 0, 0, 0.55);
-    }
-  }
-  .luma-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 18px;
-    padding: 1.5px;
-    background: linear-gradient(135deg, #ff2a6d 0%, #f97316 30%, #22d3ee 60%, #a855f7 100%);
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-            mask-composite: exclude;
-    background-size: 300% 300%;
-    animation: lumaBorderFlow 4.5s linear infinite;
-    pointer-events: none;
-  }
-  @keyframes lumaBorderFlow {
-    0%   { background-position: 0% 50%; }
-    100% { background-position: 300% 50%; }
-  }
-  .luma-card-row { display: flex; align-items: center; gap: 8px; }
-  .luma-logo {
-    font-size: 11px;
-    font-weight: 900;
-    letter-spacing: 1.5px;
-    background: linear-gradient(90deg, #ff2a6d, #f97316, #22d3ee, #a855f7, #ff2a6d);
-    background-size: 300% 100%;
-    -webkit-background-clip: text;
-            background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
-    animation: lumaLogoShimmer 3.5s linear infinite;
-    text-shadow: 0 0 8px rgba(255, 42, 109, 0.3);
-  }
-  @keyframes lumaLogoShimmer {
-    0%   { background-position: 0% 50%; }
-    100% { background-position: 300% 50%; }
-  }
-  .luma-live-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 9px;
-    font-weight: 900;
-    letter-spacing: 0.5px;
-    background: linear-gradient(90deg, #ff2a6d, #f43f5e);
-    color: #fff;
-    padding: 2px 7px;
-    border-radius: 6px;
-    box-shadow: 0 0 8px rgba(255, 42, 109, 0.6);
-  }
-  .luma-live-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 0 6px #fff;
-    animation: lumaDotBlink 1.2s ease-in-out infinite;
-  }
-  @keyframes lumaDotBlink {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: 0.25; }
-  }
-  .luma-avatar-wrap {
-    position: relative;
-    width: 44px; height: 44px;
-    flex-shrink: 0;
-  }
-  .luma-avatar-ring {
-    position: absolute; inset: -2px;
-    border-radius: 50%;
-    background: conic-gradient(from 0deg, #ff2a6d, #f97316, #22d3ee, #a855f7, #ff2a6d);
-    animation: lumaRingSpin 4s linear infinite;
-  }
-  @keyframes lumaRingSpin {
-    to { transform: rotate(360deg); }
-  }
-  .luma-avatar-img {
-    position: absolute; inset: 2px;
-    width: calc(100% - 4px); height: calc(100% - 4px);
-    border-radius: 50%;
-    object-fit: cover;
-    background: #1f1635;
-    border: 1.5px solid #0a0a18;
-  }
-  .luma-vbadge {
-    position: absolute; right: -2px; bottom: -2px;
-    width: 16px; height: 16px;
-    background: linear-gradient(135deg, #fbbf24, #f59e0b);
-    color: #1e1b4b;
-    border-radius: 50%;
-    font-size: 9px; font-weight: 900;
-    display: flex; align-items: center; justify-content: center;
-    border: 1.5px solid #0a0a18;
-    box-shadow: 0 0 6px rgba(251, 191, 36, 0.6);
-  }
-  .luma-host-name {
-    font-size: 13px; font-weight: 800;
-    color: #fff;
-    text-shadow: 0 0 6px rgba(34, 211, 238, 0.4);
-  }
-  .luma-meta {
-    font-size: 9px;
-    color: rgba(255, 255, 255, 0.55);
-    font-weight: 600;
-    margin-top: 2px;
-  }
-  .luma-meta-bullet {
-    display: inline-block;
-    width: 3px; height: 3px;
-    border-radius: 50%;
-    background: #22d3ee;
-    margin: 0 5px;
-    vertical-align: middle;
-    box-shadow: 0 0 4px #22d3ee;
-  }
-  .luma-title {
-    position: relative;
-    margin-top: 10px;
-    padding: 9px 11px;
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 1.45;
-    color: rgba(255, 255, 255, 0.95);
-    background: rgba(0, 0, 0, 0.32);
-    border-radius: 10px;
-    border: 1px solid rgba(34, 211, 238, 0.18);
-    overflow: hidden;
-  }
-  .luma-title::before {
-    content: '';
-    position: absolute;
-    left: -30%; top: 0; bottom: 0;
-    width: 30%;
-    background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.22), transparent);
-    animation: lumaTitleSweep 2.8s linear infinite;
-  }
-  @keyframes lumaTitleSweep {
-    0%   { left: -30%; }
-    100% { left: 130%; }
-  }
-  .luma-quote {
-    color: #22d3ee;
-    font-size: 14px;
-    margin-right: 3px;
-    text-shadow: 0 0 6px rgba(34, 211, 238, 0.6);
-  }
-  .luma-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 10px;
-    padding-top: 9px;
-    border-top: 1px dashed rgba(34, 211, 238, 0.22);
-  }
-  .luma-room-tag {
-    font-size: 9px;
-    color: rgba(255, 255, 255, 0.45);
-    font-weight: 700;
-    letter-spacing: 0.5px;
-  }
-  .luma-room-id {
-    font-size: 11px;
-    color: #fff;
-    font-weight: 800;
-    font-family: 'SF Mono', Consolas, monospace;
-    margin-left: 5px;
-    text-shadow: 0 0 6px rgba(255, 42, 109, 0.5);
-  }
-  .luma-cta {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    font-size: 10.5px;
-    font-weight: 900;
-    color: #fff;
-    background: linear-gradient(90deg, #ff2a6d, #f97316);
-    padding: 5px 11px;
-    border-radius: 100px;
-    box-shadow: 0 0 10px rgba(255, 42, 109, 0.5);
-    animation: lumaCtaPulse 1.8s ease-in-out infinite;
-  }
-  @keyframes lumaCtaPulse {
-    0%, 100% { transform: scale(1); box-shadow: 0 0 10px rgba(255, 42, 109, 0.5); }
-    50%      { transform: scale(1.04); box-shadow: 0 0 18px rgba(255, 42, 109, 0.85); }
-  }
-  .luma-from {
-    font-size: 8.5px;
-    color: rgba(255, 255, 255, 0.4);
-    margin-top: 8px;
-    text-align: right;
-  }
-</style>
-<div class="luma-card">
-  <div class="luma-card-row" style="justify-content: space-between;">
-    <span class="luma-logo">LUMA · LIVE</span>
-    <span class="luma-live-badge"><span class="luma-live-dot"></span>LIVE</span>
-  </div>
-  <div class="luma-card-row" style="margin-top: 11px;">
-    <div class="luma-avatar-wrap">
-      <div class="luma-avatar-ring"></div>
-      <img class="luma-avatar-img" src="${safeHostAvatar}" onerror="this.style.background='linear-gradient(135deg,#a855f7,#22d3ee)'" />
-      <div class="luma-vbadge">V</div>
-    </div>
-    <div style="flex:1; min-width:0;">
-      <div class="luma-host-name">${hostName}</div>
-      <div class="luma-meta">签约主播<span class="luma-meta-bullet"></span>${fansText} 粉丝<span class="luma-meta-bullet"></span>正在直播</div>
-    </div>
-  </div>
-  <div class="luma-title"><span class="luma-quote">"</span>${title}</div>
-  <div class="luma-footer">
-    <div>
-      <span class="luma-room-tag">ROOM</span>
-      <span class="luma-room-id">${roomId || '—'}</span>
-    </div>
-    <span class="luma-cta">立即围观 ›</span>
-  </div>
-  <div class="luma-from">from ${charName}</div>
-</div>`;
 }
 window.executeShareToCharacter = executeShareToCharacter;
 
