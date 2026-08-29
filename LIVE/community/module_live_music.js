@@ -267,18 +267,38 @@
     s.id = 'lsma-float-music-script';
     s.src = FLOAT_MUSIC_SRC;
     s.async = true;
+    s.onload = function () { markFloatMusicStatus('loaded', '✅ 第三方脚本已加载（左下角应有 🎵 按钮）'); };
+    s.onerror = function () { markFloatMusicStatus('error', '❌ 脚本加载失败（api.lsma.fun 网络不通）'); };
     document.body.appendChild(s);
+    // 5 秒后如果还没触发 onload/onerror 也提示
+    setTimeout(function () {
+      if (!document.getElementById('lsma-float-music-status').dataset.state) {
+        markFloatMusicStatus('timeout', '⏳ 脚本未响应（可能被拦截或网络慢）');
+      }
+    }, 5000);
   }
   function unmountFloatMusic() {
     var s = document.getElementById('lsma-float-music-script');
     if (s && s.parentNode) s.parentNode.removeChild(s);
-    // 第三方可能在 body/底部加了一个容器，扫掉常见的
+    var status = document.getElementById('lsma-float-music-status');
+    if (status && status.parentNode) status.parentNode.removeChild(status);
     var candidates = document.querySelectorAll(
       '[id*="lsma"], [id*="float-music"], [id*="float_music"], [class*="lsma-float"], [class*="float-music"], [class*="float_music"]'
     );
     candidates.forEach(function (n) {
       try { if (n && n.parentNode) n.parentNode.removeChild(n); } catch (e) {}
     });
+  }
+  function markFloatMusicStatus(state, msg) {
+    var el = document.getElementById('lsma-float-music-status');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'lsma-float-music-status';
+      el.style.cssText = 'position:fixed;left:50%;bottom:80px;transform:translateX(-50%);z-index:99999;padding:8px 14px;border-radius:14px;background:rgba(15,23,42,0.9);color:#fff;font-size:11px;font-weight:700;font-family:system-ui;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.dataset.state = state;
   }
 
   // ---- 主渲染 ---------------------------------------------------------
