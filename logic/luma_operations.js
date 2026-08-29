@@ -234,6 +234,11 @@ const lumaOpsGateway = {
 
     if (session) {
       await api.db.delete("live_sessions", session.id);
+      // 直播间结束，清空该房号的临时存储（弹幕历史 + 可见快照）
+      if (window.LiveRoomStore && typeof window.LiveRoomStore.clearRoom === 'function') {
+        const rid = session.roomId || session.id || characterId;
+        try { await window.LiveRoomStore.clearRoom(rid); } catch (e) {}
+      }
     }
 
     window.charSchedulesMap[characterId] = {

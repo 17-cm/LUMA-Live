@@ -25,6 +25,79 @@ let currentWalletBalance = 0;
 let guestbookData = {};
 window.guestbookData = guestbookData;
 
+// =========================================================================
+// 【直播间临时存储接入】基于 LiveRoomStore 的辅助函数
+// 不可见层：把弹幕/char台词/礼物/user发言写入按 roomId 隔离的历史（上限 200 条）
+// 可见层：维护公屏弹幕快照，进房时恢复
+// =========================================================================
+
+function currentRoomStoreId() {
+  if (!currentRoom) return null;
+  return currentRoom.roomId || currentRoom.id || currentRoom.characterId;
+}
+
+// 恢复公屏清单时的标记，避免重复写入历史
+let isRestoringDanmaku = false;
+
+// 记录一条直播历史（含时间戳），并同步到可见弹幕快照（仅弹幕/礼物/用户发言进可见层）
+async function recordLiveHistory(type, senderName, text, extra) {
+  const roomId = currentRoomStoreId();
+  if (!roomId || !window.LiveRoomStore) return;
+  const rec = {
+    ts: Date.now(),
+    type,
+    sender: senderName,
+    text,
+    extra: extra || null
+  };
+  try {
+    await window.LiveRoomStore.appendHistory(roomId, rec);
+  } catch (e) {}
+  // 可见层只收录弹幕、礼物、用户发言；char 台词不进公屏快照（避免重复刷屏）
+  if (type === 'danmaku' || type === 'gift' || type === 'user') {
+    try {
+      await window.LiveRoomStore.appendScreenDanmaku(roomId, {
+        ts: rec.ts,
+        type: rec.type,
+        sender: rec.sender,
+        text: rec.text
+      });
+    } catch (e) {}
+  }
+}
+
+// 构造进房时首次 AI 调用的历史上下文（多轮 messages + 纯文本）
+async function buildLiveHistoryPayload() {
+  const roomId = currentRoomStoreId();
+  if (!roomId || !window.LiveRoomStore) return { history: [], historyText: '' };
+  const hist = await window.LiveRoomStore.getHistory(roomId);
+  const history = hist.map(h => ({
+    role: h.type === 'char' ? 'assistant' : 'user',
+    content: `${h.sender ? h.sender + ': ' : ''}${h.text || ''}`
+  }));
+  const historyText = await window.LiveRoomStore.buildHistoryContextText(roomId);
+  return { history, historyText };
+}
+
+// 进房时恢复可见弹幕列表到公屏
+async function restoreScreenDanmaku() {
+  const feed = document.getElementById('danmakuFeed');
+  const roomId = currentRoomStoreId();
+  if (!feed || !roomId || !window.LiveRoomStore) return;
+  const list = await window.LiveRoomStore.getScreenDanmaku(roomId);
+  if (!list || list.length === 0) return;
+  isRestoringDanmaku = true;
+  try {
+    // 底部旧→顶部新：倒序插入，恢复"退出前"的观感
+    list.forEach(item => {
+      const sInfo = getSenderLiveInfo(item.sender, item.type);
+      pushDanmakuToScreen(sInfo, item.text, item.type);
+    });
+  } finally {
+    isRestoringDanmaku = false;
+  }
+}
+
 const SUB_CATEGORIES = {
   'all': ['全部推荐', '热门精选', '新人出道', '高光时刻', '连麦互动'],
   '电竞竞技': ['全部', '王者荣耀', '原神 / 星铁', '无畏契约', '和平精英', '我的世界'],
@@ -375,6 +448,9 @@ function enterLiveRoomDirectly(sessionId) {
   if (!window.hostSpeechPool || window.hostSpeechPool.length === 0) {
     hostSpeechPool = [];
   }
+
+  // 恢复该房子上次退出前的公屏弹幕（可见层快照）
+  restoreScreenDanmaku();
   
   closePlusDrawer();
   if (window.PageStack) {
@@ -550,11 +626,16 @@ async function fetchBatchLivePackage(force = false) {
     
     // 动态上下文：赛道频道、标题与最近送礼
     const dynamicContext = `当前赛道：${currentRoom.category}（${currentRoom.subTag || '日常'}），标题：《${currentRoom.topic}》${giftHistoryText}`;
+
+    // 注入直播间历史上下文（不可见层）：进房首次调用带全部历史，之后随新记录继续累积
+    const liveHistory = await buildLiveHistoryPayload();
     
     const res = await window.aiGenerate({
       characterId: currentRoom.characterId,
       appTags: ['live', 'package'],
-      instruction: dynamicContext
+      instruction: dynamicContext,
+      history: liveHistory.history,
+      historyText: liveHistory.historyText
     });
 
     const parsed = window.extractJsonFromText ? window.extractJsonFromText(res.text) : null;
@@ -728,6 +809,11 @@ function renderHostSpeech(speech, action) {
   if (contentEl) contentEl.textContent = displaySpeech || '……';
   if (actionEl) actionEl.textContent = parsedAction ? `· ${parsedAction}` : '';
 
+  // 记录主播台词到直播间历史（不可见层）
+  if (displaySpeech && !isRestoringDanmaku) {
+    recordLiveHistory('char', currentRoom ? currentRoom.name : '主播', displaySpeech);
+  }
+
   if (currentRoom && !currentRoom.isNPC && api.voice?.tts && displaySpeech) {
     api.voice.tts({ characterId: currentRoom.characterId, text: displaySpeech }).then(tts => {
       if (tts?.dataUrl && api.voice.play) api.voice.play({ channel: "voice", dataUrl: tts.dataUrl });
@@ -770,10 +856,16 @@ function pushDanmakuToScreen(sender, text, type = 'normal', customInfo = null) {
     <span class="danmaku-content-text">${escapeHtml(text)}</span>
   `;
   
-  feed.insertBefore(div, feed.firstChild);
+feed.insertBefore(div, feed.firstChild);
 
   if (feed.children.length > 35) {
     feed.removeChild(feed.lastChild);
+  }
+
+  // 记录到直播间历史（不可见层）。恢复清单时不重复记录。
+  if (!isRestoringDanmaku) {
+    const typeForHistory = isGift ? 'gift' : (isUser ? 'user' : (isChar ? 'char' : 'danmaku'));
+    recordLiveHistory(typeForHistory, info.name, text);
   }
 }
 window.pushDanmakuToScreen = pushDanmakuToScreen;
@@ -788,11 +880,17 @@ async function sendUserDanmaku() {
   pushDanmakuToScreen(uInfo, val, 'user');
   input.value = '';
 
+  // 记录用户发言到直播间历史（不可见层）
+  recordLiveHistory('user', uInfo.name, val);
+
   try {
+    const liveHistory = await buildLiveHistoryPayload();
     const res = await window.aiGenerate({
       characterId: currentRoom.characterId,
       appTags: ['live', 'reply'],
-      instruction: `【${uInfo.tag}】${uInfo.name}发言：“${val}”`
+      instruction: `【${uInfo.tag}】${uInfo.name}发言：“${val}”`,
+      history: liveHistory.history,
+      historyText: liveHistory.historyText
     });
 
     const parsed = window.extractJsonFromText(res.text);
@@ -1324,6 +1422,9 @@ async function sendGift(name, cost) {
     showGrandGiftBanner(uInfo, name, qty);
     pushDanmakuToScreen(uInfo, `送了 ${qty} 个【${name}】给【${streamerName}】✨`, 'gift');
 
+    // 记录送礼消息到直播间历史（不可见层）
+    recordLiveHistory('gift', uInfo.name, `送了 ${qty} 个【${name}】给【${streamerName}】`, { giftName: name, count: qty, cost: totalCost });
+
     // 启动连击倒计时圆圈
     startComboTimer();
 
@@ -1333,10 +1434,13 @@ async function sendGift(name, cost) {
     }
 
     try {
+      const liveHistory = await buildLiveHistoryPayload();
       const res = await window.aiGenerate({
         characterId: currentRoom.characterId,
         appTags: ['live', 'reply'],
-        instruction: `【${uInfo.tag}】${uInfo.name}送了 ${qty} 个【${name}】（总价值 ${totalCost} LUMA 币）给主播`
+        instruction: `【${uInfo.tag}】${uInfo.name}送了 ${qty} 个【${name}】（总价值 ${totalCost} LUMA 币）给主播`,
+        history: liveHistory.history,
+        historyText: liveHistory.historyText
       });
       const parsed = window.extractJsonFromText(res.text);
       if (parsed && typeof parsed === 'object') {

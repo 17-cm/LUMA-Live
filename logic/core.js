@@ -557,11 +557,18 @@ async function aiGenerate(params) {
     ? renderPresetTemplate(tpl, { char: charName, user: userName, instruction: params.instruction || '' })
     : (params.instruction || '');
 
+  // 历史上下文统一前缀（供全局宿主模型分支与纯文本兜底使用）
+  const historyText = params.historyText || (
+    Array.isArray(params.history)
+      ? params.history.map(h => `${h.role === 'assistant' ? '主播' : '观众'}: ${h.content || ''}`).join('\n')
+      : ''
+  );
+
   const customApi = window.customApiConfig || {};
   if (customApi.enableGlobalModel) {
     const genOptions = {
       ...params,
-      instruction: filledInstruction
+      instruction: historyText ? `${historyText}\n\n${filledInstruction}` : filledInstruction
     };
     if (characterId && !genOptions.characterId) {
       genOptions.characterId = characterId;
@@ -590,13 +597,23 @@ async function aiGenerate(params) {
     ? `你正在扮演角色【${charName}】。\n角色设定：${persona}`
     : `你正在扮演角色【${charName}】。`;
 
+  // 组装多轮 messages：system + (可选历史) + 当前 user 指令
+  const messages = [{ role: 'system', content: systemPrompt }];
+  if (Array.isArray(params.history) && params.history.length > 0) {
+    params.history.forEach(h => {
+      if (!h || !h.role) return;
+      messages.push({ role: h.role, content: h.content });
+    });
+  }
+  messages.push({ role: 'user', content: filledInstruction });
+
   const endpoint = formatOpenAIEndpoint(url, 'chat');
   try {
     const res = await robustNetworkRequest({
       url: endpoint,
       method: 'POST',
       headers: { 'Authorization': key ? `Bearer ${key}` : '', 'Content-Type': 'application/json' },
-      body: { model: model, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: filledInstruction }], temperature: 0.9 }
+      body: { model: model, messages: messages, temperature: 0.9 }
     });
     const data = res.json || (res.text ? JSON.parse(res.text) : null);
     const text = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || data?.text || data?.response;

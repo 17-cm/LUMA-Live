@@ -87,6 +87,11 @@
           try {
             if (window.api && api.db) {
               await api.db.delete("live_sessions", session.id);
+              // 结算下播，清空该房号临时存储
+              if (window.LiveRoomStore && typeof window.LiveRoomStore.clearRoom === 'function') {
+                const rid = session.roomId || session.id || session.characterId;
+                await window.LiveRoomStore.clearRoom(rid).catch(() => {});
+              }
             }
           } catch (e) {
             console.warn("[Offline Engine] 移除已结束场次失败:", e);
