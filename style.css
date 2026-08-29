@@ -594,12 +594,12 @@ input:checked + .switch-slider:before {
   position: relative;
   z-index: 15;
   width: 100%;
-  min-height: 56px;
+  min-height: 72px;
   background: rgba(0, 0, 0, 0.18);
   backdrop-filter: blur(20px) saturate(140%);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 8px 14px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
   flex-shrink: 0;
@@ -2864,10 +2864,10 @@ input:checked + .switch-slider:before {
 .speech-marquee-track {
   display: inline-block;
   white-space: nowrap;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   color: #ffffff;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.3px;
   text-shadow: 0 1px 2px rgba(0,0,0,0.45);
   will-change: transform;
   transform: translateX(0);
@@ -2897,7 +2897,7 @@ input:checked + .switch-slider:before {
   visibility: hidden;
 }
 
-/* 模式2：顶部玻璃栏，让控件形成整体感 */
+/* 模式2：顶部玻璃栏（已停用）
 #liveRoomModal.video-bg-mode::before {
   content: "";
   position: absolute;
@@ -2915,6 +2915,7 @@ input:checked + .switch-slider:before {
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
 }
+*/
 /* 弹幕流背景透明 */
 #liveRoomModal.video-bg-mode .danmaku-stream-viewport {
   background: transparent;

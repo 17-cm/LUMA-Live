@@ -266,7 +266,7 @@
           <div class="flex items-center gap-1.5 leading-none">
             ${senderInfo.tag ? `<span class="text-[7.5px] bg-rose-500/30 text-rose-200 border border-rose-400/40 px-1 py-[0.5px] rounded font-black truncate max-w-[60px] leading-none">${senderInfo.tag}</span>` : ''}
             <span class="text-xs font-black text-white truncate max-w-[85px]">${senderInfo.name}</span>
-            <span class="text-[7.5px] bg-slate-900 text-amber-300 border border-amber-400/50 font-black px-1 py-[0.5px] rounded-full leading-none">${senderInfo.vip || 'Lv.1'}</span>
+            <span class="text-[7.5px] ${senderInfo.idColor || 'bg-slate-900 text-amber-300 border-amber-400/50'} font-black px-1 py-[0.5px] rounded-full leading-none"></span>
           </div>
           <p class="gift-banner-desc text-[9px] text-white/90 font-medium mt-1 leading-tight truncate">
             送了 <span class="text-rose-300 font-bold">${count}</span> 个 <span class="text-amber-300 font-bold">【${gift.name}】</span> 给 <span class="text-amber-200 font-bold">${window.currentRoom ? window.currentRoom.name : '主播'}</span>

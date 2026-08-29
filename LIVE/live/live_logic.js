@@ -202,10 +202,13 @@ window.getCurrentUserLiveInfo = getCurrentUserLiveInfo;
 
 function getSenderLiveInfo(sender, type = 'normal') {
   if (type === 'user' || sender === '你' || (window.currentUser && sender === window.currentUser.name)) {
-    return getCurrentUserLiveInfo();
+    const u = getCurrentUserLiveInfo();
+    if (!u.idColor) u.idColor = 'bg-rose-500/25 text-rose-200 border-rose-400/45';
+    return u;
   }
-  
+
   if (sender && typeof sender === 'object' && sender.avatar) {
+    if (!sender.idColor) sender.idColor = 'bg-slate-700/40 text-white/80 border-white/20';
     return sender;
   }
 
@@ -218,7 +221,8 @@ function getSenderLiveInfo(sender, type = 'normal') {
       avatar: foundChar.avatar || foundChar.cover || getAvatar((foundChar && (foundChar.name || foundChar.id)) || null, 'first'),
       tag: (foundChar.tags && foundChar.tags[0]) || '特邀嘉宾',
       tagColor: 'bg-purple-500/25 text-purple-200 border-purple-400/40',
-      vip: 'VIP 8',
+      vip: '',
+      idColor: 'bg-purple-500/25 text-purple-200 border-purple-400/45',
       type: 'char'
     };
   }
@@ -226,11 +230,25 @@ function getSenderLiveInfo(sender, type = 'normal') {
   let hash = 0;
   for (let i = 0; i < strSender.length; i++) hash = (hash * 31 + strSender.charCodeAt(i)) % 100000;
   const avatar = getAvatar(strSender, 'emoji');
-  
+
   // 随机弹幕观众称号系统：仅约 25% 概率获得随机称号，其余 75% 无称号
   const hasTitle = (Math.abs(hash * 13) % 100) < 25;
   let tag = '';
   let tagColor = 'bg-white/10 text-white/70 border-white/15';
+
+  // 随机观众 id 颜色池：按 hash 决定，让"ID"以颜色区分而不是等级文字
+  const idColorThemes = [
+    { bg: 'bg-rose-500/25',    text: 'text-rose-200',    border: 'border-rose-400/45' },
+    { bg: 'bg-amber-500/25',   text: 'text-amber-200',   border: 'border-amber-400/45' },
+    { bg: 'bg-emerald-500/25', text: 'text-emerald-200', border: 'border-emerald-400/45' },
+    { bg: 'bg-cyan-500/25',    text: 'text-cyan-200',    border: 'border-cyan-400/45' },
+    { bg: 'bg-fuchsia-500/25', text: 'text-fuchsia-200', border: 'border-fuchsia-400/45' },
+    { bg: 'bg-sky-500/25',     text: 'text-sky-200',     border: 'border-sky-400/45' },
+    { bg: 'bg-lime-500/25',    text: 'text-lime-200',    border: 'border-lime-400/45' },
+    { bg: 'bg-orange-500/25',  text: 'text-orange-200',  border: 'border-orange-400/45' },
+  ];
+  const idColorIndex = Math.abs(hash * 11) % idColorThemes.length;
+  const idColor = idColorThemes[idColorIndex];
 
   if (hasTitle) {
     const npcTitles = ['粉丝团', '乐子人', '榜一大哥', '热心吃瓜', '常驻房管', '深夜守候', '高能弹幕君', '纯爱战神', '深海潜水', '魔法使'];
@@ -244,13 +262,14 @@ function getSenderLiveInfo(sender, type = 'normal') {
     ];
     tagColor = colorThemes[Math.abs(hash * 7) % colorThemes.length];
   }
-  
+
   return {
     name: strSender,
     avatar: avatar,
     tag: tag,
     tagColor: tagColor,
-    vip: `Lv.${(Math.abs(hash) % 18) + 2}`,
+    vip: '',                          // 取消等级文字，用 idColor 替代
+    idColor: `${idColor.bg} ${idColor.text} ${idColor.border}`,
     type: type
   };
 }
@@ -886,7 +905,7 @@ window.renderHostSpeech = renderHostSpeech;
 // 设计：每句台词从右往左完整滚过视野一次，停留 1.2s 后取下一句；
 //       新台词来时若当前正在滚，排队等当前动画结束无缝切换。
 // =========================================================================
-const SPEECH_MARQUEE_SPEED = 60;        // px/秒
+const SPEECH_MARQUEE_SPEED = 36;        // px/秒
 const SPEECH_MARQUEE_GAP = 60;          // 句末额外空白
 const SPEECH_MARQUEE_HOLD_MS = 1200;    // 完全滚出后停留
 const SPEECH_MARQUEE_FADE_IN_MS = 200;  // 淡入
@@ -929,10 +948,10 @@ function playSpeechMarquee(text) {
         return;
       }
 
-      // 长文字：从右往左滚
-      const startX = viewportWidth;
-      const endX = -(textWidth + SPEECH_MARQUEE_GAP);
-      const distance = startX - endX;
+      // 长文字：居中滚动，从右往左慢速滚动，滚到刚好末尾对齐左边停止
+      const startX = (viewportWidth - textWidth) / 2;
+      const endX = (viewportWidth - textWidth) / 2 - (textWidth - viewportWidth);
+      const distance = Math.abs(startX - endX);
       const duration = (distance / SPEECH_MARQUEE_SPEED) * 1000;
 
       track.style.transform = `translateX(${startX}px)`;
@@ -1373,7 +1392,7 @@ function showGrandGiftBanner(senderInfo, giftName, count = 1, isComboUpdate = fa
         <div class="flex items-center gap-1.5 leading-none">
           ${tagSpan}
           <span class="text-xs font-black text-white truncate max-w-[85px]">${escapeHtml(senderInfo.name)}</span>
-          <span class="text-[7.5px] bg-slate-900 text-amber-300 border border-amber-400/50 font-black px-1 py-[0.5px] rounded-full leading-none">${escapeHtml(senderInfo.vip || 'Lv.1')}</span>
+          <span class="text-[7.5px] ${senderInfo.idColor || 'bg-slate-900 text-amber-300 border-amber-400/50'} font-black px-1 py-[0.5px] rounded-full leading-none"></span>
         </div>
         <p class="gift-banner-desc text-[9px] text-white/90 font-medium mt-1 leading-tight truncate">
           送了 <span class="text-rose-300 font-bold">${count}</span> 个 <span class="text-amber-300 font-bold">【${escapeHtml(giftName)}】</span> 给 <span class="text-amber-200 font-bold">${escapeHtml(streamerName)}</span>
