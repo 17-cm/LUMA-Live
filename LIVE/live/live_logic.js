@@ -1681,106 +1681,117 @@ window.closeSharePickerModal = closeSharePickerModal;
 
 async function executeShareToCharacter(targetId, targetName) {
   closeSharePickerModal();
-  const title = currentRoom ? currentRoom.topic : '热点吃瓜动态';
-  const name = currentRoom ? currentRoom.name : '今日社区';
-  const roomId = currentRoom ? (currentRoom.roomId || '') : '';
+  const room = currentRoom || {};
+  const roomCharId = room.characterId || room.id || '';
+
+  // 1) 调 SDK 拉目标 char 真实信息（5.12 文档推荐）
+  let charName = targetName;
+  try {
+    if (api.characters && typeof api.characters.get === 'function') {
+      const c = await api.characters.get(targetId);
+      if (c) charName = c.name || c.displayName || targetName || 'TA';
+    }
+  } catch (e) { console.warn('[LUMA分享] characters.get 失败:', e); }
+
+  // 2) 调 SDK 拉用户昵称（5.12 文档示例）
+  let userName = '你';
+  try {
+    if (api.user && typeof api.user.getProfile === 'function') {
+      const u = await api.user.getProfile({ characterId: targetId });
+      if (u) userName = u.name || u.nickname || '你';
+    }
+  } catch (e) { /* ignore */ }
+
+  // 3) 主播/直播信息：currentRoom 优先，fallback 调 SDK
+  let hostName = room.hostName || room.streamerName || room.name || '主播';
+  let title = room.topic || room.title || '热点吃瓜动态';
+  let roomId = String(room.roomId || room.id || '');
+
+  if ((!room.hostName || !room.topic) && roomCharId) {
+    try {
+      if (api.characters && typeof api.characters.get === 'function') {
+        const host = await api.characters.get(roomCharId);
+        if (host) {
+          hostName = host.name || hostName;
+          title = room.topic || room.title || host.title || host.topic || '直播中';
+          roomId = roomId || String(host.roomId || host.id || '');
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  // 4) 粉丝数：与直播间/超话保持一致
+  let fans = 0;
+  try {
+    if (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function') {
+      fans = window.LumaFansManager.getFans(roomCharId, room) || 0;
+    } else if (typeof window.getHostBaseFans === 'function') {
+      fans = window.getHostBaseFans(roomCharId, room) || 0;
+    } else if (typeof room.fanCount === 'number') {
+      fans = room.fanCount;
+    } else if (room.fanCount) {
+      fans = room.fanCount;
+    }
+  } catch (e) { console.warn('[LUMA分享] 读取粉丝数失败:', e); }
+  const fansText = fans >= 10000 ? (fans / 10000).toFixed(1) + 'w' : String(fans || 0);
+
+  // 5) summary（UI 标题）+ historyText（AI 看的历史）
+  const summary = `${userName}给${charName}分享了 LUMA LIVE 直播：${hostName}「${title}」`;
+  const historyText = `[LUMA直播分享:分享者=${userName}:对象=${charName}:主播=${hostName}:标题=${title}:房间号=${roomId}:粉丝=${fansText}:时间=${Date.now()}]`;
+
+  // 6) 按官方 5.12 结构化 card 字段（不用 html，宿主按 sections/rows 渲染）
+  const cardPayload = {
+    appLabel: 'LUMA LIVE',
+    title: title,
+    subtitle: '直播分享 · LIVE CARD',
+    status: '直播中',
+    accentColor: '#ff2a6d',
+    sections: [
+      {
+        title: '直播间',
+        rows: [
+          { label: '主播', value: hostName },
+          { label: '粉丝', value: fansText },
+          { label: '状态', value: '直播中 · 立即围观' }
+        ]
+      },
+      {
+        title: '房间信息',
+        rows: [
+          { label: '房间号', value: roomId || '—' },
+          { label: '分享者', value: userName },
+          { label: '分享对象', value: charName }
+        ]
+      }
+    ],
+    actions: [{ label: '立即围观直播间' }]
+  };
 
   try {
-    await api.chat.sendMessage({
-      characterId: targetId,
-      role: 'user',
-      content: `[分享动态:来源=${name}:标题=${title}:roomId=${roomId}]`
-    });
-    api.ui.toast(`已成功分享给【${targetName}】！`);
+    if (api.chat && typeof api.chat.sendCard === 'function') {
+      console.log('[LUMA分享] 走 sendCard（结构化 card）');
+      await api.chat.sendCard({
+        characterId: targetId,
+        role: 'user',
+        summary,
+        historyText,
+        card: cardPayload
+      });
+    } else if (api.chat && typeof api.chat.sendMessage === 'function') {
+      console.log('[LUMA分享] 降级 sendMessage（纯文本）');
+      await api.chat.sendMessage({
+        characterId: targetId,
+        role: 'user',
+        content: historyText
+      });
+    }
+    api.ui.toast(`已分享给【${charName}】！`);
   } catch (e) {
-    api.ui.toast(`分享成功！`);
+    console.error('[LUMA分享] 失败:', e);
+    api.ui.toast && api.ui.toast('分享成功！');
   }
 }
 window.executeShareToCharacter = executeShareToCharacter;
-
-// =========================================================================
-// 6. 野生 NPC 召唤与公会签约
-// =========================================================================
-async function handleGenerateWildNPC() {
-  const badge = document.getElementById('btnSummonWildBadge');
-  const originalBadgeContent = badge ? badge.innerHTML : '<span>召唤</span><span>›</span>';
-  if (badge) {
-    badge.innerHTML = `<svg class="animate-spin w-3.5 h-3.5 text-rose-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>`;
-  }
-
-  await api.ui.toast("正在召唤野生主播并生成专属立绘...");
-  try {
-    const settings = window.imageSettings || {};
-    const ratioPrompt = (settings.prompts) ? settings.prompts.map(p => p.content).join(', ') : 'square 1:1 composition';
-    const imgRes = await window.aiGenerateImage({
-      prompt: `1girl, aesthetic anime live streaming portrait, cozy lighting, masterpiece, ${ratioPrompt}`
-    });
-    const coverUrl = imgRes?.dataUrl || character?.avatar || '';
-
-    const npcNames = ['可可', '夏桃', '安妮', '琉璃', '星奈'];
-    const chosenName = `野生主播·${npcNames[Math.floor(Math.random() * npcNames.length)]}`;
-    const now = Date.now();
-    const npcId = `npc_${now}_${Math.random().toString(36).slice(2, 6)}`;
-
-    // 随机分配一级赛道，并用稳定身份键让二级分类分散，避免每次召唤都固定同一个分类
-    const mainCatKeys = Object.keys(SUB_CATEGORIES).filter(k => k !== 'all');
-    const chosenMainCat = mainCatKeys[Math.floor(Math.random() * mainCatKeys.length)];
-    const subCatList = (SUB_CATEGORIES[chosenMainCat] || []).filter(item => item !== '全部' && item !== '全部推荐');
-    const chosenSubTag = subCatList[Math.floor(Math.random() * subCatList.length)] || '日常唠嗑';
-
-    const newNPC = await api.db.create("live_sessions", {
-      characterId: npcId,
-      name: chosenName,
-      avatar: coverUrl,
-      cover: coverUrl,
-      category: chosenMainCat,
-      subTag: chosenSubTag,
-      topic: `【${chosenName}】的精彩直播`,
-      persona: `一位性格元气可爱的虚拟野生主播。`,
-      heat: 3600,
-      roomId: Math.floor(Math.random() * 899999 + 100000),
-      startTime: now,
-      endTime: now + 2 * 60 * 60 * 1000,
-      isNPC: true
-    });
-
-    window.liveList.unshift(newNPC);
-    renderLiveGrid();
-    await api.ui.toast("野生主播已开播，已同步至广场！");
-  } catch (e) {
-    await api.ui.toast("生图失败，请检查生图配置");
-  } finally {
-    if (badge) badge.innerHTML = originalBadgeContent;
-  }
-}
-window.handleGenerateWildNPC = handleGenerateWildNPC;
-
-async function signCurrentNPC() {
-  if (!currentRoom || !currentRoom.isNPC) return;
-  const roleCard = `【角色姓名】${currentRoom.name}\n【角色设定】${currentRoom.persona || 'LUMA Live 野生主播'}\n【第一句开场白】哈喽大家！我是新人主播${currentRoom.name}～`;
-
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(roleCard);
-    api.ui.toast(`【${currentRoom.name}】人设卡已复制到剪贴板！`);
-  } else {
-    alert(roleCard);
-  }
-}
-window.signCurrentNPC = signCurrentNPC;
-
-// =========================================================================
-// 7. 主播个人空间（微博风格）
-// 【已迁移】本节代码已整体迁移至 LIVE/主页/streamer_profile.js（归档分类）
-// 包含：主播档案生成、主页渲染、编辑档案、关注、直播场次、相册、留言墙
-// =========================================================================
-
-
-// =========================================================================
-// 8. 周期性作息推演与同步服务
-// =========================================================================
-// =========================================================================
-// LUMA官方运营组·定时器轮询
-// 官方运营组定期读取参数，通过概率模拟AI决策，通知房管审核开播/下播
 
 // =========================================================================
 // 9. 分享直达与深层链接解析 (Deep Linking)
