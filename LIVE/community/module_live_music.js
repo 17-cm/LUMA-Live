@@ -363,12 +363,19 @@
       var cover = pic
         ? '<img src="' + escapeHtml(pic) + '" class="w-full h-full object-cover" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div class="w-full h-full hidden items-center justify-center bg-gradient-to-br from-fuchsia-100 to-blue-100"><svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>'
         : '<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-fuchsia-100 to-blue-100"><svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>';
+      var playUrl = s.playUrl;
+      var playBtn = playUrl
+        ? '<a href="' + escapeHtml(playUrl) + '" target="_blank" rel="noopener" class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0 active:scale-90 transition" aria-label="播放" title="播放">' +
+            '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>' +
+          '</a>'
+        : '';
       return '<div class="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200 mb-2">' +
         '<div class="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">' + cover + '</div>' +
         '<div class="flex-1 min-w-0">' +
           '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(s.title) + '</div>' +
           '<div class="text-[10px] text-slate-500 mt-0.5 truncate">' + escapeHtml(s.artist) + '</div>' +
         '</div>' +
+        playBtn +
         '<button onclick="addLiveMusicSong(' + i + ')" class="w-9 h-9 rounded-full bg-gradient-to-br from-fuchsia-500 to-pink-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm active:scale-90 transition" aria-label="添加到歌曲库" title="添加">' +
           '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
         '</button>' +
@@ -422,10 +429,12 @@
         return resp.json();
       }).then(function (json) {
         window.__liveMusicLastRawJson = json;
+        window.__liveMusicDisplayMode = 'search';
         var songs = parseSongsFromResponse(json);
         if (!songs || songs.length === 0) {
           // 启发式+自定义都拿不到 → 兜底展示原始 JSON 让你看到 API 实际返回了什么
           area.innerHTML = renderRawJsonFallback(json);
+          window.__liveMusicLastResult = null;
           return;
         }
         window.__liveMusicLastResult = songs;
@@ -433,6 +442,7 @@
       });
     }).catch(function (e) {
       console.warn('[liveMusic] 搜索失败:', e);
+      window.__liveMusicDisplayMode = 'search';
       area.innerHTML = '<div class="text-center py-12 text-[11px] text-rose-500">请求失败：' + escapeHtml(e && e.message ? e.message : String(e)) + '<br/><span class="text-slate-400">检查 URL / 参数 / CORS</span></div>';
       window.__liveMusicLastResult = null;
     });
