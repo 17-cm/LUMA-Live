@@ -152,14 +152,14 @@
   </div>
 
   <!-- 子页面 4.5: 直播间音乐 全屏子页 -->
-  <div id="communityLiveMusicView" class="full-page-view hidden bg-gradient-to-b from-[#0f0820] via-[#1a0f2e] to-[#0f0820]">
-    <div class="page-nav-bar" style="background-color: transparent;">
-      <button onclick="closeLiveMusicSubPage()" class="w-9 h-9 rounded-full bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-center text-white shadow-sm active:scale-90 transition" aria-label="返回">
+  <div id="communityLiveMusicView" class="full-page-view hidden bg-slate-50">
+    <div class="page-nav-bar bg-white border-b border-slate-100">
+      <button onclick="closeLiveMusicSubPage()" class="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition" aria-label="返回">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </button>
       <div class="text-center">
-        <h3 class="text-sm font-black text-white leading-none tracking-wide">直播间音乐</h3>
-        <span class="text-[9px] text-white/50 font-bold tracking-[0.18em] mt-1 block">LIVE MUSIC · PLAYLIST</span>
+        <h3 class="text-sm font-black text-slate-900 leading-none tracking-wide">直播间音乐</h3>
+        <span class="text-[9px] text-slate-400 font-bold tracking-[0.18em] mt-1 block">LIVE MUSIC · PLAYLIST</span>
       </div>
       <button onclick="openLiveMusicAddModal()" class="w-9 h-9 rounded-full bg-gradient-to-br from-fuchsia-500 to-pink-500 flex items-center justify-center text-white shadow-md active:scale-90 transition" aria-label="添加歌单" title="添加歌单">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
