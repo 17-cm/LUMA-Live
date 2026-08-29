@@ -1,28 +1,31 @@
 (function () {
   'use strict';
 
-  var currentVideoRef = null;
+  var currentVideoDataUrl = null;
+  var isVideoMode = false;
 
-  window.getRandomBackgroundVideo = async function (charId) {
-    try {
-      var data = window.getLiveSettingsVideoGallery ? await window.getLiveSettingsVideoGallery(charId) : null;
-      if (!data || !data.videos || data.videos.length === 0) return null;
-      var idx = Math.floor(Math.random() * data.videos.length);
-      return data.videos[idx];
-    } catch (e) {
-      return null;
-    }
-  };
-
-  window.switchToRandomVideoBg = async function (charId) {
-    var portrait = document.getElementById('stageHostPortrait');
-    var videoEl = document.getElementById('stageHostVideo');
+  window.switchBackgroundMode = async function (charId) {
+    var fullscreenVideo = document.getElementById('stageFullscreenVideo');
     var loading = document.getElementById('stageVideoLoading');
+    var portrait = document.getElementById('stageHostPortrait');
     var room = document.getElementById('liveRoomModal');
 
-    if (!videoEl || !loading) return;
+    if (!fullscreenVideo || !loading) return;
 
-    var videoItem = await window.getRandomBackgroundVideo(charId);
+    // 如果当前是视频模式，切回 1:1 头像
+    if (isVideoMode) {
+      fullscreenVideo.pause();
+      fullscreenVideo.src = '';
+      fullscreenVideo.classList.add('hidden');
+      loading.classList.add('hidden');
+      if (portrait) portrait.classList.remove('hidden');
+      if (room) room.classList.remove('live-bg-video');
+      isVideoMode = false;
+      return;
+    }
+
+    // 切换到视频模式
+    var videoItem = await getRandomBackgroundVideo(charId);
     if (!videoItem || !videoItem.ref) {
       if (window.api && window.api.ui && window.api.ui.toast) {
         window.api.ui.toast('请先在社区-直播设置上传视频');
@@ -31,67 +34,73 @@
     }
 
     loading.classList.remove('hidden');
-    videoEl.classList.add('hidden');
-    if (portrait) portrait.classList.add('hidden');
-    if (room) room.classList.add('live-bg-video');
 
     try {
       var media = window.api && window.api.media && window.api.media.get ? await window.api.media.get({ ref: videoItem.ref }) : null;
-      if (!media || !media.dataUrl) {
-        throw new Error('media.get returned no dataUrl');
-      }
-      videoEl.src = media.dataUrl;
-      videoEl.currentTime = 0;
+      if (!media || !media.dataUrl) throw new Error('media.get returned no dataUrl');
 
-      var playPromise = videoEl.play();
-      if (playPromise) {
-        playPromise.catch(function () {
-          videoEl.muted = true;
-          videoEl.play();
-        });
-      }
+      currentVideoDataUrl = media.dataUrl;
+      fullscreenVideo.src = currentVideoDataUrl;
+      fullscreenVideo.currentTime = 0;
 
-      videoEl.onloadeddata = function () {
+      var playPromise = fullscreenVideo.play();
+      if (playPromise) playPromise.catch(function () {
+        fullscreenVideo.muted = true;
+        fullscreenVideo.play();
+      });
+
+      fullscreenVideo.onloadeddata = function () {
         loading.classList.add('hidden');
-        videoEl.classList.remove('hidden');
+        fullscreenVideo.classList.remove('hidden');
+        if (portrait) portrait.classList.add('hidden');
+        if (room) room.classList.add('live-bg-video');
+        isVideoMode = true;
       };
-      videoEl.onerror = function () {
-        fallbackToPortrait(portrait, videoEl, loading, room);
-      };
+      fullscreenVideo.onerror = function () { fallback(); };
       setTimeout(function () {
-        if (!loading.classList.contains('hidden')) {
-          fallbackToPortrait(portrait, videoEl, loading, room);
-        }
+        if (!loading.classList.contains('hidden')) fallback();
       }, 5000);
     } catch (e) {
-      fallbackToPortrait(portrait, videoEl, loading, room);
+      fallback();
     }
   };
 
-  function fallbackToPortrait(portrait, videoEl, loading, room) {
+  function fallback() {
+    var loading = document.getElementById('stageVideoLoading');
+    var fullscreenVideo = document.getElementById('stageFullscreenVideo');
     if (loading) loading.classList.add('hidden');
-    if (videoEl) videoEl.classList.add('hidden');
-    if (portrait) portrait.classList.remove('hidden');
-    if (room) room.classList.remove('live-bg-video');
+    if (fullscreenVideo) fullscreenVideo.classList.add('hidden');
     if (window.api && window.api.ui && window.api.ui.toast) {
       window.api.ui.toast('视频加载失败，已恢复默认背景');
     }
   }
 
+  async function getRandomBackgroundVideo(charId) {
+    try {
+      var data = window.getLiveSettingsVideoGallery ? await window.getLiveSettingsVideoGallery(charId) : null;
+      if (!data || !data.videos || data.videos.length === 0) return null;
+      var idx = Math.floor(Math.random() * data.videos.length);
+      return data.videos[idx];
+    } catch (e) {
+      return null;
+    }
+  }
+
   window.clearVideoBg = function () {
-    var portrait = document.getElementById('stageHostPortrait');
-    var videoEl = document.getElementById('stageHostVideo');
+    var fullscreenVideo = document.getElementById('stageFullscreenVideo');
     var loading = document.getElementById('stageVideoLoading');
+    var portrait = document.getElementById('stageHostPortrait');
     var room = document.getElementById('liveRoomModal');
 
-    if (videoEl) {
-      videoEl.pause();
-      videoEl.src = '';
-      videoEl.classList.add('hidden');
+    if (fullscreenVideo) {
+      fullscreenVideo.pause();
+      fullscreenVideo.src = '';
+      fullscreenVideo.classList.add('hidden');
     }
     if (loading) loading.classList.add('hidden');
     if (portrait) portrait.classList.remove('hidden');
     if (room) room.classList.remove('live-bg-video');
-    currentVideoRef = null;
+    currentVideoDataUrl = null;
+    isVideoMode = false;
   };
 })();

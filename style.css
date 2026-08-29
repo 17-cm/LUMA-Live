@@ -2838,10 +2838,23 @@ input:checked + .switch-slider:before {
 /* =========================================================================
    【直播背景视频】
    ========================================================================= */
+
+/* 全屏视频元素 */
+.stage-fullscreen-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
 .stage-video-loading {
   position: absolute;
   inset: 0;
-  z-index: 20;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
   background: rgba(0,0,0,0.65);
   display: flex;
   flex-direction: column;
@@ -2868,6 +2881,9 @@ input:checked + .switch-slider:before {
 }
 
 /* 视频全屏背景时控件的描边发光高亮 */
+.live-bg-video .stage-avatar-zone {
+  display: none;
+}
 .live-bg-video .stage-back-btn {
   box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55), 0 2px 12px rgba(0,0,0,0.5);
 }

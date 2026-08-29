@@ -944,8 +944,8 @@ function handleDrawerAction(action) {
   } else if (action === 'quality') {
     closePlusDrawer();
     var bgCharId = currentRoom && currentRoom.characterId;
-    if (bgCharId && typeof window.switchToRandomVideoBg === 'function') {
-      window.switchToRandomVideoBg(bgCharId);
+    if (bgCharId && typeof window.switchBackgroundMode === 'function') {
+      window.switchBackgroundMode(bgCharId);
     } else {
       api.ui.toast("画质与画布比例调节（即将支持 1:1、9:16 及原画切换）");
     }
