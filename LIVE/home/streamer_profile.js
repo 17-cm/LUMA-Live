@@ -735,11 +735,11 @@ window.openVideoModal = function (ref, dataUrl) {
   overlay.id = 'spVideoModalOverlay';
   overlay.className = 'fixed inset-0 z-[9999] bg-black/95 flex flex-col';
   overlay.innerHTML =
-    '<div class="flex items-center justify-between px-4 pt-3 pb-2 z-20">' +
-      '<button id="spVideoBackBtn" class="w-10 h-10 rounded-full bg-white/15 text-white flex items-center justify-center active:scale-90 transition" aria-label="返回">' +
+    '<div id="spVideoToolbar" class="flex items-center justify-between pl-4 pr-[64px] z-20">' +
+      '<button id="spVideoBackBtn" class="w-11 h-11 rounded-full bg-black/45 text-white flex items-center justify-center active:scale-90 transition ring-1 ring-white/20" aria-label="返回">' +
         '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>' +
       '</button>' +
-      '<button id="spVideoDeleteBtn" class="px-3 h-9 rounded-full bg-rose-500/90 text-white text-xs font-bold flex items-center gap-1.5 active:scale-95 transition" aria-label="删除视频">' +
+      '<button id="spVideoDeleteBtn" class="px-3.5 h-9 rounded-full bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 active:scale-95 transition shadow-lg" aria-label="删除视频">' +
         '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path></svg>' +
         '<span>删除</span>' +
       '</button>' +
@@ -748,6 +748,16 @@ window.openVideoModal = function (ref, dataUrl) {
       '<video id="spVideoPlayer" src="' + dataUrl.replace(/'/g, "\\'") + '" class="max-w-full max-h-full object-contain" controls autoplay></video>' +
     '</div>';
   document.body.appendChild(overlay);
+
+  var toolbar = document.getElementById('spVideoToolbar');
+  var safeTop = 88;
+  try {
+    var cs = window.getComputedStyle(document.documentElement);
+    var v = cs.getPropertyValue('--ai-phone-app-safe-top');
+    if (v) safeTop = parseInt(v, 10) || safeTop;
+  } catch (e) {}
+  toolbar.style.paddingTop = (safeTop + 6) + 'px';
+  toolbar.style.paddingBottom = '8px';
 
   document.getElementById('spVideoBackBtn').onclick = function () { closeVideoModal(); };
   document.getElementById('spVideoDeleteBtn').onclick = function () { confirmDeleteVideo(ref, overlay); };
@@ -784,6 +794,8 @@ function showDeleteConfirmModal(ref, charId) {
   dlg.id = 'spVideoDeleteConfirm';
   dlg.className = 'fixed inset-0 z-[10000] flex items-center justify-center px-6';
   dlg.style.backgroundColor = 'rgba(0,0,0,0.55)';
+  dlg.style.paddingTop = 'var(--ai-phone-app-safe-top, 88px)';
+  dlg.style.paddingBottom = 'var(--ai-phone-app-safe-bottom, 24px)';
   dlg.innerHTML =
     '<div class="w-full max-w-[320px] bg-white rounded-3xl px-6 pt-6 pb-5 shadow-2xl text-center">' +
       '<div class="w-12 h-12 mx-auto rounded-full bg-rose-50 flex items-center justify-center mb-3">' +
@@ -792,8 +804,8 @@ function showDeleteConfirmModal(ref, charId) {
       '<h4 class="text-base font-black text-slate-900">删除这个视频？</h4>' +
       '<p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">删除后无法恢复，且会影响直播间画面切换。</p>' +
       '<div class="flex gap-2.5 mt-5">' +
-        '<button id="spDelCancelBtn" class="flex-1 py-2.5 rounded-2xl bg-slate-100 text-slate-600 text-xs font-bold active:scale-95 transition">取消</button>' +
-        '<button id="spDelConfirmBtn" class="flex-1 py-2.5 rounded-2xl bg-rose-500 text-white text-xs font-bold shadow-sm active:scale-95 transition">删除</button>' +
+        '<button id="spDelCancelBtn" class="flex-1 min-h-[44px] py-2.5 rounded-2xl bg-slate-100 text-slate-600 text-xs font-bold active:scale-95 transition">取消</button>' +
+        '<button id="spDelConfirmBtn" class="flex-1 min-h-[44px] py-2.5 rounded-2xl bg-rose-500 text-white text-xs font-bold shadow-sm active:scale-95 transition">删除</button>' +
       '</div>' +
     '</div>';
   dlg.onclick = function (e) { if (e.target === dlg) dlg.remove(); };
