@@ -995,29 +995,53 @@ function pushDanmakuToScreen(sender, text, type = 'normal', customInfo = null) {
   const isChar = (info.type === 'char');
   const isGift = (type === 'gift' || String(text).includes('送出了') || String(text).includes('送了'));
 
+  // 8 色调色板（user/char 也参与随机，但 hash 来源不同以保证区分）
+  const BUBBLE_PALETTE = {
+    'text-rose-200':    { bg: 'rgba(255, 42, 109, 0.18)',  border: 'rgba(255, 42, 109, 0.36)' },
+    'text-amber-200':   { bg: 'rgba(245, 158, 11, 0.18)',  border: 'rgba(245, 158, 11, 0.36)' },
+    'text-emerald-200': { bg: 'rgba(16, 185, 129, 0.18)',  border: 'rgba(16, 185, 129, 0.36)' },
+    'text-cyan-200':    { bg: 'rgba(34, 211, 238, 0.18)',  border: 'rgba(34, 211, 238, 0.36)' },
+    'text-fuchsia-200': { bg: 'rgba(217, 70, 239, 0.18)',  border: 'rgba(217, 70, 239, 0.36)' },
+    'text-sky-200':     { bg: 'rgba(56, 189, 248, 0.18)',  border: 'rgba(56, 189, 248, 0.36)' },
+    'text-lime-200':    { bg: 'rgba(132, 204, 22, 0.20)',  border: 'rgba(132, 204, 22, 0.38)' },
+    'text-orange-200':  { bg: 'rgba(249, 115, 22, 0.18)',  border: 'rgba(249, 115, 22, 0.36)' },
+  };
+  const PALETTE_KEYS = Object.keys(BUBBLE_PALETTE);
+
+  // 选择调色板 key：char/user/普通观众都用 name 算 hash 取随机色
+  const pickKey = (salt) => {
+    let h = 0;
+    const s = String(info.name || '') + '|' + salt;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 100000;
+    return PALETTE_KEYS[Math.abs(h * 17) % PALETTE_KEYS.length];
+  };
+  const userKey  = pickKey('user');
+  const charKey  = pickKey('char');
+  const giftKey  = pickKey('gift');
+  const randomKey = (function () {
+    const m = String(info.idColor || '').match(/text-[\w-]+/);
+    return (m && BUBBLE_PALETTE[m[0]]) ? m[0] : PALETTE_KEYS[Math.abs((info.name||'').length * 7) % PALETTE_KEYS.length];
+  })();
+
+  // 气泡背景/边框：char/user/gift 用对应 key；普通观众用 randomKey
+  const choosePalette = isChar ? charKey : isUser ? userKey : isGift ? giftKey : randomKey;
+  const bubbleStyle = `background-color: ${BUBBLE_PALETTE[choosePalette].bg}; border-color: ${BUBBLE_PALETTE[choosePalette].border};`;
+
+  // 昵称文字色
+  const nameColorHex = {
+    'text-rose-200':    '#fecdd3',
+    'text-amber-200':   '#fde68a',
+    'text-emerald-200': '#a7f3d0',
+    'text-cyan-200':    '#a5f3fc',
+    'text-fuchsia-200': '#f5d0fe',
+    'text-sky-200':     '#bae6fd',
+    'text-lime-200':    '#d9f99d',
+    'text-orange-200':  '#fed7aa',
+  }[choosePalette] || '#fde68a';
+
   const div = document.createElement('div');
   div.className = `danmaku-bubble ${isUser ? 'user-sent' : ''} ${isGift ? 'gift-sent' : ''}`;
-
-  // 昵称颜色：user/char 固定色；普通观众按 idColor 调色板（idColor 形如 "bg-xxx text-yyy border-zzz"）
-  let nameInlineStyle = 'color: rgba(255,255,255,0.7);';
-  if (isUser) {
-    nameInlineStyle = 'color: #fecdd3;';            // rose-200
-  } else if (isChar) {
-    nameInlineStyle = 'color: #e9d5ff;';            // purple-200
-  } else if (info.idColor) {
-    const palette = {
-      'text-rose-200':    '#fecdd3',
-      'text-amber-200':   '#fde68a',
-      'text-emerald-200': '#a7f3d0',
-      'text-cyan-200':    '#a5f3fc',
-      'text-fuchsia-200': '#f5d0fe',
-      'text-sky-200':     '#bae6fd',
-      'text-lime-200':    '#d9f99d',
-      'text-orange-200':  '#fed7aa',
-    };
-    const m = String(info.idColor).match(/text-[\w-]+/);
-    if (m && palette[m[0]]) nameInlineStyle = `color: ${palette[m[0]]};`;
-  }
+  div.setAttribute('style', bubbleStyle);
   
   let tagHtml = '';
   if (info.tag) {
@@ -1037,7 +1061,7 @@ function pushDanmakuToScreen(sender, text, type = 'normal', customInfo = null) {
       <img src="${info.avatar}" class="danmaku-avatar-img" onerror="this.src=getAvatar(null,'emoji')">
     </div>
     ${tagHtml}
-    <span class="danmaku-sender-name" style="${nameInlineStyle}">${escapeHtml(info.name)}:</span>
+    <span class="danmaku-sender-name" style="color: ${nameColorHex};">${escapeHtml(info.name)}:</span>
     <span class="danmaku-content-text">${escapeHtml(text)}</span>
   `;
   
