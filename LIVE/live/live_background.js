@@ -1,31 +1,23 @@
 (function () {
   'use strict';
 
-  var currentVideoDataUrl = null;
   var isVideoMode = false;
 
   window.switchBackgroundMode = async function (charId) {
-    var fullscreenVideo = document.getElementById('stageFullscreenVideo');
-    var loading = document.getElementById('stageVideoLoading');
-    var portrait = document.getElementById('stageHostPortrait');
     var room = document.getElementById('liveRoomModal');
+    var bg = document.getElementById('stageLiveBg');
+    var loading = document.getElementById('stageVideoLoading');
 
-    if (!fullscreenVideo || !loading) return;
+    if (!room || !bg) return;
 
-    // 如果当前是视频模式，切回 1:1 头像
     if (isVideoMode) {
-      fullscreenVideo.pause();
-      fullscreenVideo.src = '';
-      fullscreenVideo.classList.add('hidden');
-      loading.classList.add('hidden');
-      if (portrait) portrait.classList.remove('hidden');
-      if (room) room.classList.remove('live-bg-video');
-      isVideoMode = false;
+      // 模式2 → 模式1：切换回头像+公屏背景
+      enterMode1(room, bg, loading);
       return;
     }
 
-    // 切换到视频模式
-    var videoItem = await getRandomBackgroundVideo(charId);
+    // 模式1 → 模式2：切换到全屏视频背景
+    var videoItem = await getRandomBgVideo(charId);
     if (!videoItem || !videoItem.ref) {
       if (window.api && window.api.ui && window.api.ui.toast) {
         window.api.ui.toast('请先在社区-直播设置上传视频');
@@ -37,45 +29,54 @@
 
     try {
       var media = window.api && window.api.media && window.api.media.get ? await window.api.media.get({ ref: videoItem.ref }) : null;
-      if (!media || !media.dataUrl) throw new Error('media.get returned no dataUrl');
+      if (!media || !media.dataUrl) throw new Error('media.get failed');
 
-      currentVideoDataUrl = media.dataUrl;
-      fullscreenVideo.src = currentVideoDataUrl;
-      fullscreenVideo.currentTime = 0;
-
-      var playPromise = fullscreenVideo.play();
-      if (playPromise) playPromise.catch(function () {
-        fullscreenVideo.muted = true;
-        fullscreenVideo.play();
-      });
-
-      fullscreenVideo.onloadeddata = function () {
-        loading.classList.add('hidden');
-        fullscreenVideo.classList.remove('hidden');
-        if (portrait) portrait.classList.add('hidden');
-        if (room) room.classList.add('live-bg-video');
-        isVideoMode = true;
-      };
-      fullscreenVideo.onerror = function () { fallback(); };
-      setTimeout(function () {
-        if (!loading.classList.contains('hidden')) fallback();
-      }, 5000);
+      enterMode2(room, bg, loading, media.dataUrl);
     } catch (e) {
-      fallback();
+      loading.classList.add('hidden');
+      if (window.api && window.api.ui && window.api.ui.toast) {
+        window.api.ui.toast('视频加载失败');
+      }
     }
   };
 
-  function fallback() {
-    var loading = document.getElementById('stageVideoLoading');
-    var fullscreenVideo = document.getElementById('stageFullscreenVideo');
+  function enterMode1(room, bg, loading) {
     if (loading) loading.classList.add('hidden');
-    if (fullscreenVideo) fullscreenVideo.classList.add('hidden');
-    if (window.api && window.api.ui && window.api.ui.toast) {
-      window.api.ui.toast('视频加载失败，已恢复默认背景');
-    }
+    bg.innerHTML = '';
+    room.classList.remove('live-bg-video');
+    isVideoMode = false;
   }
 
-  async function getRandomBackgroundVideo(charId) {
+  function enterMode2(room, bg, loading, dataUrl) {
+    bg.innerHTML = '<video id="stageFullscreenVideo" class="stage-fullscreen-video" muted loop playsinline autoplay></video>';
+    var video = document.getElementById('stageFullscreenVideo');
+    if (!video) return;
+
+    video.src = dataUrl;
+    video.currentTime = 0;
+
+    var playPromise = video.play();
+    if (playPromise) playPromise.catch(function () {
+      video.muted = true;
+      video.play();
+    });
+
+    video.onloadeddata = function () {
+      if (loading) loading.classList.add('hidden');
+      room.classList.add('live-bg-video');
+      isVideoMode = true;
+    };
+    video.onerror = function () {
+      enterMode1(room, bg, loading);
+    };
+    setTimeout(function () {
+      if (loading && !loading.classList.contains('hidden')) {
+        enterMode1(room, bg, loading);
+      }
+    }, 5000);
+  }
+
+  async function getRandomBgVideo(charId) {
     try {
       var data = window.getLiveSettingsVideoGallery ? await window.getLiveSettingsVideoGallery(charId) : null;
       if (!data || !data.videos || data.videos.length === 0) return null;
@@ -87,20 +88,12 @@
   }
 
   window.clearVideoBg = function () {
-    var fullscreenVideo = document.getElementById('stageFullscreenVideo');
-    var loading = document.getElementById('stageVideoLoading');
-    var portrait = document.getElementById('stageHostPortrait');
     var room = document.getElementById('liveRoomModal');
-
-    if (fullscreenVideo) {
-      fullscreenVideo.pause();
-      fullscreenVideo.src = '';
-      fullscreenVideo.classList.add('hidden');
-    }
+    var bg = document.getElementById('stageLiveBg');
+    var loading = document.getElementById('stageVideoLoading');
+    if (bg) bg.innerHTML = '';
     if (loading) loading.classList.add('hidden');
-    if (portrait) portrait.classList.remove('hidden');
     if (room) room.classList.remove('live-bg-video');
-    currentVideoDataUrl = null;
     isVideoMode = false;
   };
 })();

@@ -4,8 +4,11 @@
   document.getElementById('fullscreen-root').insertAdjacentHTML('beforeend', `
   <div id="liveRoomModal" class="full-page-view hidden">
     
-    <!-- 【全屏视频背景层（z-index 低于所有控件，只在视频模式显示）】 -->
-    <video id="stageFullscreenVideo" class="stage-fullscreen-video hidden" muted loop playsinline></video>
+    <!-- 【全屏视频背景层：替换整个直播间底层背景，z-index 低于所有区域】 -->
+    <div id="stageLiveBg" class="stage-live-bg">
+      <!-- 模式1：1:1 头像区（z-index 1） + 公屏模糊底图 -->
+      <!-- 模式2：全屏视频（z-index 1） -->
+    </div>
     <div id="stageVideoLoading" class="stage-video-loading hidden">
       <div class="stage-video-loading-spinner"></div>
       <span class="stage-video-loading-text">正在切换背景视频…</span>

@@ -2839,14 +2839,38 @@ input:checked + .switch-slider:before {
    【直播背景视频】
    ========================================================================= */
 
-/* 全屏视频元素 */
-.stage-fullscreen-video {
+/* 背景容器（替换整个直播间的底层背景） */
+.stage-live-bg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+  z-index: 0;
+  overflow: hidden;
+}
+
+/* 全屏视频元素 */
+.stage-fullscreen-video {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  z-index: 1;
+  display: block;
+}
+
+/* 加载层在 liveRoomModal 内绝对定位，在背景之上、控件之下 */
+.stage-video-loading {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  background: rgba(0,0,0,0.65);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  pointer-events: none;
 }
 
 .stage-video-loading {
@@ -2881,7 +2905,10 @@ input:checked + .switch-slider:before {
 }
 
 /* 视频全屏背景时控件的描边发光高亮 */
-.live-bg-video .stage-avatar-zone {
+.live-bg-video .stage-portrait-main {
+  display: none;
+}
+.live-bg-video .pure-ambient-bleed-bg {
   display: none;
 }
 .live-bg-video .stage-back-btn {

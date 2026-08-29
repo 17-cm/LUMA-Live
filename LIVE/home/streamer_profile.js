@@ -687,7 +687,7 @@ function renderSpGallery() {
   if (!box || !window.currentViewingProfile) return;
   const p = window.currentViewingProfile;
   
-  // 先在相册里放好原图骨架 + 视频占位
+  // 先放原图骨架
   box.innerHTML = `
     <div class="gallery-grid-3" id="spGalleryGrid">
       ${p.gallery.filter(img => img).map(img => `
@@ -706,7 +706,6 @@ function renderSpGallery() {
       if (!container) return;
       if (vids.length === 0) { container.innerHTML = ''; return; }
 
-      // 逐个 media.get 换 dataUrl 后渲染，Promise.all 等全部
       Promise.all(vids.map(function (v) {
         if (!v.ref) return null;
         return (window.api && window.api.media && window.api.media.get ? window.api.media.get({ ref: v.ref }).then(function (m) {
@@ -714,7 +713,7 @@ function renderSpGallery() {
         }).catch(function () { return null; }) : null);
       })).then(function (results) {
         container.innerHTML = results.filter(Boolean).map(function (r) {
-          return '<div class="relative aspect-video rounded-xl bg-slate-100 overflow-hidden cursor-pointer" onclick="openVideoModal(\'' + r.dataUrl.replace(/'/g, "\\'") + '\')">' +
+          return '<div class="relative aspect-square rounded-xl bg-slate-100 overflow-hidden cursor-pointer" onclick="openVideoModal(\'' + r.dataUrl.replace(/'/g, "\\'") + '\')">' +
             '<video src="' + r.dataUrl + '" class="w-full h-full object-cover" muted preload="metadata"></video>' +
             '<div class="absolute inset-0 flex items-center justify-center pointer-events-none">' +
               '<svg class="w-8 h-8 text-white drop-shadow-lg" viewBox="0 0 24 24" fill="white"><polygon points="8 5 19 12 8 19 8 5"></polygon></svg>' +
