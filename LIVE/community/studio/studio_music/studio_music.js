@@ -61,7 +61,7 @@
             '<div class="text-sm font-black text-slate-900 truncate">' + (currentTool ? escapeHtml(currentTool.name || '当前工具') : '尚未选择工具') + '</div>' +
           '</div>' +
         '</div>' +
-        '<button onclick="window.LM.openLiveMusicAddModePicker()" class="absolute top-3 right-3 w-9 h-9 rounded-full bg-gradient-to-br from-fuchsia-500 to-pink-500 flex items-center justify-center text-white shadow-md active:scale-90 transition z-10" aria-label="添加工具">' +
+        '<button onclick="window.LM.openLiveMusicAddModal()" class="absolute top-3 right-3 w-9 h-9 rounded-full bg-gradient-to-br from-fuchsia-500 to-pink-500 flex items-center justify-center text-white shadow-md active:scale-90 transition z-10" aria-label="添加工具">' +
           '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
         '</button>' +
         '<div class="flex items-end gap-1 h-8 mb-1">' +
@@ -89,17 +89,13 @@
         }).join('') +
       '</div>' +
 
-      // 搜索框（direct 模式不显示）
-      (function () {
-        var cur = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
-        if (cur && cur.mode === 'direct') return '';
-        return '<div class="relative mb-3">' +
-          '<svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>' +
-          '<input id="liveMusicSearchInput" type="text" placeholder="' + escapeHtml(placeholder) + '" ' +
-                 'class="w-full h-10 pl-10 pr-4 rounded-2xl bg-white border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100 transition" />' +
-          '<button id="liveMusicSearchBtn" class="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 px-3 rounded-xl bg-slate-900 text-white text-[10px] font-black active:scale-95 transition">搜索</button>' +
-        '</div>';
-      })() +
+      // 搜索框
+      '<div class="relative mb-3">' +
+        '<svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>' +
+        '<input id="liveMusicSearchInput" type="text" placeholder="' + escapeHtml(placeholder) + '" ' +
+               'class="w-full h-10 pl-10 pr-4 rounded-2xl bg-white border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100 transition" />' +
+        '<button id="liveMusicSearchBtn" class="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 px-3 rounded-xl bg-slate-900 text-white text-[10px] font-black active:scale-95 transition">搜索</button>' +
+      '</div>' +
 
       // 唯一显示区
       '<div id="liveMusicDisplayArea" class="min-h-[200px]">' + renderDisplayHTML() + '</div>';
@@ -112,16 +108,6 @@
     var mode = window.__liveMusicDisplayMode;
     if (!mode) return '';
     if (mode === 'search') {
-      var cur = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
-      if (cur && cur.mode === 'direct') {
-        if (window.__liveMusicLastResult && window.__liveMusicLastResult.length > 0) {
-          return renderSearchResultHTML(window.__liveMusicLastResult);
-        }
-        setTimeout(function () { runDirectFetch(); }, 30);
-        return '<div class="text-center py-12 text-[11px] text-slate-400 flex items-center justify-center gap-2">' +
-          '<svg class="w-4 h-4 animate-spin text-fuchsia-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>' +
-          '正在获取…</div>';
-      }
       if (window.__liveMusicLastResult && window.__liveMusicLastResult.length > 0) return renderSearchResultHTML(window.__liveMusicLastResult);
       return '<div class="text-center py-12 text-[11px] text-slate-400">输入关键词开始搜索</div>';
     }
@@ -157,9 +143,9 @@
           '</a>'
         : '';
       return '<div class="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200 mb-2">' +
-        '<button onclick="playLiveMusicSong(' + i + ')" class="w-12 h-12 rounded-xl flex-shrink-0 bg-gradient-to-br from-fuchsia-500 to-pink-500 text-white flex items-center justify-center shadow-sm active:scale-90 transition" aria-label="播放" title="播放">' +
-          '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>' +
-        '</button>' +
+        '<div class="w-12 h-12 rounded-xl flex-shrink-0 bg-gradient-to-br from-fuchsia-100 to-blue-100 flex items-center justify-center">' +
+          '<svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>' +
+        '</div>' +
         '<div class="flex-1 min-w-0">' +
           '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(s.title) + '</div>' +
           '<div class="text-[10px] text-slate-500 mt-0.5 truncate">' + escapeHtml(s.artist) + '</div>' +
@@ -191,37 +177,6 @@
     input.onkeydown = function (e) {
       if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
     };
-  }
-
-  function runDirectFetch() {
-    var area = document.getElementById('liveMusicDisplayArea');
-    if (!area) return;
-    var tool = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
-    if (!tool || tool.mode !== 'direct') {
-      area.innerHTML = '<div class="text-center py-12 text-[11px] text-rose-500">当前工具不是"直接拿 URL"模式</div>';
-      return;
-    }
-    area.innerHTML = '<div class="text-center py-12 text-[11px] text-slate-400 flex items-center justify-center gap-2">' +
-      '<svg class="w-4 h-4 animate-spin text-fuchsia-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>' +
-      '正在获取…</div>';
-
-    buildRequest(tool, '').then(function (req) {
-      return doFetchJson(req).then(function (json) {
-        var songs = parseSongsFromResponse(json);
-        if (!songs || songs.length === 0) {
-          area.innerHTML = renderRawJsonFallback(json);
-          window.__liveMusicLastResult = null;
-          return;
-        }
-        window.__liveMusicLastResult = songs;
-        window.__liveMusicDisplayMode = 'search';
-        showSearchResult(songs);
-      });
-    }).catch(function (e) {
-      if (window.console && window.console.warn) window.console.warn('[liveMusic] 获取失败:', e);
-      area.innerHTML = '<div class="text-center py-12 text-[11px] text-rose-500">请求失败：' + escapeHtml(e && e.message ? e.message : String(e)) + '<br/><span class="text-slate-400">检查 URL / 参数 / CORS</span></div>';
-      window.__liveMusicLastResult = null;
-    });
   }
 
   function runToolSearch(keyword) {
@@ -316,23 +271,29 @@
       '</div>';
     }
     return window.liveMusicSongs.map(function (s) {
-      return '<div class="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200">' +
-        '<div class="w-11 h-11 rounded-xl flex-shrink-0 bg-gradient-to-br from-fuchsia-100 to-blue-100 flex items-center justify-center">' +
-          '<svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>' +
-        '</div>' +
+      return '<div class="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200 mb-2">' +
+        '<button onclick="playLiveMusicSongFromLibrary(\'' + s.id + '\')" class="w-11 h-11 rounded-xl flex-shrink-0 bg-white border-2 border-fuchsia-400 text-fuchsia-500 flex items-center justify-center active:scale-90 transition" aria-label="播放" title="播放">' +
+          '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>' +
+        '</button>' +
         '<div class="flex-1 min-w-0">' +
           '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(s.title) + '</div>' +
           '<div class="text-[10px] text-slate-500 mt-0.5 truncate">' + escapeHtml(s.artist) + '</div>' +
         '</div>' +
-        '<button onclick="removeLiveMusicSong(\'' + s.id + '\')" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0 active:scale-90 transition" aria-label="从歌曲库移除" title="移除">' +
+        '<button onclick="askRemoveLiveMusicSong(\'' + s.id + '\', \'' + escapeHtml(s.title).replace(/'/g, "\\'") + '\')" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0 active:scale-90 transition" aria-label="从歌曲库移除" title="删除">' +
           '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
         '</button>' +
       '</div>';
     }).join('');
   }
-  window.removeLiveMusicSong = function (id) {
-    window.liveMusicSongs = (window.liveMusicSongs || []).filter(function (s) { return s.id !== id; });
-    saveSettings().then(function () { renderLiveMusicPage(); });
+  window.playLiveMusicSongFromLibrary = function (id) {
+    if (window.console && window.console.log) window.console.log('[liveMusic] 歌曲库播放键占位：', id);
+  };
+  window.askRemoveLiveMusicSong = function (id, title) {
+    if (window.LM && typeof window.LM.confirmRemoveLiveMusicSong === 'function') {
+      window.LM.confirmRemoveLiveMusicSong(id, title);
+    } else if (window.confirm('确定删除「' + title + '」？')) {
+      window.removeLiveMusicSong(id);
+    }
   };
 
   // ---- 添加歌曲 --------------------------------------------------------
@@ -392,13 +353,6 @@
       renderLiveMusicPage();
     }
   }
-
-  window.playLiveMusicSong = function (i) {
-    var songs = window.__liveMusicLastResult;
-    if (!songs || !songs[i]) return;
-    var s = songs[i];
-    if (window.console && window.console.log) window.console.log('[liveMusic] 播放键占位：', s && s.title);
-  };
 
   window.addLiveMusicSong = function (i) {
     var songs = window.__liveMusicLastResult;

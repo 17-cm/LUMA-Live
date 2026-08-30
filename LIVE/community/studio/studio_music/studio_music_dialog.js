@@ -103,8 +103,7 @@
     dlg.querySelector('#lmToolCancelBtn').onclick = function () { dlg.remove(); };
     dlg.querySelector('#lmToolEditBtn').onclick = function () {
       dlg.remove();
-      if (tool.mode === 'direct') L.openLiveMusicAddDirectModal(tool);
-      else L.openLiveMusicAddModal(tool);
+      L.openLiveMusicAddModal(tool);
     };
     dlg.querySelector('#lmToolDeleteBtn').onclick = function () {
       dlg.remove();
@@ -147,335 +146,6 @@
         L.renderLiveMusicPage();
       });
     };
-  }
-
-  // ---- ➕ 添加工具：模式选择（3 选项）---------------------------------
-  function openLiveMusicAddModePicker() {
-    if (document.getElementById('liveMusicAddModePicker')) return;
-    var dlg = document.createElement('div');
-    dlg.id = 'liveMusicAddModePicker';
-    dlg.className = 'fixed inset-0 z-[10000] flex items-center justify-center bg-black/55';
-    dlg.innerHTML =
-      '<div class="w-[360px] max-w-[calc(100vw-40px)] bg-white rounded-3xl shadow-2xl px-3 py-3">' +
-        '<div class="px-3 pt-2 pb-3 flex items-center justify-between">' +
-          '<h4 class="text-base font-black text-slate-900">添加工具</h4>' +
-          '<button id="lmModePickerCloseBtn" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 active:scale-90 transition" aria-label="关闭">' +
-            '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
-          '</button>' +
-        '</div>' +
-        '<div class="space-y-1.5 px-1 pb-2">' +
-          '<button data-mode="direct" class="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-fuchsia-50 active:scale-[0.98] transition text-left">' +
-            '<div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-pink-500 flex items-center justify-center flex-shrink-0 shadow-sm">' +
-              '<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>' +
-            '</div>' +
-            '<div class="flex-1 min-w-0">' +
-              '<div class="text-xs font-black text-slate-900">直接拿 URL</div>' +
-              '<div class="text-[10px] text-slate-500 mt-0.5 leading-relaxed">接口一次返回单首详情（含播放链接）<br/>点 + 后直接入歌曲库</div>' +
-            '</div>' +
-            '<svg class="w-4 h-4 text-slate-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
-          '</button>' +
-          '<button data-mode="list" class="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-amber-50 active:scale-[0.98] transition text-left opacity-60">' +
-            '<div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0 shadow-sm">' +
-              '<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>' +
-            '</div>' +
-            '<div class="flex-1 min-w-0">' +
-              '<div class="text-xs font-black text-slate-900">列表无 URL <span class="text-[10px] font-bold text-amber-500 ml-1">（待设计）</span></div>' +
-              '<div class="text-[10px] text-slate-500 mt-0.5 leading-relaxed">接口返回列表但每首无播放链接<br/>需要手动选歌或二次处理</div>' +
-            '</div>' +
-            '<svg class="w-4 h-4 text-slate-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
-          '</button>' +
-          '<button data-mode="search" class="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-blue-50 active:scale-[0.98] transition text-left">' +
-            '<div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center flex-shrink-0 shadow-sm">' +
-              '<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>' +
-            '</div>' +
-            '<div class="flex-1 min-w-0">' +
-              '<div class="text-xs font-black text-slate-900">关键词搜索 <span class="text-[10px] font-bold text-slate-400 ml-1">（推荐）</span></div>' +
-              '<div class="text-[10px] text-slate-500 mt-0.5 leading-relaxed">搜索框输入关键词 → 接口返列表<br/>点 + 自动二次请求拿详情</div>' +
-            '</div>' +
-            '<svg class="w-4 h-4 text-slate-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
-          '</button>' +
-        '</div>' +
-      '</div>';
-    dlg.onclick = function (e) { if (e.target === dlg) dlg.remove(); };
-    document.body.appendChild(dlg);
-    dlg.querySelector('#lmModePickerCloseBtn').onclick = function () { dlg.remove(); };
-    dlg.querySelectorAll('[data-mode]').forEach(function (b) {
-      b.onclick = function () {
-        var mode = b.getAttribute('data-mode');
-        dlg.remove();
-        if (mode === 'direct') {
-          openLiveMusicAddDirectModal();
-        } else if (mode === 'list') {
-          openLiveMusicAddListStubModal();
-        } else {
-          openLiveMusicAddModal();
-        }
-      };
-    });
-  }
-
-  // ---- 模式 2：列表无 URL（待设计）占位弹窗 ------------------------
-  function openLiveMusicAddListStubModal() {
-    if (document.getElementById('liveMusicAddListStub')) return;
-    var dlg = document.createElement('div');
-    dlg.id = 'liveMusicAddListStub';
-    dlg.className = 'fixed inset-0 z-[10000] flex items-center justify-center bg-black/55';
-    dlg.innerHTML =
-      '<div class="w-[360px] max-w-[calc(100vw-40px)] bg-white rounded-3xl shadow-2xl px-6 pt-6 pb-5 text-center">' +
-        '<div class="w-12 h-12 mx-auto rounded-full bg-amber-50 flex items-center justify-center mb-3">' +
-          '<svg class="w-6 h-6 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>' +
-        '</div>' +
-        '<h4 class="text-base font-black text-slate-900">该模式待设计</h4>' +
-        '<p class="text-[11px] text-slate-500 mt-2 leading-relaxed">「列表无 URL」模式正在开发中。<br/>先选「关键词搜索」或「直接拿 URL」吧。</p>' +
-        '<button id="lmListStubCloseBtn" class="mt-5 w-full py-2.5 rounded-2xl bg-slate-100 text-slate-600 text-xs font-bold active:scale-95 transition">知道了</button>' +
-      '</div>';
-    dlg.onclick = function (e) { if (e.target === dlg) dlg.remove(); };
-    document.body.appendChild(dlg);
-    dlg.querySelector('#lmListStubCloseBtn').onclick = function () { dlg.remove(); };
-  }
-
-  // ---- 模式 1：直接拿 URL（极简弹窗）-------------------------------
-  function openLiveMusicAddDirectModal(editTool) {
-    if (document.getElementById('liveMusicAddDirectModal')) return;
-    var isEdit = !!editTool;
-
-    var dlg = document.createElement('div');
-    dlg.id = 'liveMusicAddDirectModal';
-    dlg.className = 'fixed inset-0 z-[10000] flex items-center justify-center bg-black/55';
-    dlg.innerHTML =
-      '<div class="w-[360px] max-w-[calc(100vw-40px)] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden max-h-[80vh]">' +
-        '<div class="px-5 pt-5 pb-3 flex items-center justify-between border-b border-slate-100">' +
-          '<div>' +
-            '<h4 class="text-base font-black text-slate-900">' + (isEdit ? '编辑工具' : '添加工具') + '</h4>' +
-            '<p class="text-[10px] text-slate-400 mt-0.5">模式：直接拿 URL</p>' +
-          '</div>' +
-          '<button id="lmDirectCloseBtn" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 active:scale-90 transition" aria-label="关闭">' +
-            '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
-          '</button>' +
-        '</div>' +
-        '<div id="lmDirectContent" class="flex-1 overflow-y-auto px-5 py-3"></div>' +
-        '<div class="px-5 py-3 border-t border-slate-100 flex gap-2">' +
-          '<button id="lmDirectCancelBtn" class="flex-1 py-2.5 rounded-2xl bg-slate-100 text-slate-600 text-xs font-bold active:scale-95 transition">取消</button>' +
-          '<button id="lmDirectSaveBtn" class="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white text-xs font-black shadow-md active:scale-95 transition">保存</button>' +
-        '</div>' +
-      '</div>';
-
-    var _toolName = (editTool && editTool.name) || '';
-    var _toolUrl = (editTool && editTool.url) || '';
-    var _paramsRows = (editTool && Array.isArray(editTool.params) && editTool.params.length > 0)
-      ? editTool.params.map(function (p) { return { key: p.key || '', value: p.value || '' }; })
-      : [{ key: '', value: '' }];
-    var _fmtTitle = (editTool && editTool.fmtTitle) || '';
-    var _fmtArtist = (editTool && editTool.fmtArtist) || '';
-    var _fmtLyric = (editTool && editTool.fmtLyric) || '';
-    var _fmtPlayUrl = (editTool && editTool.fmtPlayUrl) || '';
-    var _headersStr = (editTool && typeof editTool.headers === 'string') ? editTool.headers : '';
-    var _hrLines = _headersStr ? _headersStr.split(/\r?\n/) : [];
-    var _hr0 = _hrLines[0] ? _hrLines[0].split(':') : ['', ''];
-    var _hr1 = _hrLines[1] ? _hrLines[1].split(':') : ['', ''];
-    var _hName1 = (_hr0[0] || '').trim();
-    var _hValue1 = (_hr0[1] || '').trim();
-    var _hName2 = (_hr1[0] || '').trim();
-    var _hValue2 = (_hr1[1] || '').trim();
-
-    function _capture() {
-      var n = dlg.querySelector('#lmDirectName');
-      if (n) _toolName = n.value;
-      var u = dlg.querySelector('#lmDirectUrl');
-      if (u) _toolUrl = u.value;
-      dlg.querySelectorAll('[data-dparam-row]').forEach(function (row) {
-        var idx = parseInt(row.getAttribute('data-dparam-row'), 10);
-        var k = row.querySelector('[data-dparam-key]');
-        var v = row.querySelector('[data-dparam-value]');
-        if (k && _paramsRows[idx]) _paramsRows[idx].key = k.value;
-        if (v && _paramsRows[idx]) _paramsRows[idx].value = v.value;
-      });
-      var ft = dlg.querySelector('#lmDirectFmtTitle'); if (ft) _fmtTitle = ft.value;
-      var fa = dlg.querySelector('#lmDirectFmtArtist'); if (fa) _fmtArtist = fa.value;
-      var fl = dlg.querySelector('#lmDirectFmtLyric'); if (fl) _fmtLyric = fl.value;
-      var fp = dlg.querySelector('#lmDirectFmtPlayUrl'); if (fp) _fmtPlayUrl = fp.value;
-      var h1n = dlg.querySelector('#lmDirectHeaderName1'); if (h1n) _hName1 = h1n.value;
-      var h1v = dlg.querySelector('#lmDirectHeaderValue1'); if (h1v) _hValue1 = h1v.value;
-      var h2n = dlg.querySelector('#lmDirectHeaderName2'); if (h2n) _hName2 = h2n.value;
-      var h2v = dlg.querySelector('#lmDirectHeaderValue2'); if (h2v) _hValue2 = h2v.value;
-    }
-
-    function _render() {
-      _capture();
-      var rows = _paramsRows.map(function (r, i) {
-        return '<div class="flex items-center gap-2 mb-2" data-dparam-row="' + i + '">' +
-          '<input type="text" data-dparam-key placeholder="参数名" value="' + escapeHtml(r.key) + '" ' +
-                 'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-          '<input type="text" data-dparam-value placeholder="值" value="' + escapeHtml(r.value) + '" ' +
-                 'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-          (_paramsRows.length > 1 ?
-            '<button data-dparam-remove="' + i + '" class="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0 active:scale-90 transition" aria-label="删除该参数">' +
-              '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
-            '</button>' :
-            '<div class="w-9 h-9 flex-shrink-0"></div>'
-          ) +
-        '</div>';
-      }).join('');
-
-      dlg.querySelector('#lmDirectContent').innerHTML =
-        '<div class="space-y-3">' +
-          '<div>' +
-            '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">备注</label>' +
-            '<input id="lmDirectName" type="text" placeholder="例：单曲直拿" value="' + escapeHtml(_toolName) + '" ' +
-                   'class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-          '</div>' +
-          '<div>' +
-            '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">请求地址</label>' +
-            '<input id="lmDirectUrl" type="text" placeholder="https://api.example.com/song.php" value="' + escapeHtml(_toolUrl) + '" ' +
-                   'class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-          '</div>' +
-          '<div>' +
-            '<div class="flex items-center justify-between mb-1.5">' +
-              '<label class="text-[10px] font-black text-slate-500 tracking-wider">默认参数</label>' +
-              '<button id="lmDirectParamAddBtn" class="w-7 h-7 rounded-full bg-gradient-to-br from-fuchsia-500 to-pink-500 text-white flex items-center justify-center shadow-sm active:scale-90 transition" aria-label="增加参数">' +
-                '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
-              '</button>' +
-            '</div>' +
-            '<div id="lmDirectParamRows">' + rows + '</div>' +
-            '<p class="text-[10px] text-slate-400 mt-1.5 leading-relaxed">这些参数会拼到 URL 后面（GET）或 body 里（POST）。</p>' +
-          '</div>' +
-          '<div>' +
-            '<div class="flex items-center gap-1.5 mb-1.5">' +
-              '<label class="text-[10px] font-black text-slate-500 tracking-wider">请求头（可选）</label>' +
-              '<button id="lmDirectHeaderHelpBtn" class="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-black active:scale-90 transition" aria-label="说明">?</button>' +
-            '</div>' +
-            '<div class="space-y-2">' +
-              '<div class="flex items-center gap-2">' +
-                '<input id="lmDirectHeaderName1" type="text" placeholder="Header 名" value="' + escapeHtml(_hName1) + '" ' +
-                       'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-                '<input id="lmDirectHeaderValue1" type="text" placeholder="值" value="' + escapeHtml(_hValue1) + '" ' +
-                       'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-              '</div>' +
-              '<div class="flex items-center gap-2">' +
-                '<input id="lmDirectHeaderName2" type="text" placeholder="Header 名" value="' + escapeHtml(_hName2) + '" ' +
-                       'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-                '<input id="lmDirectHeaderValue2" type="text" placeholder="值" value="' + escapeHtml(_hValue2) + '" ' +
-                       'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-              '</div>' +
-            '</div>' +
-          '</div>' +
-          '<div>' +
-            '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">返回格式（告诉系统哪个字段是哪个）</label>' +
-            '<div class="rounded-2xl border border-slate-200 bg-slate-50 divide-y divide-slate-100">' +
-              '<div class="flex items-center gap-2 px-3 py-2.5">' +
-                '<span class="text-[10px] font-black text-slate-500 w-16 flex-shrink-0">歌名</span>' +
-                '<input id="lmDirectFmtTitle" type="text" placeholder="name" value="' + escapeHtml(_fmtTitle) + '" ' +
-                       'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
-              '</div>' +
-              '<div class="flex items-center gap-2 px-3 py-2.5">' +
-                '<span class="text-[10px] font-black text-slate-500 w-16 flex-shrink-0">歌手</span>' +
-                '<input id="lmDirectFmtArtist" type="text" placeholder="singer" value="' + escapeHtml(_fmtArtist) + '" ' +
-                       'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
-              '</div>' +
-              '<div class="flex items-center gap-2 px-3 py-2.5">' +
-                '<span class="text-[10px] font-black text-slate-500 w-16 flex-shrink-0">歌词</span>' +
-                '<input id="lmDirectFmtLyric" type="text" placeholder="lyric" value="' + escapeHtml(_fmtLyric) + '" ' +
-                       'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
-              '</div>' +
-              '<div class="flex items-center gap-2 px-3 py-2.5">' +
-                '<span class="text-[10px] font-black text-slate-500 w-16 flex-shrink-0">播放URL</span>' +
-                '<input id="lmDirectFmtPlayUrl" type="text" placeholder="music_url" value="' + escapeHtml(_fmtPlayUrl) + '" ' +
-                       'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
-              '</div>' +
-            '</div>' +
-            '<p class="text-[10px] text-slate-400 mt-1.5 leading-relaxed">填 API 返回的<b>字段名</b>，留空 = 自动启发式匹配。</p>' +
-          '</div>' +
-        '</div>';
-
-      dlg.querySelector('#lmDirectParamAddBtn').onclick = function () {
-        _paramsRows.push({ key: '', value: '' });
-        _render();
-      };
-      var hHelp = dlg.querySelector('#lmDirectHeaderHelpBtn');
-      if (hHelp) hHelp.onclick = function () {
-        openHelpModal('请求头说明',
-          '<p>部分 API 需要校验「<b>请求头</b>」才能正常返回数据。</p>' +
-          '<p class="mt-2 pt-2 border-t border-slate-100"><b>常见用途：</b></p>' +
-          '<p class="mt-1">· <span class="font-mono text-fuchsia-600">Referer</span> — 防盗链</p>' +
-          '<p class="mt-1">· <span class="font-mono text-fuchsia-600">User-Agent</span> — 模拟浏览器</p>' +
-          '<p class="mt-1">· <span class="font-mono text-fuchsia-600">Cookie</span> — 需要登录态</p>' +
-          '<p class="mt-2 text-slate-500 text-[10px]">最多填 2 条，留空 = 不发送。</p>'
-        );
-      };
-      dlg.querySelectorAll('[data-dparam-row]').forEach(function (row) {
-        var idx = parseInt(row.getAttribute('data-dparam-row'), 10);
-        row.querySelector('[data-dparam-key]').oninput = function (e) { _paramsRows[idx].key = e.target.value; };
-        row.querySelector('[data-dparam-value]').oninput = function (e) { _paramsRows[idx].value = e.target.value; };
-        var rm = row.querySelector('[data-dparam-remove]');
-        if (rm) {
-          rm.onclick = function () {
-            _paramsRows.splice(idx, 1);
-            _render();
-          };
-        }
-      });
-    }
-
-    dlg.onclick = function (e) { if (e.target === dlg) dlg.remove(); };
-    document.body.appendChild(dlg);
-    dlg.querySelector('#lmDirectCloseBtn').onclick = function () { dlg.remove(); };
-    dlg.querySelector('#lmDirectCancelBtn').onclick = function () { dlg.remove(); };
-    dlg.querySelector('#lmDirectSaveBtn').onclick = function () {
-      _capture();
-      var name = _toolName.trim();
-      var url = _toolUrl.trim();
-      if (!name) { flashError(dlg, 'lmDirectName', '请填写备注'); return; }
-      if (!url) { flashError(dlg, 'lmDirectUrl', '请填写请求地址'); return; }
-      var cleanParams = _paramsRows
-        .filter(function (p) { return p.key.trim() || p.value.trim(); })
-        .map(function (p) { return { key: p.key.trim(), value: p.value.trim() }; });
-      var headersStr = '';
-      if (_hName1) headersStr += _hName1 + ': ' + _hValue1 + '\n';
-      if (_hName2) headersStr += _hName2 + ': ' + _hValue2 + '\n';
-      headersStr = headersStr.replace(/\n+$/, '');
-      if (isEdit) {
-        editTool.name = name;
-        editTool.url = url;
-        editTool.method = 'GET';
-        editTool.params = cleanParams;
-        editTool.fmtTitle = _fmtTitle.trim();
-        editTool.fmtArtist = _fmtArtist.trim();
-        editTool.fmtLyric = _fmtLyric.trim();
-        editTool.fmtPlayUrl = _fmtPlayUrl.trim();
-        editTool.headers = headersStr;
-        editTool.searchKey = '';
-        editTool.detailKey = '';
-        editTool.mode = 'direct';
-        editTool.updatedAt = Date.now();
-      } else {
-        var tool = {
-          id: 'tool_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-          name: name,
-          url: url,
-          method: 'GET',
-          params: cleanParams,
-          fmtTitle: _fmtTitle.trim(),
-          fmtArtist: _fmtArtist.trim(),
-          fmtLyric: _fmtLyric.trim(),
-          fmtPlayUrl: _fmtPlayUrl.trim(),
-          headers: headersStr,
-          searchKey: '',
-          detailKey: '',
-          mode: 'direct',
-          createdAt: Date.now()
-        };
-        window.liveMusicTools.push(tool);
-        if (!window.liveMusicCurrentToolId) window.liveMusicCurrentToolId = tool.id;
-      }
-      L.saveSettings().then(function () {
-        dlg.remove();
-        if (window.AiPhone && window.AiPhone.ui && window.AiPhone.ui.toast) window.AiPhone.ui.toast(isEdit ? '已保存' : '已添加工具');
-        else if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast(isEdit ? '已保存' : '已添加工具');
-        L.renderLiveMusicPage();
-      });
-    };
-
-    _render();
   }
 
   // ---- ➕ 添加工具 / 编辑工具弹窗 ------------------------------------
@@ -791,7 +461,6 @@
         editTool.searchKey = searchKey;
         editTool.detailKey = detailKey;
         editTool.headers = headersStr;
-        editTool.mode = 'search';
         editTool.updatedAt = Date.now();
       } else {
         var tool = {
@@ -807,7 +476,6 @@
           searchKey: searchKey,
           detailKey: detailKey,
           headers: headersStr,
-          mode: 'search',
           createdAt: Date.now()
         };
         window.liveMusicTools.push(tool);
@@ -826,10 +494,40 @@
   }
 
   L.openLiveMusicAddModal = openLiveMusicAddModal;
-  L.openLiveMusicAddModePicker = openLiveMusicAddModePicker;
-  L.openLiveMusicAddDirectModal = openLiveMusicAddDirectModal;
   L.openLiveMusicToolMenu = openLiveMusicToolMenu;
   L.confirmDeleteTool = confirmDeleteTool;
   L.openHelpModal = openHelpModal;
   L.flashError = flashError;
+
+  // ---- 歌曲库删除确认 -------------------------------------------------
+  function confirmRemoveLiveMusicSong(id, title) {
+    if (document.getElementById('liveMusicSongRemoveConfirm')) return;
+    var dlg = document.createElement('div');
+    dlg.id = 'liveMusicSongRemoveConfirm';
+    dlg.className = 'fixed inset-0 z-[10001] flex items-center justify-center bg-black/55';
+    dlg.innerHTML =
+      '<div class="w-[320px] max-w-[calc(100vw-40px)] bg-white rounded-3xl shadow-2xl px-6 pt-6 pb-5 text-center">' +
+        '<div class="w-12 h-12 mx-auto rounded-full bg-rose-50 flex items-center justify-center mb-3">' +
+          '<svg class="w-6 h-6 text-rose-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg>' +
+        '</div>' +
+        '<h4 class="text-base font-black text-slate-900">删除歌曲？</h4>' +
+        '<p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">确定要删除「' + escapeHtml(title || '') + '」吗？<br/>删除后无法恢复。</p>' +
+        '<div class="flex gap-2.5 mt-5">' +
+          '<button id="lmSongDelCancelBtn" class="flex-1 min-h-[44px] py-2.5 rounded-2xl bg-slate-100 text-slate-600 text-xs font-bold active:scale-95 transition">取消</button>' +
+          '<button id="lmSongDelConfirmBtn" class="flex-1 min-h-[44px] py-2.5 rounded-2xl bg-rose-500 text-white text-xs font-black shadow-sm active:scale-95 transition">删除</button>' +
+        '</div>' +
+      '</div>';
+    dlg.onclick = function (e) { if (e.target === dlg) dlg.remove(); };
+    document.body.appendChild(dlg);
+    dlg.querySelector('#lmSongDelCancelBtn').onclick = function () { dlg.remove(); };
+    dlg.querySelector('#lmSongDelConfirmBtn').onclick = function () {
+      window.liveMusicSongs = (window.liveMusicSongs || []).filter(function (s) { return s.id !== id; });
+      L.saveSettings().then(function () {
+        dlg.remove();
+        if (window.AiPhone && window.AiPhone.ui && window.AiPhone.ui.toast) window.AiPhone.ui.toast('已删除');
+        L.renderLiveMusicPage();
+      });
+    };
+  }
+  L.confirmRemoveLiveMusicSong = confirmRemoveLiveMusicSong;
 })();
