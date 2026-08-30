@@ -1208,6 +1208,28 @@
         paramRows.push({ key: '', value: '' });
         renderApiPanel();
       };
+      // 帮助按钮（每次重渲染都重新绑）
+      var skHelpBtn = dlg.querySelector('#lmSearchKeyHelpBtn');
+      if (skHelpBtn) skHelpBtn.onclick = function () {
+        openHelpModal('搜索框参数说明',
+          '<p>这里填写的是「<b>搜索框内容会发到哪个参数名</b>」。</p>' +
+          '<p class="mt-2">比如你的接口：<br/><span class="font-mono text-slate-900">?token=xxx&name=江辰</span></p>' +
+          '<p class="mt-2">「name」就是要填的内容（搜索框输入「江辰」，请求就带上 <span class="font-mono text-slate-900">name=江辰</span>）。</p>' +
+          '<p class="mt-3 pt-3 border-t border-slate-100"><b>例：</b>你想搜索歌手，接口是 <span class="font-mono">?singer=xx</span>，这里就填 <span class="font-mono text-fuchsia-600">singer</span>。</p>' +
+          '<p class="mt-2 text-slate-500 text-[10px]">💡 这个参数是<strong>独立</strong>的，不需要在默认参数里预先添加！</p>'
+        );
+      };
+      var dkHelpBtn = dlg.querySelector('#lmDetailKeyHelpBtn');
+      if (dkHelpBtn) dkHelpBtn.onclick = function () {
+        openHelpModal('二次请求参数说明',
+          '<p>当你的接口需要「<b>分两次请求</b>」拿歌时配置：</p>' +
+          '<p class="mt-2"><b>第 1 次：</b>搜索框输入关键词 → 接口返回歌曲<b>列表</b>（带序号）</p>' +
+          '<p class="mt-2"><b>第 2 次：</b>点列表里某首后面的 ➕ → 自动用那首歌的序号再次请求 → 拿<b>详情</b>（含播放 URL / 封面）</p>' +
+          '<p class="mt-2 pt-2 border-t border-slate-100">这里填的是「第 2 次请求时携带的<b>序号参数名</b>」。</p>' +
+          '<p class="mt-2"><b>例：</b>你的接口是 <span class="font-mono">?token=xxx&name=江辰&n=1</span>，这里就填 <span class="font-mono text-fuchsia-600">n</span>。</p>' +
+          '<p class="mt-2 text-slate-500 text-[10px]">💡 这个参数是<strong>独立</strong>的，不需要在默认参数里预先添加！</p>'
+        );
+      };
       dlg.querySelectorAll('[data-param-row]').forEach(function (row) {
         var idx = parseInt(row.getAttribute('data-param-row'), 10);
         row.querySelector('[data-param-key]').oninput = function (e) { paramRows[idx].key = e.target.value; };
@@ -1249,27 +1271,7 @@
     dlg.querySelector('#lmModeApiBtn').onclick = function () { mode = 'api'; renderMode(); };
     dlg.querySelector('#lmAddCloseBtn').onclick = function () { dlg.remove(); };
     dlg.querySelector('#lmAddCancelBtn').onclick = function () { dlg.remove(); };
-    var skHelp = dlg.querySelector('#lmSearchKeyHelpBtn');
-    if (skHelp) skHelp.onclick = function () {
-      openHelpModal('搜索框参数说明',
-        '<p>这里填写的是「<b>搜索框内容会发到哪个参数名</b>」。</p>' +
-        '<p class="mt-2">比如你的接口：<br/><span class="font-mono text-slate-900">?token=xxx&name=江辰</span></p>' +
-        '<p class="mt-2">「name」就是要填的内容（搜索框输入「江辰」，请求就带上 <span class="font-mono text-slate-900">name=江辰</span>）。</p>' +
-        '<p class="mt-3 pt-3 border-t border-slate-100"><b>例：</b>你想搜索歌手，接口是 <span class="font-mono">?singer=xx</span>，这里就填 <span class="font-mono text-fuchsia-600">singer</span>。</p>' +
-        '<p class="mt-2 text-slate-500 text-[10px]">💡 这个参数是<strong>独立</strong>的，不需要在默认参数里预先添加！</p>'
-      );
-    };
-    var dkHelp = dlg.querySelector('#lmDetailKeyHelpBtn');
-    if (dkHelp) dkHelp.onclick = function () {
-      openHelpModal('二次请求参数说明',
-        '<p>当你的接口需要「<b>分两次请求</b>」拿歌时配置：</p>' +
-        '<p class="mt-2"><b>第 1 次：</b>搜索框输入关键词 → 接口返回歌曲<b>列表</b>（带序号）</p>' +
-        '<p class="mt-2"><b>第 2 次：</b>点列表里某首后面的 ➕ → 自动用那首歌的序号再次请求 → 拿<b>详情</b>（含播放 URL / 封面）</p>' +
-        '<p class="mt-2 pt-2 border-t border-slate-100">这里填的是「第 2 次请求时携带的<b>序号参数名</b>」。</p>' +
-        '<p class="mt-2"><b>例：</b>你的接口是 <span class="font-mono">?token=xxx&name=江辰&n=1</span>，这里就填 <span class="font-mono text-fuchsia-600">n</span>。</p>' +
-        '<p class="mt-2 text-slate-500 text-[10px]">💡 这个参数是<strong>独立</strong>的，不需要在默认参数里预先添加！</p>'
-      );
-    };
+    // 帮助按钮 onclick 在 renderApiPanel 内部绑定（每次重渲染都重新绑）
     dlg.querySelector('#lmAddSaveBtn').onclick = function () {
       if (mode === 'local') return;
       var name = ((dlg.querySelector('#lmToolName') || {}).value || '').trim();
