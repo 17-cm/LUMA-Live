@@ -27,6 +27,12 @@
         var data = JSON.parse(raw);
         window.liveMusicTools = Array.isArray(data.list) ? data.list : [];
         window.liveMusicCurrentToolId = data.current || null;
+        // 旧数据迁移：补 searchKey/detailKey 默认值
+        window.liveMusicTools.forEach(function (t) {
+          if (typeof t.searchKey === 'undefined') t.searchKey = 'name';
+          if (typeof t.detailKey === 'undefined') t.detailKey = '';
+          if (typeof t.params === 'undefined') t.params = [];
+        });
       }
     } catch (e) {}
   }
@@ -494,39 +500,57 @@
   }
 
   // 把工具的 url+params 组装成 fetch 请求
-  // 规则：搜索框的值补在「最后一个有 key 的参数」的 value 上（其他参数按字面值）
-  function buildRequest(tool, keyword) {
+  // 规则：
+  //   - 搜索框的值补到 tool.searchKey 指定的参数上
+  //   - tool.params 里其他参数按字面值
+  //   - extraKv 可注入额外参数（如二级请求的 n=<序号>）
+  //   - searchKey 为空 → 用「最后一个有 key 的参数」兜底
+  function buildRequest(tool, keyword, extraKv) {
     var url = tool.url || '';
     var method = (tool.method || 'GET').toUpperCase();
     var params = Array.isArray(tool.params) ? tool.params : [];
+    var searchKey = (tool.searchKey || '').trim();
 
-    // 过滤出有 key 的参数（按工具里写的顺序）
+    // 过滤出有 key 的参数
     var keyed = params.filter(function (p) { return p && p.key; });
-    var lastKeyedIdx = keyed.length - 1;
+    // 定位 searchKey 所在的参数；找不到则用最后一个
+    var targetIdx = -1;
+    if (searchKey) {
+      targetIdx = keyed.findIndex(function (p) { return p.key === searchKey; });
+    }
+    if (targetIdx < 0) targetIdx = keyed.length - 1;
 
-    function buildOne(p, idx, isLast) {
+    function buildOne(p, idx) {
       var v = p.value || '';
-      if (isLast) v = keyword != null ? String(keyword) : v;
+      if (idx === targetIdx && keyword != null && String(keyword).length > 0) v = String(keyword);
       return encodeURIComponent(p.key) + '=' + encodeURIComponent(v);
     }
 
-    // GET：参数拼到 query
-    var qs = keyed.map(function (p, idx) {
-      return buildOne(p, idx, idx === lastKeyedIdx);
-    }).join('&');
+    var parts = keyed.map(function (p, idx) { return buildOne(p, idx); });
 
-    var fullUrl = url;
-    if (qs) {
-      fullUrl += (url.indexOf('?') >= 0 ? '&' : '?') + qs;
+    // 注入 extraKv
+    if (extraKv && typeof extraKv === 'object') {
+      Object.keys(extraKv).forEach(function (k) {
+        if (k == null) return;
+        var v = extraKv[k];
+        if (v == null) return;
+        // 覆盖同 key
+        var replaced = false;
+        for (var i = 0; i < parts.length; i++) {
+          if (parts[i].split('=')[0] === encodeURIComponent(k)) { parts[i] = encodeURIComponent(k) + '=' + encodeURIComponent(v); replaced = true; break; }
+        }
+        if (!replaced) parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(v));
+      });
     }
+
+    var qs = parts.join('&');
+    var fullUrl = url;
+    if (qs) fullUrl += (url.indexOf('?') >= 0 ? '&' : '?') + qs;
 
     var options = { method: method, headers: {} };
     if (method === 'POST') {
-      var form = keyed.map(function (p, idx) {
-        return buildOne(p, idx, idx === lastKeyedIdx);
-      }).join('&');
       options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
-      options.body = form;
+      options.body = qs;
     }
     return Promise.resolve({ url: fullUrl, options: options });
   }
@@ -818,73 +842,75 @@
     var s = songs[i];
     var tool = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
 
-    // 如果已有 URL / 封面 → 直接 push
+    // 已有 URL / 封面 → 直接 push
     if (s.playUrl) {
       pushSongToLibrary(s, tool);
       return;
     }
 
-    // 没 URL → 走详情接口：URL 里临时加 n=<歌曲在搜索结果里的 n>&name=<歌名>
+    // 没 URL → 用 detailKey 发二级请求
     if (!tool) {
       if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('未选工具，无法获取 URL');
       return;
     }
+    var detailKey = (tool.detailKey || '').trim();
+    if (!detailKey) {
+      // 没配 detailKey → 直接 push（无 URL）
+      pushSongToLibrary(s, tool, true);
+      return;
+    }
     var lastKw = window.__liveMusicLastKeyword || '';
-    var n = s.n || s.rawId || '';
+    var detailValue = s.n || s.rawId || '';
+    if (!detailValue) {
+      // 搜索结果里没有序号字段
+      pushSongToLibrary(s, tool, true);
+      return;
+    }
     if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('正在获取「' + s.title + '」详情…');
 
-    // 临时构造工具：把搜索关键词（lastKw）当 name，n 放 url query
-    var detailUrl = (tool.url || '').split('?')[0];
-    var sep = detailUrl.indexOf('?') >= 0 ? '&' : '?';
-    // 拼成 ?token=xxx&name=江辰&n=1
-    var kvs = [];
-    (tool.params || []).forEach(function (p) {
-      if (!p || !p.key) return;
-      if (p.key === 'n') return; // 跳过，n 单独拼
-      var v = p.value || '';
-      if (p.key === 'name') v = lastKw || s.title; // name 强制用搜索关键词
-      kvs.push(encodeURIComponent(p.key) + '=' + encodeURIComponent(v));
-    });
-    kvs.push('n=' + encodeURIComponent(n));
-    var finalUrl = detailUrl + sep + kvs.join('&');
-
-    fetch(finalUrl).then(function (resp) {
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      return resp.json();
-    }).then(function (json) {
-      var detail = parseSongsFromResponse(json);
-      // 详情接口返单对象 → 1 首；返列表 → 找匹配的
-      var match = null;
-      if (detail && detail.length > 0) {
-        match = detail.find(function (d) { return d.title === s.title; }) ||
-                detail.find(function (d) { return d.title && s.title && d.title.indexOf(s.title) >= 0; }) ||
-                detail[0];
-      } else {
-        // 单对象 parseSongs 不一定兜住，单独处理
-        var d2 = json.data || json;
-        if (d2 && d2.name) {
-          match = {
-            rawId: '',
-            title: d2.name || '',
-            artist: d2.singer || '',
-            pic: d2.cover || '',
-            playUrl: d2.music_url || ''
-          };
+    // 用 buildRequest：把 lastKw 当搜索词，detailValue 注入到 detailKey
+    buildRequest(tool, lastKw, (function () {
+      var o = {};
+      o[detailKey] = detailValue;
+      return o;
+    })()).then(function (req) {
+      return fetch(req.url, req.options).then(function (resp) {
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.json();
+      }).then(function (json) {
+        var detail = parseSongsFromResponse(json);
+        var match = null;
+        if (detail && detail.length > 0) {
+          match = detail.find(function (d) { return d.title === s.title; }) ||
+                  detail.find(function (d) { return d.title && s.title && d.title.indexOf(s.title) >= 0; }) ||
+                  detail[0];
+        } else {
+          // 单对象兜底
+          var d2 = json.data || json;
+          if (d2 && (d2.name || d2.music_url)) {
+            match = {
+              rawId: '',
+              title: d2.name || s.title,
+              artist: d2.singer || s.artist,
+              pic: d2.cover || '',
+              playUrl: d2.music_url || ''
+            };
+          }
         }
-      }
-      if (match && (match.playUrl || match.pic)) {
-        pushSongToLibrary(mergeSong(s, match), tool);
-      } else {
-        pushSongToLibrary(s, tool, true);
-      }
+        if (match && (match.playUrl || match.pic)) {
+          pushSongToLibrary(mergeSong(s, match), tool);
+        } else {
+          pushSongToLibrary(s, tool, true);
+        }
+      });
     }).catch(function (e) {
       console.warn('[liveMusic] 详情获取失败:', e);
       pushSongToLibrary(s, tool, true);
     });
   };
 
-  function fetchByTool(tool, keyword) {
-    return buildRequest(tool, keyword).then(function (req) {
+  function fetchByTool(tool, keyword, extraKv) {
+    return buildRequest(tool, keyword, extraKv).then(function (req) {
       return fetch(req.url, req.options).then(function (resp) {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.json();
@@ -987,6 +1013,8 @@
     var paramRows = (editTool && Array.isArray(editTool.params) && editTool.params.length > 0)
       ? editTool.params.map(function (p) { return { key: p.key || '', value: p.value || '' }; })
       : [{ key: '', value: '' }];
+    var searchKeyVal = (editTool && editTool.searchKey) || 'name';
+    var detailKeyVal = (editTool && editTool.detailKey) || '';
 
     function renderMode() {
       var localBtn = dlg.querySelector('#lmModeLocalBtn');
@@ -1053,6 +1081,28 @@
             '<div id="lmParamRows">' + rows + '</div>' +
           '</div>' +
           '<div>' +
+            '<div class="flex items-center gap-1.5 mb-1.5">' +
+              '<label class="text-[10px] font-black text-slate-500 tracking-wider">搜索框参数</label>' +
+              '<button id="lmSearchKeyHelpBtn" class="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-black active:scale-90 transition" aria-label="说明">?</button>' +
+            '</div>' +
+            '<div class="flex items-center gap-2">' +
+              '<input id="lmSearchKey" type="text" placeholder="例：name" value="' + escapeHtml(searchKeyVal) + '" ' +
+                     'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
+              '<div class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-[10px] text-slate-400 flex items-center">请在搜索框输入</div>' +
+            '</div>' +
+          '</div>' +
+          '<div>' +
+            '<div class="flex items-center gap-1.5 mb-1.5">' +
+              '<label class="text-[10px] font-black text-slate-500 tracking-wider">二级请求参数（可选）</label>' +
+              '<button id="lmDetailKeyHelpBtn" class="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-black active:scale-90 transition" aria-label="说明">?</button>' +
+            '</div>' +
+            '<div class="flex items-center gap-2">' +
+              '<input id="lmDetailKey" type="text" placeholder="例：n（不填则跳过二级请求）" value="' + escapeHtml(detailKeyVal) + '" ' +
+                     'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
+              '<div class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-[10px] text-slate-400 flex items-center">序号</div>' +
+            '</div>' +
+          '</div>' +
+          '<div>' +
             '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">返回格式（可选）</label>' +
             '<input id="lmToolFormat" type="text" placeholder="留空则用启发式（自动找第一个数组）" value="' + escapeHtml(editTool ? (editTool.format || '') : '') + '" ' +
                    'class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
@@ -1087,15 +1137,61 @@
       });
     }
 
+    // 帮助弹窗（searchKey / detailKey）
+    function openHelpModal(title, body) {
+      if (document.getElementById('lmKeyHelpModal')) return;
+      var h = document.createElement('div');
+      h.id = 'lmKeyHelpModal';
+      h.className = 'fixed inset-0 z-[10002] flex items-center justify-center px-6';
+      h.style.backgroundColor = 'rgba(0,0,0,0.55)';
+      h.style.paddingTop = 'var(--ai-phone-app-safe-top, 88px)';
+      h.style.paddingBottom = 'var(--ai-phone-app-safe-bottom, 24px)';
+      h.innerHTML =
+        '<div class="w-full max-w-[360px] bg-white rounded-3xl shadow-2xl overflow-hidden">' +
+          '<div class="px-5 pt-5 pb-3 border-b border-slate-100 flex items-center justify-between">' +
+            '<h4 class="text-sm font-black text-slate-900">' + escapeHtml(title) + '</h4>' +
+            '<button id="lmKeyHelpCloseBtn" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 active:scale-90 transition" aria-label="关闭">' +
+              '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+            '</button>' +
+          '</div>' +
+          '<div class="px-5 py-4 text-[11px] text-slate-700 leading-relaxed">' + body + '</div>' +
+        '</div>';
+      h.onclick = function (e) { if (e.target === h) h.remove(); };
+      h.querySelector('#lmKeyHelpCloseBtn').onclick = function () { h.remove(); };
+      document.body.appendChild(h);
+    }
     dlg.querySelector('#lmModeLocalBtn').onclick = function () { mode = 'local'; renderMode(); };
     dlg.querySelector('#lmModeApiBtn').onclick = function () { mode = 'api'; renderMode(); };
     dlg.querySelector('#lmAddCloseBtn').onclick = function () { dlg.remove(); };
     dlg.querySelector('#lmAddCancelBtn').onclick = function () { dlg.remove(); };
+    var skHelp = dlg.querySelector('#lmSearchKeyHelpBtn');
+    if (skHelp) skHelp.onclick = function () {
+      openHelpModal('搜索框参数说明',
+        '<p>这里填写的是「<b>搜索框内容会发到哪个参数名</b>」。</p>' +
+        '<p class="mt-2">比如你的接口：<br/><span class="font-mono text-slate-900">?token=xxx&name=江辰</span></p>' +
+        '<p class="mt-2">「name」就是要填的内容（搜索框输入「江辰」，请求就带上 <span class="font-mono text-slate-900">name=江辰</span>）。</p>' +
+        '<p class="mt-2 text-slate-500">⚠️ 这个参数名必须已经在「添加参数」里填过。</p>' +
+        '<p class="mt-3 pt-3 border-t border-slate-100"><b>例：</b>你想搜索歌手，接口是 <span class="font-mono">?singer=xx</span>，这里就填 <span class="font-mono text-fuchsia-600">singer</span>。</p>'
+      );
+    };
+    var dkHelp = dlg.querySelector('#lmDetailKeyHelpBtn');
+    if (dkHelp) dkHelp.onclick = function () {
+      openHelpModal('二级请求参数说明',
+        '<p>当你的接口需要「<b>分两次请求</b>」拿歌时配置：</p>' +
+        '<p class="mt-2"><b>第 1 次：</b>搜索框输入关键词 → 接口返回歌曲<b>列表</b>（带序号）</p>' +
+        '<p class="mt-2"><b>第 2 次：</b>点列表里某首后面的 ➕ → 自动用那首歌的序号再次请求 → 拿<b>详情</b>（含播放 URL / 封面）</p>' +
+        '<p class="mt-2 pt-2 border-t border-slate-100">这里填的是「第 2 次请求时携带的<b>序号参数名</b>」。</p>' +
+        '<p class="mt-2"><b>例：</b>你的接口是 <span class="font-mono">?token=xxx&name=江辰&n=1</span>，这里就填 <span class="font-mono text-fuchsia-600">n</span>。</p>' +
+        '<p class="mt-2 text-slate-500">⚠️ 留空 = 不发二级请求，➕ 时直接用搜索结果入库（无 URL）。<br/>适用于接口一次性返回歌名+URL 的情况。</p>'
+      );
+    };
     dlg.querySelector('#lmAddSaveBtn').onclick = function () {
       if (mode === 'local') return;
       var name = ((dlg.querySelector('#lmToolName') || {}).value || '').trim();
       var url = ((dlg.querySelector('#lmToolUrl') || {}).value || '').trim();
       var format = ((dlg.querySelector('#lmToolFormat') || {}).value || '').trim();
+      var searchKey = ((dlg.querySelector('#lmSearchKey') || {}).value || '').trim();
+      var detailKey = ((dlg.querySelector('#lmDetailKey') || {}).value || '').trim();
       if (!name) { flashError(dlg, 'lmToolName', '请填写备注'); return; }
       if (!url) { flashError(dlg, 'lmToolUrl', '请填写请求地址'); return; }
       var cleanParams = paramRows
@@ -1107,6 +1203,8 @@
         editTool.method = currentMethod;
         editTool.params = cleanParams;
         editTool.format = format;
+        editTool.searchKey = searchKey;
+        editTool.detailKey = detailKey;
         editTool.updatedAt = Date.now();
       } else {
         var tool = {
@@ -1116,6 +1214,8 @@
           method: currentMethod,
           params: cleanParams,
           format: format,
+          searchKey: searchKey,
+          detailKey: detailKey,
           createdAt: Date.now()
         };
         window.liveMusicTools.push(tool);
