@@ -15,11 +15,10 @@
   'use strict';
 
   // ---- 网络层（走宿主代理绕 CORS） --------------------------------------
-  // 优先用 window.robustNetworkRequest 调 /api/tool-proxy，target API 没开 CORS 也能通
-  // 兜底：宿主 SDK 不可用时浏览器直连
+  // 优先用 window.AiPhone.network.fetch 调 /api/tool-proxy
+  // target API 没开 CORS 也能通。回退到浏览器直连。
   function doFetchJson(req) {
     var options = req.options || {};
-    var body = options.body;
     var params = {
       url: req.url,
       method: options.method || 'GET',
@@ -27,10 +26,12 @@
       proxy: true,
       timeoutMs: options.timeoutMs || 20000
     };
-    if (body) params.body = body;
+    if (options.body) params.body = options.body;
     var p;
-    if (typeof window.robustNetworkRequest === 'function') {
-      p = window.robustNetworkRequest(params);
+    if (window.AiPhone && window.AiPhone.network && typeof window.AiPhone.network.fetch === 'function') {
+      p = window.AiPhone.network.fetch(params);
+    } else if (window.api && window.api.network && typeof window.api.network.fetch === 'function') {
+      p = window.api.network.fetch(params);
     } else {
       p = fetch(params.url, {
         method: params.method,
@@ -42,7 +43,7 @@
         });
       });
     }
-    return p.then(function (res) {
+    return Promise.resolve(p).then(function (res) {
       if (res && res.ok) {
         if (res.json) return res.json;
         if (res.text) { try { return JSON.parse(res.text); } catch (e) { throw new Error('返回不是合法 JSON'); } }
