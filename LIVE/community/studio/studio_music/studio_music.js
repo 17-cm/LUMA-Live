@@ -199,13 +199,17 @@
     }).join('');
   }
 
-  // ---- 歌曲封面缩略图：有封面显示图片，无封面/加载失败回退图标 -------
+  // ---- 歌曲封面缩略图：封面是图片链接，直接用 <img> 展示；无链接才用图标占位 ----
   var LM_SONG_ICON = '<svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>';
 
   function renderSongThumb(cover, sizeCls) {
-    return '<div class="' + sizeCls + ' rounded-xl flex-shrink-0 bg-gradient-to-br from-fuchsia-100 to-blue-100 flex items-center justify-center relative overflow-hidden">' +
+    if (cover) {
+      return '<div class="' + sizeCls + ' rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">' +
+        '<img src="' + escapeHtml(cover) + '" alt="" loading="lazy" class="w-full h-full object-cover">' +
+      '</div>';
+    }
+    return '<div class="' + sizeCls + ' rounded-xl flex-shrink-0 bg-gradient-to-br from-fuchsia-100 to-blue-100 flex items-center justify-center">' +
       LM_SONG_ICON +
-      (cover ? '<img src="' + escapeHtml(cover) + '" alt="" loading="lazy" class="absolute inset-0 w-full h-full object-cover" onerror="this.style.display=\'none\'">' : '') +
     '</div>';
   }
 
