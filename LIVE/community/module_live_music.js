@@ -74,6 +74,13 @@
       if (typeof t.searchKey === 'undefined') t.searchKey = '';
       if (typeof t.detailKey === 'undefined') t.detailKey = '';
       if (typeof t.params === 'undefined') t.params = [];
+      if (typeof t.fmtTitle === 'undefined') t.fmtTitle = '';
+      if (typeof t.fmtArtist === 'undefined') t.fmtArtist = '';
+      if (typeof t.fmtLyric === 'undefined') t.fmtLyric = '';
+      if (typeof t.fmtPlayUrl === 'undefined') t.fmtPlayUrl = '';
+    });
+    window.liveMusicSongs.forEach(function (s) {
+      if (typeof s.lyric === 'undefined') s.lyric = s.pic || '';
     });
   }
 
@@ -167,8 +174,14 @@
     title:   ['name', 'title', 'songName', 'song_name', 'trackName', 'song', 'musicName', 'music_name'],
     artist:  ['artists', 'singer', 'ar_name', 'artist', 'singerName', 'author', 'singer_name', 'artist_name'],
     pic:     ['picUrl', 'pic', 'cover', 'pic_img', 'album_pic', 'picurl', 'coverUrl', 'coverImgUrl', 'image', 'pic_url'],
-    playUrl: ['url', 'playUrl', 'play_url', 'mp3Url', 'mp3_url', 'src', 'audioUrl', 'audio', 'music_url', 'link']
+    playUrl: ['url', 'playUrl', 'play_url', 'mp3Url', 'mp3_url', 'src', 'audioUrl', 'audio', 'music_url', 'link'],
+    lyric:   ['lyric', 'lyricContent', 'lyric_text', 'lrc', 'lrcContent', 'lyric_url', 'lyricUrl']
   };
+  // 模块级缓存：新工具模式下输入的字段名（重渲染不丢）
+  var _newToolFmtTitle = '';
+  var _newToolFmtArtist = '';
+  var _newToolFmtLyric = '';
+  var _newToolFmtPlayUrl = '';
   function pickField(obj, candidates) {
     if (!obj || typeof obj !== 'object') return '';
     for (var i = 0; i < candidates.length; i++) {
@@ -229,25 +242,31 @@
     return map;
   }
 
-  // 从工具读取返回格式配置。空 → 启发式
+  // 从工具读取返回格式配置（4 个字段名）。空 → 启发式
   function getCurrentFormatMap() {
     var tool = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
     if (!tool) return {};
-    return parseFormatMap(tool.format);
+    return {
+      title: (tool.fmtTitle || '').trim(),
+      artist: (tool.fmtArtist || '').trim(),
+      lyric: (tool.fmtLyric || '').trim(),
+      playUrl: (tool.fmtPlayUrl || '').trim(),
+      rawId: (tool.detailKey || '').trim()
+    };
   }
 
-  // 把 API 返回解析成歌曲数组 [{title, artist, pic, playUrl, rawId}]
+  // 把 API 返回解析成歌曲数组 [{title, artist, lyric, playUrl, rawId}]
   // 优先用工具的"返回格式"配置；空 → 启发式
   function parseSongsFromResponse(json) {
     if (json == null) return [];
     var fmtMap = getCurrentFormatMap();
-    var useCustom = Object.keys(fmtMap).length > 0;
+    var useCustom = Object.keys(fmtMap).some(function (k) { return !!fmtMap[k]; });
 
     var out = [];
 
     if (useCustom) {
-      // 自定义 JSONPath：先看 json 本身是数组 / 是单个对象 / 数组在某个路径下
-      var arr = pickByPath(json, fmtMap.__array || '');
+      // 自定义字段名：找第一个数组
+      var arr = findFirstArray(json);
       if (arr) {
         for (var j = 0; j < arr.length; j++) {
           var it0 = arr[j];
@@ -259,7 +278,7 @@
             n: it0.n || it0.N || '',
             title: t0,
             artist: pickByPath(it0, fmtMap.artist) || pickField(it0, FIELD_GUESS.artist) || '未知歌手',
-            pic: pickByPath(it0, fmtMap.pic) || pickField(it0, FIELD_GUESS.pic) || '',
+            lyric: pickByPath(it0, fmtMap.lyric) || pickField(it0, FIELD_GUESS.lyric) || '',
             playUrl: pickByPath(it0, fmtMap.playUrl) || pickField(it0, FIELD_GUESS.playUrl) || ''
           });
           if (out.length >= 50) break;
@@ -273,7 +292,7 @@
           rawId: pickByPath(json, fmtMap.rawId) || pickField(json, ['n','id','songId','song_id','mid','trackId']) || '',
           title: t1,
           artist: pickByPath(json, fmtMap.artist) || pickField(json, FIELD_GUESS.artist) || '未知歌手',
-          pic: pickByPath(json, fmtMap.pic) || pickField(json, FIELD_GUESS.pic) || '',
+          lyric: pickByPath(json, fmtMap.lyric) || pickField(json, FIELD_GUESS.lyric) || '',
           playUrl: pickByPath(json, fmtMap.playUrl) || pickField(json, FIELD_GUESS.playUrl) || ''
         });
       }
@@ -293,7 +312,7 @@
           n: it1.n || it1.N || '',
           title: title,
           artist: pickField(it1, FIELD_GUESS.artist) || '未知歌手',
-          pic: pickField(it1, FIELD_GUESS.pic) || '',
+          lyric: pickField(it1, FIELD_GUESS.lyric) || '',
           playUrl: pickField(it1, FIELD_GUESS.playUrl) || ''
         });
         if (out.length >= 50) break;
@@ -307,7 +326,7 @@
         rawId: pickField(json, ['n', 'id', 'songId', 'song_id', 'mid', 'trackId']) || '',
         title: singleTitle,
         artist: pickField(json, FIELD_GUESS.artist) || '未知歌手',
-        pic: pickField(json, FIELD_GUESS.pic) || '',
+        lyric: pickField(json, FIELD_GUESS.lyric) || '',
         playUrl: pickField(json, FIELD_GUESS.playUrl) || ''
       });
       return out;
@@ -320,7 +339,7 @@
           rawId: pickField(json.data, ['n', 'id', 'songId', 'song_id', 'mid', 'trackId']) || '',
           title: innerTitle,
           artist: pickField(json.data, FIELD_GUESS.artist) || '未知歌手',
-          pic: pickField(json.data, FIELD_GUESS.pic) || '',
+          lyric: pickField(json.data, FIELD_GUESS.lyric) || '',
           playUrl: pickField(json.data, FIELD_GUESS.playUrl) || ''
         });
       }
@@ -453,10 +472,6 @@
   function renderSearchResultHTML(songs) {
     if (!songs || songs.length === 0) return '<div class="text-center py-12 text-[11px] text-slate-400">没有匹配的歌曲</div>';
     return songs.map(function (s, i) {
-      var pic = s.pic;
-      var cover = pic
-        ? '<img src="' + escapeHtml(pic) + '" class="w-full h-full object-cover" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div class="w-full h-full hidden items-center justify-center bg-gradient-to-br from-fuchsia-100 to-blue-100"><svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>'
-        : '<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-fuchsia-100 to-blue-100"><svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>';
       var playUrl = s.playUrl;
       var playBtn = playUrl
         ? '<a href="' + escapeHtml(playUrl) + '" target="_blank" rel="noopener" class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0 active:scale-90 transition" aria-label="播放" title="播放">' +
@@ -464,7 +479,9 @@
           '</a>'
         : '';
       return '<div class="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200 mb-2">' +
-        '<div class="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">' + cover + '</div>' +
+        '<div class="w-12 h-12 rounded-xl flex-shrink-0 bg-gradient-to-br from-fuchsia-100 to-blue-100 flex items-center justify-center">' +
+          '<svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>' +
+        '</div>' +
         '<div class="flex-1 min-w-0">' +
           '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(s.title) + '</div>' +
           '<div class="text-[10px] text-slate-500 mt-0.5 truncate">' + escapeHtml(s.artist) + '</div>' +
@@ -636,7 +653,7 @@
     var fieldRows = [
       { field: 'title',   label: '歌名',   guess: pickGuessFor(flat, FIELD_GUESS.title) },
       { field: 'artist',  label: '歌手',   guess: pickGuessFor(flat, FIELD_GUESS.artist) },
-      { field: 'pic',     label: '封面',   guess: pickGuessFor(flat, FIELD_GUESS.pic) },
+      { field: 'lyric',   label: '歌词',   guess: pickGuessFor(flat, FIELD_GUESS.lyric) },
       { field: 'playUrl', label: '音频',   guess: pickGuessFor(flat, FIELD_GUESS.playUrl) }
     ];
     var header = '<div class="rounded-2xl bg-amber-50 border border-amber-200 p-3 mb-3">' +
@@ -873,12 +890,10 @@
       '</div>';
     }
     return window.liveMusicSongs.map(function (s) {
-      var pic = s.pic;
-      var cover = pic
-        ? '<img src="' + escapeHtml(pic) + '" class="w-full h-full object-cover" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div class="w-full h-full hidden items-center justify-center bg-gradient-to-br from-fuchsia-100 to-blue-100"><svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>'
-        : '<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-fuchsia-100 to-blue-100"><svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>';
       return '<div class="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200">' +
-        '<div class="w-11 h-11 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">' + cover + '</div>' +
+        '<div class="w-11 h-11 rounded-xl flex-shrink-0 bg-gradient-to-br from-fuchsia-100 to-blue-100 flex items-center justify-center">' +
+          '<svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>' +
+        '</div>' +
         '<div class="flex-1 min-w-0">' +
           '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(s.title) + '</div>' +
           '<div class="text-[10px] text-slate-500 mt-0.5 truncate">' + escapeHtml(s.artist) + '</div>' +
@@ -941,19 +956,19 @@
                   detail.find(function (d) { return d.title && s.title && d.title.indexOf(s.title) >= 0; }) ||
                   detail[0];
         } else {
-          // 单对象兜底
+          // 单对象兜底（按工具配置的字段名抽）
           var d2 = json.data || json;
           if (d2 && (d2.name || d2.music_url)) {
             match = {
               rawId: '',
               title: d2.name || s.title,
               artist: d2.singer || s.artist,
-              pic: d2.cover || '',
+              lyric: d2.lyric || '',
               playUrl: d2.music_url || ''
             };
           }
         }
-        if (match && (match.playUrl || match.pic)) {
+        if (match && (match.playUrl || match.lyric)) {
           pushSongToLibrary(mergeSong(s, match), tool);
         } else {
           pushSongToLibrary(s, tool, true);
@@ -979,7 +994,7 @@
       rawId: s.rawId || m.rawId,
       title: m.title || s.title,
       artist: m.artist || s.artist,
-      pic: m.pic || s.pic,
+      lyric: m.lyric || s.lyric,
       playUrl: m.playUrl || s.playUrl
     };
   }
@@ -1001,7 +1016,7 @@
       rawId: s.rawId,
       title: s.title,
       artist: s.artist,
-      pic: s.pic,
+      lyric: s.lyric || '',
       playUrl: s.playUrl,
       sourceToolId: tool ? tool.id : null,
       addedAt: Date.now()
@@ -1040,13 +1055,13 @@
 
     var dlg = document.createElement('div');
     dlg.id = 'liveMusicAddModal';
-    dlg.className = 'fixed inset-0 z-[10000] flex items-center justify-center px-5';
+    dlg.className = 'fixed inset-0 z-[10000] flex items-end justify-center';
     dlg.style.backgroundColor = 'rgba(0,0,0,0.55)';
-    dlg.style.paddingTop = 'var(--ai-phone-app-safe-top, 88px)';
     dlg.style.paddingBottom = 'var(--ai-phone-app-safe-bottom, 24px)';
+    dlg.style.animation = 'lmFadeIn 0.2s ease-out';
 
     dlg.innerHTML =
-      '<div class="w-full max-w-[400px] max-h-[80vh] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden">' +
+      '<div class="w-full max-w-[420px] max-h-[85vh] bg-white rounded-t-3xl rounded-b-3xl shadow-2xl flex flex-col overflow-hidden" style="animation: lmSlideUp 0.25s cubic-bezier(0.32, 0.72, 0, 1);">' +
         '<div class="px-5 pt-5 pb-3 flex items-center justify-between border-b border-slate-100">' +
           '<h4 class="text-base font-black text-slate-900">' + (isEdit ? '编辑工具' : '添加工具') + '</h4>' +
           '<button id="lmAddCloseBtn" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 active:scale-90 transition" aria-label="关闭">' +
@@ -1064,7 +1079,12 @@
         '</div>' +
       '</div>';
 
-    dlg.onclick = function (e) { if (e.target === dlg) dlg.remove(); };
+    dlg.onclick = function (e) {
+      if (e.target === dlg) {
+        _newToolFmtTitle=''; _newToolFmtArtist=''; _newToolFmtLyric=''; _newToolFmtPlayUrl='';
+        dlg.remove();
+      }
+    };
     document.body.appendChild(dlg);
 
     var mode = 'api';
@@ -1074,9 +1094,13 @@
       : [{ key: '', value: '' }];
     var searchKeyVal = (editTool && editTool.searchKey) || '';
     var detailKeyVal = (editTool && editTool.detailKey) || '';
-    // 备注 / URL 用模块级变量（编辑模式同步到 editTool；新工具用本地变量，重渲染保留）
+    // 备注 / URL / 返回格式：编辑模式用 editTool 引用；新工具模式用模块级缓存
     var toolNameVal = (editTool && editTool.name) || '';
     var toolUrlVal = (editTool && editTool.url) || '';
+    var fmtTitleVal = (editTool && editTool.fmtTitle) || _newToolFmtTitle;
+    var fmtArtistVal = (editTool && editTool.fmtArtist) || _newToolFmtArtist;
+    var fmtLyricVal = (editTool && editTool.fmtLyric) || _newToolFmtLyric;
+    var fmtPlayUrlVal = (editTool && editTool.fmtPlayUrl) || _newToolFmtPlayUrl;
 
     function renderMode() {
       var localBtn = dlg.querySelector('#lmModeLocalBtn');
@@ -1102,6 +1126,16 @@
       // 重渲染前先捕获当前所有 input 的值，避免点"+"或删除后用户已输入的内容被清空
       var liveSk = dlg.querySelector('#lmSearchKey');
       if (liveSk) searchKeyVal = liveSk.value;
+      if (!editTool) {
+        var liveFt = dlg.querySelector('#lmFmtTitle');
+        if (liveFt) _newToolFmtTitle = liveFt.value;
+        var liveFa = dlg.querySelector('#lmFmtArtist');
+        if (liveFa) _newToolFmtArtist = liveFa.value;
+        var liveFl = dlg.querySelector('#lmFmtLyric');
+        if (liveFl) _newToolFmtLyric = liveFl.value;
+        var liveFp = dlg.querySelector('#lmFmtPlayUrl');
+        if (liveFp) _newToolFmtPlayUrl = liveFp.value;
+      }
       var liveDk = dlg.querySelector('#lmDetailKey');
       if (liveDk) detailKeyVal = liveDk.value;
       var liveUrl = dlg.querySelector('#lmToolUrl');
@@ -1188,10 +1222,30 @@
             '</div>' +
           '</div>' +
           '<div>' +
-            '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">返回格式（可选）</label>' +
-            '<input id="lmToolFormat" type="text" placeholder="留空则用启发式（自动找第一个数组）" value="' + escapeHtml(editTool ? (editTool.format || '') : '') + '" ' +
-                   'class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-            '<p class="text-[10px] text-slate-400 mt-1.5 leading-relaxed">不填 = 自动从返回 JSON 找第一个数组，按 name/singer/cover/music_url 等字段名启发式匹配歌名/歌手/封面/链接。<br/>支持多行 <b>字段=路径</b>，路径以返回 JSON 根为起点：<br/><span class="text-slate-500">title=data.name<br/>artist=data.singer<br/>pic=data.cover<br/>playUrl=data.music_url</span></p>' +
+            '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">返回格式（告诉系统哪个字段是哪个）</label>' +
+            '<div class="rounded-2xl border border-slate-200 bg-slate-50 divide-y divide-slate-100">' +
+              '<div class="flex items-center gap-2 px-3 py-2.5">' +
+                '<span class="text-[10px] font-black text-slate-500 w-16 flex-shrink-0">歌名</span>' +
+                '<input id="lmFmtTitle" type="text" placeholder="name" value="' + escapeHtml(editTool ? (editTool.fmtTitle || '') : fmtTitleVal) + '" ' +
+                       'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
+              '</div>' +
+              '<div class="flex items-center gap-2 px-3 py-2.5">' +
+                '<span class="text-[10px] font-black text-slate-500 w-16 flex-shrink-0">歌手</span>' +
+                '<input id="lmFmtArtist" type="text" placeholder="singer" value="' + escapeHtml(editTool ? (editTool.fmtArtist || '') : fmtArtistVal) + '" ' +
+                       'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
+              '</div>' +
+              '<div class="flex items-center gap-2 px-3 py-2.5">' +
+                '<span class="text-[10px] font-black text-slate-500 w-16 flex-shrink-0">歌词</span>' +
+                '<input id="lmFmtLyric" type="text" placeholder="lyric" value="' + escapeHtml(editTool ? (editTool.fmtLyric || '') : fmtLyricVal) + '" ' +
+                       'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
+              '</div>' +
+              '<div class="flex items-center gap-2 px-3 py-2.5">' +
+                '<span class="text-[10px] font-black text-slate-500 w-16 flex-shrink-0">播放URL</span>' +
+                '<input id="lmFmtPlayUrl" type="text" placeholder="music_url" value="' + escapeHtml(editTool ? (editTool.fmtPlayUrl || '') : fmtPlayUrlVal) + '" ' +
+                       'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
+              '</div>' +
+            '</div>' +
+            '<p class="text-[10px] text-slate-400 mt-1.5 leading-relaxed">填 API 返回的<b>字段名</b>，系统会用它去对应 JSON 里取值。留空 = 自动启发式匹配。</p>' +
           '</div>' +
         '</div>';
 
@@ -1269,14 +1323,18 @@
     }
     dlg.querySelector('#lmModeLocalBtn').onclick = function () { mode = 'local'; renderMode(); };
     dlg.querySelector('#lmModeApiBtn').onclick = function () { mode = 'api'; renderMode(); };
-    dlg.querySelector('#lmAddCloseBtn').onclick = function () { dlg.remove(); };
-    dlg.querySelector('#lmAddCancelBtn').onclick = function () { dlg.remove(); };
+    function _clearNewToolFmtCache() { _newToolFmtTitle=''; _newToolFmtArtist=''; _newToolFmtLyric=''; _newToolFmtPlayUrl=''; }
+    dlg.querySelector('#lmAddCloseBtn').onclick = function () { _clearNewToolFmtCache(); dlg.remove(); };
+    dlg.querySelector('#lmAddCancelBtn').onclick = function () { _clearNewToolFmtCache(); dlg.remove(); };
     // 帮助按钮 onclick 在 renderApiPanel 内部绑定（每次重渲染都重新绑）
     dlg.querySelector('#lmAddSaveBtn').onclick = function () {
       if (mode === 'local') return;
       var name = ((dlg.querySelector('#lmToolName') || {}).value || '').trim();
       var url = ((dlg.querySelector('#lmToolUrl') || {}).value || '').trim();
-      var format = ((dlg.querySelector('#lmToolFormat') || {}).value || '').trim();
+      var fmtTitle = ((dlg.querySelector('#lmFmtTitle') || {}).value || '').trim();
+      var fmtArtist = ((dlg.querySelector('#lmFmtArtist') || {}).value || '').trim();
+      var fmtLyric = ((dlg.querySelector('#lmFmtLyric') || {}).value || '').trim();
+      var fmtPlayUrl = ((dlg.querySelector('#lmFmtPlayUrl') || {}).value || '').trim();
       var searchKey = ((dlg.querySelector('#lmSearchKey') || {}).value || '').trim();
       var detailKey = ((dlg.querySelector('#lmDetailKey') || {}).value || '').trim();
       if (!name) { flashError(dlg, 'lmToolName', '请填写备注'); return; }
@@ -1289,7 +1347,10 @@
         editTool.url = url;
         editTool.method = currentMethod;
         editTool.params = cleanParams;
-        editTool.format = format;
+        editTool.fmtTitle = fmtTitle;
+        editTool.fmtArtist = fmtArtist;
+        editTool.fmtLyric = fmtLyric;
+        editTool.fmtPlayUrl = fmtPlayUrl;
         editTool.searchKey = searchKey;
         editTool.detailKey = detailKey;
         editTool.updatedAt = Date.now();
@@ -1300,7 +1361,10 @@
           url: url,
           method: currentMethod,
           params: cleanParams,
-          format: format,
+          fmtTitle: fmtTitle,
+          fmtArtist: fmtArtist,
+          fmtLyric: fmtLyric,
+          fmtPlayUrl: fmtPlayUrl,
           searchKey: searchKey,
           detailKey: detailKey,
           createdAt: Date.now()
@@ -1309,6 +1373,7 @@
         if (!window.liveMusicCurrentToolId) window.liveMusicCurrentToolId = tool.id;
       }
       saveSettings().then(function () {
+        _clearNewToolFmtCache();
         dlg.remove();
         if (window.AiPhone && window.AiPhone.ui && window.AiPhone.ui.toast) window.AiPhone.ui.toast(isEdit ? '已保存' : '已添加工具');
         else if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast(isEdit ? '已保存' : '已添加工具');
