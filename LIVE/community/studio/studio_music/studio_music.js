@@ -48,29 +48,50 @@
     var placeholder = '输入歌手、歌名、id、分享链接发送请求';
 
     box.innerHTML =
-      // 顶部状态卡
-      '<div class="relative overflow-hidden rounded-3xl p-5 mb-4 bg-white border border-slate-100 shadow-sm">' +
-        '<div class="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-fuchsia-200/40 blur-2xl pointer-events-none"></div>' +
-        '<div class="absolute -bottom-8 -left-4 w-28 h-28 rounded-full bg-blue-200/40 blur-2xl pointer-events-none"></div>' +
-        '<div class="relative flex items-center gap-3 mb-3 pr-12">' +
-          '<div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-pink-500 flex items-center justify-center shadow-md flex-shrink-0">' +
-            '<svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>' +
+      // 顶部状态卡（黑粗边框，参考手机播放器结构）
+      '<div class="relative overflow-hidden rounded-3xl p-5 mb-4 bg-white border-4 border-black shadow-sm">' +
+        // 主体：grid 三列 —— 封面 / 中间内容 / 右侧按键
+        '<div class="relative grid grid-cols-[auto_1fr_auto] gap-4 items-stretch">' +
+          // 封面（左侧上下居中，1:1 大尺寸，不被拉伸）——热搜同款 file 上传
+          '<label class="relative aspect-square w-28 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 self-center flex-shrink-0 active:scale-95 transition cursor-pointer" aria-label="上传封面" title="点上传封面">' +
+            '<img id="liveMusicCoverImg" src="' + escapeHtml(window.liveMusicCover || 'https://files.catbox.moe/d1jldl.png') + '" alt="" class="absolute inset-0 w-full h-full object-cover">' +
+            '<input type="file" accept="image/*" style="display:none;" onchange="window.LM && window.LM.handleLiveMusicCoverUpload && window.LM.handleLiveMusicCoverUpload(event)">' +
+          '</label>' +
+          // 中间：按封面同高（h-full），三段按比例踩位置（顶/中/底）
+          '<div class="min-w-0 h-full flex flex-col justify-between py-1">' +
+            // 顶部：歌名 / 歌手
+            '<div class="min-w-0">' +
+              '<div class="text-sm font-black text-slate-900 truncate">未知歌名</div>' +
+              '<div class="text-[10px] text-slate-500 font-bold tracking-wider mt-0.5 truncate">未知歌手</div>' +
+            '</div>' +
+            // 中部：进度条（细线 + 圆点，水平居中段）
+            '<div class="relative h-3 flex items-center" aria-hidden="true">' +
+              '<div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[2px] bg-slate-200 rounded-full"></div>' +
+              '<div class="absolute left-0 top-1/2 -translate-y-1/2 h-[2px] bg-black rounded-full" style="width:30%;"></div>' +
+              '<div class="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-black shadow-sm" style="left:calc(30% - 5px);"></div>' +
+            '</div>' +
+            // 底部：上一首 / 播放 / 下一首
+            '<div class="flex items-center justify-center gap-4">' +
+              '<button onclick="window.console && window.console.log(\'[liveMusic] 上一首\')" class="w-12 h-12 rounded-full flex items-center justify-center text-black active:scale-90 transition" aria-label="上一首" title="上一首">' +
+                '<svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M19 20L9 12l10-8v16zM5 19V5h2v14H5z"/></svg>' +
+              '</button>' +
+              '<button onclick="window.console && window.console.log(\'[liveMusic] 播放\')" class="w-12 h-12 rounded-full flex items-center justify-center text-black active:scale-90 transition" aria-label="播放" title="播放">' +
+                '<svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>' +
+              '</button>' +
+              '<button onclick="window.console && window.console.log(\'[liveMusic] 下一首\')" class="w-12 h-12 rounded-full flex items-center justify-center text-black active:scale-90 transition" aria-label="下一首" title="下一首">' +
+                '<svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M5 4l10 8-10 8V4zm14-1h2v18h-2V3z"/></svg>' +
+              '</button>' +
+            '</div>' +
           '</div>' +
-          '<div class="flex-1 min-w-0">' +
-            '<div class="text-[10px] text-slate-500 font-bold tracking-wider">NOW PLAYING</div>' +
-            '<div class="text-sm font-black text-slate-900 truncate">' + (currentTool ? escapeHtml(currentTool.name || '当前工具') : '尚未选择工具') + '</div>' +
+          // 右侧：单曲循环 + 添加工具（按封面高度按比例踩位置）
+          '<div class="h-full flex flex-col justify-between items-stretch py-1">' +
+            '<button id="liveMusicModeBtn" onclick="window.LM && window.LM.cycleLiveMusicPlayMode && window.LM.cycleLiveMusicPlayMode()" class="inline-flex items-center justify-center px-3 h-9 rounded-full border border-black bg-white text-black text-[10px] font-black tracking-wider active:scale-95 transition whitespace-nowrap" aria-label="切换播放模式">' +
+              '<span id="liveMusicModeLabel">单曲循环</span>' +
+            '</button>' +
+            '<button onclick="window.LM && window.LM.openLiveMusicAddModal && window.LM.openLiveMusicAddModal()" class="inline-flex items-center justify-center px-3 h-9 rounded-full border border-black bg-white text-black text-[10px] font-black tracking-wider active:scale-95 transition whitespace-nowrap" aria-label="添加工具">' +
+              '<span>添加工具</span>' +
+            '</button>' +
           '</div>' +
-        '</div>' +
-        '<button onclick="window.LM.openLiveMusicAddModal()" class="absolute top-3 right-3 w-9 h-9 rounded-full bg-gradient-to-br from-fuchsia-500 to-pink-500 flex items-center justify-center text-white shadow-md active:scale-90 transition z-10" aria-label="添加工具">' +
-          '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
-        '</button>' +
-        '<div class="flex items-end gap-1 h-8 mb-1">' +
-          [12, 22, 18, 28, 14, 26, 20, 32, 16, 24, 19, 30, 15, 22, 26, 18, 28, 14, 24, 20, 16, 28, 22, 14, 26, 18, 30, 16, 22, 12].map(function (h, i) {
-            return '<div class="flex-1 rounded-full bg-gradient-to-t from-fuchsia-500 to-blue-500" style="height:' + h + '%; animation: lumaBar ' + (1 + (i % 5) * 0.12).toFixed(2) + 's ease-in-out infinite alternate; animation-delay:' + (i * 0.04).toFixed(2) + 's;"></div>';
-          }).join('') +
-        '</div>' +
-        '<div class="flex items-center justify-between mt-3">' +
-          '<span class="text-[10px] text-slate-500 font-medium">' + (window.liveMusicTools || []).length + ' 个工具 · 歌曲库 ' + (window.liveMusicSongs || []).length + ' 首</span>' +
         '</div>' +
       '</div>' +
 
@@ -101,8 +122,37 @@
       '<div id="liveMusicDisplayArea" class="min-h-[200px]">' + renderDisplayHTML() + '</div>';
 
     bindSearchInput();
+    applyLiveMusicModeBtn();
   }
   L.renderLiveMusicPage = renderLiveMusicPage;
+
+  // ---- 播放模式按键（UI 占位，单击循环切换，仅文字） ------------------
+  var LIVE_MUSIC_MODE_LIST = [
+    { label: '单曲循环' },
+    { label: '列表循环' },
+    { label: '随机播放' }
+  ];
+  window.__liveMusicPlayMode = (typeof window.__liveMusicPlayMode === 'number') ? window.__liveMusicPlayMode : 0;
+
+  function applyLiveMusicModeBtn() {
+    var labelEl = document.getElementById('liveMusicModeLabel');
+    if (!labelEl) return;
+    var m = LIVE_MUSIC_MODE_LIST[window.__liveMusicPlayMode] || LIVE_MUSIC_MODE_LIST[0];
+    labelEl.textContent = m.label;
+  }
+
+  // ---- 封面图片应用：异步把 user cover dataURL 写入 img src ---------
+  function applyLiveMusicCover() {
+    var img = document.getElementById('liveMusicCoverImg');
+    if (!img) return;
+    if (window.liveMusicCover) img.src = window.liveMusicCover;
+  }
+
+  function cycleLiveMusicPlayMode() {
+    window.__liveMusicPlayMode = (window.__liveMusicPlayMode + 1) % LIVE_MUSIC_MODE_LIST.length;
+    applyLiveMusicModeBtn();
+  }
+  L.cycleLiveMusicPlayMode = cycleLiveMusicPlayMode;
 
   function renderDisplayHTML() {
     var mode = window.__liveMusicDisplayMode;

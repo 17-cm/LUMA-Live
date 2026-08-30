@@ -11,6 +11,7 @@
   window.liveMusicTools = window.liveMusicTools || [];
   window.liveMusicCurrentToolId = window.liveMusicCurrentToolId || null;
   window.liveMusicSongs = window.liveMusicSongs || [];
+  window.liveMusicCover = window.liveMusicCover || 'https://files.catbox.moe/d1jldl.png';
 
   function getDb() {
     return (window.AiPhone && window.AiPhone.db) || (window.AiPhoneApp && window.AiPhoneApp.db) || (window.api && window.api.db) || null;
@@ -47,6 +48,7 @@
           window.liveMusicTools = Array.isArray(data.list) ? data.list : [];
           window.liveMusicCurrentToolId = data.current || null;
           window.liveMusicSongs = Array.isArray(data.songs) ? data.songs : [];
+          window.liveMusicCover = typeof data.cover === 'string' && data.cover ? data.cover : 'https://files.catbox.moe/d1jldl.png';
           migrateToolsInPlace();
         }
         if (window.LM && window.LM.renderLiveMusicPage) window.LM.renderLiveMusicPage();
@@ -60,7 +62,8 @@
     var payload = {
       list: window.liveMusicTools,
       current: window.liveMusicCurrentToolId,
-      songs: window.liveMusicSongs
+      songs: window.liveMusicSongs,
+      cover: window.liveMusicCover || null
     };
     var db = getDb();
     if (!db) return Promise.resolve();
@@ -75,9 +78,26 @@
     }).catch(function (e) { if (window.console && window.console.warn) window.console.warn('[liveMusic] db save failed', e); });
   }
 
+  // 热搜同款：FileReader + dataURL，存到 window.liveMusicCover
+  function handleLiveMusicCoverUpload(event) {
+    var file = event && event.target && event.target.files && event.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var dataUrl = e && e.target ? e.target.result : '';
+      if (!dataUrl) return;
+      window.liveMusicCover = dataUrl;
+      saveSettings().then(function () {
+        if (window.LM && typeof window.LM.renderLiveMusicPage === 'function') window.LM.renderLiveMusicPage();
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+
   L.loadSettings = loadSettings;
   L.saveSettings = saveSettings;
   L.migrateToolsInPlace = migrateToolsInPlace;
+  L.handleLiveMusicCoverUpload = handleLiveMusicCoverUpload;
   L._newToolFmtTitle = '';
   L._newToolFmtArtist = '';
   L._newToolFmtLyric = '';
