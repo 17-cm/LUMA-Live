@@ -35,6 +35,7 @@
       if (typeof t.fmtLyric === 'undefined') t.fmtLyric = '';
       if (typeof t.fmtPlayUrl === 'undefined') t.fmtPlayUrl = '';
       if (typeof t.headers === 'undefined') t.headers = '';
+      if (typeof t.mode === 'undefined') t.mode = 'search';
     });
     window.liveMusicSongs.forEach(function (s) {
       if (typeof s.lyric === 'undefined') s.lyric = s.pic || '';
