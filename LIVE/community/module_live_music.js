@@ -14,38 +14,30 @@
 (function () {
   'use strict';
 
-  // ---- 网络层（走宿主 AiPhone.network.fetch 代理绕 CORS）-----------------
-  // GET 不传 proxy 走浏览器直连（api.yunmge.com 已开 CORS，浏览器放行）
-  // POST 传 proxy: true 走 /api/tool-proxy（POST body 容易被宿主吞）
+  // ---- 网络层（走宿主 AiPhone.network.fetch）-----------------------------
+  // LUMA-Live 是宿主里的 APP，沙盒 iframe 不能 fetch 外部 API（fetch 是浏览器原生 API）
+  // 走宿主 SDK 让宿主服务器代发，target API 无 CORS 也能通
+  // 显式传 proxy: true 走宿主 /api/tool-proxy
+  // manifest 已声明 network.allowedDomains 含 api.yunmge.com
   function doFetchJson(req) {
     var options = req.options || {};
-    var method = (options.method || 'GET').toUpperCase();
     var params = {
       url: req.url,
-      method: method,
+      method: options.method || 'GET',
       headers: options.headers || {},
+      proxy: true,
       timeoutMs: options.timeoutMs || 20000
     };
-    if (method === 'POST') {
-      params.proxy = true;
-    }
     if (options.body) params.body = options.body;
+    var sdk = (window.AiPhone && window.AiPhone.network) ||
+              (window.AiPhoneApp && window.AiPhoneApp.network) ||
+              (window.api && window.api.network);
     var p;
-    if (window.AiPhone && window.AiPhone.network && typeof window.AiPhone.network.fetch === 'function') {
-      p = window.AiPhone.network.fetch(params);
-    } else if (window.api && window.api.network && typeof window.api.network.fetch === 'function') {
-      p = window.api.network.fetch(params);
+    if (sdk && typeof sdk.fetch === 'function') {
+      p = sdk.fetch(params);
     } else {
-      // 兜底：宿主 SDK 不可用时浏览器直连
-      p = fetch(params.url, {
-        method: params.method,
-        headers: params.headers,
-        body: params.body || undefined
-      }).then(function (r) {
-        return r.text().then(function (t) {
-          return { ok: r.ok, status: r.status, text: t, json: (function () { try { return JSON.parse(t); } catch (e) { return null; } })() };
-        });
-      });
+      console.warn('[liveMusic] 宿主 network SDK 不可用，无法请求外部 API');
+      return Promise.reject(new Error('宿主 network.fetch 不可用'));
     }
     return Promise.resolve(p).then(function (res) {
       if (res && res.ok) {
@@ -58,14 +50,15 @@
   }
 
   // ---- 数据层 ---------------------------------------------------------
-  // ---- 私有数据库（走宿主 api.db） -------------------------------------
-  // 沙盒 iframe 里 localStorage 不可靠，用宿主 AiPhone.db 持久化
-  // db 不提供 upsert，整个 JSON 塞进 "live_music_settings" 单条记录
+  // ---- 持久化（宿主 AiPhone.db 私有数据库） -----------------------------
+  // LUMA-Live 是宿主"小手机"里的一个 APP，所有持久化必须走宿主 SDK
+  // localStorage 在沙盒环境不可靠（退出 APP 数据就丢）
+  // db 不提供 upsert，整个 JSON 塞进 live_music_settings 单条记录
+
   function getDb() {
-    return (window.AiPhone && window.AiPhone.db) || (window.api && window.api.db) || null;
+    return (window.AiPhone && window.AiPhone.db) || (window.AiPhoneApp && window.AiPhoneApp.db) || (window.api && window.api.db) || null;
   }
   function getLsBackup() {
-    // 兜底：宿主 SDK 不可用时回退 localStorage（开发/调试）
     try { return window.localStorage; } catch (e) { return null; }
   }
 
@@ -73,15 +66,21 @@
   window.liveMusicCurrentToolId = window.liveMusicCurrentToolId || null;
   window.liveMusicSongs = window.liveMusicSongs || [];
 
-  var _dbSettingsId = null; // 记录 id，懒加载
+  var _dbSettingsId = null;
   var _dbLoaded = false;
+
+  function migrateToolsInPlace() {
+    window.liveMusicTools.forEach(function (t) {
+      if (typeof t.searchKey === 'undefined') t.searchKey = 'name';
+      if (typeof t.detailKey === 'undefined') t.detailKey = '';
+      if (typeof t.params === 'undefined') t.params = [];
+    });
+  }
 
   function loadSettings() {
     if (_dbLoaded) return;
     _dbLoaded = true;
     var db = getDb();
-    var ls = getLsBackup();
-    // 优先 db
     if (db && typeof db.list === 'function') {
       db.list('live_music_settings', { limit: 1 }).then(function (list) {
         if (list && list.length > 0) {
@@ -90,18 +89,18 @@
           window.liveMusicTools = Array.isArray(data.list) ? data.list : [];
           window.liveMusicCurrentToolId = data.current || null;
           window.liveMusicSongs = Array.isArray(data.songs) ? data.songs : [];
-          migrateTools();
-          if (window.renderLiveMusicPage) window.renderLiveMusicPage();
-        } else {
-          // db 空：尝试从 localStorage 迁移一次
-          migrateFromLocalStorage();
+          migrateToolsInPlace();
         }
-      }).catch(function () { migrateFromLocalStorage(); });
-      return;
+        if (window.renderLiveMusicPage) window.renderLiveMusicPage();
+      }).catch(function (e) {
+        console.warn('[liveMusic] db.list failed, fallback to localStorage', e);
+        loadFromLocalStorage();
+      });
+    } else {
+      loadFromLocalStorage();
     }
-    migrateFromLocalStorage();
   }
-  function migrateFromLocalStorage() {
+  function loadFromLocalStorage() {
     var ls = getLsBackup();
     if (!ls) return;
     try {
@@ -110,7 +109,7 @@
         var data = JSON.parse(raw);
         window.liveMusicTools = Array.isArray(data.list) ? data.list : [];
         window.liveMusicCurrentToolId = data.current || null;
-        migrateTools();
+        migrateToolsInPlace();
       }
       var raw2 = ls.getItem('live_music_songs');
       if (raw2) {
@@ -119,26 +118,19 @@
       }
     } catch (e) {}
   }
-  function migrateTools() {
-    window.liveMusicTools.forEach(function (t) {
-      if (typeof t.searchKey === 'undefined') t.searchKey = 'name';
-      if (typeof t.detailKey === 'undefined') t.detailKey = '';
-      if (typeof t.params === 'undefined') t.params = [];
-    });
-  }
   function saveSettings() {
     var payload = {
       list: window.liveMusicTools,
       current: window.liveMusicCurrentToolId,
       songs: window.liveMusicSongs
     };
-    // 兜底：localStorage
+    // 兜底同步写一份 localStorage（方便调试 + 兼容其他模块读法）
     var ls = getLsBackup();
     if (ls) {
       try { ls.setItem('live_music_tools', JSON.stringify({ list: window.liveMusicTools, current: window.liveMusicCurrentToolId })); } catch (e) {}
       try { ls.setItem('live_music_songs', JSON.stringify(window.liveMusicSongs || [])); } catch (e) {}
     }
-    // 主路径：db
+    // 主路径：宿主 db
     var db = getDb();
     if (!db) return;
     var p;
@@ -152,7 +144,7 @@
     }).catch(function (e) { console.warn('[liveMusic] db save failed', e); });
   }
 
-  // 兼容旧调用（saveTools / saveSongs 内部统一走 saveSettings）
+  // 兼容旧调用
   function saveTools() { saveSettings(); }
   function saveSongs() { saveSettings(); }
 
