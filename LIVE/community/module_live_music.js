@@ -15,17 +15,20 @@
   'use strict';
 
   // ---- 网络层（走宿主 AiPhone.network.fetch 代理绕 CORS）-----------------
-  // 必须显式传 proxy: true，宿主才会走 /api/tool-proxy
-  // manifest.network.allowedDomains 已声明 api.yunmge.com
+  // GET 不传 proxy 走浏览器直连（api.yunmge.com 已开 CORS，浏览器放行）
+  // POST 传 proxy: true 走 /api/tool-proxy（POST body 容易被宿主吞）
   function doFetchJson(req) {
     var options = req.options || {};
+    var method = (options.method || 'GET').toUpperCase();
     var params = {
       url: req.url,
-      method: options.method || 'GET',
+      method: method,
       headers: options.headers || {},
-      proxy: true,
       timeoutMs: options.timeoutMs || 20000
     };
+    if (method === 'POST') {
+      params.proxy = true;
+    }
     if (options.body) params.body = options.body;
     var p;
     if (window.AiPhone && window.AiPhone.network && typeof window.AiPhone.network.fetch === 'function') {
