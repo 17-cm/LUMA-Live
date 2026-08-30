@@ -96,9 +96,6 @@
   "resources": {
     "presets": [
       "presets.json"
-    ],
-    "regexes": [
-      "regex.json"
     ]
   }
 }
