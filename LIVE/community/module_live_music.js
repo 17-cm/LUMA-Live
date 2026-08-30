@@ -1233,6 +1233,9 @@
       var format = ((dlg.querySelector('#lmToolFormat') || {}).value || '').trim();
       var searchKey = ((dlg.querySelector('#lmSearchKey') || {}).value || '').trim();
       var detailKey = ((dlg.querySelector('#lmDetailKey') || {}).value || '').trim();
+      console.log('[debug-save] searchKey input exists?', !!dlg.querySelector('#lmSearchKey'), 'value=', JSON.stringify(searchKey));
+      console.log('[debug-save] detailKey input exists?', !!dlg.querySelector('#lmDetailKey'), 'value=', JSON.stringify(detailKey));
+      console.log('[debug-save] paramRows=', JSON.stringify(paramRows));
       if (!name) { flashError(dlg, 'lmToolName', '请填写备注'); return; }
       if (!url) { flashError(dlg, 'lmToolUrl', '请填写请求地址'); return; }
       var cleanParams = paramRows
