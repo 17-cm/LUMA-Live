@@ -6,11 +6,51 @@
 //   3) 工具列表：每个 API 工具配置（URL/方法/参数/返回格式）
 //   4) 我的歌曲列表：把搜索结果中的歌加入此处
 // 数据：localStorage
+
+
 //   - live_music_tools: { list, current }
 //   - live_music_songs: [ { id, title, artist, pic, playUrl, sourceToolId, addedAt } ]
 // =========================================================================
 (function () {
   'use strict';
+
+  // ---- 网络层（走宿主代理绕 CORS） --------------------------------------
+  // 优先用 window.robustNetworkRequest 调 /api/tool-proxy，target API 没开 CORS 也能通
+  // 兜底：宿主 SDK 不可用时浏览器直连
+  function doFetchJson(req) {
+    var options = req.options || {};
+    var body = options.body;
+    var params = {
+      url: req.url,
+      method: options.method || 'GET',
+      headers: options.headers || {},
+      proxy: true,
+      timeoutMs: options.timeoutMs || 20000
+    };
+    if (body) params.body = body;
+    var p;
+    if (typeof window.robustNetworkRequest === 'function') {
+      p = window.robustNetworkRequest(params);
+    } else {
+      p = fetch(params.url, {
+        method: params.method,
+        headers: params.headers,
+        body: params.body || undefined
+      }).then(function (r) {
+        return r.text().then(function (t) {
+          return { ok: r.ok, status: r.status, text: t, json: (function () { try { return JSON.parse(t); } catch (e) { return null; } })() };
+        });
+      });
+    }
+    return p.then(function (res) {
+      if (res && res.ok) {
+        if (res.json) return res.json;
+        if (res.text) { try { return JSON.parse(res.text); } catch (e) { throw new Error('返回不是合法 JSON'); } }
+        throw new Error('空响应');
+      }
+      throw new Error('HTTP ' + (res && res.status));
+    });
+  }
 
   // ---- 数据层 ---------------------------------------------------------
   var TOOLS_KEY = 'live_music_tools';
@@ -433,10 +473,7 @@
       '正在搜索…</div>';
 
     buildRequest(tool, keyword).then(function (req) {
-      return fetch(req.url, req.options).then(function (resp) {
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        return resp.json();
-      }).then(function (json) {
+      return doFetchJson(req).then(function (json) {
         window.__liveMusicLastRawJson = json;
         window.__liveMusicDisplayMode = 'search';
         var songs = parseSongsFromResponse(json);
@@ -833,10 +870,7 @@
       o[detailKey] = detailValue;
       return o;
     })()).then(function (req) {
-      return fetch(req.url, req.options).then(function (resp) {
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        return resp.json();
-      }).then(function (json) {
+      return doFetchJson(req).then(function (json) {
         var detail = parseSongsFromResponse(json);
         var match = null;
         if (detail && detail.length > 0) {
@@ -869,12 +903,7 @@
   };
 
   function fetchByTool(tool, keyword, extraKv) {
-    return buildRequest(tool, keyword, extraKv).then(function (req) {
-      return fetch(req.url, req.options).then(function (resp) {
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        return resp.json();
-      });
-    });
+    return buildRequest(tool, keyword, extraKv).then(doFetchJson);
   }
   function pickBestMatch(detail, s) {
     if (!detail || detail.length === 0) return null;
