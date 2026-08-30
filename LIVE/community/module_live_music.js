@@ -58,53 +58,105 @@
   }
 
   // ---- 数据层 ---------------------------------------------------------
-  var TOOLS_KEY = 'live_music_tools';
-  var SONGS_KEY = 'live_music_songs';
+  // ---- 私有数据库（走宿主 api.db） -------------------------------------
+  // 沙盒 iframe 里 localStorage 不可靠，用宿主 AiPhone.db 持久化
+  // db 不提供 upsert，整个 JSON 塞进 "live_music_settings" 单条记录
+  function getDb() {
+    return (window.AiPhone && window.AiPhone.db) || (window.api && window.api.db) || null;
+  }
+  function getLsBackup() {
+    // 兜底：宿主 SDK 不可用时回退 localStorage（开发/调试）
+    try { return window.localStorage; } catch (e) { return null; }
+  }
 
   window.liveMusicTools = window.liveMusicTools || [];
   window.liveMusicCurrentToolId = window.liveMusicCurrentToolId || null;
   window.liveMusicSongs = window.liveMusicSongs || [];
 
-  function loadTools() {
+  var _dbSettingsId = null; // 记录 id，懒加载
+  var _dbLoaded = false;
+
+  function loadSettings() {
+    if (_dbLoaded) return;
+    _dbLoaded = true;
+    var db = getDb();
+    var ls = getLsBackup();
+    // 优先 db
+    if (db && typeof db.list === 'function') {
+      db.list('live_music_settings', { limit: 1 }).then(function (list) {
+        if (list && list.length > 0) {
+          _dbSettingsId = list[0].id;
+          var data = list[0].payload || {};
+          window.liveMusicTools = Array.isArray(data.list) ? data.list : [];
+          window.liveMusicCurrentToolId = data.current || null;
+          window.liveMusicSongs = Array.isArray(data.songs) ? data.songs : [];
+          migrateTools();
+          if (window.renderLiveMusicPage) window.renderLiveMusicPage();
+        } else {
+          // db 空：尝试从 localStorage 迁移一次
+          migrateFromLocalStorage();
+        }
+      }).catch(function () { migrateFromLocalStorage(); });
+      return;
+    }
+    migrateFromLocalStorage();
+  }
+  function migrateFromLocalStorage() {
+    var ls = getLsBackup();
+    if (!ls) return;
     try {
-      var raw = localStorage.getItem(TOOLS_KEY);
+      var raw = ls.getItem('live_music_tools');
       if (raw) {
         var data = JSON.parse(raw);
         window.liveMusicTools = Array.isArray(data.list) ? data.list : [];
         window.liveMusicCurrentToolId = data.current || null;
-        // 旧数据迁移：补 searchKey/detailKey 默认值
-        window.liveMusicTools.forEach(function (t) {
-          if (typeof t.searchKey === 'undefined') t.searchKey = 'name';
-          if (typeof t.detailKey === 'undefined') t.detailKey = '';
-          if (typeof t.params === 'undefined') t.params = [];
-        });
+        migrateTools();
       }
-    } catch (e) {}
-  }
-  function saveTools() {
-    try {
-      localStorage.setItem(TOOLS_KEY, JSON.stringify({
-        list: window.liveMusicTools,
-        current: window.liveMusicCurrentToolId
-      }));
-    } catch (e) {}
-  }
-  function loadSongs() {
-    try {
-      var raw = localStorage.getItem(SONGS_KEY);
-      if (raw) {
-        var arr = JSON.parse(raw);
+      var raw2 = ls.getItem('live_music_songs');
+      if (raw2) {
+        var arr = JSON.parse(raw2);
         window.liveMusicSongs = Array.isArray(arr) ? arr : [];
       }
     } catch (e) {}
   }
-  function saveSongs() {
-    try {
-      localStorage.setItem(SONGS_KEY, JSON.stringify(window.liveMusicSongs || []));
-    } catch (e) {}
+  function migrateTools() {
+    window.liveMusicTools.forEach(function (t) {
+      if (typeof t.searchKey === 'undefined') t.searchKey = 'name';
+      if (typeof t.detailKey === 'undefined') t.detailKey = '';
+      if (typeof t.params === 'undefined') t.params = [];
+    });
   }
-  loadTools();
-  loadSongs();
+  function saveSettings() {
+    var payload = {
+      list: window.liveMusicTools,
+      current: window.liveMusicCurrentToolId,
+      songs: window.liveMusicSongs
+    };
+    // 兜底：localStorage
+    var ls = getLsBackup();
+    if (ls) {
+      try { ls.setItem('live_music_tools', JSON.stringify({ list: window.liveMusicTools, current: window.liveMusicCurrentToolId })); } catch (e) {}
+      try { ls.setItem('live_music_songs', JSON.stringify(window.liveMusicSongs || [])); } catch (e) {}
+    }
+    // 主路径：db
+    var db = getDb();
+    if (!db) return;
+    var p;
+    if (_dbSettingsId) {
+      p = db.update('live_music_settings', _dbSettingsId, { payload: payload });
+    } else {
+      p = db.create('live_music_settings', { payload: payload });
+    }
+    p.then(function (rec) {
+      if (!_dbSettingsId && rec && rec.id) _dbSettingsId = rec.id;
+    }).catch(function (e) { console.warn('[liveMusic] db save failed', e); });
+  }
+
+  // 兼容旧调用（saveTools / saveSongs 内部统一走 saveSettings）
+  function saveTools() { saveSettings(); }
+  function saveSongs() { saveSettings(); }
+
+  loadSettings();
 
   // ---- 工具函数 -------------------------------------------------------
   function escapeHtml(s) {
@@ -468,8 +520,6 @@
       return;
     }
     var tool = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
-    console.log('[debug] tool =', JSON.stringify(tool, null, 2));
-    console.log('[debug] keyword =', JSON.stringify(keyword));
     if (!tool) {
       area.innerHTML = '<div class="text-center py-12 text-[11px] text-rose-500">请先在"我的工具"中选中一个工具</div>';
       window.__liveMusicLastResult = null;
