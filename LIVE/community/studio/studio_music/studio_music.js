@@ -136,12 +136,6 @@
   function renderSearchResultHTML(songs) {
     if (!songs || songs.length === 0) return '<div class="text-center py-12 text-[11px] text-slate-400">没有匹配的歌曲</div>';
     return songs.map(function (s, i) {
-      var playUrl = s.playUrl;
-      var playBtn = playUrl
-        ? '<a href="' + escapeHtml(playUrl) + '" target="_blank" rel="noopener" class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0 active:scale-90 transition" aria-label="播放" title="播放">' +
-            '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>' +
-          '</a>'
-        : '';
       return '<div class="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200 mb-2">' +
         '<div class="w-12 h-12 rounded-xl flex-shrink-0 bg-gradient-to-br from-fuchsia-100 to-blue-100 flex items-center justify-center">' +
           '<svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>' +
@@ -150,7 +144,6 @@
           '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(s.title) + '</div>' +
           '<div class="text-[10px] text-slate-500 mt-0.5 truncate">' + escapeHtml(s.artist) + '</div>' +
         '</div>' +
-        playBtn +
         '<button onclick="addLiveMusicSong(' + i + ')" class="w-9 h-9 rounded-full bg-gradient-to-br from-fuchsia-500 to-pink-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm active:scale-90 transition" aria-label="添加到歌曲库" title="添加">' +
           '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
         '</button>' +
@@ -279,9 +272,7 @@
           '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(s.title) + '</div>' +
           '<div class="text-[10px] text-slate-500 mt-0.5 truncate">' + escapeHtml(s.artist) + '</div>' +
         '</div>' +
-        '<button onclick="askRemoveLiveMusicSong(\'' + s.id + '\', \'' + escapeHtml(s.title).replace(/'/g, "\\'") + '\')" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0 active:scale-90 transition" aria-label="从歌曲库移除" title="删除">' +
-          '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
-        '</button>' +
+        '<button onclick="askRemoveLiveMusicSong(\'' + s.id + '\', \'' + escapeHtml(s.title).replace(/'/g, "\\'") + '\')" class="flex-shrink-0 px-2.5 h-8 rounded-lg bg-slate-100 text-slate-500 text-[11px] font-bold active:scale-90 transition" aria-label="从歌曲库移除" title="删除">删除</button>' +
       '</div>';
     }).join('');
   }
