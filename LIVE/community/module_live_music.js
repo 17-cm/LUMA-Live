@@ -71,7 +71,7 @@
 
   function migrateToolsInPlace() {
     window.liveMusicTools.forEach(function (t) {
-      if (typeof t.searchKey === 'undefined') t.searchKey = 'name';
+      if (typeof t.searchKey === 'undefined') t.searchKey = '';
       if (typeof t.detailKey === 'undefined') t.detailKey = '';
       if (typeof t.params === 'undefined') t.params = [];
     });
@@ -540,47 +540,65 @@
     });
   }
 
-  // 把工具的 url+params 组装成 fetch 请求
+  // ================================================================
+  // ⭐ buildRequest - 完整重构版
   // 规则：
-  //   - 搜索框的值补到 tool.searchKey 指定的参数上
-  //   - tool.params 里其他参数按字面值
-  //   - extraKv 可注入额外参数（如二级请求的 n=<序号>）
-  //   - searchKey 为空 → 用「最后一个有 key 的参数」兜底
+  //   1. 默认参数（params）：用户手动填写的固定键值对，原样发送
+  //   2. 搜索框参数（searchKey）：用搜索框输入的值补全，独立于默认参数
+  //   3. 二级请求参数（detailKey）：用歌曲序号补全，独立于默认参数
+  //   三者完全独立，互不依赖，均自动合并到最终 URL
+  // ================================================================
   function buildRequest(tool, keyword, extraKv) {
     var url = tool.url || '';
     var method = (tool.method || 'GET').toUpperCase();
     var params = Array.isArray(tool.params) ? tool.params : [];
     var searchKey = (tool.searchKey || '').trim();
+    var detailKey = (tool.detailKey || '').trim();
 
-    // 过滤出有 key 的参数
-    var keyed = params.filter(function (p) { return p && p.key; });
-    // 定位 searchKey 所在的参数；找不到则用最后一个
-    var targetIdx = -1;
-    if (searchKey) {
-      targetIdx = keyed.findIndex(function (p) { return p.key === searchKey; });
+    // 用于存放最终的所有参数
+    var parts = [];
+
+    // 1. 处理默认参数（用户手动填的固定值，如 token=xxx）
+    params.forEach(function(p) {
+      if (p && p.key) {
+        parts.push(encodeURIComponent(p.key) + '=' + encodeURIComponent(p.value || ''));
+      }
+    });
+
+    // 2. 处理搜索框参数（用搜索框输入补全值）
+    if (searchKey && keyword != null && String(keyword).length > 0) {
+      var replaced = false;
+      for (var i = 0; i < parts.length; i++) {
+        var key = parts[i].split('=')[0];
+        if (key === encodeURIComponent(searchKey)) {
+          parts[i] = encodeURIComponent(searchKey) + '=' + encodeURIComponent(String(keyword));
+          replaced = true;
+          break;
+        }
+      }
+      if (!replaced) {
+        parts.push(encodeURIComponent(searchKey) + '=' + encodeURIComponent(String(keyword)));
+      }
     }
-    if (targetIdx < 0) targetIdx = keyed.length - 1;
 
-    function buildOne(p, idx) {
-      var v = p.value || '';
-      if (idx === targetIdx && keyword != null && String(keyword).length > 0) v = String(keyword);
-      return encodeURIComponent(p.key) + '=' + encodeURIComponent(v);
-    }
-
-    var parts = keyed.map(function (p, idx) { return buildOne(p, idx); });
-
-    // 注入 extraKv
+    // 3. 处理二级请求参数（用歌曲序号补全值）
     if (extraKv && typeof extraKv === 'object') {
-      Object.keys(extraKv).forEach(function (k) {
+      Object.keys(extraKv).forEach(function(k) {
         if (k == null) return;
         var v = extraKv[k];
         if (v == null) return;
-        // 覆盖同 key
         var replaced = false;
         for (var i = 0; i < parts.length; i++) {
-          if (parts[i].split('=')[0] === encodeURIComponent(k)) { parts[i] = encodeURIComponent(k) + '=' + encodeURIComponent(v); replaced = true; break; }
+          var key = parts[i].split('=')[0];
+          if (key === encodeURIComponent(k)) {
+            parts[i] = encodeURIComponent(k) + '=' + encodeURIComponent(v);
+            replaced = true;
+            break;
+          }
         }
-        if (!replaced) parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(v));
+        if (!replaced) {
+          parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(v));
+        }
       });
     }
 
@@ -1054,7 +1072,7 @@
     var paramRows = (editTool && Array.isArray(editTool.params) && editTool.params.length > 0)
       ? editTool.params.map(function (p) { return { key: p.key || '', value: p.value || '' }; })
       : [{ key: '', value: '' }];
-    var searchKeyVal = (editTool && editTool.searchKey) || 'name';
+    var searchKeyVal = (editTool && editTool.searchKey) || '';
     var detailKeyVal = (editTool && editTool.detailKey) || '';
     // 备注 / URL 用模块级变量（编辑模式同步到 editTool；新工具用本地变量，重渲染保留）
     var toolNameVal = (editTool && editTool.name) || '';
@@ -1155,18 +1173,18 @@
             '<div class="flex items-center gap-2">' +
               '<input id="lmSearchKey" type="text" placeholder="例：name" value="' + escapeHtml(searchKeyVal) + '" ' +
                      'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-              '<div class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-[10px] text-slate-400 flex items-center">请在搜索框输入</div>' +
+              '<div class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-[10px] text-slate-400 flex items-center">搜索框输入</div>' +
             '</div>' +
           '</div>' +
           '<div>' +
             '<div class="flex items-center gap-1.5 mb-1.5">' +
-              '<label class="text-[10px] font-black text-slate-500 tracking-wider">二级请求参数（可选）</label>' +
+              '<label class="text-[10px] font-black text-slate-500 tracking-wider">二次请求参数</label>' +
               '<button id="lmDetailKeyHelpBtn" class="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-black active:scale-90 transition" aria-label="说明">?</button>' +
             '</div>' +
             '<div class="flex items-center gap-2">' +
               '<input id="lmDetailKey" type="text" placeholder="例：n（不填则跳过二级请求）" value="' + escapeHtml(detailKeyVal) + '" ' +
                      'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-              '<div class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-[10px] text-slate-400 flex items-center">序号</div>' +
+              '<div class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-[10px] text-slate-400 flex items-center">歌曲序号</div>' +
             '</div>' +
           '</div>' +
           '<div>' +
@@ -1237,19 +1255,19 @@
         '<p>这里填写的是「<b>搜索框内容会发到哪个参数名</b>」。</p>' +
         '<p class="mt-2">比如你的接口：<br/><span class="font-mono text-slate-900">?token=xxx&name=江辰</span></p>' +
         '<p class="mt-2">「name」就是要填的内容（搜索框输入「江辰」，请求就带上 <span class="font-mono text-slate-900">name=江辰</span>）。</p>' +
-        '<p class="mt-2 text-slate-500">⚠️ 这个参数名必须已经在「默认参数」里填过。</p>' +
-        '<p class="mt-3 pt-3 border-t border-slate-100"><b>例：</b>你想搜索歌手，接口是 <span class="font-mono">?singer=xx</span>，这里就填 <span class="font-mono text-fuchsia-600">singer</span>。</p>'
+        '<p class="mt-3 pt-3 border-t border-slate-100"><b>例：</b>你想搜索歌手，接口是 <span class="font-mono">?singer=xx</span>，这里就填 <span class="font-mono text-fuchsia-600">singer</span>。</p>' +
+        '<p class="mt-2 text-slate-500 text-[10px]">💡 这个参数是<strong>独立</strong>的，不需要在默认参数里预先添加！</p>'
       );
     };
     var dkHelp = dlg.querySelector('#lmDetailKeyHelpBtn');
     if (dkHelp) dkHelp.onclick = function () {
-      openHelpModal('二级请求参数说明',
+      openHelpModal('二次请求参数说明',
         '<p>当你的接口需要「<b>分两次请求</b>」拿歌时配置：</p>' +
         '<p class="mt-2"><b>第 1 次：</b>搜索框输入关键词 → 接口返回歌曲<b>列表</b>（带序号）</p>' +
         '<p class="mt-2"><b>第 2 次：</b>点列表里某首后面的 ➕ → 自动用那首歌的序号再次请求 → 拿<b>详情</b>（含播放 URL / 封面）</p>' +
         '<p class="mt-2 pt-2 border-t border-slate-100">这里填的是「第 2 次请求时携带的<b>序号参数名</b>」。</p>' +
         '<p class="mt-2"><b>例：</b>你的接口是 <span class="font-mono">?token=xxx&name=江辰&n=1</span>，这里就填 <span class="font-mono text-fuchsia-600">n</span>。</p>' +
-        '<p class="mt-2 text-slate-500">⚠️ 留空 = 不发二级请求，➕ 时直接用搜索结果入库（无 URL）。<br/>适用于接口一次性返回歌名+URL 的情况。</p>'
+        '<p class="mt-2 text-slate-500 text-[10px]">💡 这个参数是<strong>独立</strong>的，不需要在默认参数里预先添加！</p>'
       );
     };
     dlg.querySelector('#lmAddSaveBtn').onclick = function () {
