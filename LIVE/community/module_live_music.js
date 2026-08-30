@@ -14,15 +14,16 @@
 (function () {
   'use strict';
 
-  // ---- 网络层（走宿主 AiPhone.network.fetch）-----------------------------
-  // manifest.network.allowedDomains 已声明 api.yunmge.com，宿主自动决定
-  // 走浏览器直连（有 CORS）或 /api/tool-proxy（无 CORS）。
+  // ---- 网络层（走宿主 AiPhone.network.fetch 代理绕 CORS）-----------------
+  // 必须显式传 proxy: true，宿主才会走 /api/tool-proxy
+  // manifest.network.allowedDomains 已声明 api.yunmge.com
   function doFetchJson(req) {
     var options = req.options || {};
     var params = {
       url: req.url,
       method: options.method || 'GET',
       headers: options.headers || {},
+      proxy: true,
       timeoutMs: options.timeoutMs || 20000
     };
     if (options.body) params.body = options.body;
