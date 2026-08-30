@@ -14,16 +14,15 @@
 (function () {
   'use strict';
 
-  // ---- 网络层（走宿主代理绕 CORS） --------------------------------------
-  // 优先用 window.AiPhone.network.fetch 调 /api/tool-proxy
-  // target API 没开 CORS 也能通。回退到浏览器直连。
+  // ---- 网络层（走宿主 AiPhone.network.fetch）-----------------------------
+  // manifest.network.allowedDomains 已声明 api.yunmge.com，宿主自动决定
+  // 走浏览器直连（有 CORS）或 /api/tool-proxy（无 CORS）。
   function doFetchJson(req) {
     var options = req.options || {};
     var params = {
       url: req.url,
       method: options.method || 'GET',
       headers: options.headers || {},
-      proxy: true,
       timeoutMs: options.timeoutMs || 20000
     };
     if (options.body) params.body = options.body;
@@ -33,6 +32,7 @@
     } else if (window.api && window.api.network && typeof window.api.network.fetch === 'function') {
       p = window.api.network.fetch(params);
     } else {
+      // 兜底：宿主 SDK 不可用时浏览器直连
       p = fetch(params.url, {
         method: params.method,
         headers: params.headers,
