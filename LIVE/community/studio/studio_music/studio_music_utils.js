@@ -38,29 +38,38 @@
   // ---- 图片 URL 识别：按常见图片后缀或 data:image 判断 -----------------
   var IMG_EXT_RE = /\.(jpe?g|png|gif|webp|bmp|svg|avif)(\?.*)?$/i;
   var IMG_DATA_RE = /^data:image\//i;
+  var MEDIA_EXT_RE = /\.(mp3|m4a|aac|flac|wav|ogg|opus|mp4|avi|mov|mkv|flv|wmv|webm)(\?.*)?$/i;
 
   function isImageUrl(v) {
     return typeof v === 'string' && (IMG_EXT_RE.test(v) || IMG_DATA_RE.test(v));
   }
 
-  // ---- 封面提取（内置启发式）：优先常见字段名，再递归扫图片后缀 ----
+  // 像图片资源的链接：http(s)/协议相对链接且不是音视频
+  function isImageLikeUrl(v) {
+    if (typeof v !== 'string') return false;
+    if (isImageUrl(v)) return true;
+    return /^(https?:)?\/\//i.test(v) && !MEDIA_EXT_RE.test(v);
+  }
+
+  // ---- 封面提取（内置启发式）：字段名命中封面关键词即采用，否则递归扫图片 ----
+  // 字段名匹配：先精确匹配候选名，再按子串匹配（pic/cover/img/thumb 等变体）
+  var COVER_KEY_RE = /(pic|cover|img|image|thumb|avatar|album|art|poster|logo)/i;
+
   function pickCover(item) {
     if (!item || typeof item !== 'object') return '';
-    var byName = pickField(item, FIELD_GUESS.cover);
-    if (byName && isImageUrl(byName)) return byName;
-    if (byName && /^https?:\/\//i.test(byName)) return byName;
     var found = '';
+    var coverKeys = FIELD_GUESS.cover;
     (function walk(node, depth) {
-      if (found || depth > 3) return;
+      if (found || depth > 4) return;
       if (!node || typeof node !== 'object') return;
       for (var k in node) {
         if (!Object.prototype.hasOwnProperty.call(node, k)) continue;
         var v = node[k];
         if (typeof v === 'string') {
+          if (coverKeys.indexOf(k) >= 0 && isImageLikeUrl(v)) { found = v; return; }
           if (isImageUrl(v)) { found = v; return; }
+          if (COVER_KEY_RE.test(k) && isImageLikeUrl(v)) { found = v; return; }
         } else if (typeof v === 'object') {
-          var nestedName = pickField(v, FIELD_GUESS.cover);
-          if (nestedName && isImageUrl(nestedName)) { found = nestedName; return; }
           walk(v, depth + 1);
         }
       }
@@ -118,4 +127,5 @@
   window.LM.pickByPath = pickByPath;
   window.LM.pickCover = pickCover;
   window.LM.isImageUrl = isImageUrl;
+  window.LM.isImageLikeUrl = isImageLikeUrl;
 })();
