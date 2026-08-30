@@ -94,6 +94,18 @@
       options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
       options.body = qs;
     }
+
+    // 4. 自定义请求头（每行 "Name: value"，空白行忽略）
+    if (tool.headers && typeof tool.headers === 'string') {
+      tool.headers.split(/\r?\n/).forEach(function(line) {
+        var idx = line.indexOf(':');
+        if (idx < 0) return;
+        var name = line.slice(0, idx).trim();
+        var value = line.slice(idx + 1).trim();
+        if (name) options.headers[name] = value;
+      });
+    }
+
     return Promise.resolve({ url: fullUrl, options: options });
   }
 

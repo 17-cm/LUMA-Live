@@ -193,6 +193,15 @@
     var fmtLyricVal = (editTool && editTool.fmtLyric) || L._newToolFmtLyric;
     var fmtPlayUrlVal = (editTool && editTool.fmtPlayUrl) || L._newToolFmtPlayUrl;
 
+    // 自定义请求头（最多 2 条，可选；从现有 tool.headers 字符串里拆 name/value）
+    var _headerRows = (editTool && typeof editTool.headers === 'string') ? editTool.headers.split(/\r?\n/) : [];
+    var _hr0 = _headerRows[0] ? _headerRows[0].split(':') : ['', ''];
+    var _hr1 = _headerRows[1] ? _headerRows[1].split(':') : ['', ''];
+    var headerName1Val = editTool ? ((_hr0[0] || '').trim()) : '';
+    var headerValue1Val = editTool ? ((_hr0[1] || '').trim()) : '';
+    var headerName2Val = editTool ? ((_hr1[0] || '').trim()) : '';
+    var headerValue2Val = editTool ? ((_hr1[1] || '').trim()) : '';
+
     function renderApiPanel() {
       var liveSk = dlg.querySelector('#lmSearchKey');
       if (liveSk) searchKeyVal = liveSk.value;
@@ -208,6 +217,14 @@
       }
       var liveDk = dlg.querySelector('#lmDetailKey');
       if (liveDk) detailKeyVal = liveDk.value;
+      var liveH1n = dlg.querySelector('#lmHeaderName1');
+      if (liveH1n) headerName1Val = liveH1n.value;
+      var liveH1v = dlg.querySelector('#lmHeaderValue1');
+      if (liveH1v) headerValue1Val = liveH1v.value;
+      var liveH2n = dlg.querySelector('#lmHeaderName2');
+      if (liveH2n) headerName2Val = liveH2n.value;
+      var liveH2v = dlg.querySelector('#lmHeaderValue2');
+      if (liveH2v) headerValue2Val = liveH2v.value;
       var liveUrl = dlg.querySelector('#lmToolUrl');
       if (liveUrl) {
         if (editTool) editTool.url = liveUrl.value;
@@ -258,6 +275,26 @@
             '<div class="flex gap-2">' +
               '<button data-method="GET" class="flex-1 py-2 rounded-xl text-xs font-black transition border ' + (currentMethod === 'GET' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200') + '">GET</button>' +
               '<button data-method="POST" class="flex-1 py-2 rounded-xl text-xs font-black transition border ' + (currentMethod === 'POST' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200') + '">POST</button>' +
+            '</div>' +
+          '</div>' +
+          '<div>' +
+            '<div class="flex items-center gap-1.5 mb-1.5">' +
+              '<label class="text-[10px] font-black text-slate-500 tracking-wider">请求头（可选）</label>' +
+              '<button id="lmHeaderHelpBtn" class="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-black active:scale-90 transition" aria-label="说明">?</button>' +
+            '</div>' +
+            '<div class="space-y-2">' +
+              '<div class="flex items-center gap-2">' +
+                '<input id="lmHeaderName1" type="text" placeholder="Header 名" value="' + escapeHtml(headerName1Val) + '" ' +
+                       'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
+                '<input id="lmHeaderValue1" type="text" placeholder="值" value="' + escapeHtml(headerValue1Val) + '" ' +
+                       'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
+              '</div>' +
+              '<div class="flex items-center gap-2">' +
+                '<input id="lmHeaderName2" type="text" placeholder="Header 名" value="' + escapeHtml(headerName2Val) + '" ' +
+                       'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
+                '<input id="lmHeaderValue2" type="text" placeholder="值" value="' + escapeHtml(headerValue2Val) + '" ' +
+                       'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
+              '</div>' +
             '</div>' +
           '</div>' +
           '<div>' +
@@ -353,6 +390,27 @@
           '<p class="mt-2 text-slate-500 text-[10px]">这个参数是<strong>独立</strong>的，不需要在默认参数里预先添加！</p>'
         );
       };
+      var hHelpBtn = dlg.querySelector('#lmHeaderHelpBtn');
+      if (hHelpBtn) hHelpBtn.onclick = function () {
+        openHelpModal('请求头说明',
+          '<p>部分 API 需要校验「<b>请求头</b>」才能正常返回数据。</p>' +
+          '<p class="mt-2 pt-2 border-t border-slate-100"><b>常见用途：</b></p>' +
+          '<p class="mt-1">· <span class="font-mono text-fuchsia-600">Referer</span> — 防盗链，告诉服务器"我从哪里来"</p>' +
+          '<p class="mt-1">· <span class="font-mono text-fuchsia-600">User-Agent</span> — 模拟浏览器身份</p>' +
+          '<p class="mt-1">· <span class="font-mono text-fuchsia-600">Cookie</span> — 需要登录态的接口</p>' +
+          '<p class="mt-3 pt-2 border-t border-slate-100"><b>填写方式：</b>左边填字段名（比如 <span class="font-mono">Referer</span>），右边填值。最多填 2 条，留空 = 不发送。</p>' +
+          '<p class="mt-2 text-slate-500 text-[10px]">可选功能，不填也能用普通 JSON API。</p>'
+        );
+      };
+      var h1n = dlg.querySelector('#lmHeaderName1');
+      if (h1n) h1n.oninput = function (e) { headerName1Val = e.target.value; };
+      var h1v = dlg.querySelector('#lmHeaderValue1');
+      if (h1v) h1v.oninput = function (e) { headerValue1Val = e.target.value; };
+      var h2n = dlg.querySelector('#lmHeaderName2');
+      if (h2n) h2n.oninput = function (e) { headerName2Val = e.target.value; };
+      var h2v = dlg.querySelector('#lmHeaderValue2');
+      if (h2v) h2v.oninput = function (e) { headerValue2Val = e.target.value; };
+
       dlg.querySelectorAll('[data-param-row]').forEach(function (row) {
         var idx = parseInt(row.getAttribute('data-param-row'), 10);
         row.querySelector('[data-param-key]').oninput = function (e) { paramRows[idx].key = e.target.value; };
@@ -378,6 +436,14 @@
       var fmtPlayUrl = ((dlg.querySelector('#lmFmtPlayUrl') || {}).value || '').trim();
       var searchKey = ((dlg.querySelector('#lmSearchKey') || {}).value || '').trim();
       var detailKey = ((dlg.querySelector('#lmDetailKey') || {}).value || '').trim();
+      var headerName1 = ((dlg.querySelector('#lmHeaderName1') || {}).value || '').trim();
+      var headerValue1 = ((dlg.querySelector('#lmHeaderValue1') || {}).value || '').trim();
+      var headerName2 = ((dlg.querySelector('#lmHeaderName2') || {}).value || '').trim();
+      var headerValue2 = ((dlg.querySelector('#lmHeaderValue2') || {}).value || '').trim();
+      var headersStr = '';
+      if (headerName1) headersStr += headerName1 + ': ' + headerValue1 + '\n';
+      if (headerName2) headersStr += headerName2 + ': ' + headerValue2 + '\n';
+      headersStr = headersStr.replace(/\n+$/, '');
       if (!name) { flashError(dlg, 'lmToolName', '请填写备注'); return; }
       if (!url) { flashError(dlg, 'lmToolUrl', '请填写请求地址'); return; }
       var cleanParams = paramRows
@@ -394,6 +460,7 @@
         editTool.fmtPlayUrl = fmtPlayUrl;
         editTool.searchKey = searchKey;
         editTool.detailKey = detailKey;
+        editTool.headers = headersStr;
         editTool.updatedAt = Date.now();
       } else {
         var tool = {
@@ -408,6 +475,7 @@
           fmtPlayUrl: fmtPlayUrl,
           searchKey: searchKey,
           detailKey: detailKey,
+          headers: headersStr,
           createdAt: Date.now()
         };
         window.liveMusicTools.push(tool);

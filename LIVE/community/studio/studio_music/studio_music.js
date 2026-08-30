@@ -143,9 +143,9 @@
           '</a>'
         : '';
       return '<div class="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200 mb-2">' +
-        '<div class="w-12 h-12 rounded-xl flex-shrink-0 bg-gradient-to-br from-fuchsia-100 to-blue-100 flex items-center justify-center">' +
-          '<svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>' +
-        '</div>' +
+        '<button onclick="playLiveMusicSong(' + i + ')" class="w-12 h-12 rounded-xl flex-shrink-0 bg-gradient-to-br from-fuchsia-500 to-pink-500 text-white flex items-center justify-center shadow-sm active:scale-90 transition" aria-label="播放" title="播放">' +
+          '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>' +
+        '</button>' +
         '<div class="flex-1 min-w-0">' +
           '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(s.title) + '</div>' +
           '<div class="text-[10px] text-slate-500 mt-0.5 truncate">' + escapeHtml(s.artist) + '</div>' +
@@ -347,6 +347,13 @@
       renderLiveMusicPage();
     }
   }
+
+  window.playLiveMusicSong = function (i) {
+    var songs = window.__liveMusicLastResult;
+    if (!songs || !songs[i]) return;
+    var s = songs[i];
+    if (window.console && window.console.log) window.console.log('[liveMusic] 播放键占位：', s && s.title);
+  };
 
   window.addLiveMusicSong = function (i) {
     var songs = window.__liveMusicLastResult;
