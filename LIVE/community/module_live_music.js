@@ -372,6 +372,9 @@
 
       // 唯一显示区
       '<div id="liveMusicDisplayArea" class="min-h-[200px]">' + renderDisplayHTML() + '</div>';
+
+    // 每次重渲染都重新绑搜索按钮（避免重渲染后事件丢失）
+    bindSearchInput();
   }
   window.renderLiveMusicPage = renderLiveMusicPage;
 
