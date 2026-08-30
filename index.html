@@ -100,16 +100,21 @@
   <!-- 6. 社区全屏页面 HTML -->
   <script src="LIVE/community/community_pages.js"></script>
   <!-- 7. 社区子模块（按依赖顺序） -->
-  <script src="LIVE/community/module_detail.js"></script>
+  <script src="LIVE/community/studio/studio_video.js"></script>
   <script src="LIVE/community/module_ranking.js"></script>
   <script src="LIVE/community/module_trends.js"></script>
   <script src="LIVE/community/module_supertopic.js"></script>
   <script src="LIVE/community/module_mytopic.js"></script>
   <script src="LIVE/community/module_forum.js"></script>
   <!-- 8.1 直播设置模块 -->
-  <script src="LIVE/community/module_live_settings.js"></script>
-  <!-- 8.2 直播设置·直播间音乐子模块 -->
-  <script src="LIVE/community/module_live_music.js"></script>
+  <script src="LIVE/community/studio/studio_settings.js"></script>
+  <!-- 8.2 直播设置·直播间音乐子模块（按依赖顺序加载） -->
+  <script src="LIVE/community/studio/studio_music/studio_music_utils.js"></script>
+  <script src="LIVE/community/studio/studio_music/studio_music_storage.js"></script>
+  <script src="LIVE/community/studio/studio_music/studio_music_request.js"></script>
+  <script src="LIVE/community/studio/studio_music/studio_music_parser.js"></script>
+  <script src="LIVE/community/studio/studio_music/studio_music_dialog.js"></script>
+  <script src="LIVE/community/studio/studio_music/studio_music.js"></script>
   <!-- 8. 社区入口（依赖所有子模块，最后加载） -->
   <script src="LIVE/community/trends.js"></script>
   <!-- 9. 直播全屏页面 HTML -->

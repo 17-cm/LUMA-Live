@@ -165,7 +165,7 @@
     </div>
 
     <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24" id="liveMusicContent">
-      <!-- 顶部状态卡 + 歌单列表由 module_live_music.js 渲染 -->
+      <!-- 顶部状态卡 + 歌单列表由 studio_music.js 渲染 -->
     </div>
   </div>
 
