@@ -1055,13 +1055,13 @@
 
     var dlg = document.createElement('div');
     dlg.id = 'liveMusicAddModal';
-    dlg.className = 'fixed inset-0 z-[10000] flex items-end justify-center';
+    dlg.className = 'fixed inset-0 z-[10000] flex items-center justify-center px-5';
     dlg.style.backgroundColor = 'rgba(0,0,0,0.55)';
+    dlg.style.paddingTop = 'var(--ai-phone-app-safe-top, 88px)';
     dlg.style.paddingBottom = 'var(--ai-phone-app-safe-bottom, 24px)';
-    dlg.style.animation = 'lmFadeIn 0.2s ease-out';
 
     dlg.innerHTML =
-      '<div class="w-full max-w-[420px] max-h-[85vh] bg-white rounded-t-3xl rounded-b-3xl shadow-2xl flex flex-col overflow-hidden" style="animation: lmSlideUp 0.25s cubic-bezier(0.32, 0.72, 0, 1);">' +
+      '<div class="w-full max-w-[420px] max-h-[80vh] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden">' +
         '<div class="px-5 pt-5 pb-3 flex items-center justify-between border-b border-slate-100">' +
           '<h4 class="text-base font-black text-slate-900">' + (isEdit ? '编辑工具' : '添加工具') + '</h4>' +
           '<button id="lmAddCloseBtn" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 active:scale-90 transition" aria-label="关闭">' +

@@ -3098,13 +3098,3 @@ input:checked + .switch-slider:before {
   from { transform: scaleY(0.3); opacity: 0.6; }
   to { transform: scaleY(1); opacity: 1; }
 }
-
-/* 直播间音乐·弹窗动画 */
-@keyframes lmSlideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
-}
-@keyframes lmFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
