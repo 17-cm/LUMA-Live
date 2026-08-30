@@ -378,7 +378,7 @@
     if (!box) return;
 
     var currentTool = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
-    var placeholder = currentTool ? ('搜索 · 当前工具：' + (currentTool.name || '未命名')) : '请先在"我的工具"中选中一个工具';
+    var placeholder = '输入歌手、歌名、id、分享链接发送请求';
 
     box.innerHTML =
       // 顶部状态卡
@@ -1061,16 +1061,12 @@
     dlg.style.paddingBottom = 'var(--ai-phone-app-safe-bottom, 24px)';
 
     dlg.innerHTML =
-      '<div class="w-full max-w-[420px] max-h-[80vh] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden">' +
+      '<div class="w-full max-w-[360px] max-h-[70vh] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden">' +
         '<div class="px-5 pt-5 pb-3 flex items-center justify-between border-b border-slate-100">' +
           '<h4 class="text-base font-black text-slate-900">' + (isEdit ? '编辑工具' : '添加工具') + '</h4>' +
           '<button id="lmAddCloseBtn" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 active:scale-90 transition" aria-label="关闭">' +
             '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
           '</button>' +
-        '</div>' +
-        '<div class="px-5 pt-3 pb-2 flex gap-2">' +
-          '<button id="lmModeLocalBtn" class="flex-1 py-2 rounded-2xl text-xs font-black transition bg-slate-100 text-slate-500 active:scale-95">本地导入</button>' +
-          '<button id="lmModeApiBtn" class="flex-1 py-2 rounded-2xl text-xs font-black transition bg-slate-900 text-white active:scale-95">设置接口导入</button>' +
         '</div>' +
         '<div id="lmAddContent" class="flex-1 overflow-y-auto px-5 py-3"></div>' +
         '<div class="px-5 py-3 border-t border-slate-100 flex gap-2">' +
@@ -1087,7 +1083,6 @@
     };
     document.body.appendChild(dlg);
 
-    var mode = 'api';
     var currentMethod = (editTool && editTool.method) || 'GET';
     var paramRows = (editTool && Array.isArray(editTool.params) && editTool.params.length > 0)
       ? editTool.params.map(function (p) { return { key: p.key || '', value: p.value || '' }; })
@@ -1101,26 +1096,6 @@
     var fmtArtistVal = (editTool && editTool.fmtArtist) || _newToolFmtArtist;
     var fmtLyricVal = (editTool && editTool.fmtLyric) || _newToolFmtLyric;
     var fmtPlayUrlVal = (editTool && editTool.fmtPlayUrl) || _newToolFmtPlayUrl;
-
-    function renderMode() {
-      var localBtn = dlg.querySelector('#lmModeLocalBtn');
-      var apiBtn = dlg.querySelector('#lmModeApiBtn');
-      localBtn.className = 'flex-1 py-2 rounded-2xl text-xs font-black transition active:scale-95 ' + (mode === 'local' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500');
-      apiBtn.className = 'flex-1 py-2 rounded-2xl text-xs font-black transition active:scale-95 ' + (mode === 'api' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500');
-      dlg.querySelector('#lmAddSaveBtn').style.display = mode === 'api' ? '' : 'none';
-      if (mode === 'local') renderLocalPanel(); else renderApiPanel();
-    }
-
-    function renderLocalPanel() {
-      dlg.querySelector('#lmAddContent').innerHTML =
-        '<div class="flex flex-col items-center justify-center py-12 text-center">' +
-          '<div class="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mb-3">' +
-            '<svg class="w-6 h-6 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>' +
-          '</div>' +
-          '<p class="text-sm font-black text-slate-900">本地导入</p>' +
-          '<p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">占位，等后续接入</p>' +
-        '</div>';
-    }
 
     function renderApiPanel() {
       // 重渲染前先捕获当前所有 input 的值，避免点"+"或删除后用户已输入的内容被清空
@@ -1321,14 +1296,11 @@
       h.querySelector('#lmKeyHelpCloseBtn').onclick = function () { h.remove(); };
       document.body.appendChild(h);
     }
-    dlg.querySelector('#lmModeLocalBtn').onclick = function () { mode = 'local'; renderMode(); };
-    dlg.querySelector('#lmModeApiBtn').onclick = function () { mode = 'api'; renderMode(); };
     function _clearNewToolFmtCache() { _newToolFmtTitle=''; _newToolFmtArtist=''; _newToolFmtLyric=''; _newToolFmtPlayUrl=''; }
     dlg.querySelector('#lmAddCloseBtn').onclick = function () { _clearNewToolFmtCache(); dlg.remove(); };
     dlg.querySelector('#lmAddCancelBtn').onclick = function () { _clearNewToolFmtCache(); dlg.remove(); };
     // 帮助按钮 onclick 在 renderApiPanel 内部绑定（每次重渲染都重新绑）
     dlg.querySelector('#lmAddSaveBtn').onclick = function () {
-      if (mode === 'local') return;
       var name = ((dlg.querySelector('#lmToolName') || {}).value || '').trim();
       var url = ((dlg.querySelector('#lmToolUrl') || {}).value || '').trim();
       var fmtTitle = ((dlg.querySelector('#lmFmtTitle') || {}).value || '').trim();
@@ -1381,7 +1353,7 @@
       });
     };
 
-    renderMode();
+    renderApiPanel();
   }
   window.openLiveMusicAddModal = openLiveMusicAddModal;
 
