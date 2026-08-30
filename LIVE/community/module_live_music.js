@@ -1056,6 +1056,9 @@
       : [{ key: '', value: '' }];
     var searchKeyVal = (editTool && editTool.searchKey) || 'name';
     var detailKeyVal = (editTool && editTool.detailKey) || '';
+    // 备注 / URL 用模块级变量（编辑模式同步到 editTool；新工具用本地变量，重渲染保留）
+    var toolNameVal = (editTool && editTool.name) || '';
+    var toolUrlVal = (editTool && editTool.url) || '';
 
     function renderMode() {
       var localBtn = dlg.querySelector('#lmModeLocalBtn');
@@ -1084,12 +1087,14 @@
       var liveDk = dlg.querySelector('#lmDetailKey');
       if (liveDk) detailKeyVal = liveDk.value;
       var liveUrl = dlg.querySelector('#lmToolUrl');
-      if (liveUrl && liveUrl.value) {
+      if (liveUrl) {
         if (editTool) editTool.url = liveUrl.value;
+        else toolUrlVal = liveUrl.value;
       }
       var liveName = dlg.querySelector('#lmToolName');
-      if (liveName && liveName.value) {
+      if (liveName) {
         if (editTool) editTool.name = liveName.value;
+        else toolNameVal = liveName.value;
       }
       dlg.querySelectorAll('[data-param-row]').forEach(function (row) {
         var idx = parseInt(row.getAttribute('data-param-row'), 10);
@@ -1118,12 +1123,12 @@
         '<div class="space-y-3">' +
           '<div>' +
             '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">备注</label>' +
-            '<input id="lmToolName" type="text" placeholder="例：我的网易云歌单" value="' + escapeHtml(editTool ? editTool.name : '') + '" ' +
+            '<input id="lmToolName" type="text" placeholder="例：我的网易云歌单" value="' + escapeHtml(editTool ? editTool.name : toolNameVal) + '" ' +
                    'class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
           '</div>' +
           '<div>' +
             '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">请求地址</label>' +
-            '<input id="lmToolUrl" type="text" placeholder="https://api.example.com/api.php" value="' + escapeHtml(editTool ? editTool.url : '') + '" ' +
+            '<input id="lmToolUrl" type="text" placeholder="https://api.example.com/api.php" value="' + escapeHtml(editTool ? editTool.url : toolUrlVal) + '" ' +
                    'class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
           '</div>' +
           '<div>' +
