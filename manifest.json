@@ -36,7 +36,6 @@
   ],
   "network": {
     "allowedDomains": [
-      "api.yunmge.com",
       "*.yunmge.com"
     ]
   },
