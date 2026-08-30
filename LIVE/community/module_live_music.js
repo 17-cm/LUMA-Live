@@ -124,29 +124,25 @@
       current: window.liveMusicCurrentToolId,
       songs: window.liveMusicSongs
     };
-    // 兜底同步写一份 localStorage（方便调试 + 兼容其他模块读法）
+    // 兜底同步写一份 localStorage（沙盒里 localStorage 也会丢，但写一份方便排查）
     var ls = getLsBackup();
     if (ls) {
       try { ls.setItem('live_music_tools', JSON.stringify({ list: window.liveMusicTools, current: window.liveMusicCurrentToolId })); } catch (e) {}
       try { ls.setItem('live_music_songs', JSON.stringify(window.liveMusicSongs || [])); } catch (e) {}
     }
-    // 主路径：宿主 db
+    // 主路径：宿主 db（异步，需要 await 才能确保写入完成）
     var db = getDb();
-    if (!db) return;
+    if (!db) return Promise.resolve();
     var p;
     if (_dbSettingsId) {
       p = db.update('live_music_settings', _dbSettingsId, { payload: payload });
     } else {
       p = db.create('live_music_settings', { payload: payload });
     }
-    p.then(function (rec) {
+    return p.then(function (rec) {
       if (!_dbSettingsId && rec && rec.id) _dbSettingsId = rec.id;
     }).catch(function (e) { console.warn('[liveMusic] db save failed', e); });
   }
-
-  // 兼容旧调用
-  function saveTools() { saveSettings(); }
-  function saveSongs() { saveSettings(); }
 
   loadSettings();
 
@@ -717,8 +713,9 @@
       return;
     }
     tool.format = lines.join('\n');
-    saveTools();
-    if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('已保存映射，请重新搜索');
+    saveSettings().then(function () { renderLiveMusicPage(); });
+    if (window.AiPhone && window.AiPhone.ui && window.AiPhone.ui.toast) window.AiPhone.ui.toast('已保存映射');
+    else if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('已保存映射');
   };
 
   // ---- 工具 / 歌曲 列表渲染 ------------------------------------------
@@ -750,8 +747,7 @@
   }
   window.toggleLiveMusicTool = function (id) {
     window.liveMusicCurrentToolId = (window.liveMusicCurrentToolId === id) ? null : id;
-    saveTools();
-    renderLiveMusicPage();
+    saveSettings().then(function () { renderLiveMusicPage(); });
   };
 
   // 点工具行 → 居中弹窗：编辑 / 删除
@@ -840,10 +836,11 @@
     dlg.querySelector('#lmToolDelConfirmBtn').onclick = function () {
       window.liveMusicTools = (window.liveMusicTools || []).filter(function (t) { return t.id !== id; });
       if (window.liveMusicCurrentToolId === id) window.liveMusicCurrentToolId = null;
-      saveTools();
-      dlg.remove();
-      if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('已删除');
-      renderLiveMusicPage();
+      saveSettings().then(function () {
+        dlg.remove();
+        if (window.AiPhone && window.AiPhone.ui && window.AiPhone.ui.toast) window.AiPhone.ui.toast('已删除');
+        renderLiveMusicPage();
+      });
     };
   }
 
@@ -876,8 +873,7 @@
   }
   window.removeLiveMusicSong = function (id) {
     window.liveMusicSongs = (window.liveMusicSongs || []).filter(function (s) { return s.id !== id; });
-    saveSongs();
-    renderLiveMusicPage();
+    saveSettings().then(function () { renderLiveMusicPage(); });
   };
 
   // ---- 添加歌曲（从搜索结果索引 i） -----------------------------------
@@ -992,16 +988,24 @@
       sourceToolId: tool ? tool.id : null,
       addedAt: Date.now()
     });
-    saveSongs();
-    if (window.api && window.api.ui && window.api.ui.toast) {
-      if (skipUrlCheck || !s.playUrl) {
-        window.api.ui.toast('已加入（无 URL）');
-      } else {
-        window.api.ui.toast('已加入歌曲库');
+    saveSettings().then(function () {
+      if (window.AiPhone && window.AiPhone.ui && window.AiPhone.ui.toast) {
+        if (skipUrlCheck || !s.playUrl) {
+          window.AiPhone.ui.toast('已加入（无 URL）');
+        } else {
+          window.AiPhone.ui.toast('已加入歌曲库');
+        }
+      } else if (window.api && window.api.ui && window.api.ui.toast) {
+        if (skipUrlCheck || !s.playUrl) {
+          window.api.ui.toast('已加入（无 URL）');
+        } else {
+          window.api.ui.toast('已加入歌曲库');
+        }
       }
-    }
-    refreshAfterAdd();
+      refreshAfterAdd();
+    });
   }
+
   function refreshAfterAdd() {
     if (window.__liveMusicDisplayMode === 'search') {
       var area = document.getElementById('liveMusicDisplayArea');
@@ -1258,10 +1262,12 @@
         window.liveMusicTools.push(tool);
         if (!window.liveMusicCurrentToolId) window.liveMusicCurrentToolId = tool.id;
       }
-      saveTools();
-      dlg.remove();
-      if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast(isEdit ? '已保存' : '已添加工具');
-      renderLiveMusicPage();
+      saveSettings().then(function () {
+        dlg.remove();
+        if (window.AiPhone && window.AiPhone.ui && window.AiPhone.ui.toast) window.AiPhone.ui.toast(isEdit ? '已保存' : '已添加工具');
+        else if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast(isEdit ? '已保存' : '已添加工具');
+        renderLiveMusicPage();
+      });
     };
 
     renderMode();
