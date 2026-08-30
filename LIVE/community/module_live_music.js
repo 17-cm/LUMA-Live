@@ -468,6 +468,8 @@
       return;
     }
     var tool = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
+    console.log('[debug] tool =', JSON.stringify(tool, null, 2));
+    console.log('[debug] keyword =', JSON.stringify(keyword));
     if (!tool) {
       area.innerHTML = '<div class="text-center py-12 text-[11px] text-rose-500">请先在"我的工具"中选中一个工具</div>';
       window.__liveMusicLastResult = null;
