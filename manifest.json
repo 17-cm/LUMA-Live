@@ -34,11 +34,6 @@
     "notifications.write",
     "characters.state.read"
   ],
-  "network": {
-    "allowedDomains": [
-      "*.yunmge.com"
-    ]
-  },
   "extensions": {
     "chat": {
       "directives": [

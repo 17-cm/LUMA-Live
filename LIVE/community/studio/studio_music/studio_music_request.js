@@ -1,6 +1,6 @@
 // =========================================================================
 // 【直播间音乐·请求层】studio_music_request.js
-// 职责：宿主 AiPhone.network.fetch 封装 + buildRequest（拼 URL / 参数）
+// 职责：浏览器原生 fetch（直连）+ buildRequest（拼 URL / 参数）
 // 依赖：utils.js
 // =========================================================================
 (function () {
@@ -8,37 +8,19 @@
 
   var L = window.LM;
 
-  // ---- 网络层（走宿主 AiPhone.network.fetch）---------------------------
-  // LUMA-Live 是宿主里的 APP，沙盒 iframe 不能 fetch 外部 API
-  // 走宿主 SDK 让宿主服务器代发，target API 无 CORS 也能通
-  // 显式传 proxy: true 走宿主 /api/tool-proxy
+  // ---- 网络层：浏览器原生 fetch（直连，不走宿主代理）---------------
+  // 不走宿主 AiPhone.network.fetch — 浏览器直接请求目标 URL
+  // 受浏览器 CORS 限制：目标 API 必须返回 Access-Control-Allow-Origin
   function doFetchJson(req) {
     var options = req.options || {};
-    var params = {
-      url: req.url,
+    var fetchOptions = {
       method: options.method || 'GET',
-      headers: options.headers || {},
-      proxy: true,
-      timeoutMs: options.timeoutMs || 20000
+      headers: options.headers || {}
     };
-    if (options.body) params.body = options.body;
-    var sdk = (window.AiPhone && window.AiPhone.network) ||
-              (window.AiPhoneApp && window.AiPhoneApp.network) ||
-              (window.api && window.api.network);
-    var p;
-    if (sdk && typeof sdk.fetch === 'function') {
-      p = sdk.fetch(params);
-    } else {
-      if (window.console && window.console.warn) window.console.warn('[liveMusic] 宿主 network SDK 不可用，无法请求外部 API');
-      return Promise.reject(new Error('宿主 network.fetch 不可用'));
-    }
-    return Promise.resolve(p).then(function (res) {
-      if (res && res.ok) {
-        if (res.json) return res.json;
-        if (res.text) { try { return JSON.parse(res.text); } catch (e) { throw new Error('返回不是合法 JSON'); } }
-        throw new Error('空响应');
-      }
-      throw new Error('HTTP ' + (res && res.status));
+    if (options.body) fetchOptions.body = options.body;
+    return fetch(req.url, fetchOptions).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
     });
   }
 
