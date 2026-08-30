@@ -1078,6 +1078,27 @@
     }
 
     function renderApiPanel() {
+      // 重渲染前先捕获当前所有 input 的值，避免点"+"或删除后用户已输入的内容被清空
+      var liveSk = dlg.querySelector('#lmSearchKey');
+      if (liveSk) searchKeyVal = liveSk.value;
+      var liveDk = dlg.querySelector('#lmDetailKey');
+      if (liveDk) detailKeyVal = liveDk.value;
+      var liveUrl = dlg.querySelector('#lmToolUrl');
+      if (liveUrl && liveUrl.value) {
+        if (editTool) editTool.url = liveUrl.value;
+      }
+      var liveName = dlg.querySelector('#lmToolName');
+      if (liveName && liveName.value) {
+        if (editTool) editTool.name = liveName.value;
+      }
+      dlg.querySelectorAll('[data-param-row]').forEach(function (row) {
+        var idx = parseInt(row.getAttribute('data-param-row'), 10);
+        var k = row.querySelector('[data-param-key]');
+        var v = row.querySelector('[data-param-value]');
+        if (k && paramRows[idx]) paramRows[idx].key = k.value;
+        if (v && paramRows[idx]) paramRows[idx].value = v.value;
+      });
+
       var rows = paramRows.map(function (r, i) {
         return '<div class="flex items-center gap-2 mb-2" data-param-row="' + i + '">' +
           '<input type="text" data-param-key placeholder="参数名" value="' + escapeHtml(r.key) + '" ' +
