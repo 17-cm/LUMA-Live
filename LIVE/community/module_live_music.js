@@ -165,6 +165,7 @@
           if (!t0) continue;
           out.push({
             rawId: pickByPath(it0, fmtMap.rawId) || pickField(it0, ['n','id','songId','song_id','mid','trackId']) || '',
+            n: it0.n || it0.N || '',
             title: t0,
             artist: pickByPath(it0, fmtMap.artist) || pickField(it0, FIELD_GUESS.artist) || '未知歌手',
             pic: pickByPath(it0, fmtMap.pic) || pickField(it0, FIELD_GUESS.pic) || '',
@@ -198,6 +199,7 @@
         if (!title) continue;
         out.push({
           rawId: pickField(it1, ['n', 'id', 'songId', 'song_id', 'mid', 'trackId']) || '',
+          n: it1.n || it1.N || '',
           title: title,
           artist: pickField(it1, FIELD_GUESS.artist) || '未知歌手',
           pic: pickField(it1, FIELD_GUESS.pic) || '',
@@ -480,6 +482,7 @@
           return;
         }
         window.__liveMusicLastResult = songs;
+        window.__liveMusicLastKeyword = keyword;
         showSearchResult(songs);
       });
     }).catch(function (e) {
@@ -821,21 +824,63 @@
       return;
     }
 
-    // 没 URL → 用歌名再走一次接口（很多 API 第二次搜同名能直接给单对象详情）
+    // 没 URL → 走详情接口：URL 里临时加 n=<歌曲在搜索结果里的 n>&name=<歌名>
     if (!tool) {
       if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('未选工具，无法获取 URL');
       return;
     }
+    var lastKw = window.__liveMusicLastKeyword || '';
+    var n = s.n || s.rawId || '';
     if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('正在获取「' + s.title + '」详情…');
-    fetchByTool(tool, s.title).then(function (json) {
+
+    // 临时构造工具：把搜索关键词（lastKw）当 name，n 放 url query
+    var detailUrl = (tool.url || '').split('?')[0];
+    var sep = detailUrl.indexOf('?') >= 0 ? '&' : '?';
+    // 拼成 ?token=xxx&name=江辰&n=1
+    var kvs = [];
+    (tool.params || []).forEach(function (p) {
+      if (!p || !p.key) return;
+      if (p.key === 'n') return; // 跳过，n 单独拼
+      var v = p.value || '';
+      if (p.key === 'name') v = lastKw || s.title; // name 强制用搜索关键词
+      kvs.push(encodeURIComponent(p.key) + '=' + encodeURIComponent(v));
+    });
+    kvs.push('n=' + encodeURIComponent(n));
+    var finalUrl = detailUrl + sep + kvs.join('&');
+
+    fetch(finalUrl).then(function (resp) {
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      return resp.json();
+    }).then(function (json) {
       var detail = parseSongsFromResponse(json);
-      var match = pickBestMatch(detail, s);
+      // 详情接口返单对象 → 1 首；返列表 → 找匹配的
+      var match = null;
+      if (detail && detail.length > 0) {
+        match = detail.find(function (d) { return d.title === s.title; }) ||
+                detail.find(function (d) { return d.title && s.title && d.title.indexOf(s.title) >= 0; }) ||
+                detail[0];
+      } else {
+        // 单对象 parseSongs 不一定兜住，单独处理
+        var d2 = json.data || json;
+        if (d2 && d2.name) {
+          match = {
+            rawId: '',
+            title: d2.name || '',
+            artist: d2.singer || '',
+            pic: d2.cover || '',
+            playUrl: d2.music_url || ''
+          };
+        }
+      }
       if (match && (match.playUrl || match.pic)) {
         pushSongToLibrary(mergeSong(s, match), tool);
       } else {
         pushSongToLibrary(s, tool, true);
       }
-    }).catch(function () { pushSongToLibrary(s, tool, true); });
+    }).catch(function (e) {
+      console.warn('[liveMusic] 详情获取失败:', e);
+      pushSongToLibrary(s, tool, true);
+    });
   };
 
   function fetchByTool(tool, keyword) {
