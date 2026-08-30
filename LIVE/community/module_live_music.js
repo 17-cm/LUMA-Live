@@ -1114,7 +1114,7 @@
           '</div>' +
           '<div>' +
             '<div class="flex items-center justify-between mb-1.5">' +
-              '<label class="text-[10px] font-black text-slate-500 tracking-wider">添加参数</label>' +
+              '<label class="text-[10px] font-black text-slate-500 tracking-wider">默认参数</label>' +
               '<button id="lmParamAddBtn" class="w-7 h-7 rounded-full bg-gradient-to-br from-fuchsia-500 to-pink-500 text-white flex items-center justify-center shadow-sm active:scale-90 transition" aria-label="增加参数">' +
                 '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
               '</button>' +
@@ -1211,7 +1211,7 @@
         '<p>这里填写的是「<b>搜索框内容会发到哪个参数名</b>」。</p>' +
         '<p class="mt-2">比如你的接口：<br/><span class="font-mono text-slate-900">?token=xxx&name=江辰</span></p>' +
         '<p class="mt-2">「name」就是要填的内容（搜索框输入「江辰」，请求就带上 <span class="font-mono text-slate-900">name=江辰</span>）。</p>' +
-        '<p class="mt-2 text-slate-500">⚠️ 这个参数名必须已经在「添加参数」里填过。</p>' +
+        '<p class="mt-2 text-slate-500">⚠️ 这个参数名必须已经在「默认参数」里填过。</p>' +
         '<p class="mt-3 pt-3 border-t border-slate-100"><b>例：</b>你想搜索歌手，接口是 <span class="font-mono">?singer=xx</span>，这里就填 <span class="font-mono text-fuchsia-600">singer</span>。</p>'
       );
     };
@@ -1233,9 +1233,6 @@
       var format = ((dlg.querySelector('#lmToolFormat') || {}).value || '').trim();
       var searchKey = ((dlg.querySelector('#lmSearchKey') || {}).value || '').trim();
       var detailKey = ((dlg.querySelector('#lmDetailKey') || {}).value || '').trim();
-      console.log('[debug-save] searchKey input exists?', !!dlg.querySelector('#lmSearchKey'), 'value=', JSON.stringify(searchKey));
-      console.log('[debug-save] detailKey input exists?', !!dlg.querySelector('#lmDetailKey'), 'value=', JSON.stringify(detailKey));
-      console.log('[debug-save] paramRows=', JSON.stringify(paramRows));
       if (!name) { flashError(dlg, 'lmToolName', '请填写备注'); return; }
       if (!url) { flashError(dlg, 'lmToolUrl', '请填写请求地址'); return; }
       var cleanParams = paramRows
