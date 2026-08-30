@@ -14,7 +14,7 @@
   var pickCover = L.pickCover;
   var FIELD_GUESS = L.FIELD_GUESS;
 
-  // ---- 从当前工具读取返回格式配置（4 个字段名） ---------------------
+  // ---- 从当前工具读取返回格式配置（5 个字段名） ---------------------
   function getCurrentFormatMap() {
     var tool = (window.liveMusicTools || []).find(function (t) { return t.id === window.liveMusicCurrentToolId; });
     if (!tool) return {};
@@ -23,8 +23,18 @@
       artist: (tool.fmtArtist || '').trim(),
       lyric: (tool.fmtLyric || '').trim(),
       playUrl: (tool.fmtPlayUrl || '').trim(),
+      cover: (tool.fmtCover || '').trim(),
       rawId: (tool.detailKey || '').trim()
     };
+  }
+
+  // ---- 封面取值：配置了字段路径就直接用该值，否则启发式提取 -------
+  function pickSongCover(item, coverPath) {
+    if (coverPath) {
+      var byPath = pickByPath(item, coverPath);
+      if (byPath) return byPath;
+    }
+    return pickCover(item);
   }
 
   // ---- 把 API 返回解析成歌曲数组 ------------------------------------
@@ -50,7 +60,7 @@
             artist: pickByPath(it0, fmtMap.artist) || pickField(it0, FIELD_GUESS.artist) || '未知歌手',
             lyric: pickByPath(it0, fmtMap.lyric) || pickField(it0, FIELD_GUESS.lyric) || '',
             playUrl: pickByPath(it0, fmtMap.playUrl) || pickField(it0, FIELD_GUESS.playUrl) || '',
-            cover: pickCover(it0)
+            cover: pickSongCover(it0, fmtMap.cover)
           });
           if (out.length >= 50) break;
         }
@@ -64,7 +74,7 @@
           artist: pickByPath(json, fmtMap.artist) || pickField(json, FIELD_GUESS.artist) || '未知歌手',
           lyric: pickByPath(json, fmtMap.lyric) || pickField(json, FIELD_GUESS.lyric) || '',
           playUrl: pickByPath(json, fmtMap.playUrl) || pickField(json, FIELD_GUESS.playUrl) || '',
-          cover: pickCover(json)
+cover: pickSongCover(json, fmtMap.cover)
         });
       }
       return out;
@@ -85,7 +95,7 @@
           artist: pickField(it1, FIELD_GUESS.artist) || '未知歌手',
           lyric: pickField(it1, FIELD_GUESS.lyric) || '',
           playUrl: pickField(it1, FIELD_GUESS.playUrl) || '',
-          cover: pickCover(it1)
+          cover: pickSongCover(it1, fmtMap.cover)
         });
         if (out.length >= 50) break;
       }
@@ -99,7 +109,7 @@
         artist: pickField(json, FIELD_GUESS.artist) || '未知歌手',
         lyric: pickField(json, FIELD_GUESS.lyric) || '',
         playUrl: pickField(json, FIELD_GUESS.playUrl) || '',
-        cover: pickCover(json)
+        cover: pickSongCover(json, fmtMap.cover)
       });
       return out;
     }
@@ -112,7 +122,7 @@
           artist: pickField(json.data, FIELD_GUESS.artist) || '未知歌手',
           lyric: pickField(json.data, FIELD_GUESS.lyric) || '',
           playUrl: pickField(json.data, FIELD_GUESS.playUrl) || '',
-          cover: pickCover(json.data)
+          cover: pickSongCover(json.data, fmtMap.cover)
         });
       }
     }

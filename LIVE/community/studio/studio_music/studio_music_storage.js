@@ -29,6 +29,7 @@
       if (typeof t.fmtArtist === 'undefined') t.fmtArtist = '';
       if (typeof t.fmtLyric === 'undefined') t.fmtLyric = '';
       if (typeof t.fmtPlayUrl === 'undefined') t.fmtPlayUrl = '';
+      if (typeof t.fmtCover === 'undefined') t.fmtCover = '';
       if (typeof t.headers === 'undefined') t.headers = '';
     });
     window.liveMusicSongs.forEach(function (s) {
@@ -103,6 +104,7 @@
   L._newToolFmtArtist = '';
   L._newToolFmtLyric = '';
   L._newToolFmtPlayUrl = '';
+  L._newToolFmtCover = '';
 
   loadSettings();
 })();

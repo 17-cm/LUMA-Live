@@ -14,6 +14,7 @@
     L._newToolFmtArtist = '';
     L._newToolFmtLyric = '';
     L._newToolFmtPlayUrl = '';
+    L._newToolFmtCover = '';
   }
 
   // ---- flashError：错误高亮 + toast -----------------------------------
@@ -192,6 +193,7 @@
     var fmtArtistVal = (editTool && editTool.fmtArtist) || L._newToolFmtArtist;
     var fmtLyricVal = (editTool && editTool.fmtLyric) || L._newToolFmtLyric;
     var fmtPlayUrlVal = (editTool && editTool.fmtPlayUrl) || L._newToolFmtPlayUrl;
+    var fmtCoverVal = (editTool && editTool.fmtCover) || L._newToolFmtCover;
 
     // 自定义请求头（最多 2 条，可选；从现有 tool.headers 字符串里拆 name/value）
     var _headerRows = (editTool && typeof editTool.headers === 'string') ? editTool.headers.split(/\r?\n/) : [];
@@ -214,6 +216,8 @@
         if (liveFl) L._newToolFmtLyric = liveFl.value;
         var liveFp = dlg.querySelector('#lmFmtPlayUrl');
         if (liveFp) L._newToolFmtPlayUrl = liveFp.value;
+        var liveFc = dlg.querySelector('#lmFmtCover');
+        if (liveFc) L._newToolFmtCover = liveFc.value;
       }
       var liveDk = dlg.querySelector('#lmDetailKey');
       if (liveDk) detailKeyVal = liveDk.value;
@@ -351,6 +355,11 @@
                 '<input id="lmFmtPlayUrl" type="text" placeholder="music_url" value="' + escapeHtml(editTool ? (editTool.fmtPlayUrl || '') : fmtPlayUrlVal) + '" ' +
                        'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
               '</div>' +
+              '<div class="flex items-center gap-2 px-3 py-2.5">' +
+                '<span class="text-[10px] font-black text-slate-500 w-16 flex-shrink-0">封面</span>' +
+                '<input id="lmFmtCover" type="text" placeholder="pic_url（可选）" value="' + escapeHtml(editTool ? (editTool.fmtCover || '') : fmtCoverVal) + '" ' +
+                       'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
+              '</div>' +
             '</div>' +
             '<p class="text-[10px] text-slate-400 mt-1.5 leading-relaxed">填 API 返回的<b>字段名</b>，系统会用它去对应 JSON 里取值。留空 = 自动启发式匹配。</p>' +
           '</div>' +
@@ -434,6 +443,7 @@
       var fmtArtist = ((dlg.querySelector('#lmFmtArtist') || {}).value || '').trim();
       var fmtLyric = ((dlg.querySelector('#lmFmtLyric') || {}).value || '').trim();
       var fmtPlayUrl = ((dlg.querySelector('#lmFmtPlayUrl') || {}).value || '').trim();
+      var fmtCover = ((dlg.querySelector('#lmFmtCover') || {}).value || '').trim();
       var searchKey = ((dlg.querySelector('#lmSearchKey') || {}).value || '').trim();
       var detailKey = ((dlg.querySelector('#lmDetailKey') || {}).value || '').trim();
       var headerName1 = ((dlg.querySelector('#lmHeaderName1') || {}).value || '').trim();
@@ -458,6 +468,7 @@
         editTool.fmtArtist = fmtArtist;
         editTool.fmtLyric = fmtLyric;
         editTool.fmtPlayUrl = fmtPlayUrl;
+        editTool.fmtCover = fmtCover;
         editTool.searchKey = searchKey;
         editTool.detailKey = detailKey;
         editTool.headers = headersStr;
@@ -473,6 +484,7 @@
           fmtArtist: fmtArtist,
           fmtLyric: fmtLyric,
           fmtPlayUrl: fmtPlayUrl,
+          fmtCover: fmtCover,
           searchKey: searchKey,
           detailKey: detailKey,
           headers: headersStr,
