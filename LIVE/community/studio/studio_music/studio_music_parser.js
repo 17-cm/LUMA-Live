@@ -11,6 +11,7 @@
   var pickField = L.pickField;
   var pickByPath = L.pickByPath;
   var findFirstArray = L.findFirstArray;
+  var pickCover = L.pickCover;
   var FIELD_GUESS = L.FIELD_GUESS;
 
   // ---- 从当前工具读取返回格式配置（4 个字段名） ---------------------
@@ -48,7 +49,8 @@
             title: t0,
             artist: pickByPath(it0, fmtMap.artist) || pickField(it0, FIELD_GUESS.artist) || '未知歌手',
             lyric: pickByPath(it0, fmtMap.lyric) || pickField(it0, FIELD_GUESS.lyric) || '',
-            playUrl: pickByPath(it0, fmtMap.playUrl) || pickField(it0, FIELD_GUESS.playUrl) || ''
+            playUrl: pickByPath(it0, fmtMap.playUrl) || pickField(it0, FIELD_GUESS.playUrl) || '',
+            cover: pickCover(it0)
           });
           if (out.length >= 50) break;
         }
@@ -61,7 +63,8 @@
           title: t1,
           artist: pickByPath(json, fmtMap.artist) || pickField(json, FIELD_GUESS.artist) || '未知歌手',
           lyric: pickByPath(json, fmtMap.lyric) || pickField(json, FIELD_GUESS.lyric) || '',
-          playUrl: pickByPath(json, fmtMap.playUrl) || pickField(json, FIELD_GUESS.playUrl) || ''
+          playUrl: pickByPath(json, fmtMap.playUrl) || pickField(json, FIELD_GUESS.playUrl) || '',
+          cover: pickCover(json)
         });
       }
       return out;
@@ -81,7 +84,8 @@
           title: title,
           artist: pickField(it1, FIELD_GUESS.artist) || '未知歌手',
           lyric: pickField(it1, FIELD_GUESS.lyric) || '',
-          playUrl: pickField(it1, FIELD_GUESS.playUrl) || ''
+          playUrl: pickField(it1, FIELD_GUESS.playUrl) || '',
+          cover: pickCover(it1)
         });
         if (out.length >= 50) break;
       }
@@ -94,7 +98,8 @@
         title: singleTitle,
         artist: pickField(json, FIELD_GUESS.artist) || '未知歌手',
         lyric: pickField(json, FIELD_GUESS.lyric) || '',
-        playUrl: pickField(json, FIELD_GUESS.playUrl) || ''
+        playUrl: pickField(json, FIELD_GUESS.playUrl) || '',
+        cover: pickCover(json)
       });
       return out;
     }
@@ -106,7 +111,8 @@
           title: innerTitle,
           artist: pickField(json.data, FIELD_GUESS.artist) || '未知歌手',
           lyric: pickField(json.data, FIELD_GUESS.lyric) || '',
-          playUrl: pickField(json.data, FIELD_GUESS.playUrl) || ''
+          playUrl: pickField(json.data, FIELD_GUESS.playUrl) || '',
+          cover: pickCover(json.data)
         });
       }
     }

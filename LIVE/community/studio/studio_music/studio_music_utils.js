@@ -31,8 +31,42 @@
     title:   ['name', 'title', 'songName', 'song_name', 'trackName', 'song', 'musicName', 'music_name'],
     artist:  ['artists', 'singer', 'ar_name', 'artist', 'singerName', 'author', 'singer_name', 'artist_name'],
     playUrl: ['url', 'playUrl', 'play_url', 'mp3Url', 'mp3_url', 'src', 'audioUrl', 'audio', 'music_url', 'link'],
-    lyric:   ['lyric', 'lyricContent', 'lyric_text', 'lrc', 'lrcContent', 'lyric_url', 'lyricUrl']
+    lyric:   ['lyric', 'lyricContent', 'lyric_text', 'lrc', 'lrcContent', 'lyric_url', 'lyricUrl'],
+    cover:   ['pic', 'picUrl', 'pic_url', 'cover', 'coverUrl', 'cover_url', 'img', 'imgUrl', 'img_url', 'image', 'imageUrl', 'image_url', 'picture', 'albumPic', 'albumPicUrl', 'album_pic', 'songPic', 'songPicUrl', 'artPic', 'artistPic', 'thumbnail', 'thumb', 'thumbUrl', 'logo', 'icon']
   };
+
+  // ---- 图片 URL 识别：按常见图片后缀或 data:image 判断 -----------------
+  var IMG_EXT_RE = /\.(jpe?g|png|gif|webp|bmp|svg|avif)(\?.*)?$/i;
+  var IMG_DATA_RE = /^data:image\//i;
+
+  function isImageUrl(v) {
+    return typeof v === 'string' && (IMG_EXT_RE.test(v) || IMG_DATA_RE.test(v));
+  }
+
+  // ---- 封面提取（内置启发式）：优先常见字段名，再递归扫图片后缀 ----
+  function pickCover(item) {
+    if (!item || typeof item !== 'object') return '';
+    var byName = pickField(item, FIELD_GUESS.cover);
+    if (byName && isImageUrl(byName)) return byName;
+    if (byName && /^https?:\/\//i.test(byName)) return byName;
+    var found = '';
+    (function walk(node, depth) {
+      if (found || depth > 3) return;
+      if (!node || typeof node !== 'object') return;
+      for (var k in node) {
+        if (!Object.prototype.hasOwnProperty.call(node, k)) continue;
+        var v = node[k];
+        if (typeof v === 'string') {
+          if (isImageUrl(v)) { found = v; return; }
+        } else if (typeof v === 'object') {
+          var nestedName = pickField(v, FIELD_GUESS.cover);
+          if (nestedName && isImageUrl(nestedName)) { found = nestedName; return; }
+          walk(v, depth + 1);
+        }
+      }
+    })(item, 0);
+    return found;
+  }
 
   // ---- 递归找 JSON 里第一个数组（深度优先） ---------------------------
   function findFirstArray(node) {
@@ -82,4 +116,6 @@
   window.LM.findFirstArray = findFirstArray;
   window.LM.pickField = pickField;
   window.LM.pickByPath = pickByPath;
+  window.LM.pickCover = pickCover;
+  window.LM.isImageUrl = isImageUrl;
 })();

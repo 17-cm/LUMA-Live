@@ -187,9 +187,7 @@
     if (!songs || songs.length === 0) return '<div class="text-center py-12 text-[11px] text-slate-400">没有匹配的歌曲</div>';
     return songs.map(function (s, i) {
       return '<div class="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200 mb-2">' +
-        '<div class="w-12 h-12 rounded-xl flex-shrink-0 bg-gradient-to-br from-fuchsia-100 to-blue-100 flex items-center justify-center">' +
-          '<svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>' +
-        '</div>' +
+        renderSongThumb(s.cover, 'w-12 h-12') +
         '<div class="flex-1 min-w-0">' +
           '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(s.title) + '</div>' +
           '<div class="text-[10px] text-slate-500 mt-0.5 truncate">' + escapeHtml(s.artist) + '</div>' +
@@ -199,6 +197,16 @@
         '</button>' +
       '</div>';
     }).join('');
+  }
+
+  // ---- 歌曲封面缩略图：有封面显示图片，无封面/加载失败回退图标 -------
+  var LM_SONG_ICON = '<svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>';
+
+  function renderSongThumb(cover, sizeCls) {
+    return '<div class="' + sizeCls + ' rounded-xl flex-shrink-0 bg-gradient-to-br from-fuchsia-100 to-blue-100 flex items-center justify-center relative overflow-hidden">' +
+      LM_SONG_ICON +
+      (cover ? '<img src="' + escapeHtml(cover) + '" alt="" loading="lazy" class="absolute inset-0 w-full h-full object-cover" onerror="this.style.display=\'none\'">' : '') +
+    '</div>';
   }
 
   // ---- 搜索框绑定 -----------------------------------------------------
@@ -315,9 +323,7 @@
     }
     return window.liveMusicSongs.map(function (s) {
       return '<div class="flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-slate-200 mb-2">' +
-        '<button onclick="playLiveMusicSongFromLibrary(\'' + s.id + '\')" class="w-11 h-11 rounded-xl flex-shrink-0 bg-white border-2 border-fuchsia-400 text-fuchsia-500 flex items-center justify-center active:scale-90 transition" aria-label="播放" title="播放">' +
-          '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>' +
-        '</button>' +
+        renderSongThumb(s.cover, 'w-11 h-11') +
         '<div class="flex-1 min-w-0">' +
           '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(s.title) + '</div>' +
           '<div class="text-[10px] text-slate-500 mt-0.5 truncate">' + escapeHtml(s.artist) + '</div>' +
@@ -344,7 +350,8 @@
       title: m.title || s.title,
       artist: m.artist || s.artist,
       lyric: m.lyric || s.lyric,
-      playUrl: m.playUrl || s.playUrl
+      playUrl: m.playUrl || s.playUrl,
+      cover: m.cover || s.cover
     };
   }
 
@@ -365,6 +372,7 @@
       artist: s.artist,
       lyric: s.lyric || '',
       playUrl: s.playUrl,
+      cover: s.cover || '',
       sourceToolId: tool ? tool.id : null,
       addedAt: Date.now()
     });
