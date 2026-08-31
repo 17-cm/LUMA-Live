@@ -257,15 +257,267 @@
   }
   L.renderDisplayHTML = renderDisplayHTML;
 
-  function renderCharPlaylistHTML() {
-    return '<div class="flex flex-col items-center justify-center py-12 px-6 rounded-3xl bg-white border-2 border-dashed border-slate-200">' +
-      '<div class="w-14 h-14 rounded-full bg-gradient-to-br from-fuchsia-100 to-blue-100 flex items-center justify-center mb-3">' +
-        '<svg class="w-6 h-6 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>' +
-      '</div>' +
-      '<p class="text-sm font-black text-slate-900">为 char 建造歌单</p>' +
-      '<p class="text-[11px] text-slate-500 mt-1.5 text-center">等后续接入</p>' +
-    '</div>';
+  // ---- char 歌单 -------------------------------------------------------
+  // 从宿主拿到 char 列表（含头像/名字），按 id 匹配歌单数据
+  function _loadCharList() {
+    return Promise.resolve().then(function () {
+      if (window.api && window.api.characters && typeof window.api.characters.list === 'function') {
+        return window.api.characters.list();
+      }
+      if (window.AiPhone && window.AiPhone.characters && typeof window.AiPhone.characters.list === 'function') {
+        return window.AiPhone.characters.list();
+      }
+      return null;
+    }).then(function (chars) {
+      if (chars && Array.isArray(chars) && chars.length > 0) {
+        return chars;
+      }
+      // 兜底：用当前主播列表（liveList + allCharacters 聚合）
+      if (typeof window.getAvailableCharsList === 'function') return window.getAvailableCharsList();
+      return [];
+    });
   }
+
+  // 某个 char 的歌单歌曲对象列表（按 songIds 关联回全局歌曲库）
+  function _charPlaylistSongs(charId) {
+    var pl = (window.liveMusicCharPlaylists || {})[charId];
+    if (!pl) return [];
+    var ids = Array.isArray(pl.songIds) ? pl.songIds : [];
+    return ids.map(function (id) {
+      return (window.liveMusicSongs || []).find(function (s) { return s.id === id; }) || null;
+    }).filter(Boolean);
+  }
+
+  window.__liveMusicCharDrawer = window.__liveMusicCharDrawer || null; // 当前展开抽屉的 charId
+
+  function renderCharPlaylistHTML() {
+    // 返回完整 HTML（说明 + char 列表骨架）；DOM 挂载后用 setTimeout 异步填充 char 列表
+    var html =
+      // 顶部说明
+      '<div class="rounded-2xl bg-slate-900 text-white p-3 mb-3 flex items-start gap-2.5">' +
+        '<svg class="w-4 h-4 mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>' +
+        '<p class="text-[11px] font-bold leading-relaxed">建造歌单后，直播时只会播放该 char 的歌单；没有歌单则会随机播放歌曲列表。</p>' +
+      '</div>' +
+      // char 列表
+      '<div id="charPlaylistList" class="space-y-2">' +
+        '<div class="text-center py-10 text-[11px] text-slate-400">加载主播列表…</div>' +
+      '</div>';
+    setTimeout(function () { renderCharPlaylistList(); }, 0);
+    return html;
+  }
+  L.renderCharPlaylistHTML = renderCharPlaylistHTML;
+
+  function renderCharPlaylistList() {
+    var listBox = document.getElementById('charPlaylistList');
+    if (!listBox) return;
+    _loadCharList().then(function (chars) {
+      if (!chars || chars.length === 0) {
+        listBox.innerHTML = '<div class="text-center py-10 text-[11px] text-slate-400">暂无可用主播</div>';
+        return;
+      }
+      listBox.innerHTML = chars.map(function (c) {
+        var cid = String(c.id || c.characterId || '');
+        if (!cid) return '';
+        var name = c.name || c.characterName || '主播';
+        var avatar = c.avatar || (typeof window.getAvatar === 'function' ? window.getAvatar(name, 'first') : '');
+        var pl = (window.liveMusicCharPlaylists || {})[cid];
+        var cnt = (pl && Array.isArray(pl.songIds)) ? pl.songIds.filter(function (id) { return (window.liveMusicSongs || []).some(function (s) { return s.id === id; }); }).length : 0;
+        var expanded = window.__liveMusicCharDrawer === cid;
+        return renderCharRow(cid, name, avatar, cnt, expanded);
+      }).join('');
+      bindCharPlaylistRows();
+    });
+  }
+  L.renderCharPlaylistList = renderCharPlaylistList;
+
+  function renderCharRow(cid, name, avatar, cnt, expanded) {
+    return (
+      '<div class="rounded-2xl bg-white border border-slate-200 overflow-hidden">' +
+        // 主行：头像 + {{char}}歌单 + 右侧向下小箭头
+        '<div class="flex items-center gap-3 p-2.5">' +
+          '<div class="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-slate-200 bg-slate-100">' +
+            (avatar ? '<img src="' + escapeHtml(avatar) + '" alt="" class="w-full h-full object-cover" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+                       '<div class="w-full h-full hidden items-center justify-center bg-gradient-to-br from-fuchsia-100 to-blue-100"><span class="text-xs font-black text-slate-500">' + escapeHtml(name.charAt(0)) + '</span></div>'
+                     : '<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-fuchsia-100 to-blue-100"><span class="text-xs font-black text-slate-500">' + escapeHtml(name.charAt(0)) + '</span></div>') +
+          '</div>' +
+          '<div class="flex-1 min-w-0">' +
+            '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(name) + ' · 歌单</div>' +
+            '<div class="text-[10px] text-slate-500 mt-0.5">' + (cnt > 0 ? '已收录 ' + cnt + ' 首' : '还没有歌曲') + '</div>' +
+          '</div>' +
+          '<button data-char-toggle="' + escapeHtml(cid) + '" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 active:scale-90 transition flex-shrink-0" aria-label="展开/收起歌单">' +
+            '<svg class="w-4 h-4 ' + (expanded ? 'rotate-180' : '') + ' transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>' +
+          '</button>' +
+        '</div>' +
+        // 抽屉（下拉展开）
+        (expanded ? renderCharDrawer(cid, name) : '') +
+      '</div>'
+    );
+  }
+  L.renderCharRow = renderCharRow;
+
+  // 抽屉：第一个按键"添加歌曲"，下面显示已收录歌曲
+  function renderCharDrawer(cid, name) {
+    var songs = _charPlaylistSongs(cid);
+    return (
+      '<div class="border-t border-slate-100 bg-slate-50 px-2.5 pb-2.5 pt-2">' +
+        '<button data-char-add="' + escapeHtml(cid) + '" data-char-name="' + escapeHtml(name || '') + '" class="w-full flex items-center justify-center gap-1.5 h-9 rounded-xl bg-slate-900 text-white text-[11px] font-black active:scale-[0.98] transition">' +
+          '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+          '添加歌曲' +
+        '</button>' +
+        '<div class="mt-2 space-y-1.5">' +
+          (songs.length === 0
+            ? '<div class="text-center py-4 text-[10px] text-slate-400">歌单还是空的，点上方「添加歌曲」收录几首吧</div>'
+            : songs.map(function (s, i) {
+                return '<div class="flex items-center gap-2 p-2 rounded-xl bg-white border border-slate-100">' +
+                  renderSongThumb(s.cover, 'w-8 h-8') +
+                  '<div class="flex-1 min-w-0">' +
+                    '<div class="text-[11px] font-bold text-slate-900 truncate">' + escapeHtml(s.title) + '</div>' +
+                    '<div class="text-[9px] text-slate-500 truncate">' + escapeHtml(s.artist || '') + '</div>' +
+                  '</div>' +
+                  '<button data-char-remove="' + escapeHtml(cid) + '" data-song-id="' + escapeHtml(s.id) + '" class="flex-shrink-0 px-2 h-7 rounded-lg bg-slate-100 text-slate-500 text-[10px] font-bold active:scale-90 transition">移除</button>' +
+                '</div>';
+              }).join('')) +
+        '</div>' +
+      '</div>'
+    );
+  }
+  L.renderCharDrawer = renderCharDrawer;
+
+  // 请参阅指南：characters.list 获取角色信息 —— 见 _loadCharList()
+  window.toggleCharPlaylistDrawer = function (cid) {
+    window.__liveMusicCharDrawer = (window.__liveMusicCharDrawer === cid) ? null : cid;
+    renderCharPlaylistList();
+  };
+
+  function bindCharPlaylistRows() {
+    var listBox = document.getElementById('charPlaylistList');
+    if (!listBox) return;
+    listBox.querySelectorAll('[data-char-toggle]').forEach(function (btn) {
+      btn.onclick = function () { window.toggleCharPlaylistDrawer(btn.getAttribute('data-char-toggle')); };
+    });
+    listBox.querySelectorAll('[data-char-add]').forEach(function (btn) {
+      btn.onclick = function () {
+        var cid = btn.getAttribute('data-char-add');
+        var name = btn.getAttribute('data-char-name') || '';
+        openCharPlaylistAddModal(cid, name);
+      };
+    });
+    listBox.querySelectorAll('[data-char-remove]').forEach(function (btn) {
+      btn.onclick = function () {
+        var cid = btn.getAttribute('data-char-remove');
+        var songId = btn.getAttribute('data-song-id');
+        removeCharPlaylistSong(cid, songId);
+      };
+    });
+  }
+
+  // 移除 char 歌单中的一首
+  function removeCharPlaylistSong(cid, songId) {
+    var pl = (window.liveMusicCharPlaylists || {})[cid];
+    if (!pl) return;
+    pl.songIds = (pl.songIds || []).filter(function (id) { return id !== songId; });
+    saveSettings().then(function () { renderCharPlaylistList(); });
+  }
+  window.removeCharPlaylistSong = removeCharPlaylistSong;
+
+  // 添加歌曲弹窗：列出歌曲库所有歌曲，右侧选中开关，右上角全选/取消全选
+  function openCharPlaylistAddModal(cid, charName) {
+    if (document.getElementById('charPlaylistAddModal')) return;
+    var songs = window.liveMusicSongs || [];
+    if (songs.length === 0) {
+      if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('歌曲库为空，请先搜索添加歌曲');
+      return;
+    }
+    var pl = (window.liveMusicCharPlaylists || {})[cid] || { name: charName, songIds: [] };
+    var selected = new Set(Array.isArray(pl.songIds) ? pl.songIds : []);
+
+    var dlg = document.createElement('div');
+    dlg.id = 'charPlaylistAddModal';
+    dlg.className = 'fixed inset-0 z-[10003] flex items-center justify-center px-4';
+    dlg.style.backgroundColor = 'rgba(0,0,0,0.55)';
+    dlg.style.paddingTop = 'var(--ai-phone-app-safe-top, 88px)';
+    dlg.style.paddingBottom = 'var(--ai-phone-app-safe-bottom, 24px)';
+    dlg.innerHTML =
+      '<div class="w-full max-w-[400px] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden">' +
+        '<div class="px-4 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between">' +
+          '<div class="min-w-0">' +
+            '<h4 class="text-sm font-black text-slate-900 truncate">为 ' + escapeHtml(charName || (pl.name || '')) + ' 添加歌曲</h4>' +
+            '<p class="text-[10px] text-slate-500 mt-0.5">从歌曲库中勾选，加入该 char 的歌单</p>' +
+          '</div>' +
+          '<button id="charPlToggleAllBtn" class="flex-shrink-0 px-2.5 h-8 rounded-full bg-slate-100 text-slate-700 text-[10px] font-black active:scale-95 transition">全选</button>' +
+        '</div>' +
+        '<div class="flex-1 overflow-y-auto no-scrollbar px-3 py-2 max-h-[46vh]">' +
+          songs.map(function (s) {
+            var checked = selected.has(s.id);
+            return '<div class="flex items-center gap-3 p-2 rounded-2xl bg-white border border-slate-100 mb-2">' +
+              renderSongThumb(s.cover, 'w-11 h-11') +
+              '<div class="flex-1 min-w-0">' +
+                '<div class="text-xs font-black text-slate-900 truncate">' + escapeHtml(s.title) + '</div>' +
+                '<div class="text-[10px] text-slate-500 mt-0.5 truncate">' + escapeHtml(s.artist || '') + '</div>' +
+              '</div>' +
+              '<button data-pl-toggle="' + escapeHtml(s.id) + '" class="flex-shrink-0 w-11 h-6 rounded-full transition relative ' + (checked ? 'bg-fuchsia-500' : 'bg-slate-200') + '" aria-label="选择此歌曲">' +
+                '<span class="absolute top-0.5 ' + (checked ? 'left-[22px]' : 'left-0.5') + ' w-5 h-5 rounded-full bg-white shadow-sm transition-all"></span>' +
+              '</button>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+        '<div class="px-4 py-3 border-t border-slate-100 flex gap-2">' +
+          '<button id="charPlCancelBtn" class="flex-1 py-2.5 rounded-2xl bg-slate-100 text-slate-600 text-xs font-bold active:scale-95 transition">取消</button>' +
+          '<button id="charPlSaveBtn" class="flex-1 py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-sm active:scale-95 transition">确定</button>' +
+        '</div>' +
+      '</div>';
+    dlg.onclick = function (e) { if (e.target === dlg) dlg.remove(); };
+    document.body.appendChild(dlg);
+
+    var allSelected = selected.size === songs.length;
+
+    function renderToggleAllLabel() {
+      var btn = dlg.querySelector('#charPlToggleAllBtn');
+      if (btn) btn.textContent = allSelected ? '取消全选' : '全选';
+    }
+    renderToggleAllLabel();
+
+    dlg.querySelectorAll('[data-pl-toggle]').forEach(function (btn) {
+      btn.onclick = function () {
+        var id = btn.getAttribute('data-pl-toggle');
+        if (selected.has(id)) { selected.delete(id); } else { selected.add(id); }
+        allSelected = selected.size === songs.length;
+        var on = selected.has(id);
+        btn.className = 'flex-shrink-0 w-11 h-6 rounded-full transition relative ' + (on ? 'bg-fuchsia-500' : 'bg-slate-200');
+        btn.querySelector('span').className = 'absolute top-0.5 ' + (on ? 'left-[22px]' : 'left-0.5') + ' w-5 h-5 rounded-full bg-white shadow-sm transition-all';
+        renderToggleAllLabel();
+      };
+    });
+    dlg.querySelector('#charPlToggleAllBtn').onclick = function () {
+      if (allSelected) {
+        selected.clear();
+        allSelected = false;
+      } else {
+        songs.forEach(function (s) { selected.add(s.id); });
+        allSelected = true;
+      }
+      dlg.querySelectorAll('[data-pl-toggle]').forEach(function (btn) {
+        var id = btn.getAttribute('data-pl-toggle');
+        var on = selected.has(id);
+        btn.className = 'flex-shrink-0 w-11 h-6 rounded-full transition relative ' + (on ? 'bg-fuchsia-500' : 'bg-slate-200');
+        btn.querySelector('span').className = 'absolute top-0.5 ' + (on ? 'left-[22px]' : 'left-0.5') + ' w-5 h-5 rounded-full bg-white shadow-sm transition-all';
+      });
+      renderToggleAllLabel();
+    };
+    dlg.querySelector('#charPlCancelBtn').onclick = function () { dlg.remove(); };
+    dlg.querySelector('#charPlSaveBtn').onclick = function () {
+      var current = (window.liveMusicCharPlaylists || {})[cid] || { name: charName, songIds: [] };
+      current.songIds = songs.filter(function (s) { return selected.has(s.id); }).map(function (s) { return s.id; });
+      current.name = charName || current.name || '';
+      window.liveMusicCharPlaylists[cid] = current;
+      dlg.remove();
+      saveSettings().then(function () {
+        if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('已更新 ' + (charName || '') + ' 的歌单');
+        renderCharPlaylistList();
+      });
+    };
+  }
+  L.openCharPlaylistAddModal = openCharPlaylistAddModal;
 
   window.switchLiveMusicDisplay = function (key) {
     window.__liveMusicDisplayMode = (window.__liveMusicDisplayMode === key) ? null : key;

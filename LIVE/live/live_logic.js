@@ -487,6 +487,11 @@ function enterLiveRoomDirectly(sessionId) {
     if (roomModal) roomModal.classList.remove('hidden');
   }
 
+  // 进入直播间：自动播放该 char 的歌单（无歌单则随机播放自动列表）
+  if (window.LM && typeof window.LM.startCharPlaylist === 'function') {
+    try { window.LM.startCharPlaylist(currentRoom.characterId || currentRoom.id); } catch (e) {}
+  }
+
   clearInterval(liveDurationInterval);
   updateLiveRoomDuration();
   liveDurationInterval = setInterval(updateLiveRoomDuration, 1000);
@@ -543,6 +548,10 @@ function closeLiveRoom() {
   clearInterval(hostSpeechDripTimer);
   clearInterval(viewerCountInterval);
   if (api.voice?.stopPlayback) api.voice.stopPlayback({ channel: "voice" });
+  // 退出直播间：暂停直播间音乐（char 歌单 / 自动列表）
+  if (window.LM && typeof window.LM.stopCharPlaylist === 'function') {
+    try { window.LM.stopCharPlaylist(); } catch (e) {}
+  }
   if (typeof window.clearVideoBackground === 'function') window.clearVideoBackground();
   if (typeof window.clearSpeechMarquee === 'function') window.clearSpeechMarquee();
 

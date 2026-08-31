@@ -105,6 +105,19 @@
     return (list[idx] && list[idx].label) || '单曲循环';
   }
 
+  // ---- 当前播放队列 ---------------------------------------------------
+  // char 歌单激活时用歌单 id 序列；否则回退到歌曲列表（自动列表）
+  function _queueSongIds() {
+    var st = window.__liveMusicPlayback;
+    if (st.queue && Array.isArray(st.queue) && st.queue.length > 0) {
+      var valid = st.queue.filter(function (id) {
+        return (window.liveMusicSongs || []).some(function (s) { return s.id === id; });
+      });
+      return valid.length ? valid : (window.liveMusicSongs || []).map(function (s) { return s.id; });
+    }
+    return (window.liveMusicSongs || []).map(function (s) { return s.id; });
+  }
+
   // ---- 播放前数据准备：playUrl 是链接，需 fetch 转 dataUrl；
   //      已转过的存 audioRef 直接复用 --------------------------------------
   var _urlCache = {};   // playUrl -> dataUrl
@@ -253,34 +266,62 @@
   }
   window.LM.stopLiveMusic = stopLiveMusic;
 
-  // ---- 上一首 / 下一首（按歌曲库顺序）-------------------------------------
+  // ---- 上一首 / 下一首（按当前播放队列；队列为空回退歌曲列表）-------------
   function playPrevSong() {
-    var songs = window.liveMusicSongs || [];
-    if (songs.length === 0) return;
+    var ids = _queueSongIds();
+    if (ids.length === 0) return;
     var st = window.__liveMusicPlayback;
-    var idx = songs.findIndex(function (s) { return s.id === st.currentSongId; });
+    var idx = ids.indexOf(st.currentSongId);
     if (idx < 0) idx = 0;
-    var next = (idx - 1 + songs.length) % songs.length;
-    playLiveMusicSong(songs[next].id);
+    var next = (idx - 1 + ids.length) % ids.length;
+    playLiveMusicSong(ids[next]);
   }
   window.LM.playPrevSong = playPrevSong;
 
   function playNextSong() {
-    var songs = window.liveMusicSongs || [];
-    if (songs.length === 0) return;
+    var ids = _queueSongIds();
+    if (ids.length === 0) return;
     var st = window.__liveMusicPlayback;
     var label = _modeLabel();
     if (label === '随机播放') {
-      var r = Math.floor(Math.random() * songs.length);
-      playLiveMusicSong(songs[r].id);
+      var r = Math.floor(Math.random() * ids.length);
+      playLiveMusicSong(ids[r]);
       return;
     }
-    var idx = songs.findIndex(function (s) { return s.id === st.currentSongId; });
-    if (idx < 0) idx = 0;
-    var next = (idx + 1) % songs.length;
-    playLiveMusicSong(songs[next].id);
+    var idx = ids.indexOf(st.currentSongId);
+    if (idx < 0) idx = -1;
+    var next = (idx + 1) % ids.length;
+    playLiveMusicSong(ids[next]);
   }
   window.LM.playNextSong = playNextSong;
+
+  // ---- 进入直播间：自动播放该 char 的歌单 -------------------------------
+  // 有歌单 → 用歌单作为队列从第一首开始；没有歌单 → 回退歌曲列表随机播放
+  window.LM.startCharPlaylist = function (charId) {
+    var playlists = window.liveMusicCharPlaylists || {};
+    var pl = playlists[charId];
+    var ids = (pl && Array.isArray(pl.songIds)) ? pl.songIds.filter(Boolean) : [];
+    var st = window.__liveMusicPlayback;
+    if (ids.length > 0) {
+      st.queue = ids.slice();
+      playLiveMusicSong(ids[0]);
+    } else {
+      st.queue = null;
+      var songs = (window.liveMusicSongs || []).filter(function (s) { return s.playUrl; });
+      if (songs.length > 0) {
+        var r = Math.floor(Math.random() * songs.length);
+        playLiveMusicSong(songs[r].id);
+      } else {
+        playLiveMusicSong((window.liveMusicSongs && window.liveMusicSongs[0]) ? window.liveMusicSongs[0].id : null);
+      }
+    }
+  };
+
+  // ---- 退出直播间：暂停当前播放，并清空歌单队列恢复默认歌曲列表 ----
+  window.LM.stopCharPlaylist = function () {
+    window.__liveMusicPlayback.queue = null;
+    pauseLiveMusic();
+  };
 
   // 模拟播完/宿主播完 → 按模式决定下一首
   function stopAndNextOnEnd() {
@@ -313,9 +354,9 @@
   // ---- 播放/暂停切换（顶部卡播放键用）-----------------------------------
   function toggleLiveMusicPlay() {
     var st = window.__liveMusicPlayback;
-    var songs = window.liveMusicSongs || [];
     if (!st.currentSongId) {
-      if (songs.length > 0) { playLiveMusicSong(songs[0].id); }
+      var ids = _queueSongIds();
+      if (ids.length > 0) { playLiveMusicSong(ids[0]); }
       return;
     }
     if (st.pending) return; // 正在准备，忽略
@@ -332,6 +373,12 @@
   window.LM.onLiveMusicState = function (fn) { _onState = fn; };
   window.LM.onLiveMusicPlayStart = function (fn) { _onPlayStart = fn; };
   window.LM.onLiveMusicStopCurrent = function (fn) { _onStopCurrent = fn; };
+
+  // 供直播间或页面读取当前播放队列（char 歌单未启用时返回 null，表示歌曲列表）
+  window.LM.getLiveMusicActiveQueue = function () {
+    var q = window.__liveMusicPlayback.queue;
+    return (q && Array.isArray(q) && q.length > 0) ? q.slice() : null;
+  };
 
   function _emitState() {
     if (_onState) {

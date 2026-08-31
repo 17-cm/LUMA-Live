@@ -12,6 +12,8 @@
   window.liveMusicCurrentToolId = window.liveMusicCurrentToolId || null;
   window.liveMusicSongs = window.liveMusicSongs || [];
   window.liveMusicCover = window.liveMusicCover || 'https://files.catbox.moe/d1jldl.png';
+  // char 专属歌单：{ [charId]: { name, songIds: [] } }
+  window.liveMusicCharPlaylists = window.liveMusicCharPlaylists || {};
 
   function getDb() {
     return (window.AiPhone && window.AiPhone.db) || (window.AiPhoneApp && window.AiPhoneApp.db) || (window.api && window.api.db) || null;
@@ -52,6 +54,7 @@
           window.liveMusicCurrentToolId = data.current || null;
           window.liveMusicSongs = Array.isArray(data.songs) ? data.songs : [];
           window.liveMusicCover = typeof data.cover === 'string' && data.cover ? data.cover : 'https://files.catbox.moe/d1jldl.png';
+          window.liveMusicCharPlaylists = (data.charPlaylists && typeof data.charPlaylists === 'object') ? data.charPlaylists : {};
           migrateToolsInPlace();
         }
         if (window.LM && window.LM.renderLiveMusicPage) window.LM.renderLiveMusicPage();
@@ -66,7 +69,8 @@
       list: window.liveMusicTools,
       current: window.liveMusicCurrentToolId,
       songs: window.liveMusicSongs,
-      cover: window.liveMusicCover || null
+      cover: window.liveMusicCover || null,
+      charPlaylists: window.liveMusicCharPlaylists || {}
     };
     var db = getDb();
     if (!db) return Promise.resolve();
