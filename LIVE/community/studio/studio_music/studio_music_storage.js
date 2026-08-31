@@ -11,7 +11,7 @@
   window.liveMusicTools = window.liveMusicTools || [];
   window.liveMusicCurrentToolId = window.liveMusicCurrentToolId || null;
   window.liveMusicSongs = window.liveMusicSongs || [];
-  window.liveMusicCover = window.liveMusicCover || 'https://files.catbox.moe/d1jldl.png';
+  window.liveMusicCover = window.liveMusicCover || 'https://picui.ogmua.cn/s1/20260831/de8088ce8dc216b76510f2ebb8630297.jpg';
   // char 专属歌单：{ [charId]: { name, songIds: [] } }
   window.liveMusicCharPlaylists = window.liveMusicCharPlaylists || {};
 
@@ -53,7 +53,7 @@
           window.liveMusicTools = Array.isArray(data.list) ? data.list : [];
           window.liveMusicCurrentToolId = data.current || null;
           window.liveMusicSongs = Array.isArray(data.songs) ? data.songs : [];
-          window.liveMusicCover = typeof data.cover === 'string' && data.cover ? data.cover : 'https://files.catbox.moe/d1jldl.png';
+          window.liveMusicCover = typeof data.cover === 'string' && data.cover ? data.cover : 'https://picui.ogmua.cn/s1/20260831/de8088ce8dc216b76510f2ebb8630297.jpg';
           window.liveMusicCharPlaylists = (data.charPlaylists && typeof data.charPlaylists === 'object') ? data.charPlaylists : {};
           migrateToolsInPlace();
         }

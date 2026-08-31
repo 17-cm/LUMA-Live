@@ -66,7 +66,7 @@
         '<div class="relative grid grid-cols-[auto_1fr_auto] gap-4 items-stretch">' +
           // 封面（左侧上下居中，1:1 大尺寸，不被拉伸）——热搜同款 file 上传
           '<label class="relative aspect-square w-28 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 self-center flex-shrink-0 active:scale-95 transition cursor-pointer" aria-label="上传封面" title="点上传封面">' +
-            '<img id="liveMusicCoverImg" src="' + escapeHtml(window.liveMusicCover || 'https://files.catbox.moe/d1jldl.png') + '" alt="" class="absolute inset-0 w-full h-full object-cover">' +
+            '<img id="liveMusicCoverImg" src="' + escapeHtml(window.liveMusicCover || 'https://picui.ogmua.cn/s1/20260831/de8088ce8dc216b76510f2ebb8630297.jpg') + '" alt="" class="absolute inset-0 w-full h-full object-cover">' +
             '<input type="file" accept="image/*" style="display:none;" onchange="window.LM && window.LM.handleLiveMusicCoverUpload && window.LM.handleLiveMusicCoverUpload(event)">' +
           '</label>' +
           // 中间：按封面同高（h-full），三段按比例踩位置（顶/中/底）

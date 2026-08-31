@@ -278,7 +278,7 @@ window.refreshTrendsWithAI = refreshTrendsWithAI;
 // 置顶热搜数据管理
 const HERO_STORAGE_KEY = 'luma_hero_hot_search';
 const DEFAULT_HERO_DATA = {
-  image: 'https://files.catbox.moe/d1jldl.png',
+  image: 'https://picui.ogmua.cn/s1/20260831/de8088ce8dc216b76510f2ebb8630297.jpg',
   title: '主播连麦当场破防！神秘神豪连续狂砸5个嘉年华瞬间反超',
   heat: '389.2万',
   discussions: '5000+'
