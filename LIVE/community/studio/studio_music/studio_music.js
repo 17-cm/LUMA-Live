@@ -57,7 +57,6 @@
     var curSong = info.songId ? (window.liveMusicSongs || []).find(function (s) { return s.id === info.songId; }) : null;
     var cardTitle = curSong ? (curSong.title || '未知歌名') : '未知歌名';
     var cardArtist = curSong ? (curSong.artist || '未知歌手') : '未知歌手';
-    var pct = (info.durationMs && info.durationMs > 0) ? Math.min(100, Math.round((info.elapsedMs / info.durationMs) * 100)) : 0;
     var isPlaying = !!(info.playing);
 
     box.innerHTML =
@@ -72,30 +71,26 @@
           '</label>' +
           // 中间：按封面同高（h-full），三段按比例踩位置（顶/中/底）
           '<div class="min-w-0 h-full flex flex-col justify-between py-1">' +
-            // 顶部：歌名 / 歌手（随播放状态实时更新）
-            '<div class="min-w-0">' +
+            // 顶部：歌名 / 歌手（以播放键为基准居中对称）
+            '<div class="min-w-0 text-center">' +
               '<div id="liveMusicCardTitle" class="text-sm font-black text-slate-900 truncate">' + escapeHtml(cardTitle) + '</div>' +
               '<div id="liveMusicCardArtist" class="text-[10px] text-slate-500 font-bold tracking-wider mt-0.5 truncate">' + escapeHtml(cardArtist) + '</div>' +
             '</div>' +
-            // 中部：进度条（细线 + 圆点，随模拟计时更新）
-            '<div class="relative h-3 flex items-center" aria-hidden="true">' +
-              '<div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[2px] bg-slate-200 rounded-full"></div>' +
-              '<div id="liveMusicProgressFill" class="absolute left-0 top-1/2 -translate-y-1/2 h-[2px] bg-black rounded-full" style="width:' + pct + '%;"></div>' +
-              '<div id="liveMusicProgressThumb" class="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-black shadow-sm" style="left:calc(' + pct + '% - 5px);"></div>' +
-            '</div>' +
-            // 底部：上一首 / 播放(暂停切换) / 下一首
+            // 中部：珠子律动装饰条（固定高度独立图层，一直律动，不影响其它元素排布）
+            '<div class="relative h-3" aria-hidden="true">' + renderBeadsHTML() + '</div>' +
+            // 底部：上一首 / 播放(暂停切换) / 下一首（居中对称）
             '<div class="flex items-center justify-center gap-4">' +
-              '<button onclick="window.LM && window.LM.playPrevSong && window.LM.playPrevSong()" class="w-12 h-12 rounded-full flex items-center justify-center text-black active:scale-90 transition" aria-label="上一首" title="上一首">' +
-                '<svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M19 20L9 12l10-8v16zM5 19V5h2v14H5z"/></svg>' +
+              '<button onclick="window.LM && window.LM.playPrevSong && window.LM.playPrevSong()" class="w-[52px] h-[52px] rounded-full flex items-center justify-center text-black active:scale-90 transition" aria-label="上一首" title="上一首">' +
+                '<svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor"><path d="M19 20L9 12l10-8v16zM5 19V5h2v14H5z"/></svg>' +
               '</button>' +
-              '<button id="liveMusicPlayBtn" onclick="window.LM && window.LM.toggleLiveMusicPlay && window.LM.toggleLiveMusicPlay()" class="w-12 h-12 rounded-full flex items-center justify-center text-black active:scale-90 transition" aria-label="播放/暂停" title="播放/暂停">' +
+              '<button id="liveMusicPlayBtn" onclick="window.LM && window.LM.toggleLiveMusicPlay && window.LM.toggleLiveMusicPlay()" class="w-[52px] h-[52px] rounded-full flex items-center justify-center text-black active:scale-90 transition" aria-label="播放/暂停" title="播放/暂停">' +
                 (isPlaying ?
-                  '<svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>' :
-                  '<svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>'
+                  '<svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>' :
+                  '<svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>'
                 ) +
               '</button>' +
-              '<button onclick="window.LM && window.LM.playNextSong && window.LM.playNextSong()" class="w-12 h-12 rounded-full flex items-center justify-center text-black active:scale-90 transition" aria-label="下一首" title="下一首">' +
-                '<svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M5 4l10 8-10 8V4zm14-1h2v18h-2V3z"/></svg>' +
+              '<button onclick="window.LM && window.LM.playNextSong && window.LM.playNextSong()" class="w-[52px] h-[52px] rounded-full flex items-center justify-center text-black active:scale-90 transition" aria-label="下一首" title="下一首">' +
+                '<svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor"><path d="M5 4l10 8-10 8V4zm14-1h2v18h-2V3z"/></svg>' +
               '</button>' +
             '</div>' +
           '</div>' +
@@ -109,10 +104,10 @@
             '</button>' +
           '</div>' +
         '</div>' +
-        // 底部：歌词区（把卡片底部拉下来一点，放当前歌词行）
-        '<div class="mt-3 pt-2.5 border-t-2 border-dashed border-slate-200 min-h-[40px] flex items-center justify-center">' +
-          '<div id="liveMusicLyricBox" class="text-[11px] font-medium text-slate-700 text-center leading-snug line-clamp-2 break-all max-h-[34px] overflow-hidden">' +
-            (curSong && curSong.lyric ? '' : '<span class="text-slate-400">暂无歌词</span>') +
+        // 底部：歌词区（只显示当前播放到的一句，随进度自动切换）
+        '<div class="mt-3 pt-2.5 border-t-2 border-dashed border-slate-200 min-h-[24px] flex items-center justify-center overflow-hidden">' +
+          '<div id="liveMusicLyricBox" class="w-full">' +
+            (curSong && curSong.lyric ? '' : '<div class="lm-lyric-line lm-lyric-on text-center">暂无歌词</div>') +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -148,6 +143,21 @@
     updateLiveMusicCard();
   }
   L.renderLiveMusicPage = renderLiveMusicPage;
+
+  // ---- 珠子律动进度条：黑色圆点 + 连接线，播放时珠子大小不停变化 ----
+  var LIVE_MUSIC_BEAD_COUNT = 16;
+  function renderBeadsHTML() {
+    var parts = [];
+    for (var i = 0; i < LIVE_MUSIC_BEAD_COUNT; i++) {
+      parts.push('<span class="lm-bead" style="animation-delay:' + ((i % 4) * 0.13) + 's;"></span>');
+      if (i < LIVE_MUSIC_BEAD_COUNT - 1) {
+        parts.push('<span class="lm-bead-link"></span>');
+      }
+    }
+    // 装饰条：始终 lm-playing（一直在律动），与播放状态无关
+    return '<div id="liveMusicBeads" class="absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center lm-playing">' + parts.join('') + '</div>';
+  }
+  L.renderBeadsHTML = renderBeadsHTML;
 
   // ---- 播放模式按键（单击循环切换）----------------------------------
   var LIVE_MUSIC_MODE_LIST = [
@@ -187,18 +197,19 @@
     var box = document.getElementById('liveMusicLyricBox');
     if (!box) return;
     if (_currentLyricLines && _currentLyricLines.length > 0) {
-      var cur = _currentLyricLines[0];
-      for (var i = 0; i < _currentLyricLines.length; i++) {
-        if (_currentLyricLines[i].t <= (elapsedMs || 0)) cur = _currentLyricLines[i];
+      var lines = _currentLyricLines;
+      var idx = 0;
+      for (var i = 0; i < lines.length; i++) {
+        if (lines[i].t <= (elapsedMs || 0)) idx = i;
       }
-      box.innerHTML = escapeHtml(cur.text);
+      box.innerHTML = '<div class="lm-lyric-line lm-lyric-on text-center">' + escapeHtml(lines[idx].text) + '</div>';
       return;
     }
     if (_currentLyricPlain) {
-      box.innerHTML = escapeHtml(_currentLyricPlain);
+      box.innerHTML = '<div class="lm-lyric-line lm-lyric-on text-center">' + escapeHtml(_currentLyricPlain) + '</div>';
       return;
     }
-    box.innerHTML = '<span class="text-slate-400">暂无歌词</span>';
+    box.innerHTML = '<div class="lm-lyric-line lm-lyric-on text-center">暂无歌词</div>';
   }
 
   // 歌曲切换时准备好歌词数据（LRC 解析 or 纯文本占位）
@@ -224,24 +235,16 @@
       }
     }
 
-    // 更新进度条与歌词
-    var pct = 0;
-    if (info.durationMs && info.durationMs > 0) {
-      pct = Math.min(100, Math.round((info.elapsedMs / info.durationMs) * 100));
-    }
-    var fill = document.getElementById('liveMusicProgressFill');
-    if (fill) fill.style.width = pct + '%';
-    var thumb = document.getElementById('liveMusicProgressThumb');
-    if (thumb) thumb.style.left = 'calc(' + pct + '% - 5px)';
+    // 歌词按当前模拟进度定位当前句（律动条为恒定律动装饰，无需在此更新）
     _updateLyricBox(info.elapsedMs || 0);
 
     // 播放/暂停图标
     var playBtn = document.getElementById('liveMusicPlayBtn');
     if (playBtn) {
       if (info.playing) {
-        playBtn.innerHTML = '<svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>';
+        playBtn.innerHTML = '<svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>';
       } else {
-        playBtn.innerHTML = '<svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>';
+        playBtn.innerHTML = '<svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>';
       }
     }
   }
@@ -250,13 +253,7 @@
   // 注册播放器事件钩子（幂等，多次调用只覆盖回调）
   if (window.LM.onLiveMusicState) window.LM.onLiveMusicState(function () { updateLiveMusicCard(); });
   if (window.LM.onLiveMusicTick) window.LM.onLiveMusicTick(function (elapsedMs) {
-    var fill = document.getElementById('liveMusicProgressFill');
-    var info = (window.LM.getLiveMusicPlaybackInfo && window.LM.getLiveMusicPlaybackInfo()) || {};
-    var pct = 0;
-    if (info.durationMs && info.durationMs > 0) pct = Math.min(100, Math.round((elapsedMs / info.durationMs) * 100));
-    if (fill) fill.style.width = pct + '%';
-    var thumb = document.getElementById('liveMusicProgressThumb');
-    if (thumb) thumb.style.left = 'calc(' + pct + '% - 5px)';
+    // 进度条不随播放移动，仅维持珠子律动；歌词按时间轴自动滚动切换
     _updateLyricBox(elapsedMs || 0);
   });
   if (window.LM.onLiveMusicPlayStart) window.LM.onLiveMusicPlayStart(function () { updateLiveMusicCard(); });
@@ -507,7 +504,7 @@
       return Promise.resolve();
     }
     return resolveLyricText(s.lyric).then(function (lyricText) {
-      window.liveMusicSongs.push({
+      var songObj = {
         id: uid(),
         rawId: s.rawId,
         title: s.title,
@@ -518,7 +515,12 @@
         durationMs: normalizeDurationMs(s.durationMs),
         sourceToolId: tool ? tool.id : null,
         addedAt: Date.now()
-      });
+      };
+      window.liveMusicSongs.push(songObj);
+      // 入库即后台预取音频缓存：下次点播放命中缓存直接播，宿主不用再重新请求
+      if (window.LM.prefetchLiveMusicAudio) {
+        try { window.LM.prefetchLiveMusicAudio(songObj); } catch (e) {}
+      }
       return saveSettings().then(function () {
         if (window.AiPhone && window.AiPhone.ui && window.AiPhone.ui.toast) {
           if (skipUrlCheck || !s.playUrl) {

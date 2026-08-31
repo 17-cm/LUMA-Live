@@ -134,6 +134,26 @@
     });
   }
 
+  // ---- 入库即后台预取：拿到音频 dataUrl 缓存，播放时命中缓存直接播 --------
+  window.LM.prefetchLiveMusicAudio = function (song) {
+    if (!song || !song.playUrl) return Promise.resolve();
+    if (song.audioRef && song.audioRef.indexOf('media-store://') === 0) return Promise.resolve();
+    var url = song.playUrl;
+    if (_urlCache[url]) return Promise.resolve();
+    return window.LM.fetchAudioDataUrl(url).then(function (dataUrl) {
+      _urlCache[url] = dataUrl;
+      var st = window.__liveMusicPlayback;
+      if (st.currentSongId && st.currentSongId === song.id) {
+        st.audioRef = dataUrl;
+        st.inited = true;
+      }
+      if (window.console && window.console.log) window.console.log('[liveMusic] 预取缓存完成:', url);
+      return dataUrl;
+    }).catch(function (e) {
+      if (window.console && window.console.warn) window.console.warn('[liveMusic] 音频预取失败:', e);
+    });
+  };
+
   // ---- 开始播放一首歌（落点即时生效，旧迭代作废）-------------------------
   function playLiveMusicSong(songId) {
     var st = window.__liveMusicPlayback;
@@ -308,7 +328,7 @@
   // ---- 外部状态钩子（main.js 注册）---------------------------------------
   var _onTick, _onState, _onPlayStart, _onStopCurrent;
 
-  window.LM.onLiveMusicTick = function (fn) { _onTick = fn; };
+  window.LM.onLiveMusicTick = function (fn) { _onTick = fn; _onTimer = fn; };
   window.LM.onLiveMusicState = function (fn) { _onState = fn; };
   window.LM.onLiveMusicPlayStart = function (fn) { _onPlayStart = fn; };
   window.LM.onLiveMusicStopCurrent = function (fn) { _onStopCurrent = fn; };
