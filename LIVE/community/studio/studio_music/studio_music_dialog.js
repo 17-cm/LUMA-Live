@@ -159,17 +159,17 @@
     dlg.className = 'fixed inset-0 z-[10000] flex items-center justify-center bg-black/55';
 
     dlg.innerHTML =
-      '<div class="w-[360px] max-w-[calc(100vw-40px)] bg-white rounded-3xl shadow-2xl flex flex-col overflow-y-auto max-h-[80vh]">' +
+      '<div class="w-full max-w-[360px] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden max-h-[80vh]">' +
         '<div class="px-5 pt-5 pb-3 flex items-center justify-between border-b border-slate-100">' +
           '<h4 class="text-base font-black text-slate-900">' + (isEdit ? '编辑工具' : '添加工具') + '</h4>' +
           '<button id="lmAddCloseBtn" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 active:scale-90 transition" aria-label="关闭">' +
             '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
           '</button>' +
         '</div>' +
-        '<div id="lmAddContent" class="flex-1 overflow-y-auto px-5 py-3"></div>' +
+        '<div id="lmAddContent" class="flex-1 overflow-y-auto overflow-x-hidden px-5 py-3"></div>' +
         '<div class="px-5 py-3 border-t border-slate-100 flex gap-2">' +
           '<button id="lmAddCancelBtn" class="flex-1 py-2.5 rounded-2xl bg-slate-100 text-slate-600 text-xs font-bold active:scale-95 transition">取消</button>' +
-          '<button id="lmAddSaveBtn" class="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white text-xs font-black shadow-md active:scale-95 transition">保存</button>' +
+          '<button id="lmAddSaveBtn" class="flex-1 py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-md active:scale-95 transition">保存</button>' +
         '</div>' +
       '</div>';
 
@@ -195,14 +195,14 @@
     var fmtPlayUrlVal = (editTool && editTool.fmtPlayUrl) || L._newToolFmtPlayUrl;
     var fmtCoverVal = (editTool && editTool.fmtCover) || L._newToolFmtCover;
 
-    // 自定义请求头（最多 2 条，可选；从现有 tool.headers 字符串里拆 name/value）
+    // 自定义请求头（可多条：从现有 tool.headers 字符串里拆 name/value）
     var _headerRows = (editTool && typeof editTool.headers === 'string') ? editTool.headers.split(/\r?\n/) : [];
-    var _hr0 = _headerRows[0] ? _headerRows[0].split(':') : ['', ''];
-    var _hr1 = _headerRows[1] ? _headerRows[1].split(':') : ['', ''];
-    var headerName1Val = editTool ? ((_hr0[0] || '').trim()) : '';
-    var headerValue1Val = editTool ? ((_hr0[1] || '').trim()) : '';
-    var headerName2Val = editTool ? ((_hr1[0] || '').trim()) : '';
-    var headerValue2Val = editTool ? ((_hr1[1] || '').trim()) : '';
+    var headerRows = _headerRows.map(function (line) {
+      var idx = line.indexOf(':');
+      if (idx < 0) return { name: (line || '').trim(), value: '' };
+      return { name: (line.slice(0, idx) || '').trim(), value: (line.slice(idx + 1) || '').trim() };
+    });
+    if (headerRows.length === 0) headerRows = [{ name: '', value: '' }];
 
     function renderApiPanel() {
       var liveSk = dlg.querySelector('#lmSearchKey');
@@ -221,14 +221,13 @@
       }
       var liveDk = dlg.querySelector('#lmDetailKey');
       if (liveDk) detailKeyVal = liveDk.value;
-      var liveH1n = dlg.querySelector('#lmHeaderName1');
-      if (liveH1n) headerName1Val = liveH1n.value;
-      var liveH1v = dlg.querySelector('#lmHeaderValue1');
-      if (liveH1v) headerValue1Val = liveH1v.value;
-      var liveH2n = dlg.querySelector('#lmHeaderName2');
-      if (liveH2n) headerName2Val = liveH2n.value;
-      var liveH2v = dlg.querySelector('#lmHeaderValue2');
-      if (liveH2v) headerValue2Val = liveH2v.value;
+      dlg.querySelectorAll('[data-header-row]').forEach(function (row) {
+        var idx = parseInt(row.getAttribute('data-header-row'), 10);
+        var n = row.querySelector('[data-header-name]');
+        var v = row.querySelector('[data-header-value]');
+        if (n && headerRows[idx]) headerRows[idx].name = n.value;
+        if (v && headerRows[idx]) headerRows[idx].value = v.value;
+      });
       var liveUrl = dlg.querySelector('#lmToolUrl');
       if (liveUrl) {
         if (editTool) editTool.url = liveUrl.value;
@@ -265,46 +264,63 @@
       dlg.querySelector('#lmAddContent').innerHTML =
         '<div class="space-y-3">' +
           '<div>' +
-            '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">备注</label>' +
-            '<input id="lmToolName" type="text" placeholder="例：我的网易云歌单" value="' + escapeHtml(editTool ? editTool.name : toolNameVal) + '" ' +
+            '<div class="flex items-center gap-1.5 mb-1.5">' +
+              '<label class="text-[10px] font-black text-slate-500 tracking-wider">备注</label>' +
+              '<button id="lmNameHelpBtn" class="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-black active:scale-90 transition" aria-label="说明">?</button>' +
+            '</div>' +
+            '<input id="lmToolName" type="text" placeholder="二次请求暂只支持参数值为列表序号，适配点歌/关键词搜索。" value="' + escapeHtml(editTool ? editTool.name : toolNameVal) + '" ' +
                    'class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
           '</div>' +
           '<div>' +
-            '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">请求地址</label>' +
+            '<div class="flex items-center gap-1.5 mb-1.5">' +
+              '<label class="text-[10px] font-black text-slate-500 tracking-wider">请求地址</label>' +
+              '<button id="lmUrlHelpBtn" class="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-black active:scale-90 transition" aria-label="说明">?</button>' +
+            '</div>' +
             '<input id="lmToolUrl" type="text" placeholder="https://api.example.com/api.php" value="' + escapeHtml(editTool ? editTool.url : toolUrlVal) + '" ' +
                    'class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
           '</div>' +
           '<div>' +
-            '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">请求方式</label>' +
+            '<div class="flex items-center gap-1.5 mb-1.5">' +
+              '<label class="text-[10px] font-black text-slate-500 tracking-wider">请求方式</label>' +
+              '<button id="lmMethodHelpBtn" class="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-black active:scale-90 transition" aria-label="说明">?</button>' +
+            '</div>' +
             '<div class="flex gap-2">' +
               '<button data-method="GET" class="flex-1 py-2 rounded-xl text-xs font-black transition border ' + (currentMethod === 'GET' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200') + '">GET</button>' +
               '<button data-method="POST" class="flex-1 py-2 rounded-xl text-xs font-black transition border ' + (currentMethod === 'POST' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200') + '">POST</button>' +
             '</div>' +
           '</div>' +
           '<div>' +
-            '<div class="flex items-center gap-1.5 mb-1.5">' +
-              '<label class="text-[10px] font-black text-slate-500 tracking-wider">请求头（可选）</label>' +
-              '<button id="lmHeaderHelpBtn" class="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-black active:scale-90 transition" aria-label="说明">?</button>' +
-            '</div>' +
-            '<div class="space-y-2">' +
-              '<div class="flex items-center gap-2">' +
-                '<input id="lmHeaderName1" type="text" placeholder="Header 名" value="' + escapeHtml(headerName1Val) + '" ' +
-                       'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-                '<input id="lmHeaderValue1" type="text" placeholder="值" value="' + escapeHtml(headerValue1Val) + '" ' +
-                       'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
+            '<div class="flex items-center justify-between mb-1.5">' +
+              '<div class="flex items-center gap-1.5">' +
+                '<label class="text-[10px] font-black text-slate-500 tracking-wider">请求头（可选）</label>' +
+                '<button id="lmHeaderHelpBtn" class="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-black active:scale-90 transition" aria-label="说明">?</button>' +
               '</div>' +
-              '<div class="flex items-center gap-2">' +
-                '<input id="lmHeaderName2" type="text" placeholder="Header 名" value="' + escapeHtml(headerName2Val) + '" ' +
-                       'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-                '<input id="lmHeaderValue2" type="text" placeholder="值" value="' + escapeHtml(headerValue2Val) + '" ' +
-                       'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-              '</div>' +
+              '<button id="lmHeaderAddBtn" class="w-7 h-7 rounded-full bg-white border-2 border-slate-900 text-slate-900 flex items-center justify-center shadow-sm active:scale-90 transition" aria-label="增加请求头">' +
+                '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+              '</button>' +
             '</div>' +
+            '<div id="lmHeaderRows">' + headerRows.map(function (hr, i) {
+              return '<div class="flex items-center gap-2 mb-2" data-header-row="' + i + '">' +
+                '<input type="text" data-header-name placeholder="Header 名" value="' + escapeHtml(hr.name) + '" ' +
+                       'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
+                '<input type="text" data-header-value placeholder="值" value="' + escapeHtml(hr.value) + '" ' +
+                       'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
+                (headerRows.length > 1 ?
+                  '<button data-header-remove="' + i + '" class="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0 active:scale-90 transition" aria-label="删除该请求头">' +
+                    '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+                  '</button>' :
+                  '<div class="w-9 h-9 flex-shrink-0"></div>'
+                ) +
+              '</div>';
+            }).join('') + '</div>' +
           '</div>' +
           '<div>' +
             '<div class="flex items-center justify-between mb-1.5">' +
-              '<label class="text-[10px] font-black text-slate-500 tracking-wider">默认参数</label>' +
-              '<button id="lmParamAddBtn" class="w-7 h-7 rounded-full bg-gradient-to-br from-fuchsia-500 to-pink-500 text-white flex items-center justify-center shadow-sm active:scale-90 transition" aria-label="增加参数">' +
+              '<div class="flex items-center gap-1.5">' +
+                '<label class="text-[10px] font-black text-slate-500 tracking-wider">默认参数（可选）</label>' +
+                '<button id="lmParamHelpBtn" class="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-black active:scale-90 transition" aria-label="说明">?</button>' +
+              '</div>' +
+              '<button id="lmParamAddBtn" class="w-7 h-7 rounded-full bg-white border-2 border-slate-900 text-slate-900 flex items-center justify-center shadow-sm active:scale-90 transition" aria-label="增加参数">' +
                 '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
               '</button>' +
             '</div>' +
@@ -312,13 +328,13 @@
           '</div>' +
           '<div>' +
             '<div class="flex items-center gap-1.5 mb-1.5">' +
-              '<label class="text-[10px] font-black text-slate-500 tracking-wider">搜索框参数</label>' +
+              '<label class="text-[10px] font-black text-slate-500 tracking-wider">搜索框参数（必填）</label>' +
               '<button id="lmSearchKeyHelpBtn" class="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-black active:scale-90 transition" aria-label="说明">?</button>' +
             '</div>' +
             '<div class="flex items-center gap-2">' +
               '<input id="lmSearchKey" type="text" placeholder="例：name" value="' + escapeHtml(searchKeyVal) + '" ' +
-                     'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-              '<div class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-[10px] text-slate-400 flex items-center">搜索框输入</div>' +
+                     'class="flex-1 min-w-0 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
+              '<div class="w-[92px] flex-shrink-0 h-9 px-2 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-[9px] text-slate-400 flex items-center justify-center leading-tight text-center">值在搜索框输入<br/>自动补全</div>' +
             '</div>' +
           '</div>' +
           '<div>' +
@@ -328,37 +344,41 @@
             '</div>' +
             '<div class="flex items-center gap-2">' +
               '<input id="lmDetailKey" type="text" placeholder="例：n（不填则跳过二级请求）" value="' + escapeHtml(detailKeyVal) + '" ' +
-                     'class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
-              '<div class="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-[10px] text-slate-400 flex items-center">歌曲序号</div>' +
+                     'class="flex-1 min-w-0 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100" />' +
+              '<div class="w-[92px] flex-shrink-0 h-9 px-2 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-[9px] text-slate-400 flex items-center justify-center leading-tight text-center">自动用歌曲列表<br/>序号补全</div>' +
             '</div>' +
+            '<p class="text-[9px] text-slate-400 mt-1.5 leading-relaxed">仅在歌曲需要二次请求时填入（一次请求返回播放链接则不需二次请求）。</p>' +
           '</div>' +
           '<div>' +
-            '<label class="text-[10px] font-black text-slate-500 tracking-wider block mb-1.5">返回格式（告诉系统哪个字段是哪个）</label>' +
+            '<div class="flex items-center gap-1.5 mb-1.5">' +
+              '<label class="text-[10px] font-black text-slate-500 tracking-wider">返回格式（告诉系统哪个字段是哪个）</label>' +
+              '<button id="lmFmtHelpBtn" class="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-black active:scale-90 transition" aria-label="说明">?</button>' +
+            '</div>' +
             '<div class="rounded-2xl border border-slate-200 bg-slate-50 divide-y divide-slate-100">' +
               '<div class="flex items-center gap-2 px-3 py-2.5">' +
                 '<span class="text-[10px] font-black text-slate-500 w-16 flex-shrink-0">歌名</span>' +
                 '<input id="lmFmtTitle" type="text" placeholder="name" value="' + escapeHtml(editTool ? (editTool.fmtTitle || '') : fmtTitleVal) + '" ' +
-                       'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
+                       'class="flex-1 min-w-0 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
               '</div>' +
               '<div class="flex items-center gap-2 px-3 py-2.5">' +
                 '<span class="text-[10px] font-black text-slate-500 w-16 flex-shrink-0">歌手</span>' +
                 '<input id="lmFmtArtist" type="text" placeholder="singer" value="' + escapeHtml(editTool ? (editTool.fmtArtist || '') : fmtArtistVal) + '" ' +
-                       'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
+                       'class="flex-1 min-w-0 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
               '</div>' +
               '<div class="flex items-center gap-2 px-3 py-2.5">' +
                 '<span class="text-[10px] font-black text-slate-500 w-16 flex-shrink-0">歌词</span>' +
                 '<input id="lmFmtLyric" type="text" placeholder="lyric" value="' + escapeHtml(editTool ? (editTool.fmtLyric || '') : fmtLyricVal) + '" ' +
-                       'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
+                       'class="flex-1 min-w-0 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
               '</div>' +
               '<div class="flex items-center gap-2 px-3 py-2.5">' +
                 '<span class="text-[10px] font-black text-slate-500 w-16 flex-shrink-0">播放URL</span>' +
                 '<input id="lmFmtPlayUrl" type="text" placeholder="music_url" value="' + escapeHtml(editTool ? (editTool.fmtPlayUrl || '') : fmtPlayUrlVal) + '" ' +
-                       'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
+                       'class="flex-1 min-w-0 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
               '</div>' +
               '<div class="flex items-center gap-2 px-3 py-2.5">' +
                 '<span class="text-[10px] font-black text-slate-500 w-16 flex-shrink-0">封面</span>' +
                 '<input id="lmFmtCover" type="text" placeholder="pic_url（可选）" value="' + escapeHtml(editTool ? (editTool.fmtCover || '') : fmtCoverVal) + '" ' +
-                       'class="flex-1 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
+                       'class="flex-1 min-w-0 h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-fuchsia-400" />' +
               '</div>' +
             '</div>' +
             '<p class="text-[10px] text-slate-400 mt-1.5 leading-relaxed">填 API 返回的<b>字段名</b>，系统会用它去对应 JSON 里取值。留空 = 自动启发式匹配。</p>' +
@@ -407,19 +427,72 @@
           '<p class="mt-1">· <span class="font-mono text-fuchsia-600">Referer</span> — 防盗链，告诉服务器"我从哪里来"</p>' +
           '<p class="mt-1">· <span class="font-mono text-fuchsia-600">User-Agent</span> — 模拟浏览器身份</p>' +
           '<p class="mt-1">· <span class="font-mono text-fuchsia-600">Cookie</span> — 需要登录态的接口</p>' +
-          '<p class="mt-3 pt-2 border-t border-slate-100"><b>填写方式：</b>左边填字段名（比如 <span class="font-mono">Referer</span>），右边填值。最多填 2 条，留空 = 不发送。</p>' +
+          '<p class="mt-3 pt-2 border-t border-slate-100"><b>填写方式：</b>每行左边填字段名（比如 <span class="font-mono">Referer</span>），右边填值。点右上角 <b>＋</b> 添加更多行，整行留空 = 不发送。</p>' +
           '<p class="mt-2 text-slate-500 text-[10px]">可选功能，不填也能用普通 JSON API。</p>'
         );
       };
-      var h1n = dlg.querySelector('#lmHeaderName1');
-      if (h1n) h1n.oninput = function (e) { headerName1Val = e.target.value; };
-      var h1v = dlg.querySelector('#lmHeaderValue1');
-      if (h1v) h1v.oninput = function (e) { headerValue1Val = e.target.value; };
-      var h2n = dlg.querySelector('#lmHeaderName2');
-      if (h2n) h2n.oninput = function (e) { headerName2Val = e.target.value; };
-      var h2v = dlg.querySelector('#lmHeaderValue2');
-      if (h2v) h2v.oninput = function (e) { headerValue2Val = e.target.value; };
-
+      var nHelpBtn = dlg.querySelector('#lmNameHelpBtn');
+      if (nHelpBtn) nHelpBtn.onclick = function () {
+        openHelpModal('备注说明',
+          '<p>给这个工具起个<b>名字</b>，方便之后在工具栏里一眼认出它是干什么的。</p>' +
+          '<p class="mt-2">比如它负责搜索「歌名」，就填 <b>歌名</b>；负责搜歌手就填 <b>歌手</b>。</p>' +
+          '<p class="mt-2 text-slate-500 text-[10px]">必填项，保存后显示在工具按钮上。</p>'
+        );
+      };
+      var urlHelpBtn = dlg.querySelector('#lmUrlHelpBtn');
+      if (urlHelpBtn) urlHelpBtn.onclick = function () {
+        openHelpModal('请求地址说明',
+          '<p>填入这个工具的<b>完整请求地址</b>（含协议和域名）。</p>' +
+          '<p class="mt-2"><b>例：</b><span class="font-mono text-slate-900">https://api.example.com/api.php</span></p>' +
+          '<p class="mt-2 text-slate-500 text-[10px]">必填项。搜索框内容、默认参数、请求头都会加到这个地址的请求里。</p>'
+        );
+      };
+      var methodHelpBtn = dlg.querySelector('#lmMethodHelpBtn');
+      if (methodHelpBtn) methodHelpBtn.onclick = function () {
+        openHelpModal('请求方式说明',
+          '<p>选择这个接口用 <b>GET</b> 还是 <b>POST</b> 请求。</p>' +
+          '<p class="mt-2">· <b>GET</b>：参数拼在 URL 问号后面</p>' +
+          '<p class="mt-1">· <b>POST</b>：参数放在请求体里</p>' +
+          '<p class="mt-2 text-slate-500 text-[10px]">绝大多数接口用 GET 即可，视接口文档而定。</p>'
+        );
+      };
+      var paramHelpBtn = dlg.querySelector('#lmParamHelpBtn');
+      if (paramHelpBtn) paramHelpBtn.onclick = function () {
+        openHelpModal('默认参数说明',
+          '<p>有些接口每次请求都带<b>固定不变</b>的参数（比如 token、key、version）。</p>' +
+          '<p class="mt-2">在这里按 <b>参数名 → 值</b> 一行行添加，点 <b>＋</b> 可继续加。</p>' +
+          '<p class="mt-2"><b>例：</b>接口要求 <span class="font-mono">?token=abc&version=1</span>，就填两行：<span class="font-mono">token → abc</span>、<span class="font-mono">version → 1</span>。</p>' +
+          '<p class="mt-2 text-slate-500 text-[10px]">可选功能。搜索框参数、二次请求参数是独立的，不用在这里加。</p>'
+        );
+      };
+      var fmtHelpBtn = dlg.querySelector('#lmFmtHelpBtn');
+      if (fmtHelpBtn) fmtHelpBtn.onclick = function () {
+        openHelpModal('返回格式说明',
+          '<p>接口返回的 JSON 里，哪些字段是<b>歌名、歌手、歌词、播放URL、封面</b>。</p>' +
+          '<p class="mt-2">在对应输入框里填接口返回的<b>字段名</b>即可，系统会自动去 JSON 里取值。</p>' +
+          '<p class="mt-2"><b>例：</b>返回 <span class="font-mono text-slate-900">{"music":"XX","singername":"YY"}</span>，歌名填 <span class="font-mono text-fuchsia-600">music</span>，歌手填 <span class="font-mono text-fuchsia-600">singername</span>。</p>' +
+          '<p class="mt-2 text-slate-500 text-[10px]">留空 = 自动启发式匹配（猜常见字段名）。</p>'
+        );
+      };
+      var headerAddBtn = dlg.querySelector('#lmHeaderAddBtn');
+      if (headerAddBtn) headerAddBtn.onclick = function () {
+        headerRows.push({ name: '', value: '' });
+        renderApiPanel();
+      };
+      dlg.querySelectorAll('[data-header-row]').forEach(function (row) {
+        var idx = parseInt(row.getAttribute('data-header-row'), 10);
+        var n = row.querySelector('[data-header-name]');
+        if (n) n.oninput = function (e) { if (headerRows[idx]) headerRows[idx].name = e.target.value; };
+        var v = row.querySelector('[data-header-value]');
+        if (v) v.oninput = function (e) { if (headerRows[idx]) headerRows[idx].value = e.target.value; };
+        var rm = row.querySelector('[data-header-remove]');
+        if (rm) {
+          rm.onclick = function () {
+            headerRows.splice(idx, 1);
+            renderApiPanel();
+          };
+        }
+      });
       dlg.querySelectorAll('[data-param-row]').forEach(function (row) {
         var idx = parseInt(row.getAttribute('data-param-row'), 10);
         row.querySelector('[data-param-key]').oninput = function (e) { paramRows[idx].key = e.target.value; };
@@ -446,14 +519,17 @@
       var fmtCover = ((dlg.querySelector('#lmFmtCover') || {}).value || '').trim();
       var searchKey = ((dlg.querySelector('#lmSearchKey') || {}).value || '').trim();
       var detailKey = ((dlg.querySelector('#lmDetailKey') || {}).value || '').trim();
-      var headerName1 = ((dlg.querySelector('#lmHeaderName1') || {}).value || '').trim();
-      var headerValue1 = ((dlg.querySelector('#lmHeaderValue1') || {}).value || '').trim();
-      var headerName2 = ((dlg.querySelector('#lmHeaderName2') || {}).value || '').trim();
-      var headerValue2 = ((dlg.querySelector('#lmHeaderValue2') || {}).value || '').trim();
-      var headersStr = '';
-      if (headerName1) headersStr += headerName1 + ': ' + headerValue1 + '\n';
-      if (headerName2) headersStr += headerName2 + ': ' + headerValue2 + '\n';
-      headersStr = headersStr.replace(/\n+$/, '');
+      dlg.querySelectorAll('[data-header-row]').forEach(function (row) {
+        var idx = parseInt(row.getAttribute('data-header-row'), 10);
+        var n = row.querySelector('[data-header-name]');
+        var v = row.querySelector('[data-header-value]');
+        if (n && headerRows[idx]) headerRows[idx].name = n.value;
+        if (v && headerRows[idx]) headerRows[idx].value = v.value;
+      });
+      var headersStr = headerRows
+        .map(function (h) { return (h.name || '').trim() + ': ' + (h.value || '').trim(); })
+        .filter(function (line) { return line.replace(/: $/, '') !== ''; })
+        .join('\n');
       if (!name) { flashError(dlg, 'lmToolName', '请填写备注'); return; }
       if (!url) { flashError(dlg, 'lmToolUrl', '请填写请求地址'); return; }
       var cleanParams = paramRows

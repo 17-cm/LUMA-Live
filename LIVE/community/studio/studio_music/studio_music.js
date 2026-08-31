@@ -61,7 +61,7 @@
 
     box.innerHTML =
       // 顶部状态卡（黑粗边框，参考手机播放器结构）
-      '<div class="relative overflow-hidden rounded-3xl p-5 mb-4 bg-white border-4 border-black shadow-sm">' +
+      '<div class="relative overflow-hidden rounded-3xl p-5 mb-4 bg-white/60 backdrop-blur-md border-2 border-black shadow-sm">' +
         // 主体：grid 三列 —— 封面 / 中间内容 / 右侧按键
         '<div class="relative grid grid-cols-[auto_1fr_auto] gap-4 items-stretch">' +
           // 封面（左侧上下居中，1:1 大尺寸，不被拉伸）——热搜同款 file 上传
@@ -71,15 +71,15 @@
           '</label>' +
           // 中间：按封面同高（h-full），三段按比例踩位置（顶/中/底）
           '<div class="min-w-0 h-full flex flex-col justify-between py-1">' +
-            // 顶部：歌名 / 歌手（以播放键为基准居中对称）
-            '<div class="min-w-0 text-center">' +
-              '<div id="liveMusicCardTitle" class="text-sm font-black text-slate-900 truncate">' + escapeHtml(cardTitle) + '</div>' +
-              '<div id="liveMusicCardArtist" class="text-[10px] text-slate-500 font-bold tracking-wider mt-0.5 truncate">' + escapeHtml(cardArtist) + '</div>' +
+            // 顶部：歌名（左对齐律动条头部）/ 歌手（右对齐律动条尾部）
+            '<div class="min-w-0 flex flex-col">' +
+              '<div id="liveMusicCardTitle" class="text-sm font-black text-slate-900 truncate text-left">' + escapeHtml(cardTitle) + '</div>' +
+              '<div id="liveMusicCardArtist" class="text-[10px] text-slate-500 font-bold tracking-wider mt-0.5 truncate text-right">' + escapeHtml(cardArtist) + '</div>' +
             '</div>' +
-            // 中部：珠子律动装饰条（固定高度独立图层，一直律动，不影响其它元素排布）
-            '<div class="relative h-3" aria-hidden="true">' + renderBeadsHTML() + '</div>' +
-            // 底部：上一首 / 播放(暂停切换) / 下一首（居中对称）
-            '<div class="flex items-center justify-center gap-4">' +
+            // 中部：黑粗线装饰（与卡片黑边框同粗 4px，纯视觉）
+            '<div class="relative h-1 bg-black rounded-full" aria-hidden="true"></div>' +
+            // 底部：上一首 / 播放(暂停切换) / 下一首（居中对称，向下偏移 2px）
+            '<div class="flex items-center justify-center gap-4 mt-0.5">' +
               '<button onclick="window.LM && window.LM.playPrevSong && window.LM.playPrevSong()" class="w-[52px] h-[52px] rounded-full flex items-center justify-center text-black active:scale-90 transition" aria-label="上一首" title="上一首">' +
                 '<svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor"><path d="M19 20L9 12l10-8v16zM5 19V5h2v14H5z"/></svg>' +
               '</button>' +
@@ -143,21 +143,6 @@
     updateLiveMusicCard();
   }
   L.renderLiveMusicPage = renderLiveMusicPage;
-
-  // ---- 珠子律动进度条：黑色圆点 + 连接线，播放时珠子大小不停变化 ----
-  var LIVE_MUSIC_BEAD_COUNT = 16;
-  function renderBeadsHTML() {
-    var parts = [];
-    for (var i = 0; i < LIVE_MUSIC_BEAD_COUNT; i++) {
-      parts.push('<span class="lm-bead" style="animation-delay:' + ((i % 4) * 0.13) + 's;"></span>');
-      if (i < LIVE_MUSIC_BEAD_COUNT - 1) {
-        parts.push('<span class="lm-bead-link"></span>');
-      }
-    }
-    // 装饰条：始终 lm-playing（一直在律动），与播放状态无关
-    return '<div id="liveMusicBeads" class="absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center lm-playing">' + parts.join('') + '</div>';
-  }
-  L.renderBeadsHTML = renderBeadsHTML;
 
   // ---- 播放模式按键（单击循环切换）----------------------------------
   var LIVE_MUSIC_MODE_LIST = [

@@ -12,13 +12,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- 全局样式 -->
   <link rel="stylesheet" href="style.css">
-  <!-- 直播间音乐：珠子律动进度 + 歌词滚动 -->
+  <!-- 直播间音乐：歌词滚动 -->
   <style>
-    #liveMusicBeads { gap: 0; width: 100%; }
-    .lm-bead { width: 6px; height: 6px; border-radius: 9999px; background: #111; flex-shrink: 0; animation: lmBeadPulse .6s ease-in-out infinite; animation-play-state: paused; }
-    #liveMusicBeads.lm-playing .lm-bead { animation-play-state: running; }
-    .lm-bead-link { flex: 1 1 auto; height: 1.5px; background: #cbd5e1; border-radius: 1px; }
-    @keyframes lmBeadPulse { 0%, 100% { transform: scale(1); opacity: .6; } 50% { transform: scale(2.1); opacity: 1; } }
     #liveMusicLyricBox { font-size: 11px; font-weight: 700; line-height: 20px; color: #94a3b8; text-align: center; transition: transform .35s ease-out; }
     .lm-lyric-line { height: 20px; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .25s, font-weight .25s; }
     .lm-lyric-line.lm-lyric-on { color: #0f172a; font-weight: 900; }
