@@ -534,6 +534,13 @@
     dlg.querySelector('#lmSongDelCancelBtn').onclick = function () { dlg.remove(); };
     dlg.querySelector('#lmSongDelConfirmBtn').onclick = function () {
       window.liveMusicSongs = (window.liveMusicSongs || []).filter(function (s) { return s.id !== id; });
+      // 删除的若是当前播放歌曲，停止播放并重置播放器
+      var info = (window.LM.getLiveMusicPlaybackInfo && window.LM.getLiveMusicPlaybackInfo()) || {};
+      if (info.songId === id) {
+        if (window.LM.stopLiveMusic) { try { window.LM.stopLiveMusic(); } catch (e) {} }
+        if (window.__liveMusicPlayback) window.__liveMusicPlayback.currentSongId = null;
+        if (window.LM.updateLiveMusicCard) { try { window.LM.updateLiveMusicCard(); } catch (e) {} }
+      }
       L.saveSettings().then(function () {
         dlg.remove();
         if (window.AiPhone && window.AiPhone.ui && window.AiPhone.ui.toast) window.AiPhone.ui.toast('已删除');

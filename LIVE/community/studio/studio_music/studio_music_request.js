@@ -24,6 +24,35 @@
     });
   }
 
+  // ---- 文本 fetch（歌词链接、纯文本返回） -------------------------------
+  function doFetchText(url, options) {
+    var fetchOptions = {
+      method: (options && options.method) || 'GET',
+      headers: (options && options.headers) || {}
+    };
+    return fetch(url, fetchOptions).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.text();
+    });
+  }
+
+  // ---- 音频链接 → dataUrl（宿主代播需要可播的 dataUrl / media-store）-----
+  // 播放必须走宿主 voice.play，需要先把远程音频 fetch 成 dataUrl。
+  // 若目标音频未开放 CORS 会失败，此时交给调用方兜底提示。
+  function fetchAudioDataUrl(url) {
+    return fetch(url).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.blob();
+    }).then(function (blob) {
+      return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(reader.result); };
+        reader.onerror = function () { reject(new Error('读取音频失败')); };
+        reader.readAsDataURL(blob);
+      });
+    });
+  }
+
   // ================================================================
   // buildRequest - 完整重构版
   // 规则：
@@ -110,5 +139,7 @@
   }
 
   L.doFetchJson = doFetchJson;
+  L.doFetchText = doFetchText;
+  L.fetchAudioDataUrl = fetchAudioDataUrl;
   L.buildRequest = buildRequest;
 })();

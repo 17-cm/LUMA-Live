@@ -32,6 +32,7 @@
     artist:  ['artists', 'singer', 'ar_name', 'artist', 'singerName', 'author', 'singer_name', 'artist_name'],
     playUrl: ['url', 'playUrl', 'play_url', 'mp3Url', 'mp3_url', 'src', 'audioUrl', 'audio', 'music_url', 'link'],
     lyric:   ['lyric', 'lyricContent', 'lyric_text', 'lrc', 'lrcContent', 'lyric_url', 'lyricUrl'],
+    duration: ['duration', 'durationMs', 'duration_ms', 'dur', 'dt', 'seconds', 'interval', 'playTime', 'time', 'len'],
     cover:   ['pic', 'picUrl', 'pic_url', 'cover', 'coverUrl', 'cover_url', 'img', 'imgUrl', 'img_url', 'image', 'imageUrl', 'image_url', 'picture', 'albumPic', 'albumPicUrl', 'album_pic', 'songPic', 'songPicUrl', 'artPic', 'artistPic', 'thumbnail', 'thumb', 'thumbUrl', 'logo', 'icon']
   };
 
@@ -49,6 +50,49 @@
     if (typeof v !== 'string') return false;
     if (isImageUrl(v)) return true;
     return /^(https?:)?\/\//i.test(v) && !MEDIA_EXT_RE.test(v);
+  }
+
+  // ---- 任意链接判断：http(s) 或协议相对 //（歌词/音频/封面都可能返回链接）
+  function isUrlLike(v) {
+    return typeof v === 'string' && /^(https?:)?\/\//i.test(v);
+  }
+
+  // ---- LRC 歌词解析：'[mm:ss.xx]文本' → [{t(ms), text}] -------------------
+  // 无时间戳的纯文本 → 单条 [{t:0, text}]；空 → []
+  function parseLrc(lrc) {
+    if (!lrc || typeof lrc !== 'string') return [];
+    var out = [];
+    var lineRe = /\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g;
+    var lines = lrc.split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (!line) continue;
+      var times = [];
+      var m;
+      lineRe.lastIndex = 0;
+      while ((m = lineRe.exec(line)) !== null) {
+        var min = parseInt(m[1], 10) || 0;
+        var sec = parseInt(m[2], 10) || 0;
+        var msRaw = m[3] ? String(m[3]) : '';
+        var ms = 0;
+        if (msRaw.length === 1) ms = parseInt(msRaw, 10) * 100;
+        else if (msRaw.length === 2) ms = parseInt(msRaw, 10) * 10;
+        else if (msRaw.length >= 3) ms = parseInt(msRaw.slice(0, 3), 10);
+        times.push(min * 60000 + sec * 1000 + ms);
+      }
+      if (times.length === 0) continue;
+      var text = line.replace(lineRe, '').trim();
+      if (!text) continue;
+      for (var j = 0; j < times.length; j++) {
+        out.push({ t: times[j], text: text });
+      }
+    }
+    out.sort(function (a, b) { return a.t - b.t; });
+    if (out.length === 0) {
+      var plain = String(lrc).trim();
+      if (plain) out.push({ t: 0, text: plain });
+    }
+    return out;
   }
 
   // ---- 封面提取（内置启发式）：字段名命中封面关键词即采用，否则递归扫图片 ----
@@ -128,4 +172,6 @@
   window.LM.pickCover = pickCover;
   window.LM.isImageUrl = isImageUrl;
   window.LM.isImageLikeUrl = isImageLikeUrl;
+  window.LM.isUrlLike = isUrlLike;
+  window.LM.parseLrc = parseLrc;
 })();
