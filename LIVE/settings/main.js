@@ -192,15 +192,6 @@ function syncParamDisplays() {
   setVal('paramEnterPlayerLiveRate', p.enterPlayerLiveRate || 60, 'valEnterPlayerLiveRate', '%');
   setVal('paramGuestbookRate', p.guestbookRate || 75, 'valGuestbookRate', '%');
 
-  // 后台轮询间隔显示
-  const pollVal = p.opsPollInterval || 3;
-  const pollInput = document.getElementById('paramOpsPollInterval');
-  const pollText = document.getElementById('valOpsPollInterval');
-  const pollTag = document.getElementById('tagOpsPollInterval');
-  if (pollInput) pollInput.value = pollVal;
-  if (pollText) pollText.textContent = `${pollVal} 分钟`;
-  if (pollTag) pollTag.textContent = `${pollVal} 分钟`;
-
   const fxSwitch = document.getElementById('paramGiftFullScreenEffect');
   if (fxSwitch) {
     fxSwitch.checked = p.giftFullScreenEffect !== false;
@@ -243,128 +234,6 @@ function updateApiIntervalDisplay(value) {
   window.appParams.apiRequestInterval = minutes;
 }
 window.updateApiIntervalDisplay = updateApiIntervalDisplay;
-
-// 后台轮询间隔显示更新
-function updateOpsPollIntervalDisplay(value) {
-  const minutes = Number(value) || 3;
-  const valEl = document.getElementById('valOpsPollInterval');
-  if (valEl) valEl.textContent = `${minutes} 分钟`;
-  const tagEl = document.getElementById('tagOpsPollInterval');
-  if (tagEl) tagEl.textContent = `${minutes} 分钟`;
-  if (!window.appParams) window.appParams = {};
-  window.appParams.opsPollInterval = minutes;
-}
-window.updateOpsPollIntervalDisplay = updateOpsPollIntervalDisplay;
-
-// 重启 LUMA官方运营组定时器
-function resetLumaOpsTimer() {
-  if (window.__lumaLiveSyncInterval) {
-    clearInterval(window.__lumaLiveSyncInterval);
-    window.__lumaLiveSyncInterval = null;
-  }
-  const pollMins = (window.appParams && window.appParams.opsPollInterval) || 3;
-  window.__lumaLiveSyncInterval = setInterval(() => {
-    syncLiveSessions({ allowSpawn: true });
-  }, pollMins * 60 * 1000);
-}
-window.resetLumaOpsTimer = resetLumaOpsTimer;
-
-// 保存后台轮询间隔：落盘 + 重播开屏 + 重启定时器
-async function saveOpsPollInterval() {
-  try {
-    if (!window.appParams) window.appParams = {};
-    await dbUpsert("app_settings", "global_params", window.appParams);
-    api.ui.toast("已保存，正在重启APP触发！");
-    // 重播开屏动画
-    if (typeof window.replaySplash === 'function') {
-      window.replaySplash();
-    }
-    // 重启定时器（从头开始计算轮询时间）
-    resetLumaOpsTimer();
-  } catch (e) {
-    api.ui.toast("保存成功");
-    resetLumaOpsTimer();
-  }
-}
-window.saveOpsPollInterval = saveOpsPollInterval;
-
-// 轮询日志查看器
-function openOpsLogViewer() {
-  const modal = document.getElementById('opsLogModal');
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    renderOpsLog();
-  }
-}
-window.openOpsLogViewer = openOpsLogViewer;
-
-function closeOpsLogViewer() {
-  const modal = document.getElementById('opsLogModal');
-  if (modal) {
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-  }
-}
-window.closeOpsLogViewer = closeOpsLogViewer;
-
-function renderOpsLog() {
-  const container = document.getElementById('opsLogContent');
-  if (!container) return;
-  const log = window.lumaOpsLog || [];
-  if (log.length === 0) {
-    container.innerHTML = '<div class="text-center text-slate-400 py-8">暂无日志，等待下一轮轮询...</div>';
-    return;
-  }
-  container.innerHTML = log.map((cycle, idx) => {
-    const p = cycle.params;
-    const decisions = (cycle.decisions || []).map(d => {
-      // 未被评估的角色：只显示状态，不投骰
-      if (d.result === '持续直播中…' || d.result === '持续休息中…') {
-        return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50">
-          <span class="text-slate-400">${d.char}</span>
-          <span class="text-slate-300 text-[10px]">${d.state}</span>
-          <span class="text-slate-400">${d.result}</span>
-        </div>`;
-      }
-      const willColor = d.result === '开播' || d.result === '下播' ? 'text-rose-600' : d.result === '跳过' ? 'text-slate-400' : 'text-slate-500';
-      const detail = d.state === '直播中'
-        ? `已播${d.liveMins}分 下播倾向[${d.baseTendency}]+比例 总${d.stopTendency}% 骰${d.dice}`
-        : `休息${d.restMins}分 开播倾向[${d.baseTendency}]+比例 总${d.spawnTendency}% 骰${d.dice}`;
-      return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50">
-        <span class="text-slate-600">${d.char}</span>
-        <span class="text-slate-400 text-[10px]">${detail}</span>
-        <span class="${willColor} font-bold">${d.result}</span>
-      </div>`;
-    }).join('');
-    const s = cycle.summary;
-    return `<div class="bg-slate-50 rounded-xl p-2.5">
-      <div class="flex justify-between items-center mb-1.5">
-        <span class="font-bold text-slate-700">第${cycle.cycle || (log.length - idx)}轮 ${cycle.time}</span>
-        <span class="text-[10px] text-slate-500">在播${s.streaming} 评估${s.evaluated || 0}人 开播${s.started} 下播${s.stopped}</span>
-      </div>
-      <div class="text-[9px] text-slate-400 mb-1.5">倾向值由角色状态栏驱动 | 直播上限${p.maxLiveMins}分 休息上限${p.maxRestMins}分</div>
-      <div class="space-y-0.5">${decisions}</div>
-    </div>`;
-  }).join('');
-}
-window.renderOpsLog = renderOpsLog;
-
-function toggleOpsLogRaw() {
-  const content = document.getElementById('opsLogContent');
-  const raw = document.getElementById('opsLogRaw');
-  if (!content || !raw) return;
-  const showing = raw.style.display !== 'none';
-  if (showing) {
-    raw.style.display = 'none';
-    content.style.display = '';
-  } else {
-    raw.textContent = JSON.stringify(window.lumaOpsLog || [], null, 2);
-    raw.style.display = '';
-    content.style.display = 'none';
-  }
-}
-window.toggleOpsLogRaw = toggleOpsLogRaw;
 
 async function saveApiIntervalSetting() {
   try {
@@ -1319,7 +1188,7 @@ async function lumaInitApp() {
       }
     }
 
-    // 启动时后台异步预读各角色状态栏倾向值，缓存本地供轮询快速使用
+    // 启动时预读各角色状态栏倾向值，供结算器/节拍器使用（readState SDK 调用）
     if (window.allCharacters && Array.isArray(window.allCharacters) && typeof readCharTendency === 'function') {
       try {
         await Promise.all(window.allCharacters.map(c => c && c.id ? readCharTendency(c.id) : Promise.resolve()));
@@ -1329,22 +1198,25 @@ async function lumaInitApp() {
     console.warn("DB读取警告:", e);
   }
 
-  // 2. 离线时间差推演（若用户离线超过轮询时间，按离开时长自动模拟后台多轮轮询与到期下播）
-  // 顺序要求：先做「历史场次真实结算 + 离线驱动热搜发帖」，再做「补跑轮询决策」，
-  // 因为后者会把 last_poll_time 刷新为当前时间，必须最后执行，否则前者会读到 elapsed=0。
+  // 2. 时间差结算器：APP 打开时一次性推演离线窗口内的完整直播时间线。
+  //    所有开播/下播时间戳都落在历史时刻，正在播的场次保持原 startTime，
+  //    时长 = now - startTime 真实累计，绝不为打开瞬间造场次。
   try {
-    if (window.OfflineSimulationEngine && typeof window.OfflineSimulationEngine.simulateOfflineCatchup === 'function') {
-      await window.OfflineSimulationEngine.simulateOfflineCatchup();
+    if (typeof settleAllLive === 'function') {
+      await settleAllLive();
     }
   } catch (e) {
-    console.warn("[LUMA Live] 离线历史结算失败:", e);
+    console.warn("[LUMA Live] 时间差结算失败:", e);
   }
-  try {
-    if (typeof catchUpOfflinePolling === 'function') {
-      await catchUpOfflinePolling();
+
+  // 2.5 启动在线节拍器：APP 运行期间每 30 秒检查一次，
+  //    推动角色按作息自动开播/下播（与结算器共用 rollToggleAt 概率判定）
+  if (typeof startLiveTicker === 'function') {
+    try {
+      startLiveTicker(30000);
+    } catch (e) {
+      console.warn("[LUMA Live] 在线节拍器启动失败:", e);
     }
-  } catch (e) {
-    console.warn("[LUMA Live] 离线时间差推演失败:", e);
   }
 
   // 3. 同步个人资料
@@ -1354,7 +1226,7 @@ async function lumaInitApp() {
   await loadTrendsFromDb();
 
   // 5. 同步直播列表并渲染赛道
-  await syncLiveSessions({ allowSpawn: true });
+  await syncLiveSessions();
 
   // 6. 渲染各模块初始状态
   selectMainCategory('all');
@@ -1368,15 +1240,7 @@ async function lumaInitApp() {
   // 7. 检查分享直达参数 (Deep link)
   checkDeepLinkParams();
 
-  // 8. 启动 LUMA官方运营组·定时器轮询
-  if (!window.__lumaLiveSyncInterval) {
-    const pollMins = (window.appParams && window.appParams.opsPollInterval) || 3;
-    window.__lumaLiveSyncInterval = setInterval(() => {
-      syncLiveSessions({ allowSpawn: true });
-    }, pollMins * 60 * 1000);
-  }
-
-  // 9. 启动全局动态时间刷新器：让帖子/评论的相对时间（刚刚/5分钟前）随真实时间流动
+  // 8. 启动全局动态时间刷新器：让帖子/评论的相对时间（刚刚/5分钟前）随真实时间流动
   if (window.TimeKeeper && typeof window.TimeKeeper.startDynamicTimeRefresher === 'function') {
     window.TimeKeeper.startDynamicTimeRefresher();
   }

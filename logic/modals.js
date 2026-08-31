@@ -441,26 +441,6 @@
       </button>
     </div>
   </div>
-  <div id="opsLogModal" class="fixed inset-0 z-[99998] hidden items-center justify-center bg-black/50 p-4" onclick="if(event.target===this)closeOpsLogViewer()">
-    <div class="bg-white rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
-      <div class="flex items-center justify-between p-4 border-b border-slate-100">
-        <h3 class="text-sm font-black text-slate-800">LUMA官方运营组·轮询日志</h3>
-        <div class="flex items-center gap-2">
-          <button onclick="renderOpsLog()" class="text-[10px] font-bold text-cyan-600 px-2 py-1 rounded-lg bg-cyan-50">刷新</button>
-          <button onclick="closeOpsLogViewer()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">×</button>
-        </div>
-      </div>
-      <div id="opsLogContent" class="flex-1 overflow-y-auto p-3 space-y-2 text-[11px]">
-        <div class="text-center text-slate-400 py-8">暂无日志，等待下一轮轮询...</div>
-      </div>
-      <div id="opsLogRaw" class="hidden flex-1 overflow-y-auto p-3 text-[10px] font-mono bg-slate-900 text-slate-100 whitespace-pre-wrap" style="display:none"></div>
-      <div class="p-3 border-t border-slate-100 text-[9px] text-slate-400 text-center flex items-center justify-center gap-2">
-        <button onclick="toggleOpsLogRaw()" class="font-bold text-cyan-600 hover:text-cyan-700">查看原始数据</button>
-        <span>·</span>
-        <span>保留最近 50 轮</span>
-      </div>
-    </div>
-  </div>
   `;
 
   function doInject() {

@@ -1,19 +1,18 @@
 // =========================================================================
-// LUMA Live 直播运营核心 (v1.3.2 - readState 状态栏倾向值读取)
-// 包含：LUMA官方运营组（定时器轮询决策）+ 房管（审核裁决网关）+ 工具注册
+// LUMA Live 直播运营核心 (v1.4.0 - 时间差结算器)
+// 包含：LUMA官方运营组（打开APP时一次性时间差结算）+ 房管（审核裁决网关）+ 工具注册
 // 本文件从 core.js 和 live.js 抽取，独立管理直播流程逻辑
 // 依赖：core.js (dbUpsert/saveDbSetting/api) + live.js (renderLiveGrid/normalizeCategory)
 // =========================================================================
 
-// 轮询日志：文件加载即初始化，避免首次轮询前访问报错
-if (!window.lumaOpsLog) window.lumaOpsLog = [];
 // =========================================================================
 // 【角色倾向值管理】
 // 倾向值由角色自行判定状态后，通过富媒体指令注入到原生状态栏
 // 状态栏数值格式：[名称:数字]，例如 [开播倾向:75] / [下播倾向:20]
-// 后台通过 AiPhone.characters.readState 读取，再参与轮询投骰
-// 倾向值范围 0-100，轮询计算时取 1/2（0-50分）+ 比例式增长（0-50分）
-// 未获取的角色返回 null，基础分按 0 计算，日志与UI标注「暂未获取」
+// 后台通过 AiPhone.characters.readState 读取，参与统一概率判定
+// 倾向换算分 = tendency/200 → 0~0.5，倾向越高起始概率越高
+// 下播倾向影响下播概率（越高越早触发下播），开播倾向影响开播概率（越高越早触发开播）
+// 未获取的角色返回 null，倾向分按 0（纯比例式增长驱动）
 // =========================================================================
 
 // 状态栏中「开播倾向」「下播倾向」的条目名称（匹配 readState 返回的 name）
@@ -148,7 +147,7 @@ const lumaOpsGateway = {
       return { success: false, reason: `【LUMA官方运营组通告】主播【${charName}】已在直播中（房号:${existing.roomId}），请勿重复开播。` };
     }
 
-    const dur = durationMins || Math.floor(Math.random() * (params.maxLiveDuration || 120) / 2 + 30);
+    const dur = durationMins || (params.maxLiveDuration || 120);
     const start = now;
     const end = start + dur * 60 * 1000;
 
@@ -206,68 +205,7 @@ const lumaOpsGateway = {
     lumaOpsNotify("开播批准", `【${charName}】通过审核已成功推流开播 (房号:${created.roomId})`, "approve");
 
     if (typeof syncLiveSessions === 'function') {
-      await syncLiveSessions({ allowSpawn: false });
-    }
-
-    return {
-      success: true,
-      data: {
-        roomId: created.roomId,
-        topic: created.topic,
-        category: created.category
-      },
-      userNotice: `主播【${charName}】已成功开播，房号：${created.roomId}`,
-      message: `【LUMA官方运营组】恭喜主播【${charName}】，推流申请已通过！直播间房号【${created.roomId}】现已正式向全平台公开发送推流广播。`
-    };
-  },
-
-  async requestStopLive({ characterId, reason = "正常下播", source = "system" }, nowTime = null) {
-    if (!characterId) return { success: false, reason: "未指定有效主播身份" };
-
-    const activeSessions = await api.db.list("live_sessions", { limit: 500 }) || [];
-    const session = activeSessions.find(s => s.characterId === characterId || s.id === characterId);
-    
-    const allChars = window.allCharacters || [];
-    const character = allChars.find(c => c.id === characterId) || await api.characters.get(characterId).catch(() => null);
-    const charName = session?.name || character?.name || "主播";
-    const now = nowTime || Date.now();
-
-    if (session) {
-      await api.db.delete("live_sessions", session.id);
-      // 直播间结束，清空该房号的临时存储（弹幕历史 + 可见快照）
-      if (window.LiveRoomStore && typeof window.LiveRoomStore.clearRoom === 'function') {
-        const rid = session.roomId || session.id || characterId;
-        try { await window.LiveRoomStore.clearRoom(rid); } catch (e) {}
-      }
-    }
-
-    window.charSchedulesMap[characterId] = {
-      isLive: false,
-      currentSessionId: null,
-      lastStartTime: session ? session.startTime : null,
-      lastEndTime: now,
-      plannedEndTime: null
-    };
-    await saveDbSetting("char_schedules", window.charSchedulesMap);
-
-    const isForced = source === 'maint_shutdown' || source === 'max_duration_reached';
-    lumaOpsNotify(
-      isForced ? "运营强制下播" : "主播已下播",
-      `【${charName}】已结束推流（原因:${reason}），进入强制休息期`,
-      isForced ? "force" : "info"
-    );
-
-    if (window.currentRoom && (window.currentRoom.characterId === characterId || window.currentRoom.id === session?.id)) {
-      if (typeof window.showHostLeftRoomStage === 'function') {
-        window.showHostLeftRoomStage(window.currentRoom);
-      } else if (typeof window.closeLiveRoom === 'function') {
-        window.closeLiveRoom();
-      }
-      api.ui.toast(`主播【${charName}】已下播休息`);
-    }
-
-    if (typeof syncLiveSessions === 'function') {
-      await syncLiveSessions({ allowSpawn: false });
+      await syncLiveSessions();
     }
 
     return {
@@ -298,6 +236,35 @@ const lumaOpsGateway = {
     if (!window.charSchedulesMap) window.charSchedulesMap = {};
     window.charSchedulesMap[characterId] = scheduleData;
     return await saveDbSetting("char_schedules", window.charSchedulesMap);
+  },
+
+  async requestStopLive({ characterId, reason, source = 'system' }, nowTime = null) {
+    if (!characterId) {
+      return { success: false, reason: "未指定主播身份" };
+    }
+    const now = nowTime || Date.now();
+    const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
+    const session = sessions.find(s => s.characterId === characterId);
+    if (!session) {
+      return { success: false, reason: "该主播没有正在直播的场次" };
+    }
+    const allChars = window.allCharacters || [];
+    const character = allChars.find(c => c.id === characterId);
+    await closeAndArchive(character, session, now);
+
+    if (window.charSchedulesMap) {
+      const sched = window.charSchedulesMap[characterId];
+      if (sched) {
+        sched.isLive = false;
+        sched.currentSessionId = null;
+        sched.plannedEndTime = null;
+        sched.lastEndTime = now;
+      }
+    }
+    try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
+    lumaOpsNotify("下播完成", `【${session.name || '主播'}】${reason || '正常下播'}`, "approve");
+    if (typeof syncLiveSessions === 'function') await syncLiveSessions();
+    return { success: true, message: `主播已下播（${reason || '正常下播'}）` };
   }
 };
 window.lumaOpsGateway = lumaOpsGateway;
@@ -335,62 +302,6 @@ function registerAiPhoneToolHandlers() {
 }
 registerAiPhoneToolHandlers();
 window.registerAiPhoneToolHandlers = registerAiPhoneToolHandlers;
-
-// =========================================================================
-
-
-// =========================================================================
-// 【延迟执行队列】判定为开播/下播后，延迟1-10分钟执行，避免同时开播下播
-// =========================================================================
-async function getPendingActions() {
-  try {
-    const saved = await api.db.get("app_settings", "luma_pending_actions").catch(() => null);
-    const unwrapped = window.readDbSettingValue ? window.readDbSettingValue(saved) : saved;
-    return Array.isArray(unwrapped) ? unwrapped : [];
-  } catch (e) { return []; }
-}
-async function addPendingAction(characterId, action, delayMins, reason, nowTime = null) {
-  const queue = await getPendingActions();
-  // 移除该角色已有的同类型待执行动作
-  const filtered = queue.filter(a => !(a.characterId === characterId && a.action === action));
-  filtered.push({
-    characterId,
-    action, // 'start' or 'stop'
-    executeAt: (nowTime || Date.now()) + delayMins * 60 * 1000,
-    delayMins,
-    reason,
-    createdAt: nowTime || Date.now()
-  });
-  try { await saveDbSetting("luma_pending_actions", filtered); } catch (e) {}
-  return filtered;
-}
-async function executeDueActions(nowTime = null) {
-  const queue = await getPendingActions();
-  const now = nowTime || Date.now();
-  const due = queue.filter(a => a.executeAt <= now);
-  const remaining = queue.filter(a => a.executeAt > now);
-  try { await saveDbSetting("luma_pending_actions", remaining); } catch (e) {}
-  for (const action of due) {
-    try {
-      if (action.action === 'start') {
-        await window.lumaOpsGateway.requestStartLive({
-          characterId: action.characterId,
-          source: "delayed_start"
-        }, action.executeAt || now);
-      } else if (action.action === 'stop') {
-        await window.lumaOpsGateway.requestStopLive({
-          characterId: action.characterId,
-          reason: action.reason || "角色下播倾向决定下播休息",
-          source: "delayed_stop"
-        }, action.executeAt || now);
-      }
-    } catch (e) {}
-  }
-  return due.length;
-}
-window.getPendingActions = getPendingActions;
-window.addPendingAction = addPendingAction;
-window.executeDueActions = executeDueActions;
 
 // 【每日开播场次统计】记录每个角色今天的开播次数
 async function getDailyStartCount(characterId) {
@@ -528,297 +439,286 @@ async function bootstrapWorldInitialState(allChars, params = {}) {
 window.bootstrapWorldInitialState = bootstrapWorldInitialState;
 
 // =========================================================================
-// 决策公式：安全区外(达到时长上限)=100%必然；安全区内=基础倾向 + (已持续时长/上限)×50%
+// 直播列表刷新：房管/工具操作后、结算完成后调用，仅读取并渲染当前场次
 // =========================================================================
-async function syncLiveSessions(options = {}, nowTime = null) {
-  let sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
-
-  // 仅刷新模式：房管操作后调用，不做新决策
-  if (options.refreshOnly || options.allowSpawn === false) {
-    window.liveList = sessions;
-    renderLiveGrid();
-    return;
-  }
-
-  const now = nowTime || Date.now();
-  const params = window.appParams || {};
-  const maxLiveMins = params.maxLiveDuration || 120;
-  const maxRestMins = params.maxRestDuration || 360;
-  const minRestMins = params.minRestDuration || 10;
-  const allChars = window.allCharacters || [];
-  if (!window.charSchedulesMap) window.charSchedulesMap = {};
-
-  // ── 轮次计数：持久化 + 每天0点重置 ──
-  const today = new Date().toDateString();
-  let cycleStore = {};
-  try {
-    const raw = await api.db.get("app_settings", "luma_ops_cycle").catch(() => null);
-    if (raw && typeof raw === 'object') cycleStore = raw;
-  } catch(e) {}
-  if (cycleStore.date !== today) {
-    cycleStore = { date: today, cycle: 0 };
-  }
-  const cycle = ++cycleStore.cycle;
-  try { await saveDbSetting("luma_ops_cycle", cycleStore); } catch(e) {}
-
-  // ── 新加入角色平滑注册（如果有新增角色，安全初始化为休息状态，绝不倒推开播时间） ──
-  let hasNewSched = false;
-  for (const c of allChars) {
-    if (!window.charSchedulesMap[c.id]) {
-      const existingSession = sessions.find(s => s.characterId === c.id);
-      if (existingSession) {
-        window.charSchedulesMap[c.id] = {
-          initialized: true,
-          isLive: true,
-          currentSessionId: existingSession.id,
-          lastStartTime: existingSession.startTime || now,
-          plannedEndTime: existingSession.endTime || (now + 60 * 60 * 1000),
-          lastEndTime: null
-        };
-      } else {
-        // 新角色平滑加入生态：设为已度过休息期的正常空闲状态，后续由轮询真实决策开播
-        window.charSchedulesMap[c.id] = {
-          initialized: true,
-          isLive: false,
-          lastStartTime: null,
-          plannedEndTime: null,
-          lastEndTime: now - (minRestMins + 5) * 60000
-        };
-      }
-      hasNewSched = true;
-    }
-  }
-  if (hasNewSched) {
-    try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch(e) {}
-  }
-
-  // 刷新会话列表（新角色初始化后可能新增了直播间）
-  sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
-  const streamingIds = new Set(sessions.map(s => s.characterId));
-
-  // ── 构建全部角色评估列表 ──
-  const dailyLimit = (params.dailyLiveLimit !== undefined && params.dailyLiveLimit > 0) ? params.dailyLiveLimit : Infinity;
-  const pendingActions = await getPendingActions();
-  const pendingCharIds = new Set(pendingActions.map(a => a.characterId));
-
-  const toEvaluate = [];
-  // 直播中角色：评估下播
-  for (const s of sessions) {
-    const liveMins = (now - (s.startTime || now)) / 60000;
-    toEvaluate.push({
-      type: 'stop',
-      charId: s.characterId,
-      charName: s.name || s.characterId,
-      liveMins: liveMins,
-      hasPending: pendingCharIds.has(s.characterId)
-    });
-  }
-  // 休息中角色：评估开播（排除强制休息期和已有待执行动作的）
-  for (const c of allChars) {
-    if (streamingIds.has(c.id)) continue;
-    const sched = window.charSchedulesMap[c.id];
-    const lastEndTime = sched?.lastEndTime;
-    const restMins = lastEndTime ? (now - lastEndTime) / 60000 : 9999;
-    const inMandatoryRest = restMins < minRestMins;
-    if (inMandatoryRest) continue;
-    if (pendingCharIds.has(c.id)) continue; // 已有待执行动作，跳过
-    toEvaluate.push({
-      type: 'start',
-      charId: c.id,
-      charName: c.name || c.id,
-      restMins: restMins
-    });
-  }
-
-  // ── 轮询日志初始化 ──
-  const cycleLog = {
-    time: new Date().toLocaleTimeString(),
-    cycle: cycle,
-    params: { maxLiveMins, maxRestMins, minRestMins, dailyLimit: dailyLimit === Infinity ? '不限制' : dailyLimit },
-    decisions: [],
-    summary: { totalChars: allChars.length, streaming: sessions.length, started: 0, stopped: 0, evaluated: toEvaluate.length, pending: pendingActions.length }
-  };
-
-  // ── 执行评估（全部角色）──
-  for (const item of toEvaluate) {
-    if (item.type === 'stop') {
-      if (item.hasPending) {
-        // 已有待执行下播动作，标注等待中
-        const pending = pendingActions.find(a => a.characterId === item.charId && a.action === 'stop');
-        const waitMins = Math.max(1, Math.round((pending.executeAt - now) / 60000));
-        cycleLog.decisions.push({
-          char: item.charName, state: '直播中',
-          liveMins: Math.round(item.liveMins),
-          result: `等待${waitMins}分后下播`
-        });
-        continue;
-      }
-      const liveMins = Math.round(item.liveMins);
-      const isUrgent = liveMins >= maxLiveMins;
-      const charTendency = await getCharTendency(item.charId);
-      const hasRealTendency = charTendency.stopTendency !== null && charTendency.stopTendency !== undefined;
-      const rawTendency = hasRealTendency ? Number(charTendency.stopTendency) : null;
-      // 下播倾向值取二分之一折算为0-50分；若暂未获取则基础得分计0
-      const tendencyScore = hasRealTendency ? Math.round(rawTendency / 2) : 0;
-      const timeScore = Math.round((liveMins / maxLiveMins) * 50);
-      
-      let stopTendency, reason, baseTendencyText;
-      if (isUrgent) {
-        stopTendency = 100;
-        reason = '达到上限必然下播';
-        baseTendencyText = hasRealTendency ? `${rawTendency}` : '暂未获取';
-      } else {
-        stopTendency = Math.min(100, tendencyScore + timeScore);
-        reason = hasRealTendency ? '下播倾向(1/2)+时间增长' : '暂未获取下播倾向(仅时间增长)';
-        baseTendencyText = hasRealTendency ? `${rawTendency} (折算${tendencyScore})` : '暂未获取';
-      }
-
-      const dice = Math.round(Math.random() * 100);
-      const willStop = dice < stopTendency;
-
-      cycleLog.decisions.push({
-        char: item.charName, state: '直播中',
-        liveMins: liveMins,
-        baseTendency: baseTendencyText,
-        stopTendency: stopTendency,
-        dice: dice,
-        reason: reason,
-        result: willStop ? '准备下播' : '继续播'
-      });
-
-      if (willStop) {
-        cycleLog.summary.stopped++;
-        // 延迟1-10分钟执行下播
-        const delayMins = Math.floor(Math.random() * 10) + 1;
-        await addPendingAction(item.charId, 'stop', delayMins, isUrgent ? "达到直播时长上限" : "角色下播倾向决定下播休息", now);
-        cycleLog.decisions[cycleLog.decisions.length - 1].delayMins = delayMins;
-        cycleLog.decisions[cycleLog.decisions.length - 1].result = `${delayMins}分后下播`;
-      }
-    } else {
-      // 检查每日场次上限
-      const todayCount = await getDailyStartCount(item.charId);
-      if (todayCount >= dailyLimit) {
-        cycleLog.decisions.push({
-          char: item.charName, state: '休息中',
-          restMins: Math.round(item.restMins),
-          result: `今日已达${dailyLimit}场上限`
-        });
-        continue;
-      }
-      const restMins = Math.round(item.restMins);
-      const isUrgent = restMins >= maxRestMins;
-      const charTendency = await getCharTendency(item.charId);
-      const hasRealTendency = charTendency.startTendency !== null && charTendency.startTendency !== undefined;
-      const rawTendency = hasRealTendency ? Number(charTendency.startTendency) : null;
-      // 开播倾向值取二分之一折算为0-50分；若暂未获取则基础得分计0
-      const tendencyScore = hasRealTendency ? Math.round(rawTendency / 2) : 0;
-      const timeScore = Math.round((restMins / maxRestMins) * 50);
-
-      let spawnTendency, reason, baseTendencyText;
-      if (isUrgent) {
-        spawnTendency = 100;
-        reason = '达到上限必然开播';
-        baseTendencyText = hasRealTendency ? `${rawTendency}` : '暂未获取';
-      } else {
-        spawnTendency = Math.min(100, tendencyScore + timeScore);
-        reason = hasRealTendency ? '开播倾向(1/2)+时间增长' : '暂未获取开播倾向(仅时间增长)';
-        baseTendencyText = hasRealTendency ? `${rawTendency} (折算${tendencyScore})` : '暂未获取';
-      }
-
-      const dice = Math.round(Math.random() * 100);
-      const willSpawn = dice < spawnTendency;
-
-      cycleLog.decisions.push({
-        char: item.charName, state: '休息中',
-        restMins: restMins,
-        baseTendency: baseTendencyText,
-        spawnTendency: spawnTendency,
-        dice: dice,
-        reason: reason,
-        result: willSpawn ? '准备开播' : '不播'
-      });
-
-      if (willSpawn) {
-        cycleLog.summary.started++;
-        // 延迟1-10分钟执行开播
-        const delayMins = Math.floor(Math.random() * 10) + 1;
-        await addPendingAction(item.charId, 'start', delayMins, "角色开播倾向决定开播", now);
-        cycleLog.decisions[cycleLog.decisions.length - 1].delayMins = delayMins;
-        cycleLog.decisions[cycleLog.decisions.length - 1].result = `${delayMins}分后开播`;
-      }
-    }
-  }
-
-  // 最终刷新并渲染
-  sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
+async function syncLiveSessions() {
+  const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
   window.liveList = sessions;
-  renderLiveGrid();
-
-  // 更新上次轮询时间（正常轮询时，不是补跑时）
-  if (!nowTime) {
-    try { await saveDbSetting("last_poll_time", Date.now()); } catch (e) {}
-  }
-
-  // ── 写入轮询日志 ──
-  cycleLog.summary.streaming = sessions.length;
-  if (!window.lumaOpsLog) window.lumaOpsLog = [];
-  window.lumaOpsLog.unshift(cycleLog);
-  if (window.lumaOpsLog.length > 50) window.lumaOpsLog.pop();
-  // 轮询完成后同步状态到聊天历史
-  syncCharStatusToChat(now);
+  if (typeof renderLiveGrid === 'function') renderLiveGrid();
+  return sessions;
 }
 window.syncLiveSessions = syncLiveSessions;
 
 // =========================================================================
-// 【离线时间差推演·补跑机制】APP打开时根据离开时间补跑轮询，模拟后台一直在跑
-// 原理：记录每次轮询时间，APP打开时计算离开了多久，按轮询间隔逐次补跑
-// 补跑时传入模拟时间，开播/下播时间戳用模拟时间，保证直播时长真实
+// 【时间差结算器】APP打开时一次性推演全场次，替代后台轮询
+// 原理：所有开播/下播时间戳都落在 [上次离开, now] 的历史时刻，
+//       正在播的场次保持原 startTime，时长 = now - startTime 真实累计，
+//       绝不为"打开瞬间"造一个 startTime（绝不从0秒计直播时长）
+// 随机性：seededRandom(charId + 上一个事件时间戳)，确定性随机游走
+//        —— 事件推进式：本场未结束时，下一场的开播时刻在数学上还不存在
 // =========================================================================
-async function catchUpOfflinePolling() {
+// 简单确定性伪随机：基于字符串种子返回 [0,1)
+function seededHash(str) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  h = Math.imul(h ^ (h >>> 16), 2246822507);
+  h = Math.imul(h ^ (h >>> 13), 3266489909);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+// =========================================================================
+// 【统一概率判定】所有直播开播/下播共用的判定核心
+// 原理：每个"时间块"(1分钟) 用 seededHash(charId + 时间块编号) 产生随机数
+//       —— 时间块编号随真实时间递增，故随机数逐块变化，不存在固定模板
+//       —— 同一时间块编号哈希值确定，离线补账重放可得到与在线一致的判定
+//       总概率 = 倾向换算分 + (已持续时长/上限)×50%  （比例式增长）
+//       seededHash < 总概率 → 该时间块触发状态切换
+// 返回触发时刻时间戳；窗口内未触发返回 null
+// kind: 'start'(开播) | 'stop'(下播)；tendency: 0-100 或 null
+// =========================================================================
+function rollToggleAt(charId, kind, anchorTs, nowTs, tendency, maxMins, minMins) {
+  const minM = Math.max(1, minMins || 1);
+  const maxM = Math.max(minM, maxMins || 120);
+  // 倾向换算分：0-100 → 0-0.5，倾向越高起点概率越高
+  const tendScore = (tendency != null && tendency >= 0) ? Math.min(100, tendency) / 200 : 0;
+  // 从最短时长之后的第一个时间块开始检查，到 now 为止
+  const startBlock = Math.ceil((anchorTs + minM * 60000) / 60000);
+  const endBlock = Math.floor(nowTs / 60000);
+  for (let b = startBlock; b <= endBlock; b++) {
+    const elapsedMins = Math.max(0, (b * 60000 - anchorTs) / 60000);
+    // 总概率 = 倾向分 + 比例式增长(已持续/上限 × 50%)
+    const growth = Math.min(1, elapsedMins / maxM) * 0.5;
+    const p = Math.min(1, tendScore + growth);
+    const r = seededHash(`${kind}:${charId}:${b}`);
+    if (r < p) return b * 60000;
+  }
+  return null;
+}
+
+// 升级 charSchedulesMap 中"只有轮询残留字段"的旧条目为结算器需要的形状
+function ensureSchedEntry(sched) {
+  if (!sched) return {
+    initialized: true, isLive: false, lastStartTime: null, plannedEndTime: null, lastEndTime: null
+  };
+  sched.initialized = sched.initialized !== false;
+  sched.isLive = !!sched.isLive;
+  sched.lastStartTime = sched.lastStartTime ?? null;
+  sched.plannedEndTime = sched.plannedEndTime ?? null;
+  sched.lastEndTime = sched.lastEndTime ?? null;
+  return sched;
+}
+
+// 结算单一角色：从 lastSeen 推演到 now，返回 { name, liveMins, ... }
+async function settleOneChar(char, now, lastSeen) {
+  const cid = char.id;
+  if (!cid) return null;
+  const params = window.appParams || {};
+  const maxLiveMins = params.maxLiveDuration || 240;   // 直播上限（分钟）
+  const minLiveMins = Math.max(15, Math.round(maxLiveMins * 0.35)); // 单场直播最短时长
+  const maxRestMins = params.maxRestDuration || 480;
+  const minRestMins = params.minRestDuration || 10;
+  const dailyLimit = ((params.dailyLiveLimit ?? 0) > 0) ? Number(params.dailyLiveLimit) : Infinity;
+
+  const sched = ensureSchedEntry(window.charSchedulesMap[cid]);
+
+  // 若该角色从未初始过，参考首次场景：视为已度过休息期的空闲状态
+  const existed = !!(sched.lastEndTime || sched.lastStartTime || sched.isLive);
+
+  // 给该角色预读一次倾向（可空），倾向越高下播越早 / 开播越晚
+  let stopTendency = null, startTendency = null;
   try {
-    const lastPollRec = await api.db.get("app_settings", "last_poll_time").catch(() => null);
-    const lastPollTime = window.readDbSettingValue ? Number(window.readDbSettingValue(lastPollRec)) : Number(lastPollRec);
-    const now = Date.now();
-    
-    // 第一次使用，没有记录，直接初始化
-    if (!lastPollTime || isNaN(lastPollTime)) {
-      try { await saveDbSetting("last_poll_time", now); } catch (e) {}
-      return { caughtUp: false, reason: "first_run" };
+    const t = await getCharTendency(cid);
+    stopTendency = t && t.stopTendency != null ? t.stopTendency : null;
+    startTendency = t && t.startTendency != null ? t.startTendency : null;
+  } catch (e) {}
+
+  // 当前场次
+  const sessions = await api.db.list("live_sessions", { limit: 500 }).catch(() => []) || [];
+  let session = sessions.find(s => s.characterId === cid) || null;
+
+  // 事件推进循环：只允许生成时间戳落在 [lastSeen, now] 内的完整场次链
+  let anchor = lastSeen;
+  let guard = 0;
+  while (guard++ < 500) {
+    if (session) {
+      // ── 直播中：概率判定本场是否在窗口内下播 ──
+      const startTs = Number(session.startTime) || anchor;
+      const stopAt = rollToggleAt(cid, 'stop', startTs, now, stopTendency, maxLiveMins, minLiveMins);
+      if (stopAt != null) {
+        // 窗口内已触发下播 → 结算为历史场次，进入休息
+        await closeAndArchive(char, session, stopAt);
+        session = null;
+        sched.isLive = false;
+        sched.currentSessionId = null;
+        sched.plannedEndTime = null;
+        sched.lastStartTime = startTs;
+        sched.lastEndTime = stopAt;
+        anchor = stopAt;
+        continue;
+      }
+      // 窗口内未触发下播：保持原 startTime，绝不动
+      sched.isLive = true;
+      sched.currentSessionId = session.id;
+      sched.plannedEndTime = startTs + maxLiveMins * 60000;
+      sched.lastStartTime = startTs;
+      break;
     }
-    
-    const pollIntervalMs = ((window.appParams && window.appParams.opsPollInterval) || 3) * 60 * 1000;
-    const elapsed = now - lastPollTime;
-    
-    // 离开时间不足一个轮询间隔，不需要补跑
-    if (elapsed < pollIntervalMs) {
-      return { caughtUp: false, reason: "too_short", elapsedMs: elapsed };
+
+    // ── 休息中：概率判定本场是否在窗口内开播 ──
+    const restBase = sched.lastEndTime || anchor;
+    const startAt = rollToggleAt(cid, 'start', restBase, now, startTendency, maxRestMins, minRestMins);
+
+    if (startAt == null) {
+      // 窗口内未触发开播 → 保持休息
+      sched.isLive = false;
+      sched.currentSessionId = null;
+      sched.plannedEndTime = null;
+      sched.lastEndTime = restBase;
+      break;
     }
-    
-    // 计算需要补跑的次数（最多补跑30次，避免太慢）
-    const maxCatchUp = 30;
-    const catchUpCount = Math.min(Math.floor(elapsed / pollIntervalMs), maxCatchUp);
-    const actualElapsed = catchUpCount * pollIntervalMs;
-    
-    // 逐次补跑，每次传入模拟时间
-    for (let i = 0; i < catchUpCount; i++) {
-      const simulatedNow = lastPollTime + (i + 1) * pollIntervalMs;
+
+    // 每日场次上限拦截
+    if (dailyLimit !== Infinity) {
       try {
-        await syncLiveSessions({ allowSpawn: true, catchUp: true }, simulatedNow);
+        const todayCount = await getDailyStartCount(cid);
+        if (todayCount >= dailyLimit) { sched.isLive = false; sched.lastEndTime = restBase; break; }
       } catch (e) {}
     }
-    
-    // 补跑完成后，用真实时间再执行一次到期延迟动作（补跑时用的是模拟时间，真实时间已超过）
-    try { await executeDueActions(); } catch (e) {}
-    
-    // 补跑完成后，更新上次轮询时间为当前时间
+
+    // 窗口内开播：startAt 是历史时刻，写入场次
+    session = await openLiveFromHistory(char, startAt);
+    if (!session) {
+      sched.isLive = false;
+      sched.lastEndTime = restBase;
+      break;
+    }
+    sched.isLive = true;
+    sched.currentSessionId = session.id;
+    sched.lastStartTime = startAt;
+    sched.plannedEndTime = null;
+    anchor = startAt;
+    try { await incrementDailyStartCount(cid); } catch (e) {}
+  }
+
+  window.charSchedulesMap[cid] = sched;
+  try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
+
+  return { name: char.name || cid, liveMins: session ? Math.round((now - (Number(session.startTime) || now)) / 60000) : 0, isLive: !!session };
+}
+
+// 给历史场次写归档：从 live_sessions 移除，写入 streamer_history
+async function closeAndArchive(char, session, endTime) {
+  try {
+    const startTs = Number(session.startTime) || endTime;
+    const durationMin = Math.max(1, Math.round((endTime - startTs) / 60000));
+    const historyRecord = {
+      id: `show_${session.characterId}_${startTs}`,
+      characterId: session.characterId,
+      streamerName: session.name || char?.name || '主播',
+      title: session.topic || '日常直播',
+      cover: session.cover || session.avatar || '', 
+      category: session.category || '随性杂谈',
+      subTag: session.subTag || '日常唠嗑',
+      startTime: startTs,
+      endTime: endTime,
+      durationMin: durationMin,
+      peakViewers: session.viewers || Math.floor(seededHash(`viewer:${startTs}`) * 800 + 300),
+      totalLikes: session.likes || Math.floor(seededHash(`like:${startTs}`) * 5000 + 1000),
+      totalGifts: Math.floor(seededHash(`gift:${startTs}`) * 200 + 50),
+      fansGained: Math.floor(durationMin * (seededHash(`fans:${startTs}`) * 3 + 1)),
+      isOfflineSimulated: true
+    };
+    await api.db.create("streamer_history", historyRecord);
+    await api.db.delete("live_sessions", session.id);
+    if (window.LiveRoomStore && typeof window.LiveRoomStore.clearRoom === 'function') {
+      const rid = session.roomId || session.id || session.characterId;
+      try { await window.LiveRoomStore.clearRoom(rid); } catch (e) {}
+    }
+  } catch (e) {}
+}
+
+// 历史时刻开播：用给定历史时间戳创建场次（unsaved startTime 为历史值）
+async function openLiveFromHistory(char, startAt, category, topic, durationMins) {
+  try {
+    const cid = char.id;
+    const allChars = window.allCharacters || [];
+    const character = allChars.find(c => c.id === cid);
+    const charName = character?.name || '主播';
+
+    let chosenCat = category, chosenSubTag = null, chosenTopic = null;
+    if (!chosenCat) {
+      if (typeof pickRandomLiveCategory === 'function') {
+        const picked = pickRandomLiveCategory();
+        chosenCat = picked.mainCat; chosenSubTag = picked.subCat;
+      } else { chosenCat = '随性杂谈'; chosenSubTag = '日常唠嗑'; }
+    }
+    if (topic) chosenTopic = `【${charName}】${topic}`;
+    if (!chosenTopic) chosenTopic = `【${charName}】的精彩直播`;
+
+    const newSession = {
+      characterId: cid,
+      name: charName,
+      avatar: character?.avatar || char?.avatar || '',
+      cover: character?.cover || character?.avatar || '',
+      category: chosenCat,
+      subTag: chosenSubTag || '日常唠嗑',
+      topic: chosenTopic,
+      heat: Math.floor(seededHash(`heat:${startAt}`) * 80000 + 20000),
+      roomId: Math.floor(seededHash(`room:${startAt}`) * 899999 + 100000),
+      startTime: startAt,
+      endTime: startAt + 60 * 60 * 1000,
+      isNPC: false
+    };
+
+    const created = await api.db.create("live_sessions", newSession);
+    return created;
+  } catch (e) { return null; }
+}
+
+// 主结算入口：APP 打开时执行，返回统计摘要
+async function settleAllLive() {
+  try {
+    const now = Date.now();
+    const lastPollRec = await api.db.get("app_settings", "last_poll_time").catch(() => null);
+    const lastSeen = window.readDbSettingValue ? Number(window.readDbSettingValue(lastPollRec)) : Number(lastPollRec);
+    if (!lastSeen || isNaN(lastSeen) || lastSeen <= 0) {
+      try { await saveDbSetting("last_poll_time", now); } catch (e) {}
+      return { settled: false, reason: "first_run" };
+    }
+    if (now - lastSeen < 60 * 1000) {
+      return { settled: false, reason: "too_short", elapsedMs: now - lastSeen };
+    }
+
+    // 先初始化缺失的排班（沿用 bootstrap 的安全语义，绝不倒推开播时间）
+    if (typeof bootstrapWorldInitialState === 'function') {
+      try { await bootstrapWorldInitialState(window.allCharacters || [], window.appParams || {}); } catch (e) {}
+    }
+
+    const chars = window.allCharacters || [];
+    const results = [];
+    for (const c of chars) {
+      try {
+        const r = await settleOneChar(c, now, lastSeen);
+        if (r) results.push(r);
+      } catch (e) {}
+    }
+
+    // 结算完成后用真实时间同步一次状态到角色日程，再刷新列表
+    try { await syncCharStatusToChat(now); } catch (e) {}
+    await syncLiveSessions();
+
     try { await saveDbSetting("last_poll_time", now); } catch (e) {}
-    
-    return { caughtUp: true, catchUpCount, elapsedMs: elapsed, simulatedMs: actualElapsed };
+
+    return { settled: true, elapsedMs: now - lastSeen, chars: results.length, live: results.filter(r => r.isLive).length };
   } catch (e) {
-    return { caughtUp: false, reason: "error", error: String(e) };
+    return { settled: false, reason: "error", error: String(e) };
   }
 }
-window.catchUpOfflinePolling = catchUpOfflinePolling;
+window.settleAllLive = settleAllLive;
 window.lumaOpsPoll = syncLiveSessions;
 
 // =========================================================================
@@ -885,3 +785,94 @@ async function syncCharStatusToChat(nowTime = null) {
   } catch (e) {}
 }
 window.syncCharStatusToChat = syncCharStatusToChat;
+
+// =========================================================================
+// 【在线节拍器】APP 运行期间每 30 秒检查一次，推动角色按作息自动开播/下播
+// 与结算器共用同一套 rollToggleAt 概率判定：倾向 + 比例式增长总概率 × 哈希随机源
+// 同一时间块编号哈希值确定 → 在线实时判定与离线补账重放结果完全一致
+// 休息中 → 该时间块触发开播 → requestStartLive
+// 直播中 → 该时间块触发下播 → requestStopLive
+// =========================================================================
+let __lumaLiveTicker = null;
+let __lumaLiveTickerBusy = false;
+
+async function tickLiveLifecycle() {
+  if (__lumaLiveTickerBusy) return;
+  __lumaLiveTickerBusy = true;
+  try {
+    const allChars = window.allCharacters || [];
+    if (!allChars.length || !window.charSchedulesMap) return;
+
+    const now = Date.now();
+    const params = window.appParams || {};
+    const maxLiveMins = params.maxLiveDuration || 240;
+    const minLiveMins = Math.max(15, Math.round(maxLiveMins * 0.35));
+    const maxRestMins = params.maxRestDuration || 480;
+    const minRestMins = params.minRestDuration || 10;
+    const dailyLimit = ((params.dailyLiveLimit ?? 0) > 0) ? Number(params.dailyLiveLimit) : Infinity;
+
+    const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
+
+    for (const c of allChars) {
+      const cid = c.id;
+      if (!cid) continue;
+      const sched = window.charSchedulesMap[cid];
+      // 未初始化过（没结算也没 bootstrap 兜底）的角色跳过，交给结算器兜底
+      if (!sched || sched.initialized === false) continue;
+
+      const session = sessions.find(s => s.characterId === cid) || null;
+
+      // 倾向值读取（与结算器一致），未获取按 null
+      let stopTendency = null, startTendency = null;
+      try {
+        const t = await getCharTendency(cid);
+        stopTendency = (t && t.stopTendency != null) ? t.stopTendency : null;
+        startTendency = (t && t.startTendency != null) ? t.startTendency : null;
+      } catch (e) {}
+
+      if (session) {
+        // ── 直播中：该时间块是否触发下播 ──
+        const startTs = Number(session.startTime) || now;
+        const stopAt = rollToggleAt(cid, 'stop', startTs, now, stopTendency, maxLiveMins, minLiveMins);
+        if (stopAt != null) {
+          await lumaOpsGateway.requestStopLive({
+            characterId: cid,
+            reason: "到点自动下播（运营组判定已到）",
+            source: "ticker"
+          });
+        }
+        continue;
+      }
+
+      // ── 休息中：该时间块是否触发开播 ──
+      const restBase = sched.lastEndTime || sched.lastStartTime || now;
+      const startAt = rollToggleAt(cid, 'start', restBase, now, startTendency, maxRestMins, minRestMins);
+      if (startAt == null) continue; // 窗口内未触发开播
+
+      if (dailyLimit !== Infinity) {
+        try {
+          const todayCount = await getDailyStartCount(cid);
+          if (todayCount >= dailyLimit) continue;
+        } catch (e) {}
+      }
+
+      await lumaOpsGateway.requestStartLive({
+        characterId: cid,
+        source: "ticker"
+      });
+    }
+  } catch (e) {
+    console.warn("[LUMA Live] 在线节拍器异常:", e);
+  } finally {
+    __lumaLiveTickerBusy = false;
+  }
+}
+
+// 启动在线节拍器（间隔可传，默认 30 秒）
+function startLiveTicker(intervalMs = 30000) {
+  if (__lumaLiveTicker) clearInterval(__lumaLiveTicker);
+  __lumaLiveTicker = setInterval(() => { tickLiveLifecycle(); }, intervalMs);
+  return __lumaLiveTicker;
+}
+window.startLiveTicker = startLiveTicker;
+window.tickLiveLifecycle = tickLiveLifecycle;
