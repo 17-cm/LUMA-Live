@@ -46,6 +46,9 @@
       '</div>';
     area.appendChild(musicCard);
 
+    // 直播粉丝增长区间 设置卡（排在音乐按键下方）
+    area.appendChild(buildFansGrowthSettingCard());
+
     try {
       var chars = window.api && window.api.characters && window.api.characters.list ? await window.api.characters.list() : [];
       renderCharList(chars);
@@ -72,6 +75,84 @@
       '</div>';
     }).join('');
   }
+
+  // 直播粉丝增长区间设置卡：每场直播结束按区间随机增粉（默认 1000-5000）
+  function buildFansGrowthSettingCard() {
+    var p = window.appParams || {};
+    var range = window.LiveStatsManager && window.LiveStatsManager.getGainRange
+      ? window.LiveStatsManager.getGainRange()
+      : { min: 1000, max: 5000 };
+    var minVal = Number(p.fansGainMin) || range.min;
+    var maxVal = Number(p.fansGainMax) || range.max;
+
+    var card = document.createElement('div');
+    card.className = 'luxe-card p-3 bg-white space-y-2.5';
+    card.id = 'fansGrowthSettingCard';
+    card.innerHTML =
+      '<div class="flex items-center gap-3">' +
+        '<div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 flex items-center justify-center shadow-md flex-shrink-0">' +
+          '<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M3 22v-4a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v4"></path><circle cx="9" cy="8" r="3.5"></circle><path d="M17 11.2a3.5 3.5 0 1 0-2.4-.2"></path><path d="M17 14v4"></path><path d="M15 16h4"></path></svg>' +
+        '</div>' +
+        '<div class="flex-1 min-w-0">' +
+          '<div class="flex items-center gap-1.5">' +
+            '<h4 class="text-sm font-black text-slate-900">直播粉丝增长</h4>' +
+            '<span class="text-[9px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded-full font-bold">结算联动</span>' +
+          '</div>' +
+          '<p class="text-[11px] text-slate-500 mt-0.5">每场直播结束后，按区间随机增长的粉丝数量</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="h-[1px] bg-slate-100"></div>' +
+      '<div class="flex items-center gap-2.5" id="fansGrowthRangeInputs">' +
+        '<div class="flex-1">' +
+          '<label class="text-[10px] font-bold text-slate-500 block mb-1">最低增粉</label>' +
+          '<input type="number" id="fansGainMin" min="0" value="' + minVal + '" class="input-ins !py-2 text-center text-xs font-bold">' +
+        '</div>' +
+        '<span class="text-slate-300 font-black text-sm pt-5">~</span>' +
+        '<div class="flex-1">' +
+          '<label class="text-[10px] font-bold text-slate-500 block mb-1">最高增粉</label>' +
+          '<input type="number" id="fansGainMax" min="0" value="' + maxVal + '" class="input-ins !py-2 text-center text-xs font-bold">' +
+        '</div>' +
+      '</div>' +
+      '<button onclick="saveFansGrowthSetting()" class="btn-brand w-full py-2 justify-center text-xs font-bold shadow-sm">' +
+        '<span>保存粉丝增长区间</span>' +
+      '</button>';
+
+    // 输入限幅：避免最高被拉低到低于最低
+    var minInput = card.querySelector('#fansGainMin');
+    var maxInput = card.querySelector('#fansGainMax');
+    if (minInput) minInput.oninput = function () {
+      if (maxInput && Number(maxInput.value) < Number(minInput.value)) maxInput.value = minInput.value;
+    };
+    if (maxInput) maxInput.oninput = function () {
+      if (minInput && Number(minInput.value) > Number(maxInput.value)) maxInput.value = minInput.value;
+    };
+
+    return card;
+  }
+  window.buildFansGrowthSettingCard = buildFansGrowthSettingCard;
+
+  // 保存粉丝增长区间到宿主持久库（app_settings.global_params）
+  async function saveFansGrowthSetting() {
+    var minEl = document.getElementById('fansGainMin');
+    var maxEl = document.getElementById('fansGainMax');
+    if (!minEl || !maxEl) return;
+
+    var min = Math.max(0, Math.floor(Number(minEl.value)));
+    var max = Math.max(min, Math.floor(Number(maxEl.value) > 0 ? Number(maxEl.value) : min));
+    if (min > max) { var t = min; min = max; max = t; }
+
+    if (!window.appParams) window.appParams = {};
+    window.appParams.fansGainMin = min;
+    window.appParams.fansGainMax = max;
+
+    try {
+      await dbUpsert('app_settings', 'global_params', window.appParams);
+      if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('直播粉丝增长区间已保存：' + min + ' ~ ' + max);
+    } catch (e) {
+      if (window.api && window.api.ui && window.api.ui.toast) window.api.ui.toast('保存成功：' + min + ' ~ ' + max);
+    }
+  }
+  window.saveFansGrowthSetting = saveFansGrowthSetting;
 
   window.showLiveSettingsUploadSheet = function (charId, charName) {
     var overlay = document.getElementById('liveSettingsUploadSheet');

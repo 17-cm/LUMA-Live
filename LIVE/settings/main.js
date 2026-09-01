@@ -1198,7 +1198,16 @@ async function lumaInitApp() {
     console.warn("DB读取警告:", e);
   }
 
-  // 2. 时间差结算器：APP 打开时一次性推演离线窗口内的完整直播时间线。
+  // 2. 把宿主持久库的真实粉丝回灌到 FansManager，保证排行榜/直播间展示与持久层一致
+  try {
+    if (typeof window.LiveStatsManager !== 'undefined' && typeof window.LiveStatsManager.hydrateAll === 'function') {
+      await window.LiveStatsManager.hydrateAll();
+    }
+  } catch (e) {
+    console.warn("[LUMA Live] 直播数据回灌失败:", e);
+  }
+
+  // 3. 时间差结算器：APP 打开时一次性推演离线窗口内的完整直播时间线。
   //    所有开播/下播时间戳都落在历史时刻，正在播的场次保持原 startTime，
   //    时长 = now - startTime 真实累计，绝不为打开瞬间造场次。
   try {

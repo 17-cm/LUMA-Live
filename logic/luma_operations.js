@@ -611,10 +611,18 @@ async function settleOneChar(char, now, lastSeen) {
 }
 
 // 给历史场次写归档：从 live_sessions 移除，写入 streamer_history
+// 并同步到直播结算数据体系：直播场次 +1、按配置区间随机增粉（真实/离线结算都走这里）
 async function closeAndArchive(char, session, endTime) {
   try {
     const startTs = Number(session.startTime) || endTime;
     const durationMin = Math.max(1, Math.round((endTime - startTs) / 60000));
+    // 单场增粉：优先走直播结算模块（按用户设置的最低~最高区间随机），保证与场次/粉丝联动
+    let fansGained = 0;
+    if (window.LiveStatsManager && typeof window.LiveStatsManager.rollFansGain === 'function') {
+      fansGained = window.LiveStatsManager.rollFansGain();
+    } else {
+      fansGained = Math.floor(durationMin * (seededHash(`fans:${startTs}`) * 3 + 1));
+    }
     const historyRecord = {
       id: `show_${session.characterId}_${startTs}`,
       characterId: session.characterId,
@@ -629,10 +637,14 @@ async function closeAndArchive(char, session, endTime) {
       peakViewers: session.viewers || Math.floor(seededHash(`viewer:${startTs}`) * 800 + 300),
       totalLikes: session.likes || Math.floor(seededHash(`like:${startTs}`) * 5000 + 1000),
       totalGifts: Math.floor(seededHash(`gift:${startTs}`) * 200 + 50),
-      fansGained: Math.floor(durationMin * (seededHash(`fans:${startTs}`) * 3 + 1)),
+      fansGained: fansGained,
       isOfflineSimulated: true
     };
     await api.db.create("streamer_history", historyRecord);
+    // 结算上报：直播场次 +1 并按区间随机增粉 → 持久化 + 刷新粉丝/排行榜
+    if (window.LiveStatsManager && typeof window.LiveStatsManager.onShowSettled === 'function') {
+      try { await window.LiveStatsManager.onShowSettled(session.characterId, fansGained); } catch (e) {}
+    }
     await api.db.delete("live_sessions", session.id);
     if (window.LiveRoomStore && typeof window.LiveRoomStore.clearRoom === 'function') {
       const rid = session.roomId || session.id || session.characterId;

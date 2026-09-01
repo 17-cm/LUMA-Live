@@ -397,7 +397,9 @@ window.appParams = window.appParams || {
   danmakuSpeed: 50,
   giftFrequency: 30,
   enterPlayerLiveRate: 60,
-  guestbookRate: 75
+  guestbookRate: 75,
+  fansGainMin: 1000,
+  fansGainMax: 5000
 };
 
 // 自定义 API 配置
