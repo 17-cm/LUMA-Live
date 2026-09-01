@@ -357,13 +357,13 @@ async function bootstrapWorldInitialState(allChars, params = {}) {
   const total = allChars.length;
   if (total === 0) return;
 
-  const shuffled = [...allChars].sort(() => Math.random() - 0.5);
-  let targetLiveCount = Math.max(1, Math.round(total * 0.4));
-  if (total === 1) targetLiveCount = 1;
-
-  for (let i = 0; i < shuffled.length; i++) {
-    const c = shuffled[i];
+  // 冷启动不再强行让固定比例的角色同时在线（去除"打开就有一批人在播"）。
+  // 改为按"今日自主决定"给每个角色排期：今天想播 → 定下它自己想开播的时刻，
+  // 到点由节拍器开播；今天休播 → 今天完全不排。像真人一样各过各的。
+  for (const c of allChars) {
+    if (!c || !c.id) continue;
     if (existingSessionCharIds.has(c.id)) {
+      // 已有在入场次（可能来自上一段时间结算/用户互动）：如实保留，不强行处理
       const sess = currentSessions.find(s => s.characterId === c.id);
       window.charSchedulesMap[c.id] = {
         initialized: true,
@@ -371,74 +371,21 @@ async function bootstrapWorldInitialState(allChars, params = {}) {
         currentSessionId: sess?.id,
         lastStartTime: sess?.startTime || now,
         plannedEndTime: sess?.endTime || (now + 60 * 60 * 1000),
-        lastEndTime: null
+        lastEndTime: null,
+        nextOpenAt: null,
+        nextCloseAt: null
       };
       continue;
     }
-
-    if (i < targetLiveCount) {
-      // 初始直播中：分配 5 ~ 35 分钟的合理中盘已播时长
-      const initLiveMins = Math.floor(Math.random() * Math.min(35, Math.floor(maxLiveMins * 0.5))) + 5;
-      const startTime = now - initLiveMins * 60000;
-      const plannedDurationMins = Math.floor(Math.random() * 60 + 60);
-      const endTime = startTime + plannedDurationMins * 60000;
-
-      const coverUrl = c.cover || c.avatar || '';
-      // 分类选取：完全随机（先一级再二级）
-      const picked = (typeof pickRandomLiveCategory === 'function') ? pickRandomLiveCategory() : { mainCat: '随性杂谈', subCat: '日常唠嗑' };
-      const chosenCat = picked.mainCat;
-      const chosenSubTag = picked.subCat;
-
-      const newSession = {
-        characterId: c.id,
-        name: c.name || '主播',
-        avatar: c.avatar || coverUrl,
-        cover: coverUrl,
-        category: chosenCat,
-        subTag: chosenSubTag,
-        topic: `【${c.name || '主播'}】的精彩直播`,
-        heat: Math.floor(Math.random() * 80000 + 20000),
-        roomId: Math.floor(Math.random() * 899999 + 100000),
-        startTime: startTime,
-        endTime: endTime,
-        isNPC: false
-      };
-
-      try {
-        const created = await api.db.create("live_sessions", newSession);
-        window.charSchedulesMap[c.id] = {
-          initialized: true,
-          isLive: true,
-          currentSessionId: created?.id,
-          lastStartTime: startTime,
-          plannedEndTime: endTime,
-          lastEndTime: null
-        };
-      } catch (e) {
-        console.warn("冷启动直播间创建失败:", e);
-      }
-    } else if (i < targetLiveCount + Math.round(total * 0.35)) {
-      // 初始休息中：处于法定强制休息期内
-      const initRestMins = Math.floor(Math.random() * Math.min(60, maxRestMins - minRestMins)) + minRestMins;
-      const lastEndTime = now - initRestMins * 60000;
-      window.charSchedulesMap[c.id] = {
-        initialized: true,
-        isLive: false,
-        lastStartTime: null,
-        plannedEndTime: null,
-        lastEndTime: lastEndTime
-      };
-    } else {
-      // 初始空闲/蓄势待发：已度过休息期，开播倾向较高，近期轮询可自然开播
-      const lastEndTime = now - (minRestMins + Math.floor(Math.random() * 40 + 10)) * 60000;
-      window.charSchedulesMap[c.id] = {
-        initialized: true,
-        isLive: false,
-        lastStartTime: null,
-        plannedEndTime: null,
-        lastEndTime: lastEndTime
-      };
-    }
+    // 无在入场次：按"今日自主决定"排期，绝不在休播/未到自己决定的时间时强行顶上线
+    const decision = getDailyLiveDecision(c.id);
+    const sched = ensureSchedEntry(window.charSchedulesMap[c.id]);
+    sched.isLive = false;
+    sched.currentSessionId = null;
+    sched.nextCloseAt = null;
+    sched.forcedRestUntil = null;
+    sched.nextOpenAt = decision.wantsToday ? decision.openMs : null;
+    window.charSchedulesMap[c.id] = sched;
   }
 
   try {
@@ -501,6 +448,54 @@ function drawRestSeconds(minRestMins, maxRestMins) {
 function drawLiveSeconds(minLiveMins, maxLiveMins) {
   return rollSeconds(minLiveMins * 60, maxLiveMins * 60);
 }
+
+// =========================================================================
+// 【角色今日自主决定】模拟真人"今天想不想播 / 想几点播 / 播几场"
+// 输入：角色 id + 当天日期 → 确定性推导（seededHash），全天稳定、离线在线结果一致。
+// 关键：全程不调 AI/API，只凭人设种子推导，替代"真得要角色用脑子做决定"的体验。
+// 一个角色一天只会有一个固定的自主决定（今天休播 or 某时段想播 + 播几场）。
+// =========================================================================
+function getDailyLiveDecision(characterId) {
+  const nowD = new Date();
+  const y = nowD.getFullYear(), mo = nowD.getMonth() + 1, dd = nowD.getDate();
+  const dateKey = `${y}-${mo}-${dd}`;
+  const cid = String(characterId || 'char');
+  const rWants = seededHash(`${cid}::wants::${dateKey}`);   // 今日想不想播
+  const rBand  = seededHash(`${cid}::band::${dateKey}`);    // 偏好时段
+  const rCnt   = seededHash(`${cid}::cnt::${dateKey}`);     // 今日场次数
+  const rLen   = seededHash(`${cid}::len::${dateKey}`);     // 单场时长
+
+  // 今日休播：约 20% 角色某天状态不佳/有安排，选择不下播 → 产生"真人今天没播"的真实感
+  const wantsToday = rWants >= 0.20;
+
+  // 偏好时段（分钟）：晨曦/午间/午后/晚间黄金/深夜电台
+  const bands = [
+    [6 * 60, 10 * 60],
+    [10 * 60, 14 * 60],
+    [13 * 60, 18 * 60],
+    [18 * 60, 23 * 60],
+    [20 * 60, 24 * 60]
+  ];
+  const band = bands[Math.floor(rBand * bands.length)];
+  // 在时段内再抖一点，形成"今天这个点我很想播"的个中感
+  const openLocalMin = band[0] + Math.floor(rCnt * (band[1] - band[0]) * 0.7);
+  // 单场时长 40~160 分钟（受全局 min/max 约束由调用方再夹紧）
+  const showLenMins = 40 + Math.floor(rLen * 120);
+  // 精力充沛时偶尔一天两场
+  const dailySessions = seededHash(`${cid}::n::${dateKey}`) < 0.3 ? 2 : 1;
+
+  const startOfDayMs = new Date(y, mo - 1, dd, 0, 0, 0, 0).getTime();
+  return {
+    key: dateKey,
+    wantsToday,
+    band,
+    openMs: startOfDayMs + openLocalMin * 60000,
+    bandCloseMs: startOfDayMs + band[1] * 60000,
+    showLenMins,
+    dailySessions
+  };
+}
+window.getDailyLiveDecision = getDailyLiveDecision;
 
 // 升级 charSchedulesMap 中"只有轮询残留字段"的旧条目为结算器需要的形状
 function ensureSchedEntry(sched) {
@@ -569,22 +564,29 @@ async function settleOneChar(char, now, lastSeen) {
       continue;
     }
 
-    // ── 休息中：秒级开播倒计时到点 → 开播 ──
+    // ── 休息中：按"今日自主决定"推进（人设×当天，离线重放与在线节拍器一致）──
+    const decision = getDailyLiveDecision(cid);
+    // 今日休播 → 这次完全不排开播
+    if (!decision.wantsToday) { sched.isLive = false; break; }
+    // 快速重开（下播后不久/强制休息锁内）→ 不做补账开播
+    if (sched.forcedRestUntil && now < sched.forcedRestUntil) { sched.isLive = false; break; }
+    if (sched.lastEndTime && (now - sched.lastEndTime) < minRestMins * 60000) { sched.isLive = false; break; }
     let nextOpen = sched.nextOpenAt;
     if (nextOpen == null) {
-      // 首次无排班（如冷启动未初始化到）→ 从上次下播/起始点抽一条秒级倒计时
-      nextOpen = (sched.lastEndTime || lastSeen) + drawRestSeconds(minRestMins, maxRestMins) * 1000;
+      // 首次无排班 → 定为该角色今天自己决定的时间点
+      nextOpen = decision.openMs;
       sched.nextOpenAt = nextOpen;
     }
+    // 已超过"最迟下播时刻"且开播时刻已过 → 今天不硬开，留待明天新决定
+    if (now > decision.bandCloseMs && now > nextOpen) { sched.isLive = false; break; }
     if (nextOpen > now) { sched.isLive = false; break; }
 
-    // 每日场次上限拦截
-    if (dailyLimit !== Infinity) {
-      try {
-        const todayCount = await getDailyStartCount(cid);
-        if (todayCount >= dailyLimit) { sched.isLive = false; break; }
-      } catch (e) {}
-    }
+    // 每日场次上限拦截（自主决定的今日场次 + 全局 dailyLimit 兜底）
+    const sCap = Math.min(decision.dailySessions, dailyLimit === Infinity ? decision.dailySessions : dailyLimit);
+    try {
+      const todayCount = await getDailyStartCount(cid);
+      if (todayCount >= sCap) { sched.isLive = false; break; }
+    } catch (e) {}
 
     // 到点开播：nextOpen 是历史/现在时刻，写入场次
     session = await openLiveFromHistory(char, nextOpen);
@@ -862,34 +864,43 @@ async function tickLiveLifecycle() {
         continue;
       }
 
-      // ── 休息中：秒级开播倒计时到点必开；未到点按 倾向+比例式增长 是否"改签提前"开 ──
-      const restBase = sched.lastEndTime || sched.lastStartTime || now;
-      const restElapsedMins = Math.max(0, (now - restBase) / 60000);
+      // ── 休息中：按"今日自主决定"开播（人设×当天，模拟真人"今天想不想播/播几场"）─
+      const decision = getDailyLiveDecision(cid);
       const minRestMs = minRestMins * 60000;
-      // 强制休息锁：刚下播（或被劝退）后的直接休息期内，绝不允许"改签提前"重开，
-      // 保证下播后有一段真实的下线休息时间，恢复真人作息感。
+      const restBase = sched.lastEndTime || sched.lastStartTime || now;
       const inForcedRest = (now - restBase) < minRestMs || (sched.forcedRestUntil != null && now < sched.forcedRestUntil);
-      const g = Math.min(1, restElapsedMins / maxRestMins) * 0.5;
-      const startP = inForcedRest ? 0 : Math.min(1, ((startTendency != null && startTendency >= 0) ? startTendency / 200 : 0) + g);
-      // toBase = 秒级倒计时到点（必开）；tendLevel = 倾向"改签"，random<p 提前开（仅休息锁解除后才允许）
-      let dueOpen = (sched.nextOpenAt != null && now >= sched.nextOpenAt);
-      if (!dueOpen && !inForcedRest && Math.random() < startP) dueOpen = true;
-      if (!dueOpen) continue;
-
-      if (dailyLimit !== Infinity) {
-        try {
-          const todayCount = await getDailyStartCount(cid);
-          if (todayCount >= dailyLimit) continue;
-        } catch (e) {}
+      // 今日休播 → 今天完全不自动补位开播（真人"今天不太想播"）：
+      if (!decision.wantsToday) continue;
+      // 首次无排班：把"下次开播"定为该角色今天自己决定的时间点
+      if (sched.nextOpenAt == null) sched.nextOpenAt = decision.openMs;
+      // 决定时刻未到 / 仍在强制休息锁内 → 绝不开播（杜绝"下一秒又开播"）
+      if (now < sched.nextOpenAt || inForcedRest) continue;
+      // 已超过"最迟下播时刻"，今天的时段已结束 → 今天不再硬开，留待明天新决定
+      if (now > decision.bandCloseMs) {
+        sched.nextOpenAt = now + drawRestSeconds(minRestMins, maxRestMins) * 1000;
+        try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
+        continue;
       }
+      // 每日场次上限（自主决定的今日场次 + 全局 dailyLimit 兜底）
+      const tCap = Math.min(decision.dailySessions, dailyLimit === Infinity ? decision.dailySessions : dailyLimit);
+      try {
+        const todayCount = await getDailyStartCount(cid);
+        if (todayCount >= tCap) {
+          sched.nextOpenAt = now + drawRestSeconds(minRestMins, maxRestMins) * 1000;
+          try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
+          continue;
+        }
+      } catch (e) {}
 
+      // 到点（该角色今天自己决定要播）→ 开播
       await lumaOpsGateway.requestStartLive({
         characterId: cid,
         source: "ticker"
       });
-      // 开播后（w上一段倒计时已消费），拧本场直播的秒级下播倒计时
+      // 开播后按"自主决定的场次时长"拧本场下播倒计时（不低于最短直播）
+      const decidedLenMins = Math.max(minLiveMins, Math.min(decision.showLenMins, maxLiveMins));
       sched.nextOpenAt = null;
-      sched.nextCloseAt = now + drawLiveSeconds(minLiveMins, maxLiveMins) * 1000;
+      sched.nextCloseAt = now + drawLiveSeconds(decidedLenMins, maxLiveMins) * 1000;
       try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
     }
   } catch (e) {
