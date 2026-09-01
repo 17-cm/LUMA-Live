@@ -391,7 +391,6 @@ window.appParams = window.appParams || {
   maxRestDuration: 480,
   minRestDuration: 10,
   dailyLiveLimit: 0,
-  opsPollInterval: 3,
   replyRandomDanmakuRate: 25,
   mentionUserRate: 30,
   enterOtherLiveRate: 35,
