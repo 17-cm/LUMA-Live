@@ -131,12 +131,16 @@ const lumaOpsGateway = {
     }
 
     const minRestMs = (params.minRestDuration || 10) * 60 * 1000;
-    if (sched && sched.lastEndTime && (now - sched.lastEndTime < minRestMs)) {
-      const remainingMins = Math.max(1, Math.ceil((minRestMs - (now - sched.lastEndTime)) / 60000));
+    // 强制休息锁：锁期内（含刚下播/被劝退）一律驳回开播申请，杜绝"下播下一秒又开播"
+    const forcedRestUntil = sched && sched.forcedRestUntil;
+    const inForcedLock = (forcedRestUntil != null && now < forcedRestUntil) ||
+                         (sched && sched.lastEndTime && (now - sched.lastEndTime < minRestMs));
+    if (inForcedLock) {
+      const remainingMins = Math.max(1, Math.ceil((minRestMs - ((sched.lastEndTime ? now - sched.lastEndTime : 0))) / 60000));
       lumaOpsNotify("开播驳回", `【${charName}】刚下播休息不足，需再休息 ${remainingMins} 分钟`, "reject");
       return {
         success: false,
-        reason: `【LUMA官方运营组通告】主播【${charName}】开播申请未通过：您距离上次下播仅过去不久，平台规定强制休息期还剩 ${remainingMins} 分钟，请劳逸结合。`
+        reason: `【LUMA官方运营组通告】主播【${charName}】开播申请未通过：您距上次下播不久，平台强制休息期还剩约 ${remainingMins} 分钟，请劳逸结合。`
       };
     }
 
@@ -252,15 +256,21 @@ const lumaOpsGateway = {
     const character = allChars.find(c => c.id === characterId);
     await closeAndArchive(character, session, now);
 
-    if (window.charSchedulesMap) {
-      const sched = window.charSchedulesMap[characterId];
-      if (sched) {
-        sched.isLive = false;
-        sched.currentSessionId = null;
-        sched.plannedEndTime = null;
-        sched.lastEndTime = now;
-      }
-    }
+    // 下播后强制进入休息期：拧一条全新秒级随机"下次开播"倒计时并加"强制休息锁"，
+    // 锁期内节拍器/改签/Tool 一律不得提前重开，杜绝"刚下播下一秒又开播"。
+    const sparams = window.appParams || {};
+    const sMinRestMs = (sparams.minRestDuration || 10) * 60 * 1000;
+    const sMaxRestMs = (sparams.maxRestDuration || 480) * 60 * 1000;
+    if (!window.charSchedulesMap) window.charSchedulesMap = {};
+    let sched = window.charSchedulesMap[characterId] || (window.charSchedulesMap[characterId] = { initialized: true });
+    sched.isLive = false;
+    sched.currentSessionId = null;
+    sched.plannedEndTime = null;
+    sched.lastEndTime = now;
+    sched.nextCloseAt = null;
+    sched.forcedRestUntil = now + sMinRestMs; // 强制休息锁：锁期内禁止任何提前开播
+    // 始终在 [最短休息, 最长休息] 内抽一条精确到秒的新倒计时（覆盖旧值）
+    sched.nextOpenAt = now + rollSeconds(sMinRestMs / 1000, sMaxRestMs / 1000) * 1000;
     try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
     lumaOpsNotify("下播完成", `【${session.name || '主播'}】${reason || '正常下播'}`, "approve");
     if (typeof syncLiveSessions === 'function') await syncLiveSessions();
@@ -855,10 +865,15 @@ async function tickLiveLifecycle() {
       // ── 休息中：秒级开播倒计时到点必开；未到点按 倾向+比例式增长 是否"改签提前"开 ──
       const restBase = sched.lastEndTime || sched.lastStartTime || now;
       const restElapsedMins = Math.max(0, (now - restBase) / 60000);
+      const minRestMs = minRestMins * 60000;
+      // 强制休息锁：刚下播（或被劝退）后的直接休息期内，绝不允许"改签提前"重开，
+      // 保证下播后有一段真实的下线休息时间，恢复真人作息感。
+      const inForcedRest = (now - restBase) < minRestMs || (sched.forcedRestUntil != null && now < sched.forcedRestUntil);
       const g = Math.min(1, restElapsedMins / maxRestMins) * 0.5;
-      const startP = Math.min(1, ((startTendency != null && startTendency >= 0) ? startTendency / 200 : 0) + g);
-      // toBase = 秒级倒计时到点（必开）；tendLevel = 倾向"改签"，random<p 提前开（比例式增长随爬）
-      const dueOpen = (sched.nextOpenAt != null && now >= sched.nextOpenAt) || Math.random() < startP;
+      const startP = inForcedRest ? 0 : Math.min(1, ((startTendency != null && startTendency >= 0) ? startTendency / 200 : 0) + g);
+      // toBase = 秒级倒计时到点（必开）；tendLevel = 倾向"改签"，random<p 提前开（仅休息锁解除后才允许）
+      let dueOpen = (sched.nextOpenAt != null && now >= sched.nextOpenAt);
+      if (!dueOpen && !inForcedRest && Math.random() < startP) dueOpen = true;
       if (!dueOpen) continue;
 
       if (dailyLimit !== Infinity) {
