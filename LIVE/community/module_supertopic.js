@@ -99,69 +99,84 @@ function renderSuperTopicView(charId = null) {
   if (headerTitle) headerTitle.textContent = `#${char.name}超话#`;
 
   container.innerHTML = `
-    <!-- 1. 沉浸式超话 Hero 头部卡片 -->
-    <div class="relative overflow-hidden rounded-3xl bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white p-4 shadow-xl border border-slate-700/50">
-      <div class="absolute -top-12 -right-12 w-44 h-44 rounded-full bg-gradient-to-br from-rose-500/25 via-purple-500/20 to-transparent blur-2xl pointer-events-none"></div>
-      <div class="absolute -bottom-10 -left-10 w-36 h-36 rounded-full bg-cyan-500/15 blur-2xl pointer-events-none"></div>
-
-      <div class="relative z-10 flex items-start justify-between gap-3">
-        <div class="flex items-center gap-3.5 min-w-0 flex-1">
-          <!-- 头像：点击切换超话 -->
-          <div class="relative flex-shrink-0 cursor-pointer active:scale-95 transition" onclick="toggleSuperTopicDrawer()">
-            <div class="w-14 h-14 rounded-2xl p-0.5 bg-gradient-to-tr from-rose-500 via-purple-500 to-cyan-400 shadow-md">
-              <img class="w-full h-full rounded-[14px] object-cover bg-slate-950" src="${char.avatar}" alt="超话头像">
-            </div>
-            <span class="absolute -bottom-1 -right-1 text-[8px] bg-slate-900/90 text-rose-300 font-extrabold px-1.5 py-0.5 rounded-full border border-rose-500/40 shadow-sm">切换</span>
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <h2 class="text-base font-black tracking-tight text-white truncate max-w-[160px]">#${char.name}超话#</h2>
-              <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-gradient-to-r from-rose-500 to-purple-600 text-white shadow-sm">超话·${char.category || '明星'}</span>
-            </div>
-            <p class="text-[10px] text-slate-300/80 mt-1 flex items-center gap-1 truncate">
-              <span class="text-rose-400 font-bold">主持人</span> @${char.name}后援会 · 官方认证
-            </p>
-          </div>
-        </div>
-        <button onclick="handleSuperTopicFollow('${char.name}')" class="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-black transition active:scale-95 shadow-md ${isFollowed ? 'bg-white/15 text-slate-200 backdrop-blur-md border border-white/20' : 'bg-gradient-to-r from-rose-500 to-purple-600 text-white shadow-rose-500/30'}">
+    <!-- 1. 顶部封面头图（同个人主页·朋友圈风格封面，随内容滚动） -->
+    <div class="relative -mx-4 h-[150px] overflow-hidden bg-slate-900 rounded-b-2xl">
+      <div class="absolute inset-0 bg-gradient-to-tr from-rose-500/45 via-purple-500/30 to-cyan-400/35 pointer-events-none"></div>
+      <img src="${char.avatar || ''}" class="absolute inset-0 w-full h-full object-cover opacity-75" alt="超话封面" loading="lazy">
+      <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent pointer-events-none"></div>
+      <!-- 右上：关注/更多 -->
+      <div class="absolute top-2.5 right-3 z-10 flex items-center gap-2">
+        <button onclick="handleSuperTopicFollow('${char.name}')" class="px-3 py-1.5 rounded-full text-[11px] font-black transition active:scale-95 shadow-md ${isFollowed ? 'bg-white/20 text-white border border-white/30 backdrop-blur' : 'bg-gradient-to-r from-rose-500 to-purple-600 text-white shadow-rose-500/30'}">
           ${isFollowed ? '✓ 已关注' : '+ 关注'}
         </button>
       </div>
+      <!-- 左下：超话名称与主持人信息 -->
+      <div class="absolute bottom-2.5 left-4 right-4 z-10 flex items-end justify-between gap-2">
+        <div class="min-w-0">
+          <h2 class="text-base font-black text-white tracking-tight drop-shadow truncate max-w-[200px]">#${char.name}超话#</h2>
+          <p class="text-[10px] text-white/85 font-medium mt-0.5 flex items-center gap-1 truncate">
+            <span class="text-rose-300 font-bold">主持人</span> @${char.name}后援会 · 官方认证
+          </p>
+        </div>
+        <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[9px] font-black bg-white/15 text-white border border-white/25 backdrop-blur">超话·${char.category || '明星'}</span>
+      </div>
+    </div>
 
-      <!-- 4合1 数据总览栏 -->
-      <div class="relative z-10 grid grid-cols-4 gap-1 mt-3.5 pt-3 border-t border-white/10 text-center">
-        <div class="px-1">
-          <div class="text-xs font-black text-white tracking-tight">${fansCount.toLocaleString()}</div>
-          <div class="text-[9px] text-slate-400 mt-0.5 font-medium">粉丝数</div>
+    <!-- 2. 白色资料卡（同个人主页风格：头像+金V+数据宫格） -->
+    <div class="relative -mt-6 z-10 bg-white rounded-3xl px-4 pb-3 pt-5 shadow-sm border border-slate-100">
+      <div class="flex items-center gap-3 min-w-0">
+        <!-- 头像：点击切换超话 -->
+        <div class="relative flex-shrink-0 cursor-pointer active:scale-95 transition" onclick="toggleSuperTopicDrawer()" title="切换超话">
+          <div class="profile-avatar-wrapper" style="margin-top:0;">
+            <img src="${char.avatar}" class="profile-avatar-img" alt="超话头像">
+            <div class="v-badge-gold" title="官方认证金V" style="width:16px;height:16px;bottom:1px;right:1px;">
+              <svg class="w-2 h-2 fill-current" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            </div>
+          </div>
+          <span class="absolute -bottom-1 -right-1 text-[8px] bg-slate-900/90 text-rose-300 font-extrabold px-1.5 py-0.5 rounded-full border border-rose-500/40 shadow-sm z-10">切换</span>
         </div>
-        <div class="px-1 border-l border-white/10">
-          <div class="text-xs font-black text-white tracking-tight">${todayDiscuss}</div>
-          <div class="text-[9px] text-slate-400 mt-0.5 font-medium">今日讨论</div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <h2 class="text-[15px] font-black text-slate-900 tracking-tight truncate max-w-[130px]">#${char.name}超话#</h2>
+            <span class="text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-900 text-amber-300 border border-amber-400/40 shrink-0">金V认证</span>
+          </div>
+          <div class="flex items-center gap-1.5 text-[10px] text-amber-600 font-bold mt-1">
+            <svg class="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            <span class="truncate">明星超话 · 官方认证蓝标</span>
+          </div>
         </div>
-        <div class="px-1 border-l border-white/10">
-          <div class="text-xs font-black text-amber-300 tracking-tight">${contribution.toLocaleString()}</div>
-          <div class="text-[9px] text-slate-400 mt-0.5 font-medium">我的贡献</div>
+      </div>
+
+      <!-- 4合1 数据矩阵（微博经典宫格） -->
+      <div class="grid grid-cols-4 gap-2 mt-3 py-2.5 px-1 rounded-2xl bg-slate-50 border border-slate-100 text-center">
+        <div>
+          <span class="block text-sm font-black text-slate-900 tracking-tight">${fansCount.toLocaleString()}</span>
+          <span class="text-[9px] text-slate-400 font-medium">粉丝</span>
         </div>
-        <div class="px-1 border-l border-white/10">
-          <div class="text-xs font-black text-rose-400 tracking-tight">${heatValue}</div>
-          <div class="text-[9px] text-slate-400 mt-0.5 font-medium">超话热度</div>
+        <div class="border-l border-slate-200">
+          <span class="block text-sm font-black text-slate-900 tracking-tight">${todayDiscuss}</span>
+          <span class="text-[9px] text-slate-400 font-medium">今日讨论</span>
+        </div>
+        <div class="border-l border-slate-200">
+          <span class="block text-sm font-black text-rose-600 tracking-tight">${contribution.toLocaleString()}</span>
+          <span class="text-[9px] text-slate-400 font-medium">我的贡献</span>
+        </div>
+        <div class="border-l border-slate-200">
+          <span class="block text-sm font-black text-amber-600 tracking-tight">${heatValue}</span>
+          <span class="text-[9px] text-slate-400 font-medium">超话热度</span>
         </div>
       </div>
     </div>
 
-    <!-- 2. 个人主页式分段导航：动态 | 签到 | 打榜 | 贡献榜 -->
-    <div class="sticky top-0 z-20 mt-3 bg-white/95 backdrop-blur-xl rounded-2xl p-1 shadow-sm border border-slate-100 flex">
+    <!-- 3. 微博 Tab 导航条（个人主页同款粘性导航·红色下划线） -->
+    <div class="sticky top-0 z-20 bg-white/95 backdrop-blur border-y border-slate-100 flex items-center justify-around px-2 shadow-xs -mx-4 mt-3">
       ${['posts', 'checkin', 'support', 'contribute'].map(k => {
         const label = { posts: '动态', checkin: '签到', support: '打榜', contribute: '贡献榜' }[k];
-        const icon = { posts: '📃', checkin: '📅', support: '🎁', contribute: '🏆' }[k];
-        return `<button id="spTabBtn_${k}" onclick="switchSuperTopicTab('${k}')" class="flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-xl transition active:scale-95 ${currentSuperTopicTab === k ? 'bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md' : 'text-slate-500'}">
-          <span class="text-[13px] leading-none">${icon}</span>
-          <span class="text-[10px] font-black">${label}</span>
-        </button>`;
+        return `<div id="spTabBtn_${k}" onclick="switchSuperTopicTab('${k}')" class="weibo-tab-item ${currentSuperTopicTab === k ? 'active' : ''}">${label}</div>`;
       }).join('')}
     </div>
 
-    <!-- 3. 内容面板（随分段导航刷新的挂载点） -->
+    <!-- 4. 内容面板（随分段导航刷新的挂载点） -->
     <div id="superTopicPanel" class="space-y-3 mt-3 pb-24"></div>
   `;
 
@@ -178,8 +193,7 @@ function switchSuperTopicTab(tabKey) {
   ['posts', 'checkin', 'support', 'contribute'].forEach(k => {
     const btn = document.getElementById(`spTabBtn_${k}`);
     if (!btn) return;
-    if (k === tabKey) btn.className = 'flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-xl transition active:scale-95 bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md';
-    else btn.className = 'flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-xl transition active:scale-95 text-slate-500';
+    btn.classList.toggle('active', k === tabKey);
   });
 
   renderSuperTopicTab();
