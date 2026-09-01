@@ -42,6 +42,54 @@
     return min + Math.floor(Math.random() * (max - min + 1));
   }
 
+  // 为 count 场初始/迁移直播生成【错落、真实、严格无重叠】的每场开播/下播时刻。
+  // 每天约一场、时间在晚高峰随机分布，杜绝“全为同一分钟(00:35)、只有日期不同”的假感。
+  // 返回升序(早→晚)数组，每项 { start, end, ts }；end 一律严格早于当前时刻。
+  function buildVariedSeedTimes(count) {
+    const n = Math.max(0, Math.floor(Number(count) || 0));
+    const out = [];
+    if (n === 0) return out;
+    const now = Date.now();
+    // 最新一场结束在上线前 ~0.3h~1.3h，往前每隔一场拉开 16h~30h（约一天）
+    let upper = now - (20 + Math.floor(Math.random() * 60)) * 60 * 1000;
+    const ends = new Array(n);
+    for (let i = n - 1; i >= 0; i--) {
+      ends[i] = upper;
+      upper -= (16 * 60 + Math.floor(Math.random() * 14 * 60)) * 60 * 1000; // 16h~30h 间隔
+    }
+    for (let i = 0; i < n; i++) {
+      const end = ends[i];
+      const durMin = 30 + Math.floor(Math.random() * 121); // 30~150 分钟
+      const start = end - durMin * 60 * 1000;
+      out.push({ start, end, ts: end });
+    }
+    out.sort((a, b) => a.end - b.end);
+    return out;
+  }
+
+  // 检测“种子味”：某 char 的全部场次都卡在同一个 时/分（初始种子用哨兵扩容时的固化分钟）。
+  // 真实结算场次时间各异，不会触发；只有历史种子才会被判定并自动重排。
+  function hasSeedSmell(shows) {
+    if (!Array.isArray(shows) || shows.length < 2) return false;
+    const hh = new Set(), mm = new Set();
+    shows.forEach(s => {
+      const d = new Date(Math.floor(Number(s.end) || Number(s.ts) || 0));
+      if (isNaN(d.getTime())) return;
+      hh.add(d.getHours());
+      mm.add(d.getMinutes());
+    });
+    return hh.size === 1 && mm.size === 1;
+  }
+
+  // 保持增益不变，仅把“同分钟”的种子时刻重排成错落的真实时间（顺序与总数不变）
+  function variegateSeedTimes(shows) {
+    const n = Array.isArray(shows) ? shows.length : 0;
+    if (n === 0) return [];
+    const gains = shows.map(s => Math.max(Math.floor(Number(s.gain)) || 0, 0));
+    const times = buildVariedSeedTimes(n);
+    return times.map((t, i) => ({ ts: t.ts, start: t.start, end: t.end, gain: gains[i] }));
+  }
+
   // 从宿主持久库读取该 char 的直播数据记录
   async function load(charId) {
     const id = getCharId(charId);
@@ -95,11 +143,20 @@
 
     // 已有台账：先做一次即时归一化清洗（自动修正历史写入的重叠/重复场次）
     if (rec && Array.isArray(rec.shows)) {
+      let changed = false;
       const norm = normalizeShows(rec.shows);
       if (norm.changed) {
         rec.shows = norm.shows;
-        rec.liveShowCount = norm.shows.length;
-        rec.fans = norm.shows.reduce((s, x) => s + x.gain, 0);
+        changed = true;
+      }
+      // 若现存场次全是“同一时钟分钟”的初始种子（如 00:35 假感），自动重排成错落的真实时刻
+      if (rec.shows.length > 0 && hasSeedSmell(rec.shows)) {
+        rec.shows = variegateSeedTimes(rec.shows);
+        changed = true;
+      }
+      if (changed) {
+        rec.liveShowCount = rec.shows.length;
+        rec.fans = rec.shows.reduce((s, x) => s + Math.floor(Number(x.gain) || 0), 0);
         await persist(rec);
       }
       return rec;
@@ -113,12 +170,10 @@
       if (count > 0) {
         const base = Math.floor(fans / count);
         let rem = fans - base * count;
-        const ts0 = Date.now() - count * 24 * 60 * 60 * 1000;
-        for (let i = 0; i < count; i++) {
-          const end = ts0 + i * 24 * 60 * 60 * 1000;
-          const durMin = 30 + Math.floor(Math.random() * 120);
-          shows.push({ ts: end, start: end - durMin * 60000, end, gain: base + (rem > 0 ? (rem--, 1) : 0) });
-        }
+        const times = buildVariedSeedTimes(count);
+        times.forEach((t) => {
+          shows.push({ ts: t.ts, start: t.start, end: t.end, gain: base + (rem > 0 ? (rem--, 1) : 0) });
+        });
       }
       rec.shows = shows;
       rec.liveShowCount = count;
@@ -132,14 +187,11 @@
     const liveShowCount = Math.floor(Math.random() * 11); // 0 ~ 10
     const shows = [];
     let fans = 0;
-    const ts0 = Date.now() - (liveShowCount > 0 ? liveShowCount * 24 * 60 * 60 * 1000 : 0);
-    for (let i = 0; i < liveShowCount; i++) {
+    buildVariedSeedTimes(liveShowCount).forEach((t) => {
       const gain = rollFansGain();
-      const end = ts0 + i * 24 * 60 * 60 * 1000;
-      const durMin = 30 + Math.floor(Math.random() * 120);
-      shows.push({ ts: end, start: end - durMin * 60000, end, gain });
+      shows.push({ ts: t.ts, start: t.start, end: t.end, gain });
       fans += gain;
-    }
+    });
     rec = { id, shows, liveShowCount, fans, initializedAt: Date.now() };
     await persist(rec);
     return rec;

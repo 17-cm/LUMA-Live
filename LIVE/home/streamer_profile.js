@@ -716,12 +716,11 @@ function fmtShowRange(show) {
   const end = Number(show.endTs) || Number(show.createdAt) || Date.now();
   const start = Number(show.startTs) || (end - 90 * 60000);
   const sD = new Date(start), eD = new Date(end);
-  if (sD.getMonth() === eD.getMonth() && sD.getDate() === eD.getDate()) {
-    return `${sD.getMonth() + 1}月${sD.getDate()}日 ${fmtPad(sD.getHours())}:${fmtPad(sD.getMinutes())} 开播`;
-  }
   const sStr = `${sD.getMonth() + 1}月${sD.getDate()}日 ${fmtPad(sD.getHours())}:${fmtPad(sD.getMinutes())}`;
-  const eStr = `${eD.getMonth() + 1}月${eD.getDate()}日 ${fmtPad(eD.getHours())}:${fmtPad(eD.getMinutes())}`;
-  return `${sStr} ~ ${eStr}`;
+  const eStr = `${fmtPad(eD.getHours())}:${fmtPad(eD.getMinutes())}`;
+  const eFull = `${eD.getMonth() + 1}月${eD.getDate()}日 ${eStr}`;
+  // 统一展示：跨天补日期，同天省略日期，每场只有一行、开收播固定不跳动
+  return `${sStr} 开播 ~ ${sD.getMonth() === eD.getMonth() && sD.getDate() === eD.getDate() ? eStr : eFull} 收播`;
 }
 window.fmtShowRange = fmtShowRange;
 
@@ -745,7 +744,7 @@ function renderSpShows() {
         <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs flex items-center justify-between">
           <div class="space-y-1">
             <h4 class="text-xs font-bold text-slate-900">${s.title}</h4>
-            <div class="text-[9px] text-rose-500 font-bold" ${s.startTs ? `data-dynamic-time data-ts="${s.startTs}"` : ''}>${window.fmtShowRange ? window.fmtShowRange(s) : ''}</div>
+            <div class="text-[9px] text-rose-500 font-bold">${window.fmtShowRange ? window.fmtShowRange(s) : ''}</div>
             <div class="flex items-center gap-2 text-[10px] text-slate-400">
               <span>时长: ${s.duration}</span>
               <span>·</span>
@@ -754,7 +753,6 @@ function renderSpShows() {
               <span class="text-rose-500 font-bold">${s.newFans}</span>
             </div>
           </div>
-          <span class="text-[9px] text-slate-400 font-medium shrink-0 ml-2" ${s.createdAt ? `data-dynamic-time data-ts="${s.createdAt}"` : ''}>${s.createdAt ? (window.formatDynamicTime ? window.formatDynamicTime(s.createdAt) : '刚刚') : (s.timeAgo || '刚刚')}</span>
         </div>
       `).join('')}
     </div>
