@@ -64,14 +64,46 @@
     }
   }
 
+  // 归一化既有台账：按时间升序排列 → 去重(同一下播时刻只保留一条) →
+  // 丢弃重叠/侵蚀场次(开场早于上一场下播的"插播")，保证 一场一时段、严格单调无重叠。
+  // 返回 { shows, changed }；changed 为 true 时调用方应持久化。
+  function normalizeShows(shows) {
+    if (!Array.isArray(shows) || shows.length === 0) return { shows: [], changed: false };
+    const list = shows.map(x => {
+      const end = Math.max(Math.floor(Number(x.end) || Number(x.ts) || 0), 0);
+      const start = Math.max(Math.min(Math.floor(Number(x.start) || (end - 90 * 60000)), end - 1), 0);
+      const realEnd = Math.max(start + 1, end);
+      return { ts: realEnd, start, end: realEnd, gain: Math.max(Math.floor(Number(x.gain) || 0), 0) };
+    }).sort((a, b) => a.end - b.end);
+    const out = [];
+    for (const s of list) {
+      const prev = out[out.length - 1];
+      // 完全重复(同下播时刻) → 跳过
+      if (prev && prev.end === s.end) continue;
+      // 开场早于/等于上一场下播 → 重叠/侵蚀，丢弃
+      if (prev && s.start < prev.end) continue;
+      out.push(s);
+    }
+    return { shows: out, changed: out.length !== list.length };
+  }
+
   // 首次接触某 char：初始化 0~10 场初始直播场次（每场随机增粉），并据此固化初始粉丝
   async function ensureInitialized(charId) {
     const id = getCharId(charId);
     if (!id) return null;
     let rec = await load(id);
 
-    // 已有合法台账
-    if (rec && Array.isArray(rec.shows)) return rec;
+    // 已有台账：先做一次即时归一化清洗（自动修正历史写入的重叠/重复场次）
+    if (rec && Array.isArray(rec.shows)) {
+      const norm = normalizeShows(rec.shows);
+      if (norm.changed) {
+        rec.shows = norm.shows;
+        rec.liveShowCount = norm.shows.length;
+        rec.fans = norm.shows.reduce((s, x) => s + x.gain, 0);
+        await persist(rec);
+      }
+      return rec;
+    }
 
     // 旧结构迁移：老记录只有 {liveShowCount, fans}，没有逐场台账
     if (rec && (Number(rec.liveShowCount) > 0 || Number(rec.fans) > 0)) {
@@ -129,6 +161,12 @@
 
   // 单场直播结算上报：台账 +1 条、场次 +1，按配置区间随机增粉，持久化并同步 FansManager/排行榜
   // startTs/endTs 为该场直播的真实开播/下播时间戳（在线与离线补跑都由 closeAndArchive 传入）
+  //
+  // 【严格护栏】一个时间段只能有一场直播；直播时段内/休息期内不得出现下一场——
+  //   1. 幂等去重：同一场(以下播时刻 end 判定)被重复上报 → 只更新该场，绝不重复追加
+  //   2. 重叠/侵蚀拦截：新场的开播时刻不得早于台账最后一场的下播时刻；
+  //      若被已有场次区间吞没，或开播落在上一场直播时段内(还没下播就"开"了下一场)，
+  //      均判定为重复/幽灵场，一场只算一次，直接丢弃，保证台账严格单调、无重叠。
   async function onShowSettled(charId, fansGained, startTs, endTs) {
     const id = getCharId(charId);
     if (!id) return null;
@@ -137,14 +175,48 @@
     const gainRaw = Math.floor(Number(fansGained));
     const gain = Number.isFinite(gainRaw) && gainRaw >= 0 ? gainRaw : rollFansGain();
 
-    const end = Math.floor(Number(endTs)) || Date.now();
-    const start = Math.floor(Number(startTs)) || (end - 90 * 60000);
+    let end = Math.floor(Number(endTs)) || Date.now();
+    let start = Math.floor(Number(startTs)) || (end - 90 * 60000);
+    if (start >= end) start = end - 90 * 60000; // 脏数据防御：绝对禁止零时长/负时长场次
 
     if (!Array.isArray(rec.shows)) rec.shows = [];
-    rec.shows.push({ ts: end, start, end, gain });
-    rec.liveShowCount = rec.shows.length;
-    rec.fans = rec.shows.reduce((s, x) => s + (Math.floor(Number(x.gain)) || 0), 0);
+    const shows = rec.shows;
 
+    const syncFans = () => {
+      rec.liveShowCount = shows.length;
+      rec.fans = shows.reduce((s, x) => s + (Math.floor(Number(x.gain)) || 0), 0);
+    };
+
+    // 1) 幂等去重：同一下播时刻 end 已在台账 → 只更新该场，不重复追加
+    const dupIdx = shows.findIndex(
+      x => Math.floor(Number(x.ts) || 0) === end || Math.floor(Number(x.end) || 0) === end
+    );
+    if (dupIdx >= 0) {
+      const cur = shows[dupIdx];
+      cur.start = Math.max(0, Math.min(start, Math.floor(Number(cur.start) || start)));
+      cur.end = end;
+      cur.ts = end;
+      cur.gain = gain;
+    } else if (shows.length) {
+      // 2) 重叠/侵蚀拦截：新场开场时刻必须晚于台账最后一场的下播时刻
+      const latest = shows.reduce((m, x) => (!m || (Number(x.end) || 0) > (Number(m.end) || 0)) ? x : m, null);
+      const lEnd = Math.max(Math.floor(Number(latest && (latest.end || latest.ts))) || 0, 0);
+      // 被已有区间完全吞没(下播不晚于旧场)，或开场早于上一场下播(直播时段内插播)：
+      // 一律视为重复/幽灵场，一场只记一次，丢弃，不再往台账写。
+      if (lEnd > 0 && (end <= lEnd || start < lEnd)) {
+        syncFans();
+        await persist(rec);
+        if (window.LumaFansManager && typeof window.LumaFansManager.setFans === 'function') {
+          try { window.LumaFansManager.setFans(id, rec.fans); } catch (e) {}
+        }
+        return { liveShowCount: shows.length, fans: rec.fans, fansGained: 0 };
+      }
+      shows.push({ ts: end, start, end, gain });
+    } else {
+      shows.push({ ts: end, start, end, gain });
+    }
+
+    syncFans();
     await persist(rec);
 
     // 同步粉丝展示 + 排行榜体系（FansManager.setFans 内部会广播并刷新人气榜）
