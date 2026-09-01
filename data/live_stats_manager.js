@@ -83,7 +83,9 @@
         let rem = fans - base * count;
         const ts0 = Date.now() - count * 24 * 60 * 60 * 1000;
         for (let i = 0; i < count; i++) {
-          shows.push({ ts: ts0 + i * 24 * 60 * 60 * 1000, gain: base + (rem > 0 ? (rem--, 1) : 0) });
+          const end = ts0 + i * 24 * 60 * 60 * 1000;
+          const durMin = 30 + Math.floor(Math.random() * 120);
+          shows.push({ ts: end, start: end - durMin * 60000, end, gain: base + (rem > 0 ? (rem--, 1) : 0) });
         }
       }
       rec.shows = shows;
@@ -101,7 +103,9 @@
     const ts0 = Date.now() - (liveShowCount > 0 ? liveShowCount * 24 * 60 * 60 * 1000 : 0);
     for (let i = 0; i < liveShowCount; i++) {
       const gain = rollFansGain();
-      shows.push({ ts: ts0 + i * 24 * 60 * 60 * 1000, gain });
+      const end = ts0 + i * 24 * 60 * 60 * 1000;
+      const durMin = 30 + Math.floor(Math.random() * 120);
+      shows.push({ ts: end, start: end - durMin * 60000, end, gain });
       fans += gain;
     }
     rec = { id, shows, liveShowCount, fans, initializedAt: Date.now() };
@@ -124,7 +128,8 @@
   }
 
   // 单场直播结算上报：台账 +1 条、场次 +1，按配置区间随机增粉，持久化并同步 FansManager/排行榜
-  async function onShowSettled(charId, fansGained) {
+  // startTs/endTs 为该场直播的真实开播/下播时间戳（在线与离线补跑都由 closeAndArchive 传入）
+  async function onShowSettled(charId, fansGained, startTs, endTs) {
     const id = getCharId(charId);
     if (!id) return null;
     const rec = await ensureInitialized(id);
@@ -132,8 +137,11 @@
     const gainRaw = Math.floor(Number(fansGained));
     const gain = Number.isFinite(gainRaw) && gainRaw >= 0 ? gainRaw : rollFansGain();
 
+    const end = Math.floor(Number(endTs)) || Date.now();
+    const start = Math.floor(Number(startTs)) || (end - 90 * 60000);
+
     if (!Array.isArray(rec.shows)) rec.shows = [];
-    rec.shows.push({ ts: Date.now(), gain });
+    rec.shows.push({ ts: end, start, end, gain });
     rec.liveShowCount = rec.shows.length;
     rec.fans = rec.shows.reduce((s, x) => s + (Math.floor(Number(x.gain)) || 0), 0);
 

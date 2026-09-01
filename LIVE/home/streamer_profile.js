@@ -215,21 +215,26 @@ async function applyLiveStatsIntoProfile(profile) {
     }
 
     // 用台账重建“直播场次”列表：条数 = 累计场次，增粉累加 = 粉丝总数
+    // 每场带真实开播/下播时间戳，展示"几月几日 几点开 ~ 几点收"，可透过时间戳验证是否真随机错落
     const realShows = [];
     let gainSum = 0;
     ledger.slice(0, 15).forEach((h, idx) => {
       const gained = Math.floor(Number(h.gain) || 0);
       gainSum += gained;
-      const durMins = 90 + ((idx * 37) % 150);
-      const dh = Math.floor(durMins / 60);
-      const dm = durMins % 60;
+      const endTs = Number(h.end) || Number(h.ts) || Date.now();
+      const startTs = Number(h.start) || (endTs - 90 * 60000);
+      const durMin = Math.max(1, Math.round((endTs - startTs) / 60000));
+      const dh = Math.floor(durMin / 60);
+      const dm = durMin % 60;
       realShows.push({
         showNumber: profile.totalShows - idx,
         title: h.title || (idx < baseTitles.length ? baseTitles[idx] : `第 ${profile.totalShows - idx} 场直播`),
         duration: `${dh}小时${dm}分`,
         heat: (35000 + idx * 4500).toLocaleString(),
         newFans: `+${gained} 粉丝`,
-        createdAt: h.ts || Date.now()
+        createdAt: endTs,
+        startTs,
+        endTs
       });
     });
     if (realShows.length) {
@@ -706,6 +711,20 @@ function renderSpPosts() {
   `;
 }
 
+function fmtPad(n) { return n < 10 ? '0' + n : '' + n; }
+function fmtShowRange(show) {
+  const end = Number(show.endTs) || Number(show.createdAt) || Date.now();
+  const start = Number(show.startTs) || (end - 90 * 60000);
+  const sD = new Date(start), eD = new Date(end);
+  if (sD.getMonth() === eD.getMonth() && sD.getDate() === eD.getDate()) {
+    return `${sD.getMonth() + 1}月${sD.getDate()}日 ${fmtPad(sD.getHours())}:${fmtPad(sD.getMinutes())} 开播`;
+  }
+  const sStr = `${sD.getMonth() + 1}月${sD.getDate()}日 ${fmtPad(sD.getHours())}:${fmtPad(sD.getMinutes())}`;
+  const eStr = `${eD.getMonth() + 1}月${eD.getDate()}日 ${fmtPad(eD.getHours())}:${fmtPad(eD.getMinutes())}`;
+  return `${sStr} ~ ${eStr}`;
+}
+window.fmtShowRange = fmtShowRange;
+
 function renderSpShows() {
   const box = document.getElementById('spPanelShows');
   if (!box || !window.currentViewingProfile) return;
@@ -726,6 +745,7 @@ function renderSpShows() {
         <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs flex items-center justify-between">
           <div class="space-y-1">
             <h4 class="text-xs font-bold text-slate-900">${s.title}</h4>
+            <div class="text-[9px] text-rose-500 font-bold" ${s.startTs ? `data-dynamic-time data-ts="${s.startTs}"` : ''}>${window.fmtShowRange ? window.fmtShowRange(s) : ''}</div>
             <div class="flex items-center gap-2 text-[10px] text-slate-400">
               <span>时长: ${s.duration}</span>
               <span>·</span>
@@ -734,7 +754,7 @@ function renderSpShows() {
               <span class="text-rose-500 font-bold">${s.newFans}</span>
             </div>
           </div>
-          <span class="text-[9px] text-slate-400 font-medium" ${s.createdAt ? `data-dynamic-time data-ts="${s.createdAt}"` : ''}>${s.createdAt ? (window.formatDynamicTime ? window.formatDynamicTime(s.createdAt) : '刚刚') : (s.timeAgo || '刚刚')}</span>
+          <span class="text-[9px] text-slate-400 font-medium shrink-0 ml-2" ${s.createdAt ? `data-dynamic-time data-ts="${s.createdAt}"` : ''}>${s.createdAt ? (window.formatDynamicTime ? window.formatDynamicTime(s.createdAt) : '刚刚') : (s.timeAgo || '刚刚')}</span>
         </div>
       `).join('')}
     </div>

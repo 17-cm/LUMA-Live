@@ -642,8 +642,9 @@ async function closeAndArchive(char, session, endTime) {
     };
     await api.db.create("streamer_history", historyRecord);
     // 结算上报：直播场次 +1 并按区间随机增粉 → 持久化 + 刷新粉丝/排行榜
+    // 传入真实开播(startTs)/下播(endTime)时间戳，直播场次列表据此展示"几点开 ~ 几点收"
     if (window.LiveStatsManager && typeof window.LiveStatsManager.onShowSettled === 'function') {
-      try { await window.LiveStatsManager.onShowSettled(session.characterId, fansGained); } catch (e) {}
+      try { await window.LiveStatsManager.onShowSettled(session.characterId, fansGained, startTs, endTime); } catch (e) {}
     }
     await api.db.delete("live_sessions", session.id);
     if (window.LiveRoomStore && typeof window.LiveRoomStore.clearRoom === 'function') {
