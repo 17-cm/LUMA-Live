@@ -1228,6 +1228,11 @@ async function lumaInitApp() {
   // 5. 同步直播列表并渲染赛道
   await syncLiveSessions();
 
+  // 5.5 后台结算与直播列表就绪 → 通知开屏退出，避免直播广场闪现"无人在播"
+  if (typeof window.markAppInitReady === 'function') {
+    try { window.markAppInitReady(); } catch (e) {}
+  }
+
   // 6. 渲染各模块初始状态
   selectMainCategory('all');
   renderDualRankList();

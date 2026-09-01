@@ -163,11 +163,35 @@
     }
     return container;
   }
-  let splashTimerId = null, isSplashExited = false;
+  const SPLASH_MIN_MS = 4000;   // 动画完整播完所需的最短展示时长
+  const SPLASH_MAX_MS = 12000;  // 兜底上限：初始化异常时也不卡死在开屏
+  let splashTimerId = null, isSplashExited = false, splashRunStartTs = 0;
+  let isFirstSplashRun = true, appInitReady = false;
+
+  // 后台初始化完成（结算器 + 直播列表同步）后通知开屏：满足最短时长即退出
+  function markAppInitReady() {
+    appInitReady = true;
+    tryAutoExitSplash();
+  }
+
+  function tryAutoExitSplash() {
+    if (isSplashExited) return;
+    const elapsed = Date.now() - splashRunStartTs;
+    if (!appInitReady) return;
+    if (elapsed >= SPLASH_MIN_MS) {
+      exitSplashScreen();
+    } else {
+      if (splashTimerId) clearTimeout(splashTimerId);
+      splashTimerId = setTimeout(exitSplashScreen, SPLASH_MIN_MS - elapsed);
+    }
+  }
+
   function runSplashScreenAnimation() {
     const container = createSplashDOM();
     if (container.parentElement !== document.body && document.body) { document.body.prepend(container); }
     isSplashExited = false;
+    splashRunStartTs = Date.now();
+    if (isFirstSplashRun) { appInitReady = false; isFirstSplashRun = false; }
     const logo = document.getElementById('splashLogoLetters');
     const penTip = document.getElementById('splashPenTip');
     const ring = document.getElementById('splashRingCircle');
@@ -186,7 +210,8 @@
     setTimeout(() => { if (ring) { ring.classList.remove('draw'); ring.classList.add('draw-done'); } }, 3500);
     setTimeout(() => { if (slogan) slogan.classList.add('show'); }, 2700);
     if (splashTimerId) clearTimeout(splashTimerId);
-    splashTimerId = setTimeout(exitSplashScreen, 4000);
+    splashTimerId = setTimeout(exitSplashScreen, SPLASH_MAX_MS);
+    tryAutoExitSplash();
   }
   function exitSplashScreen() {
     if (isSplashExited) return;
@@ -197,6 +222,7 @@
   }
   window.replaySplash = runSplashScreenAnimation;
   window.exitSplashScreen = exitSplashScreen;
+  window.markAppInitReady = markAppInitReady;
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', runSplashScreenAnimation, { once: true });
   } else {
