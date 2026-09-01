@@ -377,14 +377,15 @@ async function bootstrapWorldInitialState(allChars, params = {}) {
       };
       continue;
     }
-    // 无在入场次：按"今日自主决定"排期，绝不在休播/未到自己决定的时间时强行顶上线
-    const decision = getDailyLiveDecision(c.id);
+    // 无在入场次：只初始化空排班，把"何时开播/播多久"完全交给每刻哈希概率决定。
+    // 绝不预判任何角色"此刻该播"，杜绝"打开就有一批人在播"。
     const sched = ensureSchedEntry(window.charSchedulesMap[c.id]);
     sched.isLive = false;
     sched.currentSessionId = null;
     sched.nextCloseAt = null;
     sched.forcedRestUntil = null;
-    sched.nextOpenAt = decision.wantsToday ? decision.openMs : null;
+    sched.lastEndTime = null;
+    sched.lastStartTime = null;   // 视为"今天还没开过"，休息增长从本日清晨起算
     window.charSchedulesMap[c.id] = sched;
   }
 
@@ -450,52 +451,59 @@ function drawLiveSeconds(minLiveMins, maxLiveMins) {
 }
 
 // =========================================================================
-// 【角色今日自主决定】模拟真人"今天想不想播 / 想几点播 / 播几场"
-// 输入：角色 id + 当天日期 → 确定性推导（seededHash），全天稳定、离线在线结果一致。
-// 关键：全程不调 AI/API，只凭人设种子推导，替代"真得要角色用脑子做决定"的体验。
-// 一个角色一天只会有一个固定的自主决定（今天休播 or 某时段想播 + 播几场）。
+// 【每刻哈希概率模型】(v1.5 - 替代"每日固定决定"+"轮询骰子")
+// 目标：把角色当真人——"想不想播、想播多久、何时播"每时每刻都在变化。
+// 实现(真正的"时间哈希")：把钟表切成固定长度的时间槽 LIVE_SLOT_MS(10 分钟)，
+//   每个槽位用 seededHash(角色ID::槽号) 掷一枚确定性骰子 slotRoll ∈ [0,1)，
+//   与"倾向基线 + 比例式增长"算出的开播/下播概率比较：
+//     · 同槽内骰子固定 → 槽内稳定，绝不"一秒开一秒关"闪断
+//     · 跨槽骰子重掷   → 决策每刻在变，像真人"状态波动"
+//     · 概率含比例式增长 → 休息越久越想播、播得越久越想停，保底收敛
+//   · 播多久："下播时刻"不在开播时写死，而是每个槽位用哈希重掷一次
+//     "我该继续吗"，计划时长随槽位每刻漂移，天然错落、因人而异。
+//   · 防闪断双保险：最短直播锁(刚开播不能秒关) + 强制休息锁(下播后不能秒开)。
+// 全程不调 AI/API，只靠人设种子 + 时钟推导，离线在线同款公式、结果可复现。
 // =========================================================================
-function getDailyLiveDecision(characterId) {
+const LIVE_SLOT_MS = 10 * 60 * 1000; // 时间槽：10 分钟一掷，够细见"在变"，够粗防闪断
+window.LIVE_SLOT_MS = LIVE_SLOT_MS;
+
+function liveSlotIndex(now) {
+  return Math.floor(now / LIVE_SLOT_MS);
+}
+window.liveSlotIndex = liveSlotIndex;
+
+function clamp01(x) { return x < 0 ? 0 : (x > 1 ? 1 : x); }
+
+// 当天"状态分"：一个角色一天一个稳定基调，制造"今天状态好/差"的差异感
+function getDailyFlavor(characterId) {
   const nowD = new Date();
-  const y = nowD.getFullYear(), mo = nowD.getMonth() + 1, dd = nowD.getDate();
-  const dateKey = `${y}-${mo}-${dd}`;
+  const key = `${nowD.getFullYear()}-${nowD.getMonth() + 1}-${nowD.getDate()}`;
   const cid = String(characterId || 'char');
-  const rWants = seededHash(`${cid}::wants::${dateKey}`);   // 今日想不想播
-  const rBand  = seededHash(`${cid}::band::${dateKey}`);    // 偏好时段
-  const rCnt   = seededHash(`${cid}::cnt::${dateKey}`);     // 今日场次数
-  const rLen   = seededHash(`${cid}::len::${dateKey}`);     // 单场时长
-
-  // 今日休播：约 20% 角色某天状态不佳/有安排，选择不下播 → 产生"真人今天没播"的真实感
-  const wantsToday = rWants >= 0.20;
-
-  // 偏好时段（分钟）：晨曦/午间/午后/晚间黄金/深夜电台
-  const bands = [
-    [6 * 60, 10 * 60],
-    [10 * 60, 14 * 60],
-    [13 * 60, 18 * 60],
-    [18 * 60, 23 * 60],
-    [20 * 60, 24 * 60]
-  ];
-  const band = bands[Math.floor(rBand * bands.length)];
-  // 在时段内再抖一点，形成"今天这个点我很想播"的个中感
-  const openLocalMin = band[0] + Math.floor(rCnt * (band[1] - band[0]) * 0.7);
-  // 单场时长 40~160 分钟（受全局 min/max 约束由调用方再夹紧）
-  const showLenMins = 40 + Math.floor(rLen * 120);
-  // 精力充沛时偶尔一天两场
-  const dailySessions = seededHash(`${cid}::n::${dateKey}`) < 0.3 ? 2 : 1;
-
-  const startOfDayMs = new Date(y, mo - 1, dd, 0, 0, 0, 0).getTime();
   return {
-    key: dateKey,
-    wantsToday,
-    band,
-    openMs: startOfDayMs + openLocalMin * 60000,
-    bandCloseMs: startOfDayMs + band[1] * 60000,
-    showLenMins,
-    dailySessions
+    dayKey: key,
+    mood: seededHash(`${cid}::mood::${key}`),          // 状态分 [0,1)：越高越想播、越难被劝下播
+    wantsToday: seededHash(`${cid}::shy::${key}`) >= 0.08 // 约 8% 天彻底没状态，今天不播
   };
 }
-window.getDailyLiveDecision = getDailyLiveDecision;
+window.getDailyFlavor = getDailyFlavor;
+
+// 开播概率 = 倾向基线(受今日情绪加权) + 比例式增长(休息越久越趋近封顶)
+function hashOpenProb(characterId, slot, startTendency, mood, elapsedRestMs, maxBlueMs) {
+  const base = (startTendency != null && startTendency >= 0 ? startTendency / 200 : 0) * (0.4 + mood * 0.6);
+  const r = clamp01(elapsedRestMs / Math.max(maxBlueMs, 1));      // 比例式增长自变量 = 已休息占比
+  const growth = 0.62 * (1 - Math.pow(1 - r, 2));                 // 缓起步、中段加速、封顶 0.62
+  return clamp01(base + growth);
+}
+window.hashOpenProb = hashOpenProb;
+
+// 下播概率 = 倾向基线(受今日情绪负向加权) + 比例式增长(已播时长占比 → 封顶)
+function hashStopProb(characterId, slot, stopTendency, mood, liveMins, maxLiveMins) {
+  const base = (stopTendency != null && stopTendency >= 0 ? stopTendency / 200 : 0.12) * (0.4 + (1 - mood) * 0.6);
+  const r = clamp01(liveMins / Math.max(maxLiveMins, 1));         // 已播时长占最大时长的比例
+  const growth = 0.75 * (1 - Math.pow(1 - r, 2));                 // 越久越容易下播，趋近 0.75
+  return clamp01(base + growth);
+}
+window.hashStopProb = hashStopProb;
 
 // 升级 charSchedulesMap 中"只有轮询残留字段"的旧条目为结算器需要的形状
 function ensureSchedEntry(sched) {
@@ -532,73 +540,70 @@ async function settleOneChar(char, now, lastSeen) {
   const sessions = await api.db.list("live_sessions", { limit: 500 }).catch(() => []) || [];
   let session = sessions.find(s => s.characterId === cid) || null;
 
-  // 在播但缺"下播倒计时"：补一个真实秒级直播时长
-  if (session) {
-    const startTs = Number(session.startTime) || lastSeen;
-    if (!sched.lastStartTime) sched.lastStartTime = startTs;
-    if (sched.nextCloseAt == null) {
-      sched.nextCloseAt = startTs + drawLiveSeconds(minLiveMins, maxLiveMins) * 1000;
-    }
-  }
+  const flavor = getDailyFlavor(cid);
+  const startOfDay = (function () { const d = new Date(); d.setHours(6, 0, 0, 0); return d.getTime(); }());
+  // 休息起点：上次收官时刻；正在播则以开播时刻为后续休息起点
+  let restBase = sched.lastEndTime || (session ? (Number(session.startTime) || lastSeen) : null);
 
-  // 事件推进循环：只生成时间戳落在 [lastSeen, now] 内的完整场次链
+  // ── 每刻哈希-离线重放：把 [lastSeen, now] 切成 10 分钟槽逐槽判定 ──
+  // 每个槽用 seededHash(角色ID::槽号) 重掷一次骰子，与在线节拍器同款公式，
+  // 槽内稳定、跨槽变化 → 离线重放与在线运行完全一致、可复现。
+  sched.nextOpenAt = null;
+  sched.nextCloseAt = null;
+  let cursor = lastSeen;
   let guard = 0;
-  while (guard++ < 500) {
+  while (cursor <= now && guard++ < 2000) {
+    const slot = liveSlotIndex(cursor);
+    const slotStart = slot * LIVE_SLOT_MS;
+    const t = Math.max(slotStart, cursor);          // 本槽判定时刻（槽起点）
+    if (t > now) break;
+    const slotRoll = seededHash(`${cid}::slot::${slot}`);
+
     if (session) {
-      // ── 直播中：秒级下播倒计时到点 → 结算为历史场次，进入休息 ──
-      const closeAt = Number(sched.nextCloseAt) || (Number(session.startTime) + maxLiveMins * 60000);
-      if (closeAt > now) {
-        sched.isLive = true;
-        sched.currentSessionId = session.id;
-        break;
+      // ── 直播中：本槽是否自主下播（须播够最短时长，达最大时长必收）──
+      const startTs = Number(session.startTime) || t;
+      const liveMins = Math.max(0, (t - startTs) / 60000);
+      const overMax = liveMins >= maxLiveMins;
+      const overMin = liveMins >= minLiveMins;
+      if (overMax || (overMin && slotRoll < hashStopProb(cid, slot, null, flavor.mood, liveMins, maxLiveMins))) {
+        const closeAt = Math.min(t + LIVE_SLOT_MS, now);
+        const lastStart = startTs;
+        await closeAndArchive(char, session, closeAt);
+        session = null;
+        sched.isLive = false;
+        sched.currentSessionId = null;
+        sched.lastEndTime = closeAt;
+        sched.lastStartTime = sched.lastStartTime || lastStart;
+        restBase = closeAt;
+        try { await incrementDailyStartCount(cid); } catch (e) {}
+        cursor = closeAt;
+      } else {
+        cursor = slotStart + LIVE_SLOT_MS;          // 本槽继续播，走到下一槽再看
       }
-      await closeAndArchive(char, session, closeAt);
-      session = null;
-      sched.isLive = false;
-      sched.currentSessionId = null;
-      sched.lastEndTime = closeAt;
-      sched.lastStartTime = sched.lastStartTime || now;
-      sched.nextCloseAt = null;
-      // 进入休息：在 [最短休息, 最长休息] 内抽一条精确到秒的"下次开播"倒计时
-      sched.nextOpenAt = closeAt + drawRestSeconds(minRestMins, maxRestMins) * 1000;
       continue;
     }
 
-    // ── 休息中：按"今日自主决定"推进（人设×当天，离线重放与在线节拍器一致）──
-    const decision = getDailyLiveDecision(cid);
-    // 今日休播 → 这次完全不排开播
-    if (!decision.wantsToday) { sched.isLive = false; break; }
-    // 快速重开（下播后不久/强制休息锁内）→ 不做补账开播
-    if (sched.forcedRestUntil && now < sched.forcedRestUntil) { sched.isLive = false; break; }
-    if (sched.lastEndTime && (now - sched.lastEndTime) < minRestMins * 60000) { sched.isLive = false; break; }
-    let nextOpen = sched.nextOpenAt;
-    if (nextOpen == null) {
-      // 首次无排班 → 定为该角色今天自己决定的时间点
-      nextOpen = decision.openMs;
-      sched.nextOpenAt = nextOpen;
+    // ── 休息中：本槽是否自主开播 ──
+    if (!flavor.wantsToday) break;                  // 今天彻底没状态，全天空过
+    const sinceEnd = restBase != null ? (t - restBase) : (t - startOfDay);
+    if (restBase != null && sinceEnd < minRestMins * 60000) { cursor = slotStart + LIVE_SLOT_MS; continue; } // 强制休息锁
+    if (dailyLimit !== Infinity) {
+      try { if ((await getDailyStartCount(cid)) >= dailyLimit) break; } catch (e) {}
     }
-    // 已超过"最迟下播时刻"且开播时刻已过 → 今天不硬开，留待明天新决定
-    if (now > decision.bandCloseMs && now > nextOpen) { sched.isLive = false; break; }
-    if (nextOpen > now) { sched.isLive = false; break; }
-
-    // 每日场次上限拦截（自主决定的今日场次 + 全局 dailyLimit 兜底）
-    const sCap = Math.min(decision.dailySessions, dailyLimit === Infinity ? decision.dailySessions : dailyLimit);
-    try {
-      const todayCount = await getDailyStartCount(cid);
-      if (todayCount >= sCap) { sched.isLive = false; break; }
-    } catch (e) {}
-
-    // 到点开播：nextOpen 是历史/现在时刻，写入场次
-    session = await openLiveFromHistory(char, nextOpen);
-    if (!session) { sched.isLive = false; break; }
-    const durSec = drawLiveSeconds(minLiveMins, maxLiveMins);
-    sched.isLive = true;
-    sched.currentSessionId = session.id;
-    sched.lastStartTime = nextOpen;
-    sched.lastEndTime = null; // 直播中
-    sched.nextOpenAt = null;  // 已消费
-    sched.nextCloseAt = nextOpen + durSec * 1000; // 拧直播段的秒级下播倒计时
-    try { await incrementDailyStartCount(cid); } catch (e) {}
+    if (slotRoll < hashOpenProb(cid, slot, null, flavor.mood, Math.max(0, sinceEnd), maxRestMins * 60000)) {
+      const openAt = Math.max(t, restBase != null ? restBase + minRestMins * 60000 : t);
+      if (openAt > now) break;                       // 开播时刻落在将来，不在此窗内开
+      session = await openLiveFromHistory(char, openAt);
+      if (!session) break;
+      sched.isLive = true;
+      sched.currentSessionId = session.id;
+      sched.lastStartTime = sched.lastStartTime || openAt;
+      sched.lastEndTime = null;                      // 直播中
+      cursor = openAt;
+    } else {
+      cursor = slotStart + LIVE_SLOT_MS;
+    }
+    continue;
   }
 
   window.charSchedulesMap[cid] = sched;
@@ -841,67 +846,64 @@ async function tickLiveLifecycle() {
       } catch (e) {}
 
       if (session) {
-        // ── 直播中：秒级下播倒计时到点必收；未到点按 倾向+比例式增长 决定是否提前收 ──
+        // ── 直播中：最短直播锁 + 每刻哈希概率判定下播 ──
         const startTs = Number(session.startTime) || now;
-        if (sched.nextCloseAt == null) {
-          sched.nextCloseAt = now + drawLiveSeconds(minLiveMins, maxLiveMins) * 1000;
-        }
-        const liveElapsedMins = Math.max(0, (now - startTs) / 60000);
-        const growth = Math.min(1, liveElapsedMins / maxLiveMins) * 0.5;
-        const stopP = Math.min(1, ((stopTendency != null && stopTendency >= 0) ? stopTendency / 200 : 0) + growth);
-        const dueStop = (sched.nextCloseAt != null && now >= sched.nextCloseAt) || Math.random() < stopP;
-        if (dueStop) {
+        const liveMins = Math.max(0, (now - startTs) / 60000);
+        // 最短直播锁：刚开播还没播够最短时长，绝不下播（杜绝"开播几秒就关"）
+        if (liveMins < minLiveMins) continue;
+        const slot = liveSlotIndex(now);
+        const slotRoll = seededHash(`${cid}::slot::${slot}`);   // 每刻重掷一枚确定性骰子
+        const flavor = getDailyFlavor(cid);
+        // 每刻哈希概率：达最大时长必收；未到最大则随"倾向+比例式增长"看本槽骰子
+        const pStop = hashStopProb(cid, slot, stopTendency, flavor.mood, liveMins, maxLiveMins);
+        if (slotRoll < pStop) {
           await lumaOpsGateway.requestStopLive({
             characterId: cid,
             reason: "到点自动下播（运营组判定已到）",
             source: "ticker"
           });
-          // 下播后进入休息，拧一条秒级随机的下次开播倒计时
+          // 下播 → 上强制休息锁：至少休息 minRest 分钟，期间绝不开播（杜绝"下播几秒又开播"）
+          sched.forcedRestUntil = now + minRestMins * 60000;
+          sched.lastEndTime = now;
+          sched.nextOpenAt = null;
           sched.nextCloseAt = null;
-          sched.nextOpenAt = now + drawRestSeconds(minRestMins, maxRestMins) * 1000;
           try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
         }
         continue;
       }
 
-      // ── 休息中：按"今日自主决定"开播（人设×当天，模拟真人"今天想不想播/播几场"）─
-      const decision = getDailyLiveDecision(cid);
-      const minRestMs = minRestMins * 60000;
-      const restBase = sched.lastEndTime || sched.lastStartTime || now;
-      const inForcedRest = (now - restBase) < minRestMs || (sched.forcedRestUntil != null && now < sched.forcedRestUntil);
-      // 今日休播 → 今天完全不自动补位开播（真人"今天不太想播"）：
-      if (!decision.wantsToday) continue;
-      // 首次无排班：把"下次开播"定为该角色今天自己决定的时间点
-      if (sched.nextOpenAt == null) sched.nextOpenAt = decision.openMs;
-      // 决定时刻未到 / 仍在强制休息锁内 → 绝不开播（杜绝"下一秒又开播"）
-      if (now < sched.nextOpenAt || inForcedRest) continue;
-      // 已超过"最迟下播时刻"，今天的时段已结束 → 今天不再硬开，留待明天新决定
-      if (now > decision.bandCloseMs) {
-        sched.nextOpenAt = now + drawRestSeconds(minRestMins, maxRestMins) * 1000;
+      // ── 休息中：强制休息锁 + 每刻哈希概率判定自主开播 ──
+      const flavor = getDailyFlavor(cid);
+      if (!flavor.wantsToday) continue;              // 今天彻底没状态，不排
+      // 强制休息锁：刚下播未满最短休息 → 概率再高也不开
+      if (sched.forcedRestUntil != null && now < sched.forcedRestUntil) continue;
+      // 每日场次上限（全局 dailyLimit 兜底，防"全天疯播"）
+      if (dailyLimit !== Infinity) {
+        try {
+          const todayCount = await getDailyStartCount(cid);
+          if (todayCount >= dailyLimit) continue;
+        } catch (e) {}
+      }
+      // 休息增长：休息越久增长越大 → 迟早越过骰子自主开播
+      const restBaseMs = sched.lastEndTime || sched.lastStartTime || null;
+      const elapsedRestMs = restBaseMs
+        ? Math.max(0, now - restBaseMs)
+        : (now - (function () { const d = new Date(); d.setHours(6, 0, 0, 0); return d.getTime(); }()));
+      const slot = liveSlotIndex(now);
+      const slotRoll = seededHash(`${cid}::slot::${slot}`);   // 每刻重掷
+      const pOpen = hashOpenProb(cid, slot, startTendency, flavor.mood, elapsedRestMs, maxRestMins * 60000);
+      // 每刻哈希概率：本槽骰子 < 开播概率 → 自主开播
+      if (slotRoll < pOpen) {
+        await lumaOpsGateway.requestStartLive({
+          characterId: cid,
+          source: "ticker"
+        });
+        sched.forcedRestUntil = null;
+        sched.lastStartTime = now;
+        sched.nextOpenAt = null;
+        sched.nextCloseAt = null;
         try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
-        continue;
       }
-      // 每日场次上限（自主决定的今日场次 + 全局 dailyLimit 兜底）
-      const tCap = Math.min(decision.dailySessions, dailyLimit === Infinity ? decision.dailySessions : dailyLimit);
-      try {
-        const todayCount = await getDailyStartCount(cid);
-        if (todayCount >= tCap) {
-          sched.nextOpenAt = now + drawRestSeconds(minRestMins, maxRestMins) * 1000;
-          try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
-          continue;
-        }
-      } catch (e) {}
-
-      // 到点（该角色今天自己决定要播）→ 开播
-      await lumaOpsGateway.requestStartLive({
-        characterId: cid,
-        source: "ticker"
-      });
-      // 开播后按"自主决定的场次时长"拧本场下播倒计时（不低于最短直播）
-      const decidedLenMins = Math.max(minLiveMins, Math.min(decision.showLenMins, maxLiveMins));
-      sched.nextOpenAt = null;
-      sched.nextCloseAt = now + drawLiveSeconds(decidedLenMins, maxLiveMins) * 1000;
-      try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
     }
   } catch (e) {
     console.warn("[LUMA Live] 在线节拍器异常:", e);
