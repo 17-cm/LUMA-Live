@@ -293,6 +293,13 @@
       type: 'support_gift',
       itemName: '超话打榜'
     });
-    return window.getCharContributionScore(charId);
+    const next = window.getCharContributionScore(charId);
+    if (typeof window.notifyCommunityDataChanged === 'function') {
+      try { window.notifyCommunityDataChanged('support', { charId, addAmount, next }); } catch (e) {}
+    }
+    if (window.LumaDataHub) {
+      try { window.LumaDataHub.emit('contribution', { charId, addAmount, next }); } catch (e) {}
+    }
+    return next;
   };
 })();

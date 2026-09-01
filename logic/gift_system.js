@@ -163,6 +163,18 @@
       console.warn('[GiftSystem] 记录交易失败:', e.message);
     }
 
+    // 5.5 直播间送礼 1:1 累计为该主播专属贡献值（守护榜 / 超话贡献作用同一矩阵）
+    try {
+      if (typeof window.addCharContributionScore === 'function' && window.currentRoom) {
+        const targetCharId = window.currentRoom.characterId || window.currentRoom.id || window.currentRoom.name || null;
+        if (targetCharId) {
+          window.addCharContributionScore(targetCharId, totalCost);
+        }
+      }
+    } catch (e) {
+      console.warn('[GiftSystem] 累计贡献值失败:', e.message);
+    }
+
     // 6. 获取用户信息
     let uInfo = { name: '玩家', avatar: '', tag: '观众', vip: 'Lv.1', type: 'user' };
     try {

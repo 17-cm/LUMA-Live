@@ -62,7 +62,9 @@
         streakDays: info.streakDays || 0,
         totalDays: info.totalDays || 0,
         totalExp: exp,
-        level: level
+        level: level,
+        supportCoin: info.supportCoin || 0,
+        totalCheckins: info.totalDays || 0
       };
     },
 
@@ -92,6 +94,8 @@
       const newTotalDays = (info.totalDays || 0) + 1;
       const newExp = (info.totalExp || 0) + 100;
       const newLevel = Math.min(16, Math.floor(newExp / 300) + 1);
+      // 每次签到额外发放 100 应援币（超话「签到余额」，用于打榜周边应援）
+      const newSupportCoin = (info.supportCoin || 0) + 100;
 
       const map = hub.getCheckinsMap();
       map[key] = {
@@ -103,7 +107,8 @@
         streakDays: newStreak,
         totalDays: newTotalDays,
         totalExp: newExp,
-        level: newLevel
+        level: newLevel,
+        supportCoin: newSupportCoin
       };
 
 hub.saveCheckinsMap(map);
@@ -132,6 +137,33 @@ hub.saveCheckinsMap(map);
         success: true,
         data: map[key]
       };
+    },
+
+    // ---------------------------------------------------------------------
+    // 超话「签到余额」(应援币)：签到发放、打榜周边消耗统一走这里
+    // ---------------------------------------------------------------------
+    getSupportCoin(topicId) {
+      const info = this.getCheckinInfo('user', topicId);
+      return Number(info.supportCoin) || 0;
+    },
+
+    // 消耗应援币用于打榜，成功则返回抵扣后的余额
+    consumeSupportCoin(topicId, amount) {
+      const amt = Math.floor(Number(amount) || 0);
+      if (amt <= 0) return { ok: false, reason: 'invalid', remaining: this.getSupportCoin(topicId) };
+      const key = getCheckinKey('user', String(topicId || 'default_1'));
+      const map = hub.getCheckinsMap();
+      const field = map[key] || {};
+      const current = Number(field.supportCoin) || 0;
+      if (current < amt) {
+        return { ok: false, reason: 'insufficient', remaining: current };
+      }
+      const remaining = current - amt;
+      map[key] = { ...field, supportCoin: remaining };
+      hub.saveCheckinsMap(map);
+      // 落盘备份到 api.db 持久层
+      try { dbUpsert("luma_checkin_records", key, map[key]); } catch (e) {}
+      return { ok: true, spent: amt, remaining };
     },
 
     // 3. 实体（User 或 Char）关注超话
