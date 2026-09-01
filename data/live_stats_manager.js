@@ -1,16 +1,19 @@
 // =========================================================================
 // 【数据中心·直播结算数据体系】LIVE/数据/live_stats_manager.js
-// 直播场次 + 真实粉丝数量 的权威持久化层，全部走宿主 SDK（api.db），
-// 不使用 localStorage（iframe 沙盒里 localStorage 存不住）。
-//   1. 每结算完一场直播：直播场次 +1，并按配置区间（粉丝增长最低~最高）随机增粉。
-//   2. 直播场次 / 粉丝同时驱动 char 个人主页与排行榜体系的实时刷新。
-//   3. 首次接触某 char 时初始化 0~10 场初始直播场次，并固化当前粉丝基数。
+// 直播场次 + 真实粉丝数量 的权威持久化层，全部走宿主 SDK（api.db），不使用 localStorage
+// （iframe 沙盒里 localStorage 存不住）。
+//
+// 核心设计：以【单场结算台账】为准，保证数字自洽——
+//   · 粉丝总数  === 台账里所有场次的 增粉数 累加和
+//   · 累计直播场次 === 台账条数
+//   · 主播主页"直播场次"列表 与 头部粉丝总数 完全对得上
+// 每结算完一场直播：台账追加一条（含 增粉数），场次 +1、粉丝 += 增粉数，并同步排行榜/直播间。
 // =========================================================================
 
 (function initLiveStatsManager() {
   'use strict';
 
-  // 宿主私有库集合名（只属于当前 APP，卸载删除数据才会清掉）
+  // 宿主私有库集合名（只属于当前 APP，卸载删数据才清掉）
   const COLLECTION = 'luma_live_stats';
 
   // 配置区间默认值（可在直播设置里由用户修改，纳入 appParams）
@@ -33,16 +36,19 @@
     return { min, max };
   }
 
+  // 按配置区间随机生成单场增粉数（含边界）
+  function rollFansGain() {
+    const { min, max } = getGainRange();
+    return min + Math.floor(Math.random() * (max - min + 1));
+  }
+
   // 从宿主持久库读取该 char 的直播数据记录
   async function load(charId) {
     const id = getCharId(charId);
     if (!id) return null;
     try {
       const rec = await api.db.get(COLLECTION, id).catch(() => null);
-      if (rec && (typeof rec.liveShowCount === 'number' || typeof rec.fans === 'number')) {
-        return rec;
-      }
-      return null;
+      return rec || null;
     } catch (e) {
       return null;
     }
@@ -50,6 +56,7 @@
 
   async function persist(rec) {
     if (!rec || !rec.id) return;
+    rec.updatedAt = Date.now();
     try {
       await dbUpsert(COLLECTION, rec.id, rec);
     } catch (e) {
@@ -57,22 +64,47 @@
     }
   }
 
-  // 首次接触：初始化 0~10 场初始直播场次，并固化当前粉丝基数到宿主持久库
+  // 首次接触某 char：初始化 0~10 场初始直播场次（每场随机增粉），并据此固化初始粉丝
   async function ensureInitialized(charId) {
     const id = getCharId(charId);
     if (!id) return null;
     let rec = await load(id);
-    if (rec) return rec;
 
-    const liveShowCount = Math.floor(Math.random() * 11); // 0 ~ 10
-    let fans = 0;
-    try {
-      if (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function') {
-        fans = Math.floor(Number(window.LumaFansManager.getFans(id))) || 0;
+    // 已有合法台账
+    if (rec && Array.isArray(rec.shows)) return rec;
+
+    // 旧结构迁移：老记录只有 {liveShowCount, fans}，没有逐场台账
+    if (rec && (Number(rec.liveShowCount) > 0 || Number(rec.fans) > 0)) {
+      const count = Math.max(Math.floor(Number(rec.liveShowCount) || 0), 0);
+      let fans = Math.max(Math.floor(Number(rec.fans) || 0), 0);
+      const shows = [];
+      if (count > 0) {
+        const base = Math.floor(fans / count);
+        let rem = fans - base * count;
+        const ts0 = Date.now() - count * 24 * 60 * 60 * 1000;
+        for (let i = 0; i < count; i++) {
+          shows.push({ ts: ts0 + i * 24 * 60 * 60 * 1000, gain: base + (rem > 0 ? (rem--, 1) : 0) });
+        }
       }
-    } catch (e) {}
+      rec.shows = shows;
+      rec.liveShowCount = count;
+      rec.fans = fans;
+      rec.initializedAt = rec.initializedAt || Date.now();
+      await persist(rec);
+      return rec;
+    }
 
-    rec = { id, liveShowCount, fans, initializedAt: Date.now() };
+    // 全新初始化：生成 0~10 场初始直播场次，每场按配置区间随机增粉
+    const liveShowCount = Math.floor(Math.random() * 11); // 0 ~ 10
+    const shows = [];
+    let fans = 0;
+    const ts0 = Date.now() - (liveShowCount > 0 ? liveShowCount * 24 * 60 * 60 * 1000 : 0);
+    for (let i = 0; i < liveShowCount; i++) {
+      const gain = rollFansGain();
+      shows.push({ ts: ts0 + i * 24 * 60 * 60 * 1000, gain });
+      fans += gain;
+    }
+    rec = { id, shows, liveShowCount, fans, initializedAt: Date.now() };
     await persist(rec);
     return rec;
   }
@@ -82,23 +114,28 @@
     return await ensureInitialized(charId);
   }
 
-  // 按配置区间随机生成单场增粉数（含边界）
-  function rollFansGain() {
-    const { min, max } = getGainRange();
-    return min + Math.floor(Math.random() * (max - min + 1));
+  // 返回该角色的逐场结算台账（降序：最新在前）
+  async function getLedger(charId) {
+    const rec = await ensureInitialized(charId);
+    if (!rec) return [];
+    const shows = Array.isArray(rec.shows) ? rec.shows.slice() : [];
+    shows.sort((a, b) => (Number(b.ts) || 0) - (Number(a.ts) || 0));
+    return shows;
   }
 
-  // 单场直播结算上报：场次 +1，按配置区间随机增粉，持久化并同步 FansManager/排行榜
+  // 单场直播结算上报：台账 +1 条、场次 +1，按配置区间随机增粉，持久化并同步 FansManager/排行榜
   async function onShowSettled(charId, fansGained) {
     const id = getCharId(charId);
     if (!id) return null;
     const rec = await ensureInitialized(id);
 
-    rec.liveShowCount = Math.floor(Number(rec.liveShowCount) || 0) + 1;
-
     const gainRaw = Math.floor(Number(fansGained));
     const gain = Number.isFinite(gainRaw) && gainRaw >= 0 ? gainRaw : rollFansGain();
-    rec.fans = Math.max(0, Math.floor(Number(rec.fans) || 0) + gain);
+
+    if (!Array.isArray(rec.shows)) rec.shows = [];
+    rec.shows.push({ ts: Date.now(), gain });
+    rec.liveShowCount = rec.shows.length;
+    rec.fans = rec.shows.reduce((s, x) => s + (Math.floor(Number(x.gain)) || 0), 0);
 
     await persist(rec);
 
@@ -117,7 +154,8 @@
       for (const c of chars) {
         if (!c || !c.id) continue;
         try {
-          const rec = await load(c.id);
+          // 先确保台账就绪（生成 0~10 场初始直播场次），再回灌真实累加粉丝
+          const rec = await ensureInitialized(c.id);
           if (rec && window.LumaFansManager && typeof window.LumaFansManager.setFans === 'function') {
             window.LumaFansManager.setFans(c.id, rec.fans);
           }
@@ -133,11 +171,12 @@
     DEFAULT_GAIN_MIN,
     DEFAULT_GAIN_MAX,
     getGainRange,
+    rollFansGain,
     load,
     persist,
     ensureInitialized,
     getStats,
-    rollFansGain,
+    getLedger,
     onShowSettled,
     hydrateAll
   };

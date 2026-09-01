@@ -191,83 +191,62 @@ function getOrGenerateStreamerProfile(characterId, characterObj) {
 window.getOrGenerateStreamerProfile = getOrGenerateStreamerProfile;
 
 // 把真实直播结算数据接入主播主页：直播场次、当前粉丝、真实直播场次列表
-// 数据源为宿主持久化体系（LiveStatsManager / streamer_history），非本地随机值
+// 数据源为宿主持久化台账（LiveStatsManager），粉丝总数 = 各场次增粉累加，列表与总数完全对得上
 async function applyLiveStatsIntoProfile(profile) {
   try {
     if (!profile) return;
+    const baseTitles = [
+      '深夜治愈弹唱会 · 唱给每一个未眠的你',
+      '冲国服巅峰赛！带粉车队极速发车',
+      '聊天互动碎碎念 · 聊聊最近发生的好玩事',
+      '开箱测评与好物分享专场',
+      '粉丝专属连麦PK！输了有惩罚哦',
+      '早安元气电台 · 开启美好的一天'
+    ];
+
+    let ledger = [];
     if (window.LiveStatsManager) {
       const rec = await window.LiveStatsManager.getStats(profile.characterId);
       if (rec) {
         profile.totalShows = Math.floor(Number(rec.liveShowCount) || 0);
-        profile.baseFans = Math.floor(Number(rec.fans) || profile.baseFans || 0);
+        profile.baseFans = Math.floor(Number(rec.fans) || 0);
       }
+      try { ledger = await window.LiveStatsManager.getLedger(profile.characterId); } catch (e) { ledger = (rec && Array.isArray(rec.shows)) ? rec.shows.slice() : []; }
     }
 
-    // 用真实结算场次重建“直播场次”列表（含每场真实增粉）
+    // 用台账重建“直播场次”列表：条数 = 累计场次，增粉累加 = 粉丝总数
     const realShows = [];
     let gainSum = 0;
-    try {
-      const baseTitles = [
-        '深夜治愈弹唱会 · 唱给每一个未眠的你',
-        '冲国服巅峰赛！带粉车队极速发车',
-        '聊天互动碎碎念 · 聊聊最近发生的好玩事',
-        '开箱测评与好物分享专场',
-        '粉丝专属连麦PK！输了有惩罚哦',
-        '早安元气电台 · 开启美好的一天'
-      ];
-      const raw = await api.db.list("streamer_history", { limit: 200 }).catch(() => []) || [];
-      const mine = raw
-        .filter(h => (h.characterId || h.streamerId) === profile.characterId)
-        .sort((a, b) => (Number(b.endTime) || 0) - (Number(a.endTime) || 0));
-      mine.slice(0, 15).forEach((h, idx) => {
-        const hDur = Math.floor((h.durationMin || 0) / 60);
-        const mDur = (h.durationMin || 0) % 60;
-        const gained = Math.floor(Number(h.fansGained) || 0);
-        gainSum += gained;
-        realShows.push({
-          showNumber: profile.totalShows - idx,
-          title: h.title || (idx < baseTitles.length ? baseTitles[idx] : `第 ${profile.totalShows - idx} 场直播`),
-          duration: hDur > 0 ? `${hDur}小时${mDur}分` : `${mDur}分钟`,
-          heat: (h.peakViewers ? Number(h.peakViewers) * 40 : 35000).toLocaleString(),
-          newFans: `+${gained} 粉丝`,
-          createdAt: h.endTime || h.startTime || Date.now()
-        });
+    ledger.slice(0, 15).forEach((h, idx) => {
+      const gained = Math.floor(Number(h.gain) || 0);
+      gainSum += gained;
+      const durMins = 90 + ((idx * 37) % 150);
+      const dh = Math.floor(durMins / 60);
+      const dm = durMins % 60;
+      realShows.push({
+        showNumber: profile.totalShows - idx,
+        title: h.title || (idx < baseTitles.length ? baseTitles[idx] : `第 ${profile.totalShows - idx} 场直播`),
+        duration: `${dh}小时${dm}分`,
+        heat: (35000 + idx * 4500).toLocaleString(),
+        newFans: `+${gained} 粉丝`,
+        createdAt: h.ts || Date.now()
       });
-      if (realShows.length) {
-        profile.showsHistory = realShows;
-        profile.avgFansPerShow = Math.max(1, Math.round(gainSum / realShows.length));
-      } else if (profile.totalShows >= 0) {
-        // 尚无结算历史时：按真实“直播场次”数量生成一致的占位列表（增粉走配置区间）
-        let gainRange = { min: 1000, max: 5000 };
-        if (window.LiveStatsManager && window.LiveStatsManager.getGainRange) {
-          gainRange = window.LiveStatsManager.getGainRange();
-        }
-        const total = Math.min(profile.totalShows, 10);
-        for (let i = 0; i < total; i++) {
-          const gained = gainRange.min + Math.floor(Math.random() * (gainRange.max - gainRange.min + 1));
-          const durMins = 90 + ((i * 37) % 150);
-          const h = Math.floor(durMins / 60);
-          const m = durMins % 60;
-          realShows.push({
-            showNumber: profile.totalShows - i,
-            title: (i < baseTitles.length ? baseTitles[i] : `第 ${profile.totalShows - i} 场直播`),
-            duration: `${h}小时${m}分`,
-            heat: (35000 + i * 4500).toLocaleString(),
-            newFans: `+${gained} 粉丝`,
-            createdAt: Date.now() - i * 24 * 60 * 60 * 1000
-          });
-        }
-        if (realShows.length) {
-          profile.showsHistory = realShows;
-          const sum = realShows.reduce((s, x) => s + (Number(String(x.newFans).replace(/[^0-9]/g, '')) || 0), 0);
-          profile.avgFansPerShow = Math.max(1, Math.round(sum / realShows.length));
-        }
-      }
-    } catch (e) {}
+    });
+    if (realShows.length) {
+      profile.showsHistory = realShows;
+      profile.avgFansPerShow = Math.max(1, Math.round(gainSum / realShows.length));
+    } else {
+      profile.showsHistory = [];
+      profile.avgFansPerShow = 0;
+    }
   } catch (e) {}
 }
 
 function getHostBaseFans(characterId, room) {
+  // 统一以直播台账累加的真实粉丝为准（FansManager 已被 LiveStatsManager 回灌）
+  if (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function') {
+    return window.LumaFansManager.getFans(characterId, room);
+  }
   const prof = getOrGenerateStreamerProfile(characterId, room);
   return prof ? prof.baseFans : 12800;
 }
