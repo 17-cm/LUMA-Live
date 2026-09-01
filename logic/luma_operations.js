@@ -471,48 +471,46 @@ function seededHash(str) {
 }
 
 // =========================================================================
-// 【统一概率判定】所有直播开播/下播共用的判定核心
-// 原理：每个"时间块"(1分钟) 用 seededHash(charId + 时间块编号) 产生随机数
-//       —— 时间块编号随真实时间递增，故随机数逐块变化，不存在固定模板
-//       —— 同一时间块编号哈希值确定，离线补账重放可得到与在线一致的判定
-//       总概率 = 倾向换算分 + (已持续时长/上限)×50%  （比例式增长）
-//       seededHash < 总概率 → 该时间块触发状态切换
-// 返回触发时刻时间戳；窗口内未触发返回 null
-// kind: 'start'(开播) | 'stop'(下播)；tendency: 0-100 或 null
+// 【秒级随机倒计时模型】所有直播开播/下播共用的决策核心（替代原来的轮询骰子）
+// 放弃"每个时间块抛 seededHash 骰子碰概率"，改为每角色一根秒级随机倒计时：
+//   · 下播结算时 → 在 [最短休息, 最长休息] 内抽一个精确到秒的随机"下次开播"倒计时
+//   · 开播时     → 在 [最短直播, 最长直播] 内抽一个精确到秒的随机"下播"倒计时
+//   · nextOpenAt / nextCloseAt 持久化在 charSchedulesMap：
+//       - 离线重放照表推进 → 稳定可复现（不再每次重抽，因此不需要骰子）
+//       - 在线节拍器按秒校验 → 秒级精度天然错落，真正随机
 // =========================================================================
-function rollToggleAt(charId, kind, anchorTs, nowTs, tendency, maxMins, minMins) {
-  const minM = Math.max(1, minMins || 1);
-  const maxM = Math.max(minM, maxMins || 120);
-  // 倾向换算分：0-100 → 0-0.5，倾向越高起点概率越高
-  const tendScore = (tendency != null && tendency >= 0) ? Math.min(100, tendency) / 200 : 0;
-  // 从最短时长之后的第一个时间块开始检查，到 now 为止
-  const startBlock = Math.ceil((anchorTs + minM * 60000) / 60000);
-  const endBlock = Math.floor(nowTs / 60000);
-  for (let b = startBlock; b <= endBlock; b++) {
-    const elapsedMins = Math.max(0, (b * 60000 - anchorTs) / 60000);
-    // 总概率 = 倾向分 + 比例式增长(已持续/上限 × 50%)
-    const growth = Math.min(1, elapsedMins / maxM) * 0.5;
-    const p = Math.min(1, tendScore + growth);
-    const r = seededHash(`${kind}:${charId}:${b}`);
-    if (r < p) return b * 60000;
-  }
-  return null;
+// 秒级随机时长（精确到秒）：闭区间内均匀取整
+function rollSeconds(minSecs, maxSecs) {
+  minSecs = Math.max(0, Math.floor(minSecs));
+  maxSecs = Math.max(minSecs, Math.floor(maxSecs));
+  return minSecs + Math.floor(Math.random() * (maxSecs - minSecs + 1));
+}
+function drawRestSeconds(minRestMins, maxRestMins) {
+  return rollSeconds(minRestMins * 60, maxRestMins * 60);
+}
+function drawLiveSeconds(minLiveMins, maxLiveMins) {
+  return rollSeconds(minLiveMins * 60, maxLiveMins * 60);
 }
 
 // 升级 charSchedulesMap 中"只有轮询残留字段"的旧条目为结算器需要的形状
 function ensureSchedEntry(sched) {
   if (!sched) return {
-    initialized: true, isLive: false, lastStartTime: null, plannedEndTime: null, lastEndTime: null
+    initialized: true, isLive: false, lastStartTime: null, plannedEndTime: null, lastEndTime: null,
+    nextOpenAt: null, nextCloseAt: null
   };
   sched.initialized = sched.initialized !== false;
   sched.isLive = !!sched.isLive;
   sched.lastStartTime = sched.lastStartTime ?? null;
   sched.plannedEndTime = sched.plannedEndTime ?? null;
   sched.lastEndTime = sched.lastEndTime ?? null;
+  // 秒级倒计时字段（缺失时置空，由结算器/节拍器按需生成并持久化）
+  sched.nextOpenAt = sched.nextOpenAt ?? null;
+  sched.nextCloseAt = sched.nextCloseAt ?? null;
   return sched;
 }
 
 // 结算单一角色：从 lastSeen 推演到 now，返回 { name, liveMins, ... }
+// 离线：倾向固定忽略，纯秒级随机倒计时，照表(nextOpenAt/nextCloseAt)推进，可复现
 async function settleOneChar(char, now, lastSeen) {
   const cid = char.id;
   if (!cid) return null;
@@ -525,82 +523,69 @@ async function settleOneChar(char, now, lastSeen) {
 
   const sched = ensureSchedEntry(window.charSchedulesMap[cid]);
 
-  // 若该角色从未初始过，参考首次场景：视为已度过休息期的空闲状态
-  const existed = !!(sched.lastEndTime || sched.lastStartTime || sched.isLive);
-
-  // 给该角色预读一次倾向（可空），倾向越高下播越早 / 开播越晚
-  let stopTendency = null, startTendency = null;
-  try {
-    const t = await getCharTendency(cid);
-    stopTendency = t && t.stopTendency != null ? t.stopTendency : null;
-    startTendency = t && t.startTendency != null ? t.startTendency : null;
-  } catch (e) {}
-
   // 当前场次
   const sessions = await api.db.list("live_sessions", { limit: 500 }).catch(() => []) || [];
   let session = sessions.find(s => s.characterId === cid) || null;
 
-  // 事件推进循环：只允许生成时间戳落在 [lastSeen, now] 内的完整场次链
-  let anchor = lastSeen;
+  // 在播但缺"下播倒计时"：补一个真实秒级直播时长
+  if (session) {
+    const startTs = Number(session.startTime) || lastSeen;
+    if (!sched.lastStartTime) sched.lastStartTime = startTs;
+    if (sched.nextCloseAt == null) {
+      sched.nextCloseAt = startTs + drawLiveSeconds(minLiveMins, maxLiveMins) * 1000;
+    }
+  }
+
+  // 事件推进循环：只生成时间戳落在 [lastSeen, now] 内的完整场次链
   let guard = 0;
   while (guard++ < 500) {
     if (session) {
-      // ── 直播中：概率判定本场是否在窗口内下播 ──
-      const startTs = Number(session.startTime) || anchor;
-      const stopAt = rollToggleAt(cid, 'stop', startTs, now, stopTendency, maxLiveMins, minLiveMins);
-      if (stopAt != null) {
-        // 窗口内已触发下播 → 结算为历史场次，进入休息
-        await closeAndArchive(char, session, stopAt);
-        session = null;
-        sched.isLive = false;
-        sched.currentSessionId = null;
-        sched.plannedEndTime = null;
-        sched.lastStartTime = startTs;
-        sched.lastEndTime = stopAt;
-        anchor = stopAt;
-        continue;
+      // ── 直播中：秒级下播倒计时到点 → 结算为历史场次，进入休息 ──
+      const closeAt = Number(sched.nextCloseAt) || (Number(session.startTime) + maxLiveMins * 60000);
+      if (closeAt > now) {
+        sched.isLive = true;
+        sched.currentSessionId = session.id;
+        break;
       }
-      // 窗口内未触发下播：保持原 startTime，绝不动
-      sched.isLive = true;
-      sched.currentSessionId = session.id;
-      sched.plannedEndTime = startTs + maxLiveMins * 60000;
-      sched.lastStartTime = startTs;
-      break;
-    }
-
-    // ── 休息中：概率判定本场是否在窗口内开播 ──
-    const restBase = sched.lastEndTime || anchor;
-    const startAt = rollToggleAt(cid, 'start', restBase, now, startTendency, maxRestMins, minRestMins);
-
-    if (startAt == null) {
-      // 窗口内未触发开播 → 保持休息
+      await closeAndArchive(char, session, closeAt);
+      session = null;
       sched.isLive = false;
       sched.currentSessionId = null;
-      sched.plannedEndTime = null;
-      sched.lastEndTime = restBase;
-      break;
+      sched.lastEndTime = closeAt;
+      sched.lastStartTime = sched.lastStartTime || now;
+      sched.nextCloseAt = null;
+      // 进入休息：在 [最短休息, 最长休息] 内抽一条精确到秒的"下次开播"倒计时
+      sched.nextOpenAt = closeAt + drawRestSeconds(minRestMins, maxRestMins) * 1000;
+      continue;
     }
+
+    // ── 休息中：秒级开播倒计时到点 → 开播 ──
+    let nextOpen = sched.nextOpenAt;
+    if (nextOpen == null) {
+      // 首次无排班（如冷启动未初始化到）→ 从上次下播/起始点抽一条秒级倒计时
+      nextOpen = (sched.lastEndTime || lastSeen) + drawRestSeconds(minRestMins, maxRestMins) * 1000;
+      sched.nextOpenAt = nextOpen;
+    }
+    if (nextOpen > now) { sched.isLive = false; break; }
 
     // 每日场次上限拦截
     if (dailyLimit !== Infinity) {
       try {
         const todayCount = await getDailyStartCount(cid);
-        if (todayCount >= dailyLimit) { sched.isLive = false; sched.lastEndTime = restBase; break; }
+        if (todayCount >= dailyLimit) { sched.isLive = false; break; }
       } catch (e) {}
     }
 
-    // 窗口内开播：startAt 是历史时刻，写入场次
-    session = await openLiveFromHistory(char, startAt);
-    if (!session) {
-      sched.isLive = false;
-      sched.lastEndTime = restBase;
-      break;
-    }
+    // 到点开播：nextOpen 是历史/现在时刻，写入场次
+    session = await openLiveFromHistory(char, nextOpen);
+    if (!session) { sched.isLive = false; break; }
+    const durSec = drawLiveSeconds(minLiveMins, maxLiveMins);
     sched.isLive = true;
     sched.currentSessionId = session.id;
-    sched.lastStartTime = startAt;
-    sched.plannedEndTime = null;
-    anchor = startAt;
+    sched.lastStartTime = nextOpen;
+    sched.lastEndTime = null; // 直播中
+    sched.nextOpenAt = null;  // 已消费
+    sched.nextCloseAt = nextOpen + durSec * 1000; // 拧直播段的秒级下播倒计时
     try { await incrementDailyStartCount(cid); } catch (e) {}
   }
 
@@ -835,7 +820,7 @@ async function tickLiveLifecycle() {
 
       const session = sessions.find(s => s.characterId === cid) || null;
 
-      // 倾向值读取（与结算器一致），未获取按 null
+      // 倾向值读取（在线时倾向可能变化，实时参与"改签"判定）；未获取按 null
       let stopTendency = null, startTendency = null;
       try {
         const t = await getCharTendency(cid);
@@ -844,23 +829,37 @@ async function tickLiveLifecycle() {
       } catch (e) {}
 
       if (session) {
-        // ── 直播中：该时间块是否触发下播 ──
+        // ── 直播中：秒级下播倒计时到点必收；未到点按 倾向+比例式增长 决定是否提前收 ──
         const startTs = Number(session.startTime) || now;
-        const stopAt = rollToggleAt(cid, 'stop', startTs, now, stopTendency, maxLiveMins, minLiveMins);
-        if (stopAt != null) {
+        if (sched.nextCloseAt == null) {
+          sched.nextCloseAt = now + drawLiveSeconds(minLiveMins, maxLiveMins) * 1000;
+        }
+        const liveElapsedMins = Math.max(0, (now - startTs) / 60000);
+        const growth = Math.min(1, liveElapsedMins / maxLiveMins) * 0.5;
+        const stopP = Math.min(1, ((stopTendency != null && stopTendency >= 0) ? stopTendency / 200 : 0) + growth);
+        const dueStop = (sched.nextCloseAt != null && now >= sched.nextCloseAt) || Math.random() < stopP;
+        if (dueStop) {
           await lumaOpsGateway.requestStopLive({
             characterId: cid,
             reason: "到点自动下播（运营组判定已到）",
             source: "ticker"
           });
+          // 下播后进入休息，拧一条秒级随机的下次开播倒计时
+          sched.nextCloseAt = null;
+          sched.nextOpenAt = now + drawRestSeconds(minRestMins, maxRestMins) * 1000;
+          try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
         }
         continue;
       }
 
-      // ── 休息中：该时间块是否触发开播 ──
+      // ── 休息中：秒级开播倒计时到点必开；未到点按 倾向+比例式增长 是否"改签提前"开 ──
       const restBase = sched.lastEndTime || sched.lastStartTime || now;
-      const startAt = rollToggleAt(cid, 'start', restBase, now, startTendency, maxRestMins, minRestMins);
-      if (startAt == null) continue; // 窗口内未触发开播
+      const restElapsedMins = Math.max(0, (now - restBase) / 60000);
+      const g = Math.min(1, restElapsedMins / maxRestMins) * 0.5;
+      const startP = Math.min(1, ((startTendency != null && startTendency >= 0) ? startTendency / 200 : 0) + g);
+      // toBase = 秒级倒计时到点（必开）；tendLevel = 倾向"改签"，random<p 提前开（比例式增长随爬）
+      const dueOpen = (sched.nextOpenAt != null && now >= sched.nextOpenAt) || Math.random() < startP;
+      if (!dueOpen) continue;
 
       if (dailyLimit !== Infinity) {
         try {
@@ -873,6 +872,10 @@ async function tickLiveLifecycle() {
         characterId: cid,
         source: "ticker"
       });
+      // 开播后（w上一段倒计时已消费），拧本场直播的秒级下播倒计时
+      sched.nextOpenAt = null;
+      sched.nextCloseAt = now + drawLiveSeconds(minLiveMins, maxLiveMins) * 1000;
+      try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
     }
   } catch (e) {
     console.warn("[LUMA Live] 在线节拍器异常:", e);
