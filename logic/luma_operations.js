@@ -862,16 +862,20 @@ async function settleAllLive() {
     // 补跑结束后，用真实时间再执行一次到期延迟动作（补跑时用的模拟时间，真实时间已超过）
     try { await executeDueActions(now); } catch (e) {}
 
-    // ── 逾时硬收盘兜底：无论补跑结果如何，凡仍超最大直播时长的场次直接结算收盘 ──
+    // ── 逾时硬收盘兜底：凡仍超最大直播时长的场次，一律走「直播机制」的正规下播 ──
+    //    由 requestStopLive 统一处理：结算归档(closeAndArchive) + 更新 sched.lastEndTime
+    //    + 强制休息锁(forcedRestUntil)，与在线下播/延迟下播走同一条路，
+    //    补跑不自行造一套收盘逻辑，避免角色状态机不一致（下播后休息时长算错、无休息锁）。
     const sessions = await api.db.list("live_sessions", { limit: 500 }).catch(() => []) || [];
-    const allChars = window.allCharacters || [];
     let forcedClosed = 0;
     for (const s of sessions) {
       const cid = s.characterId;
       const liveMins = Math.max(0, (now - (Number(s.startTime) || now)) / 60000);
       if (liveMins >= maxLiveMins) {
-        const char = allChars.find(c => c.id === cid) || { id: cid };
-        try { await closeAndArchive(char, s, now); forcedClosed++; } catch (e) {}
+        try {
+          const r = await lumaOpsGateway.requestStopLive({ characterId: cid, reason: "逾时硬收盘", source: "maint_shutdown" }, now);
+          if (r && r.success) forcedClosed++;
+        } catch (e) {}
       }
     }
 
