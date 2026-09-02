@@ -6,7 +6,7 @@
 <div id="tab-trends" class="tab-page hidden h-full overflow-y-auto no-scrollbar px-4 pb-28 space-y-4">
       
       <!-- 探索·社区 导览大卡片 · 浅色杂志感光晕版 -->
-      <div class="luxe-card st3-glow-bg p-4 space-y-3">
+      <div class="luxe-card st3-glow-bg p-4 space-y-3" style="position:relative;z-index:0;">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div class="w-11 h-11 rounded-full p-0.5 bg-gradient-to-tr from-rose-500 via-purple-500 to-amber-400 shadow-md flex-shrink-0">

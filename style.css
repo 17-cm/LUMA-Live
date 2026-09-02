@@ -4800,3 +4800,19 @@ input:checked + .switch-slider:before {
   pointer-events: none;
 }
 .st3-glow-bg > * { position: relative; z-index: 1; }
+
+/* 社区导览卡专用: 玻璃感更明显, 光晕更柔, 融入 24px 模糊 */
+.luxe-card.st3-glow-bg::before {
+  background:
+    radial-gradient(55% 80% at 0% 0%, rgba(255, 42, 109, 0.14) 0%, transparent 60%),
+    radial-gradient(60% 90% at 100% 100%, rgba(121, 40, 202, 0.14) 0%, transparent 65%),
+    radial-gradient(45% 55% at 95% 5%, rgba(217, 119, 6, 0.08) 0%, transparent 70%);
+}
+.luxe-card.st3-glow-bg {
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.78) 0%, rgba(248, 246, 252, 0.7) 100%);
+}
+
+/* 野生卡: 关掉原 ::before 的旋转全息, 光晕接管 */
+.holo-wild-card.st3-glow-bg::before { content: none; }
