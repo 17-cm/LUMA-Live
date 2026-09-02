@@ -136,7 +136,7 @@ function renderSuperTopicView(charId = null) {
 
   const tabCfg = {
     posts:      { label: '动态',     sub: 'POSTS', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg>' },
-    compose:    { label: '发帖',     sub: 'POST',  ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>' },
+    compose:    { label: '发帖',     sub: 'POST',  ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' },
     rules:      { label: '规则',     sub: 'RULES', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="13" x2="15" y2="13"></line><line x1="9" y1="17" x2="13" y2="17"></line></svg>' },
     checkin:    { label: '签到',     sub: 'DAILY', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="3"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><polyline points="9 16 11 18 15 14"></polyline></svg>' },
     support:    { label: '打榜',     sub: 'CHEER', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"></path></svg>' },
@@ -151,9 +151,6 @@ function renderSuperTopicView(charId = null) {
     <div class="st2s-layout">
       <!-- 左侧侧边栏 · 56px 宽 -->
       <aside class="st2s-side">
-        <button onclick="closeCommunitySubPage()" class="st2s-side-btn" title="返回">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        </button>
         <button onclick="toggleSuperTopicDrawer()" class="st2s-side-btn" title="切换超话">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
         </button>
@@ -182,10 +179,10 @@ function renderSuperTopicView(charId = null) {
             <h2>#${char.name}超话#<span class="st2s-verified" title="官方"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></h2>
             <p>${char.category || '明星超话'} · 主持人 @${char.name}后援会</p>
             <div class="st2s-hero-stats">
-              <div><b>${fansCount.toLocaleString()}</b><span>粉丝</span></div>
-              <div><b>${todayDiscuss}</b><span>今日讨论</span></div>
-              <div><b>${contribution.toLocaleString()}</b><span>我的贡献</span></div>
-              <div><b>${heatValue}</b><span>超话热度</span></div>
+              <div><span>粉丝</span><b>${fansCount.toLocaleString()}</b></div>
+              <div><span>今日讨论</span><b>${todayDiscuss}</b></div>
+              <div><span>我的贡献</span><b>${contribution.toLocaleString()}</b></div>
+              <div><span>超话热度</span><b>${heatValue}</b></div>
             </div>
           </div>
           <button onclick="handleSuperTopicFollow('${char.name.replace(/'/g, "\\'")}')" class="st2s-follow ${isFollowed ? 'is-on' : ''}">
@@ -294,37 +291,33 @@ function renderSuperTopicPostsTab(charId) {
     </div>
 
     <div class="st2s-feed">
-      ${posts.map(post => `
-        <article class="st2s-feed-item" onclick="openSuperTopicPostDetail('${post.id}')">
-          <img class="st2s-feed-av" src="${post.author.avatar}" alt="">
-          <div class="st2s-feed-body">
-            <div class="st2s-feed-head">
-              <div class="st2s-feed-name">
-                <b>${post.author.name}</b>
-                ${post.author.badge ? `<span class="st2s-feed-bd">${post.author.badge}</span>` : ''}
+      ${posts.map(post => {
+        const primaryTag = post.primaryTag || `#${char.name}超话#`;
+        const subTags = (post.subTags || []).join(' ');
+        const mentions = (post.mentions || []).join(' ');
+        const content = post.content || '';
+        const truncated = content.length > 80 ? (content.slice(0, 80) + '…') : content;
+        return `
+          <article class="st2s-feed-item" onclick="openSuperTopicPostDetail('${post.id}')">
+            <div class="st2s-feed-full">
+              <div class="st2s-feed-head">
+                <img class="st2s-feed-av" src="${post.author.avatar}" alt="">
+                <div class="st2s-feed-name">
+                  <b>${post.author.name}</b>
+                  ${post.author.badge ? `<span class="st2s-feed-bd">${post.author.badge}</span>` : ''}
+                </div>
+                <span class="st2s-feed-time">${postTime(post)}</span>
               </div>
-              <span class="st2s-feed-time">${postTime(post)}</span>
+              <div class="st2s-feed-tags">
+                <span class="hash">${primaryTag}</span>
+                ${mentions ? `<span class="mention">${mentions}</span>` : ''}
+              </div>
+              <p class="st2s-feed-text">${truncated}</p>
+              ${subTags ? `<div class="st2s-feed-subtags">${subTags}</div>` : ''}
             </div>
-            <p class="st2s-feed-text">
-              <span class="hash">#${char.name}超话#</span> ${post.content}
-            </p>
-            <div class="st2s-feed-meta" onclick="event.stopPropagation()">
-              <button onclick="handlePostAction('${post.id}','repost')" class="st2s-feed-act">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
-                <span>${post.stats.reposts}</span>
-              </button>
-              <button onclick="openSuperTopicPostDetail('${post.id}')" class="st2s-feed-act">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                <span>${post.stats.comments}</span>
-              </button>
-              <button onclick="handlePostAction('${post.id}','like')" class="st2s-feed-act ${post.stats.isLiked ? 'is-on' : ''}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
-                <span>${post.stats.likes}</span>
-              </button>
-            </div>
-          </div>
-        </article>
-      `).join('')}
+          </article>
+        `;
+      }).join('')}
     </div>
   `;
 }
@@ -895,16 +888,17 @@ function submitSuperTopicPost(charId) {
   const image = (prev && !prev.classList.contains('hidden')) ? prev.src : '';
   const user = getCurrentUser();
   const primaryTag = `#${char.name}超话#`;
-  const tagParts = [primaryTag];
+  const subTagParts = [];
   if (subTag) {
     subTag.split(/[\s,，]+/).filter(Boolean).forEach(t => {
       const t2 = t.startsWith('#') ? t : ('#' + t);
-      tagParts.push(t2.endsWith('#') ? t2 : (t2 + '#'));
+      subTagParts.push(t2.endsWith('#') ? t2 : (t2 + '#'));
     });
   }
-  const mentionParts = mention ? mention.split(/\s+/).filter(Boolean) : [];
+  const mentionParts = mention ? mention.split(/\s+/).filter(Boolean).map(m => m.startsWith('@') ? m : ('@' + m)) : [];
   const post = {
     id: 'st_post_' + Date.now(),
+    charId: char.id,
     author: {
       name: user.name || '我',
       avatar: user.avatar || (char.avatar || ''),
@@ -912,8 +906,9 @@ function submitSuperTopicPost(charId) {
       verified: false
     },
     createdAt: Date.now(),
-    tag: tagParts.join(' '),
-    mention: mentionParts.join(' '),
+    primaryTag,
+    subTags: subTagParts,
+    mentions: mentionParts,
     content,
     image,
     imageDesc,
@@ -924,21 +919,16 @@ function submitSuperTopicPost(charId) {
   all[char.id] = all[char.id] || [];
   all[char.id].unshift(post);
   try { localStorage.setItem('st_user_posts', JSON.stringify(all)); } catch (_) {}
+  if (window.LumaDataHub && typeof window.LumaDataHub.put === 'function') {
+    try { window.LumaDataHub.put('super_topic_posts', post.id, post); } catch (_) {}
+  }
   showToast('发布成功', 'ok');
   currentSuperTopicTab = 'posts';
   renderSuperTopicTab();
 }
 window.submitSuperTopicPost = submitSuperTopicPost;
 
-// 把发帖也加入 data_hub 持久化
-function persistSuperTopicPost(post) {
-  try {
-    if (window.LumaDataHub && typeof window.LumaDataHub.put === 'function') {
-      window.LumaDataHub.put('super_topic_posts', post.id, post);
-    }
-  } catch (_) {}
-}
-window.persistSuperTopicPost = persistSuperTopicPost;
+
 
 // 启动时恢复用户帖子
 (function restoreUserPosts() {
@@ -1203,6 +1193,9 @@ window.closePostDetail = closePostDetail;
 function renderSuperTopicPostDetail(post, char) {
   const hasImage = !!post.image;
   const comments = (post.commentTree && post.commentTree.length) ? post.commentTree : [];
+  const primaryTag = post.primaryTag || `#${char.name}超话#`;
+  const subTags = (post.subTags || []).join(' ');
+  const mentions = (post.mentions || []).join(' ');
   return `
     <div class="st2s-detail">
       <div class="st2s-detail-bar">
@@ -1220,10 +1213,14 @@ function renderSuperTopicPostDetail(post, char) {
               <b>${post.author.name}</b>
               ${post.author.badge ? `<span class="st2s-detail-bd">${post.author.badge}</span>` : ''}
             </div>
-            <div class="st2s-detail-tag">${post.tag || ''} ${post.mention || ''}</div>
+            <div class="st2s-detail-tag">
+              <span class="hash">${primaryTag}</span>
+              ${mentions ? `<span class="mention">${mentions}</span>` : ''}
+            </div>
           </div>
         </header>
         <p class="st2s-detail-text">${post.content || ''}</p>
+        ${subTags ? `<div class="st2s-detail-subtags">${subTags}</div>` : ''}
         ${hasImage ? `<div class="st2s-detail-img-wrap"><img class="st2s-detail-img" src="${post.image}" alt=""></div>` : ''}
         <div class="st2s-detail-bar2">
           <span>${new Date(post.createdAt || Date.now()).toLocaleString('zh-CN', { hour12: false })}</span>

@@ -51,9 +51,11 @@
 
   <!-- 子页面 2: 主播超话专区 全屏子页 (超话 2.0 · 全息深空 UI) -->
   <div id="communitySuperTopicView" class="full-page-view st2-page hidden">
-      <!-- 顶部导览 (空: 返回由 sidebar 接管) -->
+      <!-- 顶部导览 (返回按钮) -->
     <div class="st2-nav">
-      <div class="st2-nav-spacer"></div>
+      <button onclick="closeCommunitySubPage()" class="st2s-nav-back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
       <div class="w-8"></div>
     </div>
 
