@@ -14,6 +14,13 @@ let superTopicVirtualScrollerInstance = null;
 // -------------------------------------------------------------------------
 // 工具函数
 // -------------------------------------------------------------------------
+function showToast(msg, type) {
+  console.log(`[Toast ${type}]`, msg);
+  if (window.showMessage) window.showMessage(msg);
+}
+function getCurrentUser() {
+  return { id: 'user_001', name: '游客用户', avatar: '/assets/default-avatar.png' };
+}
 function getCharContribution(charId) {
   try { return (window.getCharContributionScore && window.getCharContributionScore(charId)) || 0; } catch (e) { return 0; }
 }
@@ -171,23 +178,25 @@ function renderSuperTopicView(charId = null) {
       <div class="st2s-main">
         <!-- 拉高的顶部状态 (132px) -->
         <section class="st2s-hero">
-          <button class="st2s-av" onclick="toggleSuperTopicDrawer()" title="切换超话">
-            <img src="${char.avatar}" alt="">
-            ${char.isLive ? '<span class="st2s-live"></span>' : ''}
-          </button>
-          <div class="st2s-hero-meta">
-            <h2>#${char.name}超话#<span class="st2s-verified" title="官方"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></h2>
-            <p>${char.category || '明星超话'} · 主持人 @${char.name}后援会</p>
-            <div class="st2s-hero-stats">
-              <div><span>粉丝</span><b>${fansCount.toLocaleString()}</b></div>
-              <div><span>今日讨论</span><b>${todayDiscuss}</b></div>
-              <div><span>我的贡献</span><b>${contribution.toLocaleString()}</b></div>
-              <div><span>超话热度</span><b>${heatValue}</b></div>
+          <div class="st2s-hero-top">
+            <button class="st2s-av" onclick="toggleSuperTopicDrawer()" title="切换超话">
+              <img src="${char.avatar}" alt="">
+              ${char.isLive ? '<span class="st2s-live"></span>' : ''}
+            </button>
+            <div class="st2s-hero-meta">
+              <h2>#${char.name}超话#<span class="st2s-verified" title="官方"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></h2>
+              <p>${char.category || '明星超话'} · 主持人 @${char.name}后援会</p>
             </div>
+            <button onclick="handleSuperTopicFollow('${char.name.replace(/'/g, "\\'")}')" class="st2s-follow ${isFollowed ? 'is-on' : ''}">
+              ${isFollowed ? '已关注' : '+ 关注'}
+            </button>
           </div>
-          <button onclick="handleSuperTopicFollow('${char.name.replace(/'/g, "\\'")}')" class="st2s-follow ${isFollowed ? 'is-on' : ''}">
-            ${isFollowed ? '已关注' : '+ 关注'}
-          </button>
+          <div class="st2s-hero-stats">
+            <div><span>粉丝</span><b>${fansCount.toLocaleString()}</b></div>
+            <div><span>今日讨论</span><b>${todayDiscuss}</b></div>
+            <div><span>我的贡献</span><b>${contribution.toLocaleString()}</b></div>
+            <div><span>超话热度</span><b>${heatValue}</b></div>
+          </div>
         </section>
 
         <!-- meta · 短句行 + 当前 tab 标签 (在主区顶) -->

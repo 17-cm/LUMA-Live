@@ -53,9 +53,7 @@
   <div id="communitySuperTopicView" class="full-page-view st2-page hidden">
       <!-- 顶部导览 (返回按钮) -->
     <div class="st2-nav">
-      <button onclick="closeCommunitySubPage()" class="st2s-nav-back">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
+      <button onclick="closeCommunitySubPage()" class="st2s-nav-back">退出</button>
       <div class="w-8"></div>
     </div>
 
