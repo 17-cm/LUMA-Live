@@ -46,9 +46,10 @@
         hub.setFans(id, fans);
       }
 
-      // 如果玩家关注了该主播，额外加上玩家这 1 个真实关注粉丝
-      const followed = window.followedHosts || [];
-      const isFollowed = followed.includes(id);
+      // 如果玩家关注了该主播（含：直播间关注 followedHosts + 超话关注 followedSuperTopics），额外加 1
+      const followedHosts = window.followedHosts || [];
+      const followedSuperTopics = window.followedSuperTopics || [];
+      const isFollowed = followedHosts.includes(id) || followedSuperTopics.includes(id);
       return fans + (isFollowed ? 1 : 0);
     },
 

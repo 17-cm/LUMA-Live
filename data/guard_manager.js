@@ -156,15 +156,15 @@
       return list;
     },
 
-    // 7. 【社区·全服守护/贡献总榜】各主角收到的贡献总值 + 玩家的贡献总值 综合排名
+    // 7. 【社区·全服贡献总榜】按每个实体「收到的贡献值」降序排行（统一体系：玩家与所有主播都算）
     getAllCommunityGuardRankingList() {
-      const chars = (typeof window.getAvailableCharsList === 'function') 
-        ? window.getAvailableCharsList() 
+      const chars = (typeof window.getAvailableCharsList === 'function')
+        ? window.getAvailableCharsList()
         : (window.allCharacters || []);
-      
+
       const list = [];
 
-      // 遍历所有 Char：贡献 = 所有人对其贡献的总计
+      // 遍历所有 Char：得分 = 收到贡献（送礼+签到+打榜统一矩阵）
       chars.forEach(c => {
         const id = String(c.id || c.characterId);
         const receivedFromAll = this.getTargetReceivedTotal(id);
@@ -175,23 +175,23 @@
           avatar: c.avatar || c.cover,
           badge: '全服打投',
           score: receivedFromAll,
-          scoreLabel: '贡献值',
+          scoreLabel: '收到贡献',
           isUser: false
         });
       });
 
-      // 玩家：贡献 = 我为所有主播贡献的总计
+      // 玩家：得分 = 收到的贡献（其他主播给玩家的）
       const uName = (window.currentUser && window.currentUser.name) || '玩家';
       const uAvatar = (window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first');
-      const totalUserSpent = this.getEntitySpentTotal('user');
+      const userReceived = this.getTargetReceivedTotal('user');
 
       list.push({
         id: 'user',
         name: `${uName} (你)`,
         avatar: uAvatar,
-        badge: '至尊守护',
-        score: totalUserSpent,
-        scoreLabel: '贡献值',
+        badge: '至尊榜一',
+        score: userReceived,
+        scoreLabel: '收到贡献',
         isUser: true
       });
 

@@ -68,6 +68,24 @@ function topicHues(id) {
   for (let i = 0; i < s.length; i++) n = (n * 31 + s.charCodeAt(i)) >>> 0;
   return palettes[n % palettes.length];
 }
+// 顶部一句话：幽默搞笑随机短句（每次进超话都不同，逗你一乐）
+const SUPERTOPIC_ONE_LINERS = [
+  '本超话由摸鱼办公室冠名播出',
+  '这里的贡献值，比你的发际线还坚挺',
+  '今日份快乐由 #一键三联# 提供',
+  '不看会亏，看了会瘦（假的）',
+  '欢迎来到：熬夜冠军粉丝故乡',
+  '评论区比正片还能整活的秘密基地',
+  '点签到的人，钱包和良心都会变厚',
+  '主人留下的不只是热爱，还有钱包',
+  '主播说：钱是王八蛋，但你得给',
+  '只有真心，才配得上今晚的火箭',
+  '你的每份贡献，都是主播的续命粮',
+  '不出意外的话，这应该是劝你打call',
+  '够有钱才叫榜一，够搞笑才叫家人',
+  '把爱留在超话，把币花在今天',
+  '嘘，别让上面那行小字把你劝退'
+];
 function postTime(post) {
   if (post.time) return post.time;
   if (post.createdAt) {
@@ -119,6 +137,7 @@ function renderSuperTopicView(charId = null) {
   const todayDiscuss = topicPosts.length + 18;
   const heatValue = (fansCount * 3 + contribution).toLocaleString();
   const [a, b] = topicHues(char.id);
+  const oneLiner = SUPERTOPIC_ONE_LINERS[Math.floor(Math.random() * SUPERTOPIC_ONE_LINERS.length)];
 
   const headerTitle = document.getElementById('superTopicHeaderTitle');
   if (headerTitle) headerTitle.textContent = `#${char.name}超话#`;
@@ -128,8 +147,7 @@ function renderSuperTopicView(charId = null) {
     <section class="st2-hero" style="--st2-a:${a};--st2-b:${b}">
       <div class="st2-hero-top">
         <div class="st2-kickers">
-          <span class="st2-kicker is-hot"># 明星超话 #</span>
-          <span class="st2-kicker">${char.category || '官方超话'}</span>
+          <span class="st2-kicker is-hot">${oneLiner}</span>
         </div>
         <div class="st2-hero-act">
           <button onclick="handleSuperTopicFollow('${char.name.replace(/'/g, "\\'")}')" class="st2-follow ${isFollowed ? 'is-followed' : ''}">
@@ -394,12 +412,12 @@ function renderSuperTopicCheckinTab(char) {
 window.renderSuperTopicCheckinTab = renderSuperTopicCheckinTab;
 
 // -------------------------------------------------------------------------
-// 打榜/应援 Tab（消耗应援币 → 增长贡献值）
+// 打榜/应援 Tab（消耗 LUMA币 → 1:1 增长贡献值）
 // -------------------------------------------------------------------------
 function renderSuperTopicSupportTab(char) {
   const panel = document.getElementById('superTopicPanel');
   if (!panel) return;
-  const supportCoin = getMyWalletBalance(char.id);
+  const supportCoin = getMyWalletBalance();
   const contribution = getCharContribution(char.id);
   const fansCount = (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function')
     ? window.LumaFansManager.getFans(char.id, char) : (char.fans || 0);
@@ -408,10 +426,10 @@ function renderSuperTopicSupportTab(char) {
     <section class="st2-support-hero">
       <div class="sup-hd">
         <span class="st2-kicker is-hot"># 周边应援中心</span>
-        <span class="bal">应援币 ${supportCoin.toLocaleString()}</span>
+        <span class="bal">LUMA币 ${supportCoin.toLocaleString()}</span>
       </div>
       <h4>为主播 #${char.name}# 应援打榜</h4>
-      <p>每日签到领取应援币，购买应援物 1:1 转化为专属贡献值，助推超话热度。</p>
+      <p>直接消耗 LUMA 币，花多少币就涨多少贡献值（1:1），助推超话热度。</p>
       <div class="sup-stats">
         <div><span>我贡献的应援值</span><b>${contribution.toLocaleString()}</b></div>
         <div><span>超话总热度</span><b style="color:#ffcf5c;">${(fansCount * 3 + contribution).toLocaleString()}</b></div>
@@ -430,7 +448,7 @@ function renderSuperTopicSupportTab(char) {
           <h6>${g.name}</h6>
           <span class="g-desc">${g.desc}</span>
           <div class="g-btm">
-            <span class="g-exp">+${g.exp} 贡献</span>
+            <span class="g-exp">+${g.price} 贡献</span>
             <span class="g-price">${g.price} 币</span>
           </div>
         </div>
@@ -438,7 +456,7 @@ function renderSuperTopicSupportTab(char) {
     </div>
 
     <button onclick="executeSupportGift()" class="st2-cta">立即应援打榜</button>
-    <p class="st2-hint">应援币不足？去「签到」每日打卡即可领取 +100</p>
+    <p class="st2-hint">LUMA币不足？去钱包充值，或直播间互动赚币</p>
   `;
 }
 window.renderSuperTopicSupportTab = renderSuperTopicSupportTab;
@@ -457,7 +475,8 @@ function renderSuperTopicContributeTab(char) {
   const panel = document.getElementById('superTopicPanel');
   if (!panel) return;
 
-  // 真实数据：消费矩阵中所有「别人 → 该角色（含我自己）」的贡献记录
+  // 真实数据：统一贡献矩阵中所有「别人 → 该角色（含我自己）」的贡献记录
+  // 三大渠道统一累计：直播间送礼 1:1 + 每日签到 +100 + 超话打榜 1:1
   let supporters = [];
   if (window.LumaGuardManager && typeof window.LumaGuardManager.getTopSupportersForChar === 'function') {
     try {
@@ -469,6 +488,7 @@ function renderSuperTopicContributeTab(char) {
           name: isUser ? `${(item.fromName || currentUserName())} (你)` : (item.fromName || '神秘粉丝'),
           avatar: item.fromAvatar || getAvatarFor(item.fromName, 'first'),
           score: score,
+          giftCount: Number(item.giftCount) || 0,
           badge: isUser
             ? (score >= 30000 ? '超话神豪' : (score > 0 ? '核心应援官' : '暂未贡献'))
             : '忠实粉丝',
@@ -476,6 +496,12 @@ function renderSuperTopicContributeTab(char) {
         };
       });
     } catch (e) {}
+  }
+
+  // 头部：该超话收到的贡献总值
+  let totalReceived = 0;
+  if (window.LumaGuardManager && typeof window.LumaGuardManager.getTargetReceivedTotal === 'function') {
+    try { totalReceived = Number(window.LumaGuardManager.getTargetReceivedTotal(char.id)) || 0; } catch (e) {}
   }
 
   if (supporters.length === 0) {
@@ -491,49 +517,38 @@ function renderSuperTopicContributeTab(char) {
   }
 
   supporters.sort((a, b) => b.score - a.score);
-  const top1 = supporters[0], top2 = supporters[1], top3 = supporters[2];
-  const rest = supporters.slice(3);
-  const podium = [
-    { col: 'c1', rank: '1', item: top1, crown: '👑' },
-    { col: 'c2', rank: '2', item: top2, crown: '🥈' },
-    { col: 'c3', rank: '3', item: top3, crown: '🥉' }
-  ].filter(p => p.item);
+  const rankCls = ['top1', 'top2', 'top3'];
+  const medal = ['👑', '🥈', '🥉'];
 
   panel.innerHTML = `
-    <!-- 领奖台 Hero -->
-    <section class="st2-podium">
-      <div class="p-hd">
-        <h4><span style="color:#ffcf5c;">#</span>${char.name} · 守护贡献榜</h4>
-        <span>送礼 / 签到 / 打榜全计入</span>
+    <!-- 榜单头部：总值概览 -->
+    <section class="st2-card" style="padding:12px 11px;">
+      <div class="st2-sec" style="margin-bottom:0;">
+        <h4><span class="sharp">#</span>${char.name} · 贡献总榜</h4>
+        <span class="note">REAL MATRIX</span>
       </div>
-      <div class="st2-podium-grid">
-        ${podium.map(p => `
-          <div class="st2-pod-col ${p.col}">
-            <div class="p-av"><img src="${p.item.avatar}" alt=""><em>${p.crown}</em></div>
-            <div class="p-name">${p.item.name}</div>
-            <div class="p-val">${p.item.score.toLocaleString()} 贡献</div>
-            <div class="p-base">${p.rank}</div>
-          </div>
-        `).join('')}
+      <div style="display:flex;align-items:baseline;gap:8px;margin-top:10px;">
+        <b style="font-size:22px;font-weight:900;color:#ffcf5c;">${totalReceived.toLocaleString()}</b>
+        <span style="font-size:10px;font-weight:700;color:rgba(223,247,238,.55);">累计贡献值 · 共 ${supporters.length} 人上榜</span>
       </div>
     </section>
 
-    <!-- 其余榜单 -->
-    <div class="st2-card" style="padding:10px 9px;${rest.length ? '' : 'display:none;'}">
-      ${rest.map((item, idx) => `
+    <!-- 一行一行排行榜 -->
+    <div class="st2-card" style="padding:10px 9px;">
+      ${supporters.map((item, idx) => `
         <div class="st2-row ${item.isUser ? 'me' : ''}">
-          <span class="rk">${idx + 4}</span>
+          <span class="rk ${idx < 3 ? rankCls[idx] : ''}">${idx < 3 ? medal[idx] : idx + 1}</span>
           <img src="${item.avatar}" alt="">
           <div class="who">
             <h6>${item.name}</h6>
-            <p>${item.badge}</p>
+            <p>${item.badge} · ${item.giftCount} 次</p>
           </div>
           <div class="val rose"><b>${item.score.toLocaleString()}</b><span>贡献值</span></div>
         </div>
       `).join('')}
     </div>
 
-    <p class="st2-hint">累计贡献 = 直播间送礼 1:1 + 每日签到 +100 + 打榜应援</p>
+    <p class="st2-hint">累计贡献 = 直播间送礼 1:1 + 每日签到 +100 + 超话打榜 1:1</p>
   `;
 }
 window.renderSuperTopicContributeTab = renderSuperTopicContributeTab;
@@ -567,7 +582,7 @@ function handleSuperTopicCheckIn(charId, charName = '') {
   try { nextContribution = window.addCharContributionScore(topicId, 100) || 0; } catch (e) {}
 
   if (api && api.ui) {
-    api.ui.toast(`🎉 签到成功！贡献 +100 · 应援币 +100 · 已连续签到第 ${data.streakDays || 1} 天！`);
+    api.ui.toast(`🎉 签到成功！贡献 +100 · 已连续签到第 ${data.streakDays || 1} 天！`);
   }
   if (window.LumaDataHub) { try { window.LumaDataHub.emit('checkin', { targetKey: topicId, storeData: data }); } catch (e) {} }
   if (typeof window.notifyCommunityDataChanged === 'function') { try { window.notifyCommunityDataChanged('checkin', { targetKey: topicId }); } catch (e) {} }
@@ -578,44 +593,53 @@ function handleSuperTopicCheckIn(charId, charName = '') {
 window.handleSuperTopicCheckIn = handleSuperTopicCheckIn;
 
 // -------------------------------------------------------------------------
-// 打榜执行（消耗应援币 → 增长贡献）
+// 打榜执行（消耗 LUMA币 → 1:1 增长贡献值，与直播间送礼同一钱包）
 // -------------------------------------------------------------------------
 function executeSupportGift() {
-  if (!window.LumaCheckinManager || typeof window.LumaCheckinManager.consumeSupportCoin !== 'function') {
-    if (api && api.ui) api.ui.toast('打榜系统未就绪，请稍后再试');
-    return;
-  }
   const char = getActiveChar();
   if (!char) return;
   const gift = (window.SUPPORT_GIFTS || []).find(g => g.id === selectedSupportGiftId) || (window.SUPPORT_GIFTS || [])[0];
   if (!gift) return;
 
-  const balance = getMyWalletBalance(char.id);
-  if (balance < gift.price) {
-    if (api && api.ui) api.ui.toast(`应援币不足（现有 ${balance}，需 ${gift.price}），每日签到可领取 +100`);
+  const cost = Math.max(0, Math.floor(Number(gift.price) || 0));
+  if (cost <= 0) {
+    if (api && api.ui) api.ui.toast('该应援物价格异常，请重新选择');
     return;
   }
 
-  const res = window.LumaCheckinManager.consumeSupportCoin(char.id, gift.price);
-  if (!res.ok) {
-    if (api && api.ui) api.ui.toast(res.reason === 'insufficient' ? '应援币不足，每日签到可获取' : '操作失败，请重试');
+  const balance = Math.max(0, Number(window.currentWalletBalance) || 0);
+  if (balance < cost) {
+    if (api && api.ui) api.ui.toast(`💎 LUMA币不足（现有 ${balance}，需 ${cost}）`);
+    if (typeof window.openRechargeModal === 'function') { try { window.openRechargeModal(); } catch (e) {} }
     return;
   }
 
-  // 消费应援币 → 增长贡献值
-  let nextContribution = 0;
-  try { nextContribution = window.addCharContributionScore(char.id, gift.exp) || 0; } catch (e) {}
+  // 扣款：优先走宿主钱包 api.wallet.pay，失败不阻断（与直播间送礼同款策略）
+  const payPromise = (window.api && window.api.wallet && typeof window.api.wallet.pay === 'function')
+    ? window.api.wallet.pay({ amount: cost, title: 'LUMA超话打榜', detail: `${gift.name}` }).catch(() => {})
+    : Promise.resolve();
 
-  closeSuperTopicSupportModal();
+  Promise.resolve(payPromise).then(() => {
+    // 扣减钱包余额并落盘宿主 db（真机重进不丢）
+    window.currentWalletBalance = Math.max(0, balance - cost);
+    if (typeof window.dbUpsert === 'function') {
+      try { window.dbUpsert("app_wallet", "vault_data", { balance: window.currentWalletBalance }); } catch (e) {}
+    }
+    if (typeof window.syncWalletDisplays === 'function') { try { window.syncWalletDisplays(); } catch (e) {} }
 
-  if (api && api.ui) {
-    api.ui.toast(`🎉 应援成功！为主播【${char.name}】送出「${gift.name}」，贡献值 +${gift.exp}，剩余应援币 ${res.remaining}！`);
-  }
-  if (typeof window.notifyCommunityDataChanged === 'function') { try { window.notifyCommunityDataChanged('support', { charId: char.id }); } catch (e) {} }
-  if (window.LumaDataHub) { try { window.LumaDataHub.emit('contribution', { charId: char.id, addAmount: gift.exp, next: nextContribution }); } catch (e) {} }
+    // 1:1 转化：花 cost 币 → 贡献 +cost（走统一贡献矩阵，真机持久化）
+    let nextContribution = 0;
+    try { nextContribution = window.addCharContributionScore(char.id, cost) || 0; } catch (e) {}
 
-  if (currentSuperTopicTab === 'support') renderSuperTopicSupportTab(char);
-  else renderSuperTopicTab();
+    if (api && api.ui) {
+      api.ui.toast(`🎉 打榜成功！为主播【${char.name}】送出「${gift.name}」，贡献 +${cost}，剩余 ${window.currentWalletBalance} 币`);
+    }
+    if (typeof window.notifyCommunityDataChanged === 'function') { try { window.notifyCommunityDataChanged('support', { charId: char.id, addAmount: cost, next: nextContribution }); } catch (e) {} }
+    if (window.LumaDataHub) { try { window.LumaDataHub.emit('contribution', { charId: char.id, addAmount: cost, next: nextContribution }); } catch (e) {} }
+
+    if (currentSuperTopicTab === 'support') renderSuperTopicSupportTab(char);
+    else renderSuperTopicTab();
+  });
 }
 window.executeSupportGift = executeSupportGift;
 
@@ -627,20 +651,20 @@ function openSuperTopicSupportModal() {
   if (!modal) return;
   const char = getActiveChar();
   if (!char) return;
-  const supportCoin = getMyWalletBalance(char.id);
+  const supportCoin = getMyWalletBalance();
 
   const charNameEl = document.getElementById('supportModalCharName');
   const userBalanceEl = document.getElementById('supportModalUserBalance');
   const grid = document.getElementById('supportItemsGrid');
   if (charNameEl) charNameEl.textContent = char.name;
-  if (userBalanceEl) userBalanceEl.textContent = `${supportCoin.toLocaleString()} 应援币`;
+  if (userBalanceEl) userBalanceEl.textContent = `${supportCoin.toLocaleString()} LUMA币`;
   if (grid) {
     grid.innerHTML = (window.SUPPORT_GIFTS || []).map(g => `
       <div onclick="selectSupportGift('${g.id}')" class="bg-slate-50 p-2.5 rounded-xl border transition active:scale-95 cursor-pointer text-center ${selectedSupportGiftId === g.id ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/40' : 'border-slate-200/70'}" id="supportGiftItem_${g.id}">
         <div class="text-xl">${g.icon}</div>
         <div class="text-xs font-black text-slate-900 mt-1">${g.name}</div>
-        <div class="text-[10px] text-rose-600 font-bold mt-0.5">+${g.exp} 贡献</div>
-        <div class="text-[8px] text-amber-500">${g.price} 应援币</div>
+        <div class="text-[10px] text-rose-600 font-bold mt-0.5">+${g.price} 贡献</div>
+        <div class="text-[8px] text-amber-500">${g.price} LUMA币</div>
       </div>
     `).join('');
   }
@@ -672,7 +696,7 @@ window.selectSupportGift = selectSupportGift;
 function updateSupportButtonText() {
   const btn = document.getElementById('btnExecuteSupport');
   const gift = (window.SUPPORT_GIFTS || []).find(g => g.id === selectedSupportGiftId) || (window.SUPPORT_GIFTS || [])[0];
-  if (btn && gift) btn.innerHTML = `<span>确认应援 (消耗 ${gift.price} 应援币 · +${gift.exp}贡献)</span>`;
+  if (btn && gift) btn.innerHTML = `<span>确认应援 (消耗 ${gift.price} LUMA币 · +${gift.price}贡献)</span>`;
 }
 
 // -------------------------------------------------------------------------
@@ -684,12 +708,29 @@ function handleSuperTopicFollow(hostName) {
   if (!char) return;
   const topicId = String(char.id);
   if (!window.followedSuperTopics) window.followedSuperTopics = [];
+  if (!window.followedHosts) window.followedHosts = [];
   const idx = window.followedSuperTopics.indexOf(topicId);
-  if (idx > -1) { window.followedSuperTopics.splice(idx, 1); if (api && api.ui) api.ui.toast(`已取消关注【${hostName}】超话`); }
-  else { window.followedSuperTopics.push(topicId); if (api && api.ui) api.ui.toast(`已成功关注【${hostName}】超话！`); }
+  const adding = idx === -1;
+  if (adding) {
+    window.followedSuperTopics.push(topicId);
+    if (!window.followedHosts.includes(topicId)) window.followedHosts.push(topicId);
+    if (api && api.ui) api.ui.toast(`已成功关注【${hostName}】超话！`);
+  } else {
+    window.followedSuperTopics.splice(idx, 1);
+    window.followedHosts = window.followedHosts.filter(id => String(id) !== topicId);
+    if (api && api.ui) api.ui.toast(`已取消关注【${hostName}】超话`);
+  }
   try { localStorage.setItem('luma_followed_supertopics', JSON.stringify(window.followedSuperTopics)); } catch (e) {}
-  if (typeof dbUpsert === 'function') { try { dbUpsert("luma_supertopic_follows", 'user', { topics: window.followedSuperTopics }); } catch (e) {} }
+  try { localStorage.setItem('luma_followed_hosts', JSON.stringify(window.followedHosts)); } catch (e) {}
+  if (typeof dbUpsert === 'function') {
+    try { dbUpsert("luma_supertopic_follows", 'user', { topics: window.followedSuperTopics }); } catch (e) {}
+    try { dbUpsert("luma_host_follows", 'user', { ids: window.followedHosts }); } catch (e) {}
+  }
   if (typeof syncFollowCountDisplay === 'function') syncFollowCountDisplay();
+  // 粉丝数据源全应用统一：刷新所有粉丝展示
+  if (window.LumaFansManager && typeof window.LumaFansManager.syncAllFansDisplays === 'function') {
+    try { window.LumaFansManager.syncAllFansDisplays(topicId); } catch (e) {}
+  }
   renderSuperTopicView(currentActiveSuperTopicCharId);
 }
 window.handleSuperTopicFollow = handleSuperTopicFollow;

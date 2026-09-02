@@ -72,15 +72,16 @@ function renderCommunityRanking(tabType = 'fans') {
       name: c.name,
       avatar: c.avatar,
       badge: '全服打投',
-      score: Math.floor(c.fans * 2.8 + 5000) + window.getCharContributionScore(c.id),
-      scoreLabel: '贡献值'
+      score: window.getCharContributionScore(c.id),
+      scoreLabel: '收到贡献'
     }));
     rankedItems.push({
       name: uName + ' (你)',
       avatar: uAvatar,
       badge: '至尊榜一',
-      score: parseInt(localStorage.getItem('luma_total_user_contribution') || '12000', 10),
-      scoreLabel: '贡献值',
+      score: (window.LumaGuardManager && typeof window.LumaGuardManager.getTargetReceivedTotal === 'function')
+        ? window.LumaGuardManager.getTargetReceivedTotal('user') : 0,
+      scoreLabel: '收到贡献',
       isUser: true
     });
     rankedItems.sort((a, b) => b.score - a.score);

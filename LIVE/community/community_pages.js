@@ -56,13 +56,7 @@
       <button onclick="closeCommunitySubPage()" class="st2-nav-ic" aria-label="返回">
         <svg viewBox="0 0 256 256" fill="currentColor"><path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"/></svg>
       </button>
-      <div class="st2-nav-c">
-        <span class="st2-nav-mark">#</span>
-        <div class="st2-nav-tt">
-          <h3 id="superTopicHeaderTitle">主播超话专区</h3>
-          <small>SUPER TOPIC · 粉丝主场</small>
-        </div>
-      </div>
+      <div class="st2-nav-spacer"></div>
       <div class="relative">
         <button onclick="toggleSuperTopicMenu()" class="st2-nav-ic" aria-label="更多">
           <svg viewBox="0 0 256 256" fill="currentColor"><circle cx="128" cy="52" r="14"></circle><circle cx="128" cy="128" r="14"></circle><circle cx="128" cy="204" r="14"></circle></svg>

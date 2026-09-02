@@ -3146,6 +3146,7 @@ input:checked + .switch-slider:before {
 .st2-nav-ic svg { width: 18px; height: 18px; }
 
 .st2-nav-c { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.st2-nav-spacer { flex: 1; }
 .st2-nav-mark {
   width: 34px; height: 34px; flex-shrink: 0;
   border-radius: 12px;
@@ -3752,6 +3753,10 @@ input:checked + .switch-slider:before {
   flex-shrink: 0;
 }
 .st2-row .rk.top { color: #ffcf5c; }
+.st2-row .rk.top1 { color: #ffcf5c; font-style: normal; font-size: 15px; }
+.st2-row .rk.top2 { color: #cbd5e1; font-style: normal; font-size: 14px; }
+.st2-row .rk.top3 { color: #f5b58a; font-style: normal; font-size: 14px; }
+.st2-row .rk.top1, .st2-row .rk.top2, .st2-row .rk.top3 { text-shadow: 0 2px 8px rgba(255,180,80,.35); }
 .st2-row img {
   width: 34px; height: 34px; flex-shrink: 0;
   border-radius: 50%;
