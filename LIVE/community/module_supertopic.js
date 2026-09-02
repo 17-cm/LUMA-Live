@@ -52,22 +52,23 @@ function currentUserName() {
 function currentUserAvatar() {
   return (window.currentUser && window.currentUser.avatar) || getAvatarFor(currentUserName(), 'first');
 }
-// 由超话 id 派生稳定双色主调（编辑暖色板：玫红-桃-琥珀-紫罗兰-深绿-海军蓝）
+// 由超话 id 派生稳定浅色主调（极简版：仅一个非常浅的暖灰底色，0.04 alpha）
 function topicHues(id) {
-  const palettes = [
-    ['#ff2a6d', '#ffb199'],
-    ['#e85d75', '#f4a261'],
-    ['#7928ca', '#f0abfc'],
-    ['#d97706', '#fbbf24'],
-    ['#059669', '#34d399'],
-    ['#1d4ed8', '#7dd3fc'],
-    ['#be185d', '#fda4af'],
-    ['#7c2d12', '#fb923c']
-  ];
   const s = String(id || '');
   let n = 0;
   for (let i = 0; i < s.length; i++) n = (n * 31 + s.charCodeAt(i)) >>> 0;
-  return palettes[n % palettes.length];
+  // 8 套极浅暖灰底色 (每个都几乎接近白, 差异化靠极轻的 hue)
+  const tints = [
+    'rgba(255, 42, 109, 0.04)',
+    'rgba(232, 93, 117, 0.04)',
+    'rgba(121, 40, 202, 0.04)',
+    'rgba(217, 119, 6, 0.04)',
+    'rgba(5, 150, 105, 0.04)',
+    'rgba(29, 78, 216, 0.04)',
+    'rgba(190, 24, 93, 0.04)',
+    'rgba(124, 45, 18, 0.04)'
+  ];
+  return tints[n % tints.length];
 }
 // 顶部一句话：幽默搞笑随机短句（每次进超话都不同，逗你一乐）
 const SUPERTOPIC_ONE_LINERS = [
@@ -144,62 +145,26 @@ function renderSuperTopicView(charId = null) {
   if (headerTitle) headerTitle.textContent = `#${char.name}超话#`;
 
   container.innerHTML = `
-    <!-- 1. 杂志封面 Hero (浅色 + 大幅头像 + 暖色光晕) -->
-    <section class="st2-hero" style="--st2-a:${a};--st2-b:${b}">
-      <div class="st2-hero-bg" style="background-image:url('${char.avatar}')"></div>
-      <div class="st2-hero-tint"></div>
-      <div class="st2-hero-inner">
-        <div class="st2-hero-top">
-          <div class="st2-kickers">
-            <span class="st2-kicker is-hot">${oneLiner}</span>
-          </div>
-          <button onclick="handleSuperTopicFollow('${char.name.replace(/'/g, "\\'")}')" class="st2-follow ${isFollowed ? 'is-followed' : ''}">
-            ${isFollowed
-              ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> 已关注'
-              : '+ 关注'}
-          </button>
-        </div>
-        <div class="st2-hero-center">
-          <button class="st2-avatar" onclick="toggleSuperTopicDrawer()" title="切换超话">
-            <img src="${char.avatar}" alt="超话头像">
-            <span class="st2-switch-chip"># 切换</span>
-          </button>
-          <div class="st2-id">
-            <div class="st2-id-name">
-              <h2>#${char.name}超话#</h2>
-              <span class="st2-verified" title="官方认证"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
-            </div>
-            <div class="st2-id-sub">
-              <b>主持人</b>
-              <span class="t">@${char.name}后援会 · 官方认证</span>
-            </div>
-          </div>
-        </div>
+    <!-- 1. Hero · 96px 极简横排 (无光晕, 1px 描边) -->
+    <section class="st2s-hero">
+      <button class="st2s-av" onclick="toggleSuperTopicDrawer()" title="切换超话">
+        <img src="${char.avatar}" alt="">
+        ${char.isLive ? '<span class="st2s-live"></span>' : ''}
+      </button>
+      <div class="st2s-meta">
+        <h2>#${char.name}超话#<span class="st2s-verified" title="官方"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></h2>
+        <p>${char.category || '明星超话'} · ${fansCount.toLocaleString()} 粉丝 · 热度 ${heatValue}</p>
       </div>
+      <button onclick="handleSuperTopicFollow('${char.name.replace(/'/g, "\\'")}')" class="st2s-follow ${isFollowed ? 'is-on' : ''}">
+        ${isFollowed ? '已关注' : '+ 关注'}
+      </button>
     </section>
 
-    <!-- 2. 编辑式数据带 (编辑杂志 typography) -->
-    <section class="st2-ribbon">
-      <div class="st2-ribbon-item">
-        <span class="st2-ribbon-n is-rose">${fansCount.toLocaleString()}</span>
-        <span class="st2-ribbon-l">粉丝</span>
-      </div>
-      <div class="st2-ribbon-item">
-        <span class="st2-ribbon-n is-ink">${todayDiscuss}</span>
-        <span class="st2-ribbon-l">今日讨论</span>
-      </div>
-      <div class="st2-ribbon-item">
-        <span class="st2-ribbon-n is-violet">${contribution.toLocaleString()}</span>
-        <span class="st2-ribbon-l">我的贡献</span>
-      </div>
-      <div class="st2-ribbon-item">
-        <span class="st2-ribbon-n is-amber">${heatValue}</span>
-        <span class="st2-ribbon-l">超话热度</span>
-      </div>
-    </section>
+    <!-- 2. 一行小字 meta · 替换原 4 数据带 -->
+    <p class="st2s-meta-line">${oneLiner} · 今日讨论 ${todayDiscuss} · 我的贡献 ${contribution.toLocaleString()}</p>
 
-    <!-- 3. 分段导航 pill (与浅色 hero 协调 + 当前 Tab 玫瑰金下划) -->
-    <nav class="st2-tabs">
+    <!-- 3. 4 tab · 文字下划线式 (保留用户喜欢的 SVG 图标) -->
+    <nav class="st2s-tabs">
       ${['posts', 'checkin', 'support', 'contribute'].map(k => {
         const cfg = {
           posts: { label: '动态', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg>' },
@@ -207,12 +172,12 @@ function renderSuperTopicView(charId = null) {
           support: { label: '打榜', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"></path></svg>' },
           contribute: { label: '贡献榜', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"></circle><path d="M15.5 13 17 22l-5-3-5 3 1.5-9"></path></svg>' }
         }[k];
-        return `<button id="spTabBtn_${k}" onclick="switchSuperTopicTab('${k}')" class="st2-tab ${currentSuperTopicTab === k ? 'active' : ''}">${cfg.ic}<span>${cfg.label}</span></button>`;
+        return `<button id="spTabBtn_${k}" onclick="switchSuperTopicTab('${k}')" class="st2s-tab ${currentSuperTopicTab === k ? 'on' : ''}">${cfg.ic}<span>${cfg.label}</span></button>`;
       }).join('')}
     </nav>
 
-    <!-- 4. 内容面板挂载点 (整段面板按 Tab 染浅色) -->
-    <div id="superTopicPanel" class="st2-panel" data-tab="${currentSuperTopicTab}"></div>
+    <!-- 4. 内容面板 · 取消色染, 全部走统一 .st2s-card 1px 描边白底 -->
+    <div id="superTopicPanel" class="st2s-panel" data-tab="${currentSuperTopicTab}"></div>
   `;
 
   renderSuperTopicTab();
@@ -270,41 +235,40 @@ function renderSuperTopicPostsTab(charId) {
   }
 
   panel.innerHTML = `
-    <div class="st2-sec">
-      <h4><span class="sharp">#</span>超话动态</h4>
-      <span class="note">TOTAL ${posts.length}</span>
+    <div class="st2s-sec">
+      <h4>超话动态</h4>
+      <span class="note">${posts.length} 条</span>
     </div>
 
     ${posts.map(post => `
-      <article class="st2-post" onclick="openTrendDetail('${post.id}')">
-        <div class="st2-post-hd">
-          <img class="st2-post-av" src="${post.author.avatar}" alt="">
-          <div class="st2-post-au">
-            <div class="st2-post-name">
-              <h5>${post.author.name}</h5>
+      <article class="st2s-card st2s-post" onclick="openTrendDetail('${post.id}')">
+        <div class="st2s-post-hd">
+          <img class="st2s-post-av" src="${post.author.avatar}" alt="">
+          <div class="st2s-post-au">
+            <div class="st2s-post-name">
+              <b>${post.author.name}</b>
               ${post.author.badge ? `<i>${post.author.badge}</i>` : ''}
             </div>
-            <div class="st2-post-meta">${postTime(post)}</div>
+            <span class="st2s-post-meta">${postTime(post)}</span>
           </div>
-          <span class="st2-post-tag">#${char.name}超话#</span>
         </div>
-        <p class="st2-post-body">
+        <p class="st2s-post-body">
           <span class="hash">#${char.name}超话#</span> ${post.content}
         </p>
         ${post.image ? `
-        <div class="st2-post-media">
-          <img src="${post.image}" loading="lazy" alt="超话动态配图">
+        <div class="st2s-post-media">
+          <img src="${post.image}" loading="lazy" alt="">
         </div>` : ''}
-        <div class="st2-post-ft" onclick="event.stopPropagation()">
-          <button onclick="handlePostAction('${post.id}','repost')" class="st2-act">
+        <div class="st2s-post-ft" onclick="event.stopPropagation()">
+          <button onclick="handlePostAction('${post.id}','repost')" class="st2s-act">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
             <span>${post.stats.reposts}</span>
           </button>
-          <button onclick="openTrendDetail('${post.id}')" class="st2-act">
+          <button onclick="openTrendDetail('${post.id}')" class="st2s-act">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
             <span>${post.stats.comments}</span>
           </button>
-          <button onclick="handlePostAction('${post.id}','like')" class="st2-act ${post.stats.isLiked ? 'is-liked' : ''}">
+          <button onclick="handlePostAction('${post.id}','like')" class="st2s-act ${post.stats.isLiked ? 'is-on' : ''}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
             <span>${post.stats.likes}</span>
           </button>
@@ -312,8 +276,8 @@ function renderSuperTopicPostsTab(charId) {
       </article>
     `).join('')}
 
-    <div class="st2-composer" onclick="openCreatePostModal('#${char.name}超话#', '@${char.name}')">
-      <span class="ph">说点什么，为主播 <b>#${char.name}#</b> 打 call…</span>
+    <div class="st2s-composer" onclick="openCreatePostModal('#${char.name}超话#', '@${char.name}')">
+      <span class="ph">说点什么, 为主播 <b>#${char.name}#</b> 打 call…</span>
       <span class="send">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
       </span>
@@ -335,79 +299,67 @@ function renderSuperTopicCheckinTab(char) {
   const weekDays = ['一', '二', '三', '四', '五', '六', '日'];
   let calendar = '';
   for (let i = 0; i < 7; i++) {
-    let cls = 'st2-week-d';
-    let mark = '<span class="mark"></span>';
-    if (i < dayOfWeek) { cls += ' is-past'; mark = '<span class="mark">✓</span>'; }
+    let cls = 'st2s-week-d';
+    if (i < dayOfWeek) cls += ' is-past';
     else if (i === dayOfWeek) {
       cls += ' is-now';
-      mark = '<span class="mark">今</span>';
-      if (checkIn.isCheckedToday) { cls += ' is-done'; }
+      if (checkIn.isCheckedToday) cls += ' is-done';
     }
-    calendar += `<div class="${cls}"><span>${weekDays[i]}</span>${mark}</div>`;
+    calendar += `<div class="${cls}"><span>${weekDays[i]}</span></div>`;
   }
 
   const rankList = (window.LumaCheckinManager && typeof window.LumaCheckinManager.getTopicCheckInRankList === 'function')
     ? window.LumaCheckinManager.getTopicCheckInRankList(char.id).slice(0, 5) : [];
 
   panel.innerHTML = `
-    <!-- 签到主卡 (浅色+琥珀金) -->
-    <section class="st2-sign">
-      <div class="st2-sign-hd">
-        <div class="st2-sign-l">
-          <span class="st2-sign-ic">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="3"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-          </span>
-          <div>
-            <h4>#${char.name}# 每日签到</h4>
-            <p>一天一次 · 签到即得 贡献 <b style="color:#d97706;">+100</b></p>
-          </div>
+    <!-- 签到主卡 · 极简白底 1px 描边 -->
+    <section class="st2s-card">
+      <div class="st2s-row-flex">
+        <div class="st2s-t">
+          <h4>#${char.name}# 每日签到</h4>
+          <p>一天一次 · 签到即得贡献 <b>+100</b></p>
         </div>
-        <button onclick="handleSuperTopicCheckIn('${char.id}','${char.name.replace(/'/g, "\\'")}')" class="st2-sign-btn ${checkIn.isCheckedToday ? 'is-done' : ''}">
+        <button onclick="handleSuperTopicCheckIn('${char.id}','${char.name.replace(/'/g, "\\'")}')" class="st2s-btn ${checkIn.isCheckedToday ? 'is-on' : ''}">
           ${checkIn.isCheckedToday ? `已签 ${checkIn.streakDays || 0} 天` : '立即签到'}
         </button>
       </div>
 
-      <div class="st2-week">${calendar}</div>
+      <div class="st2s-week">${calendar}</div>
 
-      <div class="st2-sign-stat">
+      <div class="st2s-stat">
         <div>
           <b>${checkIn.streakDays || 0} 天</b>
           <span>连续签到</span>
         </div>
         <div>
-          <b class="gold">${checkIn.totalDays || 0} 天</b>
-          <span>累计已签到</span>
+          <b>${checkIn.totalDays || 0} 天</b>
+          <span>累计</span>
         </div>
         <div>
-          <b class="violet">Lv.${checkIn.level || 1}</b>
+          <b>Lv.${checkIn.level || 1}</b>
           <span>超话等级</span>
         </div>
       </div>
-      <p class="st2-sign-foot">
-        累计贡献 <b>${contribution.toLocaleString()}</b> · 已签 ${checkIn.totalDays || 0} 天
-      </p>
     </section>
 
     <!-- 签到排行榜 -->
-    <section class="st2-card">
-      <div class="st2-sec">
-        <h4><span class="sharp">#</span>连续签到榜 TOP</h4>
-        <span class="note">按连签天数排序</span>
-      </div>
-      <div class="st2-list">
-        ${rankList.length ? rankList.map((item, idx) => `
-          <div class="st2-row ${item.isUser ? 'me' : ''}">
-            <span class="rk ${idx === 0 ? 'top1' : (idx === 1 ? 'top2' : (idx === 2 ? 'top3' : ''))}">${idx + 1}</span>
-            <img src="${item.avatar}" alt="">
-            <div class="who">
-              <h6>${item.name}</h6>
-              <p>Lv.${item.level || 1} · ${item.badge || '签到打卡'}</p>
-            </div>
-            <div class="val"><b>${item.days} 天</b><span>连签</span></div>
+    <div class="st2s-sec">
+      <h4>连续签到榜 TOP</h4>
+      <span class="note">按连签天数</span>
+    </div>
+    <div class="st2s-card st2s-list">
+      ${rankList.length ? rankList.map((item, idx) => `
+        <div class="st2s-row ${item.isUser ? 'me' : ''}">
+          <span class="rk ${idx === 0 ? 'top1' : (idx === 1 ? 'top2' : (idx === 2 ? 'top3' : ''))}">${idx + 1}</span>
+          <img src="${item.avatar}" alt="">
+          <div class="who">
+            <b>${item.name}</b>
+            <p>Lv.${item.level || 1} · ${item.badge || '签到打卡'}</p>
           </div>
-        `).join('') : `<div class="st2-empty"><p>暂时还没有人签到，快来抢首签！</p></div>`}
-      </div>
-    </section>
+          <div class="val"><b>${item.days} 天</b><span>连签</span></div>
+        </div>
+      `).join('') : `<div class="st2s-empty"><p>暂时还没有人签到, 快来抢首签!</p></div>`}
+    </div>
   `;
 }
 window.renderSuperTopicCheckinTab = renderSuperTopicCheckinTab;
@@ -424,40 +376,48 @@ function renderSuperTopicSupportTab(char) {
     ? window.LumaFansManager.getFans(char.id, char) : (char.fans || 0);
 
   panel.innerHTML = `
-    <section class="st2-support-hero">
-      <div class="sup-hd">
-        <span class="st2-kicker is-violet"># 周边应援中心</span>
-        <span class="bal">LUMA币 <b>${supportCoin.toLocaleString()}</b></span>
+    <!-- 打榜主卡 · 极简白底 1px 描边, 无紫色块 -->
+    <section class="st2s-card">
+      <div class="st2s-row-flex">
+        <div class="st2s-t">
+          <h4>应援打榜中心</h4>
+          <p>LUMA币 <b>${supportCoin.toLocaleString()}</b> · 1 币 = 1 贡献</p>
+        </div>
       </div>
-      <h4>为主播 #${char.name}# 应援打榜</h4>
-      <p>直接消耗 LUMA 币，花多少币就涨多少贡献值（1:1），助推超话热度。</p>
-      <div class="sup-stats">
-        <div><span>我贡献的应援值</span><b>${contribution.toLocaleString()}</b></div>
-        <div><span>超话总热度</span><b class="amber">${(fansCount * 3 + contribution).toLocaleString()}</b></div>
+      <p class="st2s-quote">为主播 <b>#${char.name}#</b> 应援, 花多少币就涨多少贡献值, 助推超话热度。</p>
+      <div class="st2s-stat">
+        <div>
+          <b>${contribution.toLocaleString()}</b>
+          <span>我的贡献</span>
+        </div>
+        <div>
+          <b>${(fansCount * 3 + contribution).toLocaleString()}</b>
+          <span>超话热度</span>
+        </div>
       </div>
     </section>
 
-    <div class="st2-sec">
-      <h4><span class="sharp">#</span>选择应援周边</h4>
+    <div class="st2s-sec">
+      <h4>选择应援周边</h4>
       <span class="note">TAP TO SELECT</span>
     </div>
 
-    <div class="st2-gift-grid">
+    <div class="st2s-gift-grid">
       ${(window.SUPPORT_GIFTS || []).map(g => `
-        <div class="st2-gift ${selectedSupportGiftId === g.id ? 'sel' : ''}" onclick="selectSupportGiftDirect('${g.id}','${char.id}')">
+        <div class="st2s-gift ${selectedSupportGiftId === g.id ? 'sel' : ''}" onclick="selectSupportGiftDirect('${g.id}','${char.id}')">
           <span class="g-ic">${g.icon}</span>
-          <h6>${g.name}</h6>
+          <b>${g.name}</b>
           <span class="g-desc">${g.desc}</span>
           <div class="g-btm">
-            <span class="g-exp">+${g.price} 贡献</span>
+            <span class="g-exp">+${g.price}</span>
             <span class="g-price">${g.price} 币</span>
           </div>
         </div>
       `).join('')}
     </div>
 
-    <button onclick="executeSupportGift()" class="st2-cta">立即应援打榜</button>
-    <p class="st2-hint">LUMA币不足？去钱包充值，或直播间互动赚币</p>
+    <button onclick="executeSupportGift()" class="st2s-cta">立即应援打榜</button>
+    <p class="st2s-hint">LUMA币不足? 去钱包充值, 或直播间互动赚币</p>
   `;
 }
 window.renderSuperTopicSupportTab = renderSuperTopicSupportTab;
@@ -507,11 +467,10 @@ function renderSuperTopicContributeTab(char) {
 
   if (supporters.length === 0) {
     panel.innerHTML = `
-      <div class="st2-card st2-empty">
-        <div class="glyph">💎</div>
+      <div class="st2s-card st2s-empty">
         <h5>#${char.name}# 暂无贡献记录</h5>
-        <p>去「送礼 / 签到 / 打榜」为主播贡献，即可上榜</p>
-        <button class="go" onclick="switchSuperTopicTab('support')">去应援</button>
+        <p>去「送礼 / 签到 / 打榜」为主播贡献, 即可上榜</p>
+        <button class="st2s-btn" onclick="switchSuperTopicTab('support')">去应援</button>
       </div>
     `;
     return;
@@ -522,34 +481,31 @@ function renderSuperTopicContributeTab(char) {
   const medal = ['👑', '🥈', '🥉'];
 
   panel.innerHTML = `
-    <!-- 榜单头部：总值概览 -->
-    <section class="st2-card">
-      <div class="st2-sec" style="margin-bottom:0;">
-        <h4><span class="sharp">#</span>${char.name} · 贡献总榜</h4>
-        <span class="note">REAL MATRIX</span>
-      </div>
-      <div class="st2-total-row">
-        <b class="amber">${totalReceived.toLocaleString()}</b>
+    <!-- 榜单头部 · 极简: 1 个统计 + 1 行小字 -->
+    <div class="st2s-sec">
+      <h4>${char.name} · 贡献总榜</h4>
+      <span class="note">REAL MATRIX</span>
+    </div>
+    <div class="st2s-card st2s-list">
+      <div class="st2s-total-row">
+        <b>${totalReceived.toLocaleString()}</b>
         <span>累计贡献值 · 共 ${supporters.length} 人上榜</span>
       </div>
-    </section>
 
-    <!-- 一行一行排行榜 -->
-    <div class="st2-card">
       ${supporters.map((item, idx) => `
-        <div class="st2-row ${item.isUser ? 'me' : ''}">
+        <div class="st2s-row ${item.isUser ? 'me' : ''}">
           <span class="rk ${idx < 3 ? rankCls[idx] : ''}">${idx < 3 ? medal[idx] : idx + 1}</span>
           <img src="${item.avatar}" alt="">
           <div class="who">
-            <h6>${item.name}</h6>
+            <b>${item.name}</b>
             <p>${item.badge} · ${item.giftCount} 次</p>
           </div>
-          <div class="val rose"><b>${item.score.toLocaleString()}</b><span>贡献值</span></div>
+          <div class="val"><b>${item.score.toLocaleString()}</b><span>贡献值</span></div>
         </div>
       `).join('')}
     </div>
 
-    <p class="st2-hint">累计贡献 = 直播间送礼 1:1 + 每日签到 +100 + 超话打榜 1:1</p>
+    <p class="st2s-hint">累计贡献 = 直播间送礼 1:1 + 每日签到 +100 + 超话打榜 1:1</p>
   `;
 }
 window.renderSuperTopicContributeTab = renderSuperTopicContributeTab;

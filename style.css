@@ -3109,6 +3109,705 @@ input:checked + .switch-slider:before {
    - 全部使用独立 st2-* 命名空间，不与旧样式耦合
    ========================================================================= */
 
+/* =========================================================================
+   【超话 极简版 v3】st2s-* 系列
+   - Hero 96px 横排, 无光晕, 1px 描边
+   - 4 tab 文字下划线 (保留用户喜欢的 SVG 图标)
+   - 全部卡片 1px 描边白底, 取消整段面板色染
+   - 颜色极浅 (alpha 0.04-0.10), 品牌色仅在 tab 底线 + 关注按钮 + 1 个数字
+   ========================================================================= */
+.st2s-page, #communitySuperTopicContent {
+  --st2s-ink: #0f172a;
+  --st2s-ink-soft: #475569;
+  --st2s-ink-mute: #94a3b8;
+  --st2s-line: rgba(15, 23, 42, 0.08);
+  --st2s-line-soft: rgba(15, 23, 42, 0.05);
+  --st2s-rose: #ff2a6d;
+  --st2s-rose-soft: rgba(255, 42, 109, 0.06);
+  --st2s-amber: #d97706;
+  --st2s-violet: #7928ca;
+}
+
+/* 1. Hero · 96px 极简横排 */
+.st2s-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--st2s-line);
+  border-radius: 16px;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02);
+}
+.st2s-av {
+  position: relative;
+  width: 56px; height: 56px;
+  border-radius: 16px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  flex-shrink: 0;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--st2s-line);
+}
+.st2s-av img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.st2s-live {
+  position: absolute;
+  top: 2px; right: 2px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--st2s-rose);
+  box-shadow: 0 0 0 2px #fff;
+}
+.st2s-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.st2s-meta h2 {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--st2s-ink);
+  letter-spacing: -.03em;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.st2s-verified {
+  display: inline-flex;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--st2s-rose);
+  color: #fff;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.st2s-verified svg { width: 9px; height: 9px; }
+.st2s-meta p {
+  font-size: 10.5px;
+  color: var(--st2s-ink-soft);
+  font-weight: 600;
+  letter-spacing: -.005em;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.st2s-follow {
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: -.01em;
+  color: #fff;
+  background: var(--st2s-ink);
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: transform .15s ease, background .2s ease;
+}
+.st2s-follow:active { transform: scale(0.95); }
+.st2s-follow.is-on {
+  background: #fff;
+  color: var(--st2s-ink-soft);
+  box-shadow: 0 0 0 1px var(--st2s-line);
+}
+
+/* 2. meta-line · 一行小字 */
+.st2s-meta-line {
+  font-size: 10.5px;
+  color: var(--st2s-ink-mute);
+  font-weight: 600;
+  letter-spacing: -.005em;
+  line-height: 1.5;
+  padding: 10px 2px 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 3. 4 tab · 文字下划线式 */
+.st2s-tabs {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 4px 0;
+  border-bottom: 1px solid var(--st2s-line-soft);
+  margin-bottom: 14px;
+}
+.st2s-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 0 8px;
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--st2s-ink-soft);
+  letter-spacing: -.01em;
+  cursor: pointer;
+  position: relative;
+  transition: color .2s ease;
+}
+.st2s-tab svg { width: 13px; height: 13px; opacity: 0.7; transition: opacity .2s ease; }
+.st2s-tab.on {
+  color: var(--st2s-ink);
+  font-weight: 900;
+}
+.st2s-tab.on svg { opacity: 1; }
+.st2s-tab.on::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 1.5px;
+  background: var(--st2s-rose);
+  border-radius: 1px;
+}
+.st2s-tab:active { opacity: 0.6; }
+
+/* 4. 通用 card (取消色染, 统一 1px 白底) */
+.st2s-card {
+  background: #fff;
+  border: 1px solid var(--st2s-line);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+/* 5. section 标题 (轻量) */
+.st2s-sec {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 4px 4px 6px;
+}
+.st2s-sec h4 {
+  font-size: 11.5px;
+  font-weight: 900;
+  color: var(--st2s-ink);
+  letter-spacing: -.02em;
+}
+.st2s-sec .note {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--st2s-ink-mute);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+/* 6. row-flex (左右两列, 用于签到 / 打榜主卡) */
+.st2s-row-flex {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.st2s-row-flex .st2s-t {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.st2s-row-flex .st2s-t h4 {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--st2s-ink);
+  letter-spacing: -.03em;
+  line-height: 1.2;
+}
+.st2s-row-flex .st2s-t p {
+  font-size: 10.5px;
+  color: var(--st2s-ink-soft);
+  font-weight: 600;
+  letter-spacing: -.005em;
+}
+.st2s-row-flex .st2s-t p b { color: var(--st2s-ink); font-weight: 800; }
+.st2s-quote {
+  font-size: 11px;
+  color: var(--st2s-ink-soft);
+  line-height: 1.6;
+  font-weight: 600;
+  letter-spacing: -.005em;
+  margin: 0 0 12px;
+  padding: 0;
+}
+.st2s-quote b { color: var(--st2s-ink); font-weight: 800; }
+
+/* 7. 主要按钮 · 黑底白字 (签到立即 / 立即应援) */
+.st2s-btn {
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 900;
+  letter-spacing: -.01em;
+  color: #fff;
+  background: var(--st2s-ink);
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: transform .15s ease, background .2s ease;
+}
+.st2s-btn:active { transform: scale(0.95); }
+.st2s-btn.is-on {
+  background: #fff;
+  color: var(--st2s-ink-soft);
+  box-shadow: 0 0 0 1px var(--st2s-line);
+}
+.st2s-cta {
+  display: block;
+  width: 100%;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: -.01em;
+  color: #fff;
+  background: var(--st2s-ink);
+  border: 0;
+  border-radius: 12px;
+  padding: 13px 0;
+  margin: 12px 0 8px;
+  cursor: pointer;
+  transition: transform .15s ease, background .2s ease;
+}
+.st2s-cta:active { transform: scale(0.98); }
+
+/* 8. 极简 stat (3 列) */
+.st2s-stat {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--st2s-line-soft);
+}
+.st2s-stat > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+.st2s-stat b {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--st2s-ink);
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.st2s-stat span {
+  font-size: 9px;
+  color: var(--st2s-ink-mute);
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+/* 9. 周历 (7 格细线) */
+.st2s-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin: 4px 0 12px;
+}
+.st2s-week-d {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--st2s-ink-mute);
+  background: #fff;
+  border: 1px solid var(--st2s-line-soft);
+  border-radius: 8px;
+  position: relative;
+}
+.st2s-week-d.is-past {
+  color: var(--st2s-ink-soft);
+  background: var(--st2s-rose-soft);
+}
+.st2s-week-d.is-past::after {
+  content: '✓';
+  position: absolute;
+  top: 3px; right: 4px;
+  font-size: 8px;
+  color: var(--st2s-rose);
+  font-weight: 900;
+}
+.st2s-week-d.is-now {
+  border-color: var(--st2s-ink);
+  color: var(--st2s-ink);
+  font-weight: 900;
+}
+.st2s-week-d.is-now.is-done {
+  background: var(--st2s-rose-soft);
+  border-color: var(--st2s-rose);
+  color: var(--st2s-rose);
+}
+
+/* 10. 列表 (签到榜 / 贡献榜) */
+.st2s-list {
+  padding: 0;
+}
+.st2s-list .st2s-row {
+  padding: 10px 14px;
+}
+.st2s-list .st2s-row + .st2s-row {
+  border-top: 1px solid var(--st2s-line-soft);
+}
+.st2s-list .st2s-total-row {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--st2s-line-soft);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.st2s-list .st2s-total-row b {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--st2s-ink);
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+}
+.st2s-list .st2s-total-row span {
+  font-size: 10px;
+  color: var(--st2s-ink-mute);
+  font-weight: 700;
+  letter-spacing: -.005em;
+}
+
+.st2s-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.st2s-row .rk {
+  width: 22px; height: 22px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--st2s-ink-soft);
+  background: transparent;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.st2s-row .rk.top1 { background: linear-gradient(135deg, #ffe066, #ffb700); color: #fff; }
+.st2s-row .rk.top2 { background: linear-gradient(135deg, #e0e0e0, #b0b0b0); color: #fff; }
+.st2s-row .rk.top3 { background: linear-gradient(135deg, #ffc8a0, #d4956a); color: #fff; }
+.st2s-row img {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--st2s-ink-mute);
+  box-shadow: 0 0 0 1px var(--st2s-line-soft);
+}
+.st2s-row .who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.st2s-row .who b {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--st2s-ink);
+  letter-spacing: -.02em;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.st2s-row .who p {
+  font-size: 9.5px;
+  color: var(--st2s-ink-mute);
+  font-weight: 700;
+  letter-spacing: -.005em;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.st2s-row .val {
+  flex-shrink: 0;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-end;
+}
+.st2s-row .val b {
+  font-size: 12.5px;
+  font-weight: 900;
+  color: var(--st2s-ink);
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+.st2s-row .val span {
+  font-size: 8.5px;
+  color: var(--st2s-ink-mute);
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.st2s-row.me {
+  background: var(--st2s-rose-soft);
+}
+.st2s-row.me .who b { color: var(--st2s-rose); }
+
+/* 11. 动态帖子 (用 .st2s-card 通用壳) */
+.st2s-post {
+  padding: 13px 14px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.st2s-post:active { background: var(--st2s-line-soft); }
+.st2s-post-hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.st2s-post-av {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px var(--st2s-line-soft);
+}
+.st2s-post-au {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.st2s-post-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--st2s-ink);
+  letter-spacing: -.01em;
+}
+.st2s-post-name b { font-weight: 800; }
+.st2s-post-name i {
+  font-size: 8.5px;
+  font-weight: 800;
+  color: var(--st2s-rose);
+  background: var(--st2s-rose-soft);
+  padding: 1.5px 5px;
+  border-radius: 999px;
+  font-style: normal;
+  letter-spacing: .04em;
+}
+.st2s-post-meta {
+  font-size: 9.5px;
+  color: var(--st2s-ink-mute);
+  font-weight: 600;
+  letter-spacing: -.005em;
+}
+.st2s-post-body {
+  font-size: 12.5px;
+  color: var(--st2s-ink);
+  line-height: 1.6;
+  font-weight: 500;
+  letter-spacing: -.005em;
+  margin: 0 0 8px;
+  word-break: break-word;
+}
+.st2s-post-body .hash {
+  color: var(--st2s-rose);
+  font-weight: 800;
+}
+.st2s-post-media {
+  margin: 0 0 8px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--st2s-line-soft);
+}
+.st2s-post-media img {
+  width: 100%;
+  display: block;
+  max-height: 240px;
+  object-fit: cover;
+}
+.st2s-post-ft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--st2s-line-soft);
+}
+.st2s-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--st2s-ink-soft);
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: background .15s ease, color .15s ease;
+}
+.st2s-act svg { width: 13px; height: 13px; }
+.st2s-act:active { background: var(--st2s-line-soft); }
+.st2s-act.is-on { color: var(--st2s-rose); }
+.st2s-act.is-on svg { fill: var(--st2s-rose); }
+
+/* 12. composer (发布输入条) */
+.st2s-composer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--st2s-line);
+  border-radius: 14px;
+  padding: 11px 12px 11px 14px;
+  margin: 4px 0 8px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.st2s-composer:active { background: var(--st2s-line-soft); }
+.st2s-composer .ph {
+  flex: 1;
+  font-size: 11.5px;
+  color: var(--st2s-ink-mute);
+  font-weight: 700;
+  letter-spacing: -.005em;
+}
+.st2s-composer .ph b { color: var(--st2s-ink); font-weight: 900; }
+.st2s-composer .send {
+  width: 26px; height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--st2s-ink);
+  color: #fff;
+  flex-shrink: 0;
+}
+.st2s-composer .send svg { width: 13px; height: 13px; }
+
+/* 13. 礼物格子 (打榜) */
+.st2s-gift-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.st2s-gift {
+  background: #fff;
+  border: 1px solid var(--st2s-line);
+  border-radius: 12px;
+  padding: 10px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.st2s-gift:active { transform: scale(0.97); }
+.st2s-gift.sel {
+  border-color: var(--st2s-ink);
+  background: var(--st2s-rose-soft);
+}
+.st2s-gift .g-ic { font-size: 20px; line-height: 1; }
+.st2s-gift b {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--st2s-ink);
+  letter-spacing: -.01em;
+}
+.st2s-gift .g-desc {
+  font-size: 9.5px;
+  color: var(--st2s-ink-soft);
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0 0 4px;
+}
+.st2s-gift .g-btm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+  border-top: 1px solid var(--st2s-line-soft);
+  margin-top: 2px;
+}
+.st2s-gift .g-exp {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--st2s-rose);
+  letter-spacing: -.01em;
+}
+.st2s-gift .g-price {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--st2s-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 14. empty / hint */
+.st2s-empty {
+  text-align: center;
+  padding: 32px 16px;
+}
+.st2s-empty h5 {
+  font-size: 12.5px;
+  font-weight: 900;
+  color: var(--st2s-ink);
+  letter-spacing: -.02em;
+  margin: 0 0 6px;
+}
+.st2s-empty p {
+  font-size: 11px;
+  color: var(--st2s-ink-soft);
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+.st2s-hint {
+  font-size: 9.5px;
+  color: var(--st2s-ink-mute);
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: -.005em;
+  line-height: 1.5;
+  margin: 12px 0 4px;
+  padding: 0 12px;
+}
+
+/* 15. 总榜头部 (在 .st2s-list 内) */
+.st2s-total-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
 /* ---------- 颜色 & 圆角 token (CSS variables) ---------- */
 .st2-page {
   --st2-canvas: #fafaf7;
