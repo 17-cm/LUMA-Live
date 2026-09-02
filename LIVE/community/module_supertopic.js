@@ -144,40 +144,66 @@ function renderSuperTopicView(charId = null) {
   const headerTitle = document.getElementById('superTopicHeaderTitle');
   if (headerTitle) headerTitle.textContent = `#${char.name}超话#`;
 
+  const tabCfg = {
+    posts: { label: '动态', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg>', sub: 'POSTS' },
+    checkin: { label: '签到', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="3"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><polyline points="9 16 11 18 15 14"></polyline></svg>', sub: 'DAILY' },
+    support: { label: '打榜', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"></path></svg>', sub: 'CHEER' },
+    contribute: { label: '贡献榜', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"></circle><path d="M15.5 13 17 22l-5-3-5 3 1.5-9"></path></svg>', sub: 'RANK' }
+  };
+
   container.innerHTML = `
-    <!-- 1. Hero · 96px 极简横排 (无光晕, 1px 描边) -->
-    <section class="st2s-hero">
-      <button class="st2s-av" onclick="toggleSuperTopicDrawer()" title="切换超话">
-        <img src="${char.avatar}" alt="">
-        ${char.isLive ? '<span class="st2s-live"></span>' : ''}
-      </button>
-      <div class="st2s-meta">
-        <h2>#${char.name}超话#<span class="st2s-verified" title="官方"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></h2>
-        <p>${char.category || '明星超话'} · ${fansCount.toLocaleString()} 粉丝 · 热度 ${heatValue}</p>
+    <div class="st2s-layout">
+      <!-- 左侧侧边栏 · 56px 宽 -->
+      <aside class="st2s-side">
+        <button onclick="closeCommunitySubPage()" class="st2s-side-btn" title="返回">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <button onclick="toggleSuperTopicDrawer()" class="st2s-side-btn" title="切换超话">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+        <div class="st2s-side-divider"></div>
+        ${['posts', 'checkin', 'support', 'contribute'].map(k => {
+          const c = tabCfg[k];
+          return `<button id="spTabBtn_${k}" onclick="switchSuperTopicTab('${k}')" class="st2s-side-tab ${currentSuperTopicTab === k ? 'on' : ''}" title="${c.label}">
+            ${c.ic}
+            <span class="st2s-side-tab-lb">${c.label}</span>
+          </button>`;
+        }).join('')}
+      </aside>
+
+      <!-- 右侧主区 -->
+      <div class="st2s-main">
+        <!-- 拉高的顶部状态 (132px) -->
+        <section class="st2s-hero">
+          <button class="st2s-av" onclick="toggleSuperTopicDrawer()" title="切换超话">
+            <img src="${char.avatar}" alt="">
+            ${char.isLive ? '<span class="st2s-live"></span>' : ''}
+          </button>
+          <div class="st2s-hero-meta">
+            <h2>#${char.name}超话#<span class="st2s-verified" title="官方"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></h2>
+            <p>${char.category || '明星超话'} · 主持人 @${char.name}后援会</p>
+            <div class="st2s-hero-stats">
+              <div><b>${fansCount.toLocaleString()}</b><span>粉丝</span></div>
+              <div><b>${todayDiscuss}</b><span>今日讨论</span></div>
+              <div><b>${contribution.toLocaleString()}</b><span>我的贡献</span></div>
+              <div><b>${heatValue}</b><span>超话热度</span></div>
+            </div>
+          </div>
+          <button onclick="handleSuperTopicFollow('${char.name.replace(/'/g, "\\'")}')" class="st2s-follow ${isFollowed ? 'is-on' : ''}">
+            ${isFollowed ? '已关注' : '+ 关注'}
+          </button>
+        </section>
+
+        <!-- meta · 短句行 + 当前 tab 标签 (在主区顶) -->
+        <div class="st2s-meta-strip">
+          <span class="st2s-meta-oneliner">${oneLiner}</span>
+          <span class="st2s-meta-tab">${tabCfg[currentSuperTopicTab].sub} · ${tabCfg[currentSuperTopicTab].label}</span>
+        </div>
+
+        <!-- 内容面板 -->
+        <div id="superTopicPanel" class="st2s-panel" data-tab="${currentSuperTopicTab}"></div>
       </div>
-      <button onclick="handleSuperTopicFollow('${char.name.replace(/'/g, "\\'")}')" class="st2s-follow ${isFollowed ? 'is-on' : ''}">
-        ${isFollowed ? '已关注' : '+ 关注'}
-      </button>
-    </section>
-
-    <!-- 2. 一行小字 meta · 替换原 4 数据带 -->
-    <p class="st2s-meta-line">${oneLiner} · 今日讨论 ${todayDiscuss} · 我的贡献 ${contribution.toLocaleString()}</p>
-
-    <!-- 3. 4 tab · 文字下划线式 (保留用户喜欢的 SVG 图标) -->
-    <nav class="st2s-tabs">
-      ${['posts', 'checkin', 'support', 'contribute'].map(k => {
-        const cfg = {
-          posts: { label: '动态', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg>' },
-          checkin: { label: '签到', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="3"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><polyline points="9 16 11 18 15 14"></polyline></svg>' },
-          support: { label: '打榜', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"></path></svg>' },
-          contribute: { label: '贡献榜', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"></circle><path d="M15.5 13 17 22l-5-3-5 3 1.5-9"></path></svg>' }
-        }[k];
-        return `<button id="spTabBtn_${k}" onclick="switchSuperTopicTab('${k}')" class="st2s-tab ${currentSuperTopicTab === k ? 'on' : ''}">${cfg.ic}<span>${cfg.label}</span></button>`;
-      }).join('')}
-    </nav>
-
-    <!-- 4. 内容面板 · 取消色染, 全部走统一 .st2s-card 1px 描边白底 -->
-    <div id="superTopicPanel" class="st2s-panel" data-tab="${currentSuperTopicTab}"></div>
+    </div>
   `;
 
   renderSuperTopicTab();
@@ -185,15 +211,28 @@ function renderSuperTopicView(charId = null) {
 window.renderSuperTopicView = renderSuperTopicView;
 
 // -------------------------------------------------------------------------
-// 分段导航切换
+// 分段导航切换 (侧边栏 tab)
 // -------------------------------------------------------------------------
 function switchSuperTopicTab(tabKey) {
-  if (currentSuperTopicTab !== tabKey) currentSuperTopicTab = tabKey;
+  if (currentSuperTopicTab !== tabKey) {
+    currentSuperTopicTab = tabKey;
+    // 同步顶部 meta-strip 的 tab 文字
+    const stripTab = document.querySelector('.st2s-meta-tab');
+    if (stripTab) {
+      const cfg = {
+        posts: 'POSTS · 动态',
+        checkin: 'DAILY · 签到',
+        support: 'CHEER · 打榜',
+        contribute: 'RANK · 贡献榜'
+      }[tabKey];
+      stripTab.textContent = cfg || '';
+    }
+  }
 
   ['posts', 'checkin', 'support', 'contribute'].forEach(k => {
     const btn = document.getElementById(`spTabBtn_${k}`);
     if (!btn) return;
-    btn.classList.toggle('active', k === tabKey);
+    btn.classList.toggle('on', k === tabKey);
   });
 
   renderSuperTopicTab();
@@ -237,44 +276,42 @@ function renderSuperTopicPostsTab(charId) {
   panel.innerHTML = `
     <div class="st2s-sec">
       <h4>超话动态</h4>
-      <span class="note">${posts.length} 条</span>
+      <span class="note">${posts.length} 条 · 加载更多</span>
     </div>
 
-    ${posts.map(post => `
-      <article class="st2s-card st2s-post" onclick="openTrendDetail('${post.id}')">
-        <div class="st2s-post-hd">
-          <img class="st2s-post-av" src="${post.author.avatar}" alt="">
-          <div class="st2s-post-au">
-            <div class="st2s-post-name">
-              <b>${post.author.name}</b>
-              ${post.author.badge ? `<i>${post.author.badge}</i>` : ''}
+    <div class="st2s-feed">
+      ${posts.map(post => `
+        <article class="st2s-feed-item" onclick="openTrendDetail('${post.id}')">
+          <img class="st2s-feed-av" src="${post.author.avatar}" alt="">
+          <div class="st2s-feed-body">
+            <div class="st2s-feed-head">
+              <div class="st2s-feed-name">
+                <b>${post.author.name}</b>
+                ${post.author.badge ? `<span class="st2s-feed-bd">${post.author.badge}</span>` : ''}
+              </div>
+              <span class="st2s-feed-time">${postTime(post)}</span>
             </div>
-            <span class="st2s-post-meta">${postTime(post)}</span>
+            <p class="st2s-feed-text">
+              <span class="hash">#${char.name}超话#</span> ${post.content}
+            </p>
+            <div class="st2s-feed-meta" onclick="event.stopPropagation()">
+              <button onclick="handlePostAction('${post.id}','repost')" class="st2s-feed-act">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+                <span>${post.stats.reposts}</span>
+              </button>
+              <button onclick="openTrendDetail('${post.id}')" class="st2s-feed-act">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                <span>${post.stats.comments}</span>
+              </button>
+              <button onclick="handlePostAction('${post.id}','like')" class="st2s-feed-act ${post.stats.isLiked ? 'is-on' : ''}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
+                <span>${post.stats.likes}</span>
+              </button>
+            </div>
           </div>
-        </div>
-        <p class="st2s-post-body">
-          <span class="hash">#${char.name}超话#</span> ${post.content}
-        </p>
-        ${post.image ? `
-        <div class="st2s-post-media">
-          <img src="${post.image}" loading="lazy" alt="">
-        </div>` : ''}
-        <div class="st2s-post-ft" onclick="event.stopPropagation()">
-          <button onclick="handlePostAction('${post.id}','repost')" class="st2s-act">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
-            <span>${post.stats.reposts}</span>
-          </button>
-          <button onclick="openTrendDetail('${post.id}')" class="st2s-act">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            <span>${post.stats.comments}</span>
-          </button>
-          <button onclick="handlePostAction('${post.id}','like')" class="st2s-act ${post.stats.isLiked ? 'is-on' : ''}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
-            <span>${post.stats.likes}</span>
-          </button>
-        </div>
-      </article>
-    `).join('')}
+        </article>
+      `).join('')}
+    </div>
 
     <div class="st2s-composer" onclick="openCreatePostModal('#${char.name}超话#', '@${char.name}')">
       <span class="ph">说点什么, 为主播 <b>#${char.name}#</b> 打 call…</span>
