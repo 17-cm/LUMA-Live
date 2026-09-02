@@ -67,22 +67,12 @@
 
       hub.saveSpendingMatrix(matrix);
 
-      // 同步到全网贡献总分与超话
-      if (fId === 'user') {
-        // 沙盒 iframe 无 allow-same-origin 权限，localStorage 不可用，用 try-catch 保护
-        try {
-          const totalUserContrib = parseInt(localStorage.getItem('luma_total_user_contribution') || '12000', 10) + amt;
-          localStorage.setItem('luma_total_user_contribution', totalUserContrib.toString());
-          localStorage.setItem(`luma_char_contribution_${tId}`, item.totalAmount.toString());
-        } catch (e) {}
-      }
-
       // 触发数据同步更新
       this.syncRankings();
       return item;
     },
 
-    // 2. 获取指定实体（例如某主播）收到的所有打榜贡献总值
+    // 2. 获取指定实体（例如某主播）收到的所有贡献总值（送礼 + 签到 + 打榜 汇总）
     getTargetReceivedTotal(toId) {
       const tId = String(toId);
       const matrix = hub.getSpendingMatrix();
@@ -92,23 +82,10 @@
           sum += Number(item.totalAmount) || 0;
         }
       });
-
-      // 兼容历史数据源 (luma_char_contribution_*)：
-      // 若玩家对该主播的直接贡献大于消费矩阵中已记录的玩家部分，则补充差额，保证不丢失也不重复计算
-      try {
-        const localRaw = parseInt(localStorage.getItem(`luma_char_contribution_${tId}`), 10);
-        if (localRaw && localRaw > 0) {
-          const matrixUserVal = matrix[`user_TO_${tId}`] ? (Number(matrix[`user_TO_${tId}`].totalAmount) || 0) : 0;
-          if (localRaw > matrixUserVal) {
-            sum += (localRaw - matrixUserVal);
-          }
-        }
-      } catch (e) {}
-
       return sum;
     },
 
-    // 3. 获取指定实体（例如玩家或某主播）为他人打榜消费的总值
+    // 3. 获取指定实体（例如玩家或某主播）为他人贡献的总值
     getEntitySpentTotal(fromId) {
       const fId = String(fromId);
       const matrix = hub.getSpendingMatrix();
@@ -118,22 +95,6 @@
           sum += Number(item.totalAmount) || 0;
         }
       });
-
-      // 兼容历史数据源 (luma_total_user_contribution 超出基础 12000 的部分)
-      if (fId === 'user') {
-        try {
-          const localTotal = parseInt(localStorage.getItem('luma_total_user_contribution') || '12000', 10);
-          const localSpent = Math.max(0, localTotal - 12000);
-          let matrixUserTotal = 0;
-          Object.values(matrix).forEach(item => {
-            if (item.fromId === 'user') matrixUserTotal += Number(item.totalAmount) || 0;
-          });
-          if (localSpent > matrixUserTotal) {
-            sum += (localSpent - matrixUserTotal);
-          }
-        } catch (e) {}
-      }
-
       return sum;
     },
 
@@ -195,7 +156,7 @@
       return list;
     },
 
-    // 7. 【社区·全服守护/贡献总榜】汇总所有主播收到的贡献 + 玩家贡献进行全局排名
+    // 7. 【社区·全服守护/贡献总榜】各主角收到的贡献总值 + 玩家的贡献总值 综合排名
     getAllCommunityGuardRankingList() {
       const chars = (typeof window.getAvailableCharsList === 'function') 
         ? window.getAvailableCharsList() 
@@ -203,36 +164,33 @@
       
       const list = [];
 
-      // 遍历所有 Char
+      // 遍历所有 Char：贡献 = 所有人对其贡献的总计
       chars.forEach(c => {
         const id = String(c.id || c.characterId);
         const receivedFromAll = this.getTargetReceivedTotal(id);
-        const baseScore = Math.floor((c.fans || 12000) * 1.5 + 3000);
-        const totalContrib = baseScore + receivedFromAll;
 
         list.push({
           id: id,
           name: c.name,
           avatar: c.avatar || c.cover,
           badge: '全服打投',
-          score: totalContrib,
+          score: receivedFromAll,
           scoreLabel: '贡献值',
           isUser: false
         });
       });
 
-      // 玩家的总体贡献排位
+      // 玩家：贡献 = 我为所有主播贡献的总计
       const uName = (window.currentUser && window.currentUser.name) || '玩家';
       const uAvatar = (window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first');
       const totalUserSpent = this.getEntitySpentTotal('user');
-      const baseUserScore = 15000 + totalUserSpent * 2;
 
       list.push({
         id: 'user',
         name: `${uName} (你)`,
         avatar: uAvatar,
-        badge: '至尊榜一',
-        score: baseUserScore,
+        badge: '至尊守护',
+        score: totalUserSpent,
         scoreLabel: '贡献值',
         isUser: true
       });

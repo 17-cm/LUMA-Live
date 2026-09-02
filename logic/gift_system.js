@@ -166,7 +166,8 @@
     // 5.5 直播间送礼 1:1 累计为该主播专属贡献值（守护榜 / 超话贡献作用同一矩阵）
     try {
       if (typeof window.addCharContributionScore === 'function' && window.currentRoom) {
-        const targetCharId = window.currentRoom.characterId || window.currentRoom.id || window.currentRoom.name || null;
+        // 只认角色的真实 id；避免退到会话 id/显示名而写错矩阵 key 导致守护榜读不到
+        const targetCharId = window.currentRoom.characterId || window.currentRoom.hostId || null;
         if (targetCharId) {
           window.addCharContributionScore(targetCharId, totalCost);
         }

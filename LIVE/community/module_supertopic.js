@@ -1,7 +1,7 @@
 // =========================================================================
 // 【模块二·社区子文档2·主播超话系统】LIVE/社区/module_supertopic.js
 // 深度复刻微博超话：点击头像切换超话 + 个人主页式分段导航（动态 | 签到 | 打榜 | 贡献榜）
-// 签到一天一次 → 贡献值+100、应援币+100（真实连续天数）；打榜周边应援消耗应援币增长贡献值
+// 贡献值三渠道（送礼1:1·签到+100·打榜花钱）统一计入同一张 (我→主播) 贡献矩阵，展示均在超话贡献榜/主页守护榜
 // =========================================================================
 var api = window.api || {};
 let currentActiveSuperTopicCharId = null;
@@ -15,12 +15,8 @@ let superTopicVirtualScrollerInstance = null;
 function getCharContribution(charId) {
   try { return (window.getCharContributionScore && window.getCharContributionScore(charId)) || 0; } catch (e) { return 0; }
 }
-function getSupportCoin(charId) {
-  try {
-    if (window.LumaCheckinManager && typeof window.LumaCheckinManager.getSupportCoin === 'function') {
-      return Number(window.LumaCheckinManager.getSupportCoin(charId)) || 0;
-    }
-  } catch (e) {}
+function getMyWalletBalance() {
+  try { return Number(window.currentWalletBalance) || 0; } catch (e) {}
   return 0;
 }
 function getCheckIn(col) {
@@ -90,7 +86,7 @@ function renderSuperTopicView(charId = null) {
   const fansCount = (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function')
     ? window.LumaFansManager.getFans(char.id, char) : (char.fans || 0);
   const contribution = getCharContribution(char.id);
-  const supportCoin = getSupportCoin(char.id);
+  const supportCoin = getMyWalletBalance(char.id);
   const topicPosts = topicPostsFor(char);
   const todayDiscuss = topicPosts.length + 18;
   const heatValue = (fansCount * 3 + contribution).toLocaleString();
@@ -227,7 +223,7 @@ function renderSuperTopicPostsTab(charId) {
       createdAt: Date.now(),
       tag: `#${char.name}超话#`,
       mention: `@${char.name}`,
-      content: `欢迎来到【${char.name}】粉丝专属超话！每天签到打卡、用应援币为主播打榜周边，均可登上超话守护贡献总榜！`,
+      content: `欢迎来到【${char.name}】粉丝专属超话！每天签到打卡、为主播送礼或花钱打榜应援，均可登上超话守护贡献总榜！`,
       image: char.avatar,
       stats: { reposts: 180, comments: 24, likes: 680, isLiked: false, isDownloaded: false },
       commentTree: []
@@ -293,7 +289,6 @@ function renderSuperTopicCheckinTab(char) {
   const panel = document.getElementById('superTopicPanel');
   if (!panel) return;
   const checkIn = getCheckIn(char.id);
-  const supportCoin = getSupportCoin(char.id);
   const contribution = getCharContribution(char.id);
   const today = new Date();
   const dayOfWeek = today.getDay() === 0 ? 6 : today.getDay() - 1;
@@ -319,7 +314,7 @@ function renderSuperTopicCheckinTab(char) {
           <span class="text-xl">📅</span>
           <div>
             <h4 class="text-xs font-black text-emerald-950">#${char.name}# 每日签到</h4>
-            <p class="text-[9px] text-emerald-700 mt-0.5">一天一次 · 签到即得 贡献+100 / 应援币+100</p>
+            <p class="text-[9px] text-emerald-700 mt-0.5">一天一次 · 签到即得 贡献 +100</p>
           </div>
         </div>
         <button onclick="handleSuperTopicCheckIn('${char.id}', '${char.name}')" class="px-3.5 py-2 rounded-xl text-xs font-black transition active:scale-95 shadow-md ${checkIn.isCheckedToday ? 'bg-emerald-100 text-emerald-700 shadow-none cursor-default' : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-emerald-500/20'}">
@@ -346,8 +341,6 @@ function renderSuperTopicCheckinTab(char) {
         <span class="text-rose-500">我已签到 <b class="text-rose-600">${checkIn.totalDays || 0}</b> 天</span>
         <span class="w-1 h-1 rounded-full bg-slate-300"></span>
         <span>连签 <b class="text-emerald-600">${checkIn.streakDays || 0}</b> 天</span>
-        <span class="w-1 h-1 rounded-full bg-slate-300"></span>
-        <span>应援币 <b class="text-amber-600">${supportCoin.toLocaleString()}</b></span>
         <span class="w-1 h-1 rounded-full bg-slate-300"></span>
         <span>贡献 <b class="text-purple-600">${contribution.toLocaleString()}</b></span>
       </div>
@@ -383,7 +376,7 @@ window.renderSuperTopicCheckinTab = renderSuperTopicCheckinTab;
 function renderSuperTopicSupportTab(char) {
   const panel = document.getElementById('superTopicPanel');
   if (!panel) return;
-  const supportCoin = getSupportCoin(char.id);
+  const supportCoin = getMyWalletBalance(char.id);
   const contribution = getCharContribution(char.id);
   const fansCount = (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function')
     ? window.LumaFansManager.getFans(char.id, char) : (char.fans || 0);
@@ -443,25 +436,43 @@ window.selectSupportGiftDirect = selectSupportGiftDirect;
 function renderSuperTopicContributeTab(char) {
   const panel = document.getElementById('superTopicPanel');
   if (!panel) return;
-  const userContribute = getCharContribution(char.id);
 
-  // 融合预设粉丝生态 + 玩家真实贡献
-  const baseFans = [
-    { name: '星空拾荒者', id: 'seed_1', avatar: getAvatarFor('星空拾荒者', 'first'), score: 38200, badge: '至尊盟主' },
-    { name: '喵喵守护大队长', id: 'seed_2', avatar: getAvatarFor('喵喵守护大队长', 'first'), score: 26500, badge: '超级铁粉' },
-    { name: '不吃香菜的猫', id: 'seed_3', avatar: getAvatarFor('不吃香菜的猫', 'first'), score: 18400, badge: '忠实舰长' },
-    { name: '月亮邮局', id: 'seed_4', avatar: getAvatarFor('月亮邮局', 'first'), score: 9800, badge: '守护天使' }
-  ];
-  const userItem = {
-    name: `${currentUserName()} (你)`,
-    id: 'user',
-    avatar: currentUserAvatar(),
-    score: userContribute,
-    badge: userContribute >= 30000 ? '超话神豪' : (userContribute > 0 ? '核心应援官' : '暂未贡献'),
-    isUser: true
-  };
-  const fullList = [...baseFans, userItem].sort((a, b) => b.score - a.score);
-  const top1 = fullList[0], top2 = fullList[1], top3 = fullList[2], rest = fullList.slice(3);
+  // 真实数据：消费矩阵中所有「别人 → 该角色（含我自己）」的贡献记录
+  let supporters = [];
+  if (window.LumaGuardManager && typeof window.LumaGuardManager.getTopSupportersForChar === 'function') {
+    try {
+      supporters = window.LumaGuardManager.getTopSupportersForChar(char.id).map(item => {
+        const isUser = String(item.fromId) === 'user';
+        const score = Number(item.totalAmount) || 0;
+        return {
+          id: item.fromId,
+          name: isUser ? `${(item.fromName || currentUserName())} (你)` : (item.fromName || '神秘粉丝'),
+          avatar: item.fromAvatar || getAvatarFor(item.fromName, 'first'),
+          score: score,
+          badge: isUser
+            ? (score >= 30000 ? '超话神豪' : (score > 0 ? '核心应援官' : '暂未贡献'))
+            : '忠实粉丝',
+          isUser: isUser
+        };
+      });
+    } catch (e) {}
+  }
+
+  if (supporters.length === 0) {
+    panel.innerHTML = `
+      <div class="bg-white rounded-2xl p-8 text-center border border-slate-100 shadow-sm">
+        <div class="text-3xl">💎</div>
+        <p class="text-xs font-black text-slate-900 mt-2">#${char.name}# 暂无贡献记录</p>
+        <p class="text-[10px] text-slate-400 mt-1 font-bold">去「送礼 / 签到 / 打榜」为主播贡献，即可上榜</p>
+        <button onclick="switchSuperTopicTab('support')" class="mt-3 px-4 py-2 rounded-full bg-gradient-to-r from-rose-500 to-purple-600 text-white text-[10px] font-black shadow-md active:scale-95">去应援</button>
+      </div>
+    `;
+    return;
+  }
+
+  supporters.sort((a, b) => b.score - a.score);
+  const top1 = supporters[0], top2 = supporters[1], top3 = supporters[2];
+  const rest = supporters.slice(3);
 
   panel.innerHTML = `
     <div class="bg-gradient-to-br from-purple-900 via-indigo-950 to-slate-900 rounded-2xl p-4 text-white shadow-lg border border-purple-800/40 relative overflow-hidden">
@@ -470,7 +481,7 @@ function renderSuperTopicContributeTab(char) {
           <span class="text-xl">💎</span>
           <div class="min-w-0">
             <h5 class="font-black text-xs text-white">#${char.name}# 专属守护·贡献总榜</h5>
-            <p class="text-[9px] text-purple-200 mt-0.5 truncate">直播间送礼 · 每日签到 · 周边应援，全场景消费均计入贡献值！</p>
+            <p class="text-[9px] text-purple-200 mt-0.5 truncate">所有粉丝对 @${char.name} 的贡献值（含你）· 送礼/签到/打榜全计入</p>
           </div>
         </div>
         <button onclick="switchSuperTopicTab('support')" class="px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 text-[10px] font-black shadow-md active:scale-95 flex-shrink-0">去应援</button>
@@ -492,14 +503,14 @@ function renderSuperTopicContributeTab(char) {
             <img src="${item.avatar}" class="w-8 h-8 rounded-full object-cover border border-slate-200 flex-shrink-0">
             <div class="min-w-0">
               <div class="flex items-center gap-1.5"><h5 class="text-xs font-black text-slate-900 truncate">${item.name}</h5><span class="text-[8px] bg-purple-50 text-purple-700 font-bold px-1.5 py-0.2 rounded">${item.badge}</span></div>
-              ${item.isUser ? '<p class="text-[8px] text-rose-500 font-bold mt-0.5">由你的签到与应援积累</p>' : ''}
+              ${item.isUser ? '<p class="text-[8px] text-rose-500 font-bold mt-0.5">由你的送礼 / 签到 / 打榜积累</p>' : ''}
             </div>
           </div>
           <div class="text-right flex-shrink-0"><span class="text-xs font-black text-rose-600">${item.score.toLocaleString()}</span><p class="text-[8px] text-slate-400 font-bold">贡献值</p></div>
         </div>
       `).join('')}
     </div>
-    <p class="text-center text-[9px] text-slate-400 font-bold pt-1 pb-2">累计贡献 = 直播间送礼 + 每日签到 + 周边应援</p>
+    <p class="text-center text-[9px] text-slate-400 font-bold pt-1 pb-2">累计贡献 = 直播间送礼 1:1 + 每日签到 +100 + 打榜应援</p>
   `;
 }
 window.renderSuperTopicContributeTab = renderSuperTopicContributeTab;
@@ -556,7 +567,7 @@ function executeSupportGift() {
   const gift = (window.SUPPORT_GIFTS || []).find(g => g.id === selectedSupportGiftId) || (window.SUPPORT_GIFTS || [])[0];
   if (!gift) return;
 
-  const balance = getSupportCoin(char.id);
+  const balance = getMyWalletBalance(char.id);
   if (balance < gift.price) {
     if (api && api.ui) api.ui.toast(`应援币不足（现有 ${balance}，需 ${gift.price}），每日签到可领取 +100`);
     return;
@@ -593,7 +604,7 @@ function openSuperTopicSupportModal() {
   if (!modal) return;
   const char = getActiveChar();
   if (!char) return;
-  const supportCoin = getSupportCoin(char.id);
+  const supportCoin = getMyWalletBalance(char.id);
 
   const charNameEl = document.getElementById('supportModalCharName');
   const userBalanceEl = document.getElementById('supportModalUserBalance');
