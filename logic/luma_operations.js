@@ -890,38 +890,10 @@ async function settleAllLive() {
 window.settleAllLive = settleAllLive;
 
 // =========================================================================
-// 【在线后台轮询入口】APP运行期间定时触发（settings/main.js 调 startLiveTicker）
-// 每轮 = 决策轮询(含延迟队列入队) → 执行到期队列 → 更新 last_poll_time
-// 决策函数 syncLiveSessions 在非补跑时会写 last_poll_time，供下次离线补跑使用
+// 【在线后台轮询入口】注意：在线决策轮询由 settings/main.js 的 resetLumaOpsTimer
+// 定时调用 syncLiveSessions({allowSpawn:true}) 驱动（间隔=设置页「后台轮询时长间隔」，
+// 默认3分钟可调）——这是 76a5f13 原版机制，不设独立的在线决策节拍器。
 // =========================================================================
-let __lumaPollBusy = false;
-let __lumaPollTicker = null;
-
-async function tickLiveLifecycle() {
-  if (__lumaPollBusy) return;
-  __lumaPollBusy = true;
-  try {
-    const allChars = window.allCharacters || [];
-    if (!allChars.length || !window.charSchedulesMap) return;
-    // 1) 决策轮询：倾向(1/2)+比例增长+掷骰，命中进延迟1-10分钟执行队列，并写 last_poll_time
-    await syncLiveSessions();
-    // 2) 执行到期队列：已入队且到点的开播/下播在此落实
-    await executeDueActions(Date.now());
-  } catch (e) {
-    console.warn("[LUMA Live] 后台轮询异常:", e);
-  } finally {
-    __lumaPollBusy = false;
-  }
-}
-
-// 启动在线后台轮询（间隔可传，默认30秒）
-function startLiveTicker(intervalMs = 30000) {
-  if (__lumaPollTicker) clearInterval(__lumaPollTicker);
-  __lumaPollTicker = setInterval(() => { tickLiveLifecycle(); }, intervalMs);
-  return __lumaPollTicker;
-}
-window.startLiveTicker = startLiveTicker;
-window.tickLiveLifecycle = tickLiveLifecycle;
 
 // =========================================================================
 // 【状态同步到角色日程】后台定时把每个角色的直播状态写入角色日程

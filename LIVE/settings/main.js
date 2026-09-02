@@ -178,6 +178,16 @@ function syncParamDisplays() {
 
   setVal('paramMaxLiveDuration', p.maxLiveDuration || 240, 'valMaxLiveDuration', '分钟');
   setVal('paramMaxRestDuration', p.maxRestDuration || 480, 'valMaxRestDuration', '分钟');
+
+  // 后台轮询间隔显示（抽屉1.6）
+  const pollVal = p.opsPollInterval || 3;
+  const pollInput = document.getElementById('paramOpsPollInterval');
+  const pollText = document.getElementById('valOpsPollInterval');
+  const pollTag = document.getElementById('tagOpsPollInterval');
+  if (pollInput) pollInput.value = pollVal;
+  if (pollText) pollText.textContent = `${pollVal} 分钟`;
+  if (pollTag) pollTag.textContent = `${pollVal} 分钟`;
+
   setVal('paramReplyRandomDanmakuRate', p.replyRandomDanmakuRate !== undefined ? p.replyRandomDanmakuRate : 25, 'valReplyRandomDanmakuRate', '%');
   setVal('paramMentionUserRate', p.mentionUserRate !== undefined ? p.mentionUserRate : 30, 'valMentionUserRate', '%');
   setVal('paramEnterOtherLiveRate', p.enterOtherLiveRate !== undefined ? p.enterOtherLiveRate : 35, 'valEnterOtherLiveRate', '%');
@@ -255,6 +265,124 @@ function getApiRequestIntervalMinutes() {
   return 5;
 }
 window.getApiRequestIntervalMinutes = getApiRequestIntervalMinutes;
+
+// =========================================================================
+// 官方运营组·后台轮询（76a5f13 原版机制）
+// 在线轮询由本组定时器驱动 syncLiveSessions({allowSpawn:true})；
+// 间隔取设置页「后台轮询间隔」 opsPollInterval，默认3分钟，可调。
+// 同时提供「后台轮询日志」查看器（渲染 window.lumaOpsLog）。
+// =========================================================================
+// 后台轮询间隔显示更新
+function updateOpsPollIntervalDisplay(value) {
+  const minutes = Number(value) || 3;
+  const valEl = document.getElementById('valOpsPollInterval');
+  if (valEl) valEl.textContent = `${minutes} 分钟`;
+  const tagEl = document.getElementById('tagOpsPollInterval');
+  if (tagEl) tagEl.textContent = `${minutes} 分钟`;
+  if (!window.appParams) window.appParams = {};
+  window.appParams.opsPollInterval = minutes;
+}
+window.updateOpsPollIntervalDisplay = updateOpsPollIntervalDisplay;
+
+// 重启官方运营组定时器（在线轮询唯一入口，间隔=opsPollInterval 分钟）
+function resetLumaOpsTimer() {
+  if (window.__lumaLiveSyncInterval) {
+    clearInterval(window.__lumaLiveSyncInterval);
+    window.__lumaLiveSyncInterval = null;
+  }
+  const pollMins = (window.appParams && window.appParams.opsPollInterval) || 3;
+  window.__lumaLiveSyncInterval = setInterval(() => {
+    syncLiveSessions({ allowSpawn: true });
+  }, pollMins * 60 * 1000);
+}
+window.resetLumaOpsTimer = resetLumaOpsTimer;
+
+// 保存后台轮询间隔：落盘 + 重播开屏 + 重启定时器
+async function saveOpsPollInterval() {
+  try {
+    if (!window.appParams) window.appParams = {};
+    await dbUpsert("app_settings", "global_params", window.appParams);
+    api.ui.toast("已保存，正在重启轮询触发！");
+    if (typeof window.replaySplash === 'function') {
+      window.replaySplash();
+    }
+    resetLumaOpsTimer();
+  } catch (e) {
+    api.ui.toast("保存成功");
+    resetLumaOpsTimer();
+  }
+}
+window.saveOpsPollInterval = saveOpsPollInterval;
+
+// 轮询日志查看器
+function openOpsLogViewer() {
+  const modal = document.getElementById('opsLogModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    renderOpsLog();
+  }
+}
+window.openOpsLogViewer = openOpsLogViewer;
+
+function closeOpsLogViewer() {
+  const modal = document.getElementById('opsLogModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
+window.closeOpsLogViewer = closeOpsLogViewer;
+
+function renderOpsLog() {
+  const container = document.getElementById('opsLogContent');
+  if (!container) return;
+  const log = window.lumaOpsLog || [];
+  if (log.length === 0) {
+    container.innerHTML = '<div class="text-center text-slate-400 py-8">暂无日志，等待下一轮轮询...</div>';
+    return;
+  }
+  container.innerHTML = log.map((cycle, idx) => {
+    const p = cycle.params || {};
+    const decisions = (cycle.decisions || []).map(d => {
+      const willColor = /(开播|下播)/.test(String(d.result || '')) ? 'text-rose-600' : 'text-slate-500';
+      const detail = d.state === '直播中'
+        ? `已播${d.liveMins}分 下播倾向[${d.baseTendency ?? '暂未获取'}]+比例 总${d.stopTendency ?? 0}% 骰${d.dice}`
+        : `休息${d.restMins}分 开播倾向[${d.baseTendency ?? '暂未获取'}]+比例 总${d.spawnTendency ?? 0}% 骰${d.dice}`;
+      return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50">
+        <span class="text-slate-600">${d.char}</span>
+        <span class="text-slate-400 text-[10px]">${detail}</span>
+        <span class="${willColor} font-bold">${d.result}</span>
+      </div>`;
+    }).join('');
+    const s = cycle.summary || {};
+    return `<div class="bg-slate-50 rounded-xl p-2.5">
+      <div class="flex justify-between items-center mb-1.5">
+        <span class="font-bold text-slate-700">第${cycle.cycle || (log.length - idx)}轮 ${cycle.time}</span>
+        <span class="text-[10px] text-slate-500">在播${s.streaming} 评估${s.evaluated || 0}人 开播${s.started} 下播${s.stopped}</span>
+      </div>
+      <div class="text-[9px] text-slate-400 mb-1.5">倾向值由角色状态栏驱动 | 直播上限${p.maxLiveMins}分 休息上限${p.maxRestMins}分</div>
+      <div class="space-y-0.5">${decisions}</div>
+    </div>`;
+  }).join('');
+}
+window.renderOpsLog = renderOpsLog;
+
+function toggleOpsLogRaw() {
+  const content = document.getElementById('opsLogContent');
+  const raw = document.getElementById('opsLogRaw');
+  if (!content || !raw) return;
+  const showing = raw.style.display !== 'none';
+  if (showing) {
+    raw.style.display = 'none';
+    content.style.display = '';
+  } else {
+    raw.textContent = JSON.stringify(window.lumaOpsLog || [], null, 2);
+    raw.style.display = '';
+    content.style.display = 'none';
+  }
+}
+window.toggleOpsLogRaw = toggleOpsLogRaw;
 
 // =========================================================================
 // 直播间打包预设（代码只定义返回格式，具体生成数量和内容风格在预设里配置）
@@ -1218,13 +1346,13 @@ async function lumaInitApp() {
     console.warn("[LUMA Live] 时间差结算失败:", e);
   }
 
-  // 2.5 启动在线节拍器：APP 运行期间每 30 秒检查一次，
-  //    推动角色按作息自动开播/下播（与结算器共用 rollToggleAt 概率判定）
-  if (typeof startLiveTicker === 'function') {
+  // 2.5 启动官方运营组后台轮询（76a5f13 原版）：每 opsPollInterval(默认3分钟) 决策一轮。
+  //     每轮 = syncLiveSessions({allowSpawn:true}) 决策(进延迟队列) + 到点落实 + 写日志。
+  if (typeof resetLumaOpsTimer === 'function') {
     try {
-      startLiveTicker(30000);
+      resetLumaOpsTimer();
     } catch (e) {
-      console.warn("[LUMA Live] 在线节拍器启动失败:", e);
+      console.warn("[LUMA Live] 后台轮询启动失败:", e);
     }
   }
 
