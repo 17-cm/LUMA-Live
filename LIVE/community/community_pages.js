@@ -51,31 +51,10 @@
 
   <!-- 子页面 2: 主播超话专区 全屏子页 (超话 2.0 · 全息深空 UI) -->
   <div id="communitySuperTopicView" class="full-page-view st2-page hidden">
-    <!-- 顶部导览 -->
+      <!-- 顶部导览 (空: 返回由 sidebar 接管) -->
     <div class="st2-nav">
-      <button onclick="closeCommunitySubPage()" class="st2-nav-ic" aria-label="返回">
-        <svg viewBox="0 0 256 256" fill="currentColor"><path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"/></svg>
-      </button>
       <div class="st2-nav-spacer"></div>
-      <div class="relative">
-        <button onclick="toggleSuperTopicMenu()" class="st2-nav-ic" aria-label="更多">
-          <svg viewBox="0 0 256 256" fill="currentColor"><circle cx="128" cy="52" r="14"></circle><circle cx="128" cy="128" r="14"></circle><circle cx="128" cy="204" r="14"></circle></svg>
-        </button>
-        <div id="superTopicMenuPopup" class="st2-pop hidden">
-          <button onclick="toggleSuperTopicDrawer(true);toggleSuperTopicMenu()" class="st2-pop-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
-            切换超话
-          </button>
-          <button onclick="toggleSuperTopicMenu()" class="st2-pop-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-            超话规则
-          </button>
-          <button onclick="toggleSuperTopicMenu()" class="st2-pop-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
-            举报超话
-          </button>
-        </div>
-      </div>
+      <div class="w-8"></div>
     </div>
 
     <!-- 内容滚动区 -->

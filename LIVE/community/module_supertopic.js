@@ -39,9 +39,11 @@ function getActiveChar() {
     || window.getAvailableCharsList()[0] || null;
 }
 function topicPostsFor(char) {
-  return (window.weiboPosts || []).filter(p =>
+  const fromFeed = (window.weiboPosts || []).filter(p =>
     (p.tag && p.tag.includes(char.name)) || (p.mention && p.mention.includes(char.name))
   );
+  const user = (window.__SUPERTOPIC_POSTS__ || {})[char.id] || [];
+  return user.concat(fromFeed);
 }
 function getAvatarFor(name, seed) {
   try { return window.getAvatar ? window.getAvatar(name, seed || 'first') : ''; } catch (e) { return ''; }
@@ -101,21 +103,9 @@ function postTime(post) {
 }
 
 // -------------------------------------------------------------------------
-// 超话右上角「···」菜单
+// 超话主视图：返回 / 切超话 / 9 个 sidebar tab + 拉高 hero + 内容面板
 // -------------------------------------------------------------------------
-function toggleSuperTopicMenu() {
-  const popup = document.getElementById('superTopicMenuPopup');
-  if (popup) popup.classList.toggle('hidden');
-}
-window.toggleSuperTopicMenu = toggleSuperTopicMenu;
-
-document.addEventListener('click', function(e) {
-  const popup = document.getElementById('superTopicMenuPopup');
-  if (!popup || popup.classList.contains('hidden')) return;
-  if (!e.target.closest('#superTopicMenuPopup') && !e.target.closest('[onclick*="toggleSuperTopicMenu"]')) {
-    popup.classList.add('hidden');
-  }
-});
+const SUPERTOPIC_TAB_ORDER = ['posts', 'compose', 'rules', 'checkin', 'support', 'contribute', 'manage', 'report', 'refresh'];
 
 // -------------------------------------------------------------------------
 // 主视图渲染：Hero 封面 + 数据带 + 分段导航 + 内容面板
@@ -145,11 +135,17 @@ function renderSuperTopicView(charId = null) {
   if (headerTitle) headerTitle.textContent = `#${char.name}超话#`;
 
   const tabCfg = {
-    posts: { label: '动态', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg>', sub: 'POSTS' },
-    checkin: { label: '签到', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="3"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><polyline points="9 16 11 18 15 14"></polyline></svg>', sub: 'DAILY' },
-    support: { label: '打榜', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"></path></svg>', sub: 'CHEER' },
-    contribute: { label: '贡献榜', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"></circle><path d="M15.5 13 17 22l-5-3-5 3 1.5-9"></path></svg>', sub: 'RANK' }
+    posts:      { label: '动态',     sub: 'POSTS', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg>' },
+    compose:    { label: '发帖',     sub: 'POST',  ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>' },
+    rules:      { label: '规则',     sub: 'RULES', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="13" x2="15" y2="13"></line><line x1="9" y1="17" x2="13" y2="17"></line></svg>' },
+    checkin:    { label: '签到',     sub: 'DAILY', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="3"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><polyline points="9 16 11 18 15 14"></polyline></svg>' },
+    support:    { label: '打榜',     sub: 'CHEER', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"></path></svg>' },
+    contribute: { label: '贡献榜',   sub: 'RANK',  ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"></circle><path d="M15.5 13 17 22l-5-3-5 3 1.5-9"></path></svg>' },
+    manage:     { label: '管理',     sub: 'MGMT',  ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>' },
+    report:     { label: '举报',     sub: 'REPORT',ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>' },
+    refresh:    { label: '刷新',     sub: 'RELOAD',ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>' }
   };
+  const tabOrder = SUPERTOPIC_TAB_ORDER;
 
   container.innerHTML = `
     <div class="st2s-layout">
@@ -162,9 +158,12 @@ function renderSuperTopicView(charId = null) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
         </button>
         <div class="st2s-side-divider"></div>
-        ${['posts', 'checkin', 'support', 'contribute'].map(k => {
+        ${tabOrder.map(k => {
           const c = tabCfg[k];
-          return `<button id="spTabBtn_${k}" onclick="switchSuperTopicTab('${k}')" class="st2s-side-tab ${currentSuperTopicTab === k ? 'on' : ''}" title="${c.label}">
+          const checkIn = getCheckIn(char.id);
+          const userLevel = (checkIn && checkIn.level) || 1;
+          const isLocked = (k === 'manage' && userLevel < 50);
+          return `<button id="spTabBtn_${k}" onclick="switchSuperTopicTab('${k}')" class="st2s-side-tab ${currentSuperTopicTab === k ? 'on' : ''} ${isLocked ? 'is-locked' : ''}" title="${c.label}">
             ${c.ic}
             <span class="st2s-side-tab-lb">${c.label}</span>
           </button>`;
@@ -214,22 +213,32 @@ window.renderSuperTopicView = renderSuperTopicView;
 // 分段导航切换 (侧边栏 tab)
 // -------------------------------------------------------------------------
 function switchSuperTopicTab(tabKey) {
-  if (currentSuperTopicTab !== tabKey) {
+  // 详情页直接切回动态
+  if (currentSuperTopicTab === 'post_detail') {
     currentSuperTopicTab = tabKey;
-    // 同步顶部 meta-strip 的 tab 文字
-    const stripTab = document.querySelector('.st2s-meta-tab');
-    if (stripTab) {
-      const cfg = {
-        posts: 'POSTS · 动态',
-        checkin: 'DAILY · 签到',
-        support: 'CHEER · 打榜',
-        contribute: 'RANK · 贡献榜'
-      }[tabKey];
-      stripTab.textContent = cfg || '';
-    }
+    closePostDetail();
+  } else {
+    currentSuperTopicTab = tabKey;
   }
 
-  ['posts', 'checkin', 'support', 'contribute'].forEach(k => {
+  // 同步顶部 meta-strip 的 tab 文字
+  const stripTab = document.querySelector('.st2s-meta-tab');
+  if (stripTab) {
+    const stripCfg = {
+      posts: 'POSTS · 动态',
+      compose: 'POST · 发帖',
+      rules: 'RULES · 规则',
+      checkin: 'DAILY · 签到',
+      support: 'CHEER · 打榜',
+      contribute: 'RANK · 贡献榜',
+      manage: 'MGMT · 管理',
+      report: 'REPORT · 举报',
+      refresh: 'RELOAD · 刷新'
+    }[tabKey];
+    stripTab.textContent = stripCfg || '';
+  }
+
+  SUPERTOPIC_TAB_ORDER.forEach(k => {
     const btn = document.getElementById(`spTabBtn_${k}`);
     if (!btn) return;
     btn.classList.toggle('on', k === tabKey);
@@ -245,9 +254,14 @@ function renderSuperTopicTab() {
   const char = getActiveChar();
   if (!char) return;
   if (currentSuperTopicTab === 'posts') renderSuperTopicPostsTab(char.id);
+  else if (currentSuperTopicTab === 'compose') renderSuperTopicComposeTab(char);
+  else if (currentSuperTopicTab === 'rules') renderSuperTopicRulesTab(char);
   else if (currentSuperTopicTab === 'checkin') renderSuperTopicCheckinTab(char);
   else if (currentSuperTopicTab === 'support') renderSuperTopicSupportTab(char);
   else if (currentSuperTopicTab === 'contribute') renderSuperTopicContributeTab(char);
+  else if (currentSuperTopicTab === 'manage') renderSuperTopicManageTab(char);
+  else if (currentSuperTopicTab === 'report') renderSuperTopicReportTab(char);
+  else if (currentSuperTopicTab === 'refresh') renderSuperTopicRefreshTab(char);
 }
 
 // -------------------------------------------------------------------------
@@ -281,7 +295,7 @@ function renderSuperTopicPostsTab(charId) {
 
     <div class="st2s-feed">
       ${posts.map(post => `
-        <article class="st2s-feed-item" onclick="openTrendDetail('${post.id}')">
+        <article class="st2s-feed-item" onclick="openSuperTopicPostDetail('${post.id}')">
           <img class="st2s-feed-av" src="${post.author.avatar}" alt="">
           <div class="st2s-feed-body">
             <div class="st2s-feed-head">
@@ -299,7 +313,7 @@ function renderSuperTopicPostsTab(charId) {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
                 <span>${post.stats.reposts}</span>
               </button>
-              <button onclick="openTrendDetail('${post.id}')" class="st2s-feed-act">
+              <button onclick="openSuperTopicPostDetail('${post.id}')" class="st2s-feed-act">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                 <span>${post.stats.comments}</span>
               </button>
@@ -311,13 +325,6 @@ function renderSuperTopicPostsTab(charId) {
           </div>
         </article>
       `).join('')}
-    </div>
-
-    <div class="st2s-composer" onclick="openCreatePostModal('#${char.name}超话#', '@${char.name}')">
-      <span class="ph">说点什么, 为主播 <b>#${char.name}#</b> 打 call…</span>
-      <span class="send">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-      </span>
     </div>
   `;
 }
@@ -781,3 +788,478 @@ function selectSuperTopicChar(charId) {
   renderSuperTopicView(charId);
 }
 window.selectSuperTopicChar = selectSuperTopicChar;
+
+// -------------------------------------------------------------------------
+// 发帖 Tab: 副 tag / @ / 正文 / 上传图 / 图片描述(给 AI) / 发送
+// -------------------------------------------------------------------------
+function renderSuperTopicComposeTab(char) {
+  const panel = document.getElementById('superTopicPanel');
+  if (!panel) return;
+  const user = getCurrentUser();
+  const primaryTag = `#${char.name}超话#`;
+  panel.innerHTML = `
+    <div class="st2s-sec">
+      <h4>发新帖</h4>
+      <span class="note">强制归属「${primaryTag}」</span>
+    </div>
+    <div class="st2s-compose">
+      <div class="st2s-compose-row">
+        <div class="st2s-compose-chip is-locked">
+          <span class="lb">主 tag</span>
+          <span class="val">${primaryTag}</span>
+          <span class="lock" title="强制归属">· 固定</span>
+        </div>
+      </div>
+      <div class="st2s-compose-row">
+        <label class="st2s-compose-lb">副 tag <span class="hint">(逗号分隔, 可空)</span></label>
+        <input id="cpSubTag" class="st2s-compose-in" type="text" placeholder="例: #应援打卡#  #vlog#">
+      </div>
+      <div class="st2s-compose-row">
+        <label class="st2s-compose-lb">@ 提到 <span class="hint">(用 @ 触发, 可空)</span></label>
+        <input id="cpMention" class="st2s-compose-in" type="text" placeholder="例: @${char.name}  @应援团">
+      </div>
+      <div class="st2s-compose-row">
+        <label class="st2s-compose-lb">正文 <span class="hint">(必填)</span></label>
+        <textarea id="cpContent" class="st2s-compose-ta" rows="6" maxlength="500" placeholder="说点什么…"></textarea>
+        <div class="st2s-compose-count"><span id="cpCount">0</span> / 500</div>
+      </div>
+      <div class="st2s-compose-row">
+        <label class="st2s-compose-lb">图片 <span class="hint">(可空, 1 张)</span></label>
+        <div class="st2s-compose-up">
+          <input id="cpImage" type="file" accept="image/*" class="hidden">
+          <button onclick="document.getElementById('cpImage').click()" class="st2s-compose-up-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <span id="cpImageLabel">选择图片</span>
+          </button>
+          <img id="cpPreview" class="st2s-compose-preview hidden" alt="">
+          <button id="cpImageClear" class="st2s-compose-clr hidden" onclick="clearComposeImage()">移除</button>
+        </div>
+      </div>
+      <div class="st2s-compose-row">
+        <label class="st2s-compose-lb">图片描述 <span class="hint">(给 AI 看, 不公开发布)</span></label>
+        <input id="cpImageDesc" class="st2s-compose-in" type="text" placeholder="例: 直播截图, 表情惊讶, 背景舞台紫色灯光">
+      </div>
+      <div class="st2s-compose-ft">
+        <button onclick="submitSuperTopicPost('${char.id}')" class="st2s-compose-send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          发布
+        </button>
+      </div>
+    </div>
+  `;
+  // 计数器
+  const ta = document.getElementById('cpContent');
+  if (ta) ta.addEventListener('input', () => {
+    document.getElementById('cpCount').textContent = String(ta.value.length);
+  });
+  // 图片选择预览
+  const img = document.getElementById('cpImage');
+  if (img) img.addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const prev = document.getElementById('cpPreview');
+      const lbl = document.getElementById('cpImageLabel');
+      const clr = document.getElementById('cpImageClear');
+      if (prev) { prev.src = ev.target.result; prev.classList.remove('hidden'); }
+      if (lbl) lbl.textContent = f.name;
+      if (clr) clr.classList.remove('hidden');
+    };
+    reader.readAsDataURL(f);
+  });
+}
+window.renderSuperTopicComposeTab = renderSuperTopicComposeTab;
+
+function clearComposeImage() {
+  const img = document.getElementById('cpImage');
+  const prev = document.getElementById('cpPreview');
+  const lbl = document.getElementById('cpImageLabel');
+  const clr = document.getElementById('cpImageClear');
+  if (img) img.value = '';
+  if (prev) { prev.src = ''; prev.classList.add('hidden'); }
+  if (lbl) lbl.textContent = '选择图片';
+  if (clr) clr.classList.add('hidden');
+}
+window.clearComposeImage = clearComposeImage;
+
+function submitSuperTopicPost(charId) {
+  const char = (window.getAvailableCharsList() || []).find(c => String(c.id) === String(charId));
+  if (!char) return;
+  const content = (document.getElementById('cpContent') && document.getElementById('cpContent').value || '').trim();
+  if (!content) { showToast('正文不能为空', 'warn'); return; }
+  const subTag = (document.getElementById('cpSubTag') && document.getElementById('cpSubTag').value || '').trim();
+  const mention = (document.getElementById('cpMention') && document.getElementById('cpMention').value || '').trim();
+  const imageDesc = (document.getElementById('cpImageDesc') && document.getElementById('cpImageDesc').value || '').trim();
+  const prev = document.getElementById('cpPreview');
+  const image = (prev && !prev.classList.contains('hidden')) ? prev.src : '';
+  const user = getCurrentUser();
+  const primaryTag = `#${char.name}超话#`;
+  const tagParts = [primaryTag];
+  if (subTag) {
+    subTag.split(/[\s,，]+/).filter(Boolean).forEach(t => {
+      const t2 = t.startsWith('#') ? t : ('#' + t);
+      tagParts.push(t2.endsWith('#') ? t2 : (t2 + '#'));
+    });
+  }
+  const mentionParts = mention ? mention.split(/\s+/).filter(Boolean) : [];
+  const post = {
+    id: 'st_post_' + Date.now(),
+    author: {
+      name: user.name || '我',
+      avatar: user.avatar || (char.avatar || ''),
+      badge: user.badge || 'Lv.1 新粉',
+      verified: false
+    },
+    createdAt: Date.now(),
+    tag: tagParts.join(' '),
+    mention: mentionParts.join(' '),
+    content,
+    image,
+    imageDesc,
+    stats: { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false },
+    commentTree: []
+  };
+  const all = window.__SUPERTOPIC_POSTS__ = window.__SUPERTOPIC_POSTS__ || {};
+  all[char.id] = all[char.id] || [];
+  all[char.id].unshift(post);
+  try { localStorage.setItem('st_user_posts', JSON.stringify(all)); } catch (_) {}
+  showToast('发布成功', 'ok');
+  currentSuperTopicTab = 'posts';
+  renderSuperTopicTab();
+}
+window.submitSuperTopicPost = submitSuperTopicPost;
+
+// 把发帖也加入 data_hub 持久化
+function persistSuperTopicPost(post) {
+  try {
+    if (window.LumaDataHub && typeof window.LumaDataHub.put === 'function') {
+      window.LumaDataHub.put('super_topic_posts', post.id, post);
+    }
+  } catch (_) {}
+}
+window.persistSuperTopicPost = persistSuperTopicPost;
+
+// 启动时恢复用户帖子
+(function restoreUserPosts() {
+  try {
+    const raw = localStorage.getItem('st_user_posts');
+    if (!raw) return;
+    const all = JSON.parse(raw);
+    window.__SUPERTOPIC_POSTS__ = all;
+  } catch (_) {}
+})();
+
+// -------------------------------------------------------------------------
+// 规则 Tab
+// -------------------------------------------------------------------------
+const SUPERTOPIC_RULES = [
+  { n: '01', t: '粉丝专属', d: '本超话仅对 #${name}# 的粉丝开放签到、打榜、发帖功能, 请先关注主播。' },
+  { n: '02', t: '内容规范', d: '禁止发布: 色情、暴力、谣言、抄袭、人身攻击、引战、刷屏、广告外链等违规内容。' },
+  { n: '03', t: '图片规范', d: '上传图片必须与 ${name} 本人相关(直播截图、舞台照、应援物料等), 严禁盗图。' },
+  { n: '04', t: '发言礼貌', d: '请尊重其他粉丝、不同意见请理性讨论; 严禁@主播本人催更、催播、催互动。' },
+  { n: '05', t: '原创激励', d: '原创图文 / 视频 / 二创 / 应援打榜贴, 视内容质量给予 50 - 200 贡献值奖励。' },
+  { n: '06', t: '等级权限', d: 'Lv.1 - 9: 签到 / 浏览; Lv.10 - 49: 发帖 / 评论; Lv.50+: 管理 / 删帖 / 移出。' },
+  { n: '07', t: '违规处理', d: '初犯: 警告 + 禁言 24h; 再犯: 永久禁言 + 移出超话; 严重者上报平台封号。' },
+  { n: '08', t: '申诉通道', d: '如对处理有异议, 请通过侧栏「举报」旁的反馈通道联系 @${name}后援会会长。' }
+];
+function renderSuperTopicRulesTab(char) {
+  const panel = document.getElementById('superTopicPanel');
+  if (!panel) return;
+  const rules = SUPERTOPIC_RULES.map(r => ({
+    n: r.n, t: r.t, d: r.d.replace(/\$\{name\}/g, char.name)
+  }));
+  panel.innerHTML = `
+    <div class="st2s-sec">
+      <h4>超话守则</h4>
+      <span class="note">8 条 · 适用于 #${char.name}超话#</span>
+    </div>
+    <div class="st2s-rules">
+      ${rules.map(r => `
+        <div class="st2s-rule">
+          <div class="st2s-rule-no">${r.n}</div>
+          <div class="st2s-rule-body">
+            <div class="st2s-rule-t">${r.t}</div>
+            <div class="st2s-rule-d">${r.d}</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+window.renderSuperTopicRulesTab = renderSuperTopicRulesTab;
+
+// -------------------------------------------------------------------------
+// 举报 Tab
+// -------------------------------------------------------------------------
+const SUPERTOPIC_REPORT_REASONS = [
+  { v: 'porn',   l: '色情 / 低俗内容' },
+  { v: 'viol',   l: '暴力 / 血腥' },
+  { v: 'rumor',  l: '谣言 / 虚假信息' },
+  { v: 'attack', l: '人身攻击 / 引战' },
+  { v: 'plag',   l: '抄袭 / 盗图' },
+  { v: 'spam',   l: '广告 / 刷屏' },
+  { v: 'leak',   l: '泄露隐私 / 个人信息' },
+  { v: 'other',  l: '其他 (请说明)' }
+];
+function renderSuperTopicReportTab(char) {
+  const panel = document.getElementById('superTopicPanel');
+  if (!panel) return;
+  const reasonOpts = SUPERTOPIC_REPORT_REASONS.map(r =>
+    `<option value="${r.v}">${r.l}</option>`
+  ).join('');
+  panel.innerHTML = `
+    <div class="st2s-sec">
+      <h4>举报</h4>
+      <span class="note">违规内容 / 违规用户, 我们将 24h 内处理</span>
+    </div>
+    <div class="st2s-form">
+      <div class="st2s-form-row">
+        <label class="st2s-form-lb">举报原因 <span class="req">*</span></label>
+        <select id="rpReason" class="st2s-form-sel">${reasonOpts}</select>
+      </div>
+      <div class="st2s-form-row">
+        <label class="st2s-form-lb">详细描述 <span class="req">*</span></label>
+        <textarea id="rpDesc" class="st2s-form-ta" rows="5" maxlength="300" placeholder="请说明: 涉及用户 / 帖子 / 时间 / 证据截图描述…"></textarea>
+        <div class="st2s-form-count"><span id="rpCount">0</span> / 300</div>
+      </div>
+      <div class="st2s-form-row">
+        <label class="st2s-form-lb">联系方式 <span class="hint">(可空, 方便我们回访)</span></label>
+        <input id="rpContact" class="st2s-form-in" type="text" placeholder="例: 站内信 ID / 邮箱">
+      </div>
+      <div class="st2s-form-ft">
+        <button onclick="submitSuperTopicReport('${char.id}')" class="st2s-form-submit is-danger">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          提交举报
+        </button>
+      </div>
+    </div>
+  `;
+  const ta = document.getElementById('rpDesc');
+  if (ta) ta.addEventListener('input', () => {
+    document.getElementById('rpCount').textContent = String(ta.value.length);
+  });
+}
+window.renderSuperTopicReportTab = renderSuperTopicReportTab;
+
+function submitSuperTopicReport(charId) {
+  const reason = (document.getElementById('rpReason') || {}).value;
+  const desc = (document.getElementById('rpDesc') && document.getElementById('rpDesc').value || '').trim();
+  const contact = (document.getElementById('rpContact') && document.getElementById('rpContact').value || '').trim();
+  if (!reason) { showToast('请选择原因', 'warn'); return; }
+  if (!desc) { showToast('请填写详细描述', 'warn'); return; }
+  const record = {
+    id: 'st_report_' + Date.now(),
+    charId, reason, desc, contact,
+    createdAt: Date.now(),
+    status: 'pending'
+  };
+  try { window.LumaDataHub && window.LumaDataHub.put && window.LumaDataHub.put('super_topic_reports', record.id, record); } catch (_) {}
+  showToast('举报已提交, 我们会尽快处理', 'ok');
+  setTimeout(() => renderSuperTopicReportTab({ id: charId, name: '该' }), 600);
+}
+window.submitSuperTopicReport = submitSuperTopicReport;
+
+// -------------------------------------------------------------------------
+// 管理 Tab: Lv.50+ 解锁
+// -------------------------------------------------------------------------
+function renderSuperTopicManageTab(char) {
+  const panel = document.getElementById('superTopicPanel');
+  if (!panel) return;
+  const checkIn = getCheckIn(char.id);
+  const userLevel = (checkIn && checkIn.level) || 1;
+  const unlocked = userLevel >= 50;
+  panel.innerHTML = unlocked ? `
+    <div class="st2s-sec">
+      <h4>超话管理</h4>
+      <span class="note">Lv.${userLevel} · 已解锁管理权限</span>
+    </div>
+    <div class="st2s-manage">
+      <div class="st2s-manage-card">
+        <div class="st2s-manage-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 5-3.5 7.5-8.5 9-5-1.5-8.5-4-8.5-9V5l8.5-3 8.5 3z"/></svg>
+        </div>
+        <div>
+          <div class="t">违规帖子</div>
+          <div class="d">最近 7 天 0 条待审</div>
+        </div>
+        <span class="badge">0</span>
+      </div>
+      <div class="st2s-manage-card">
+        <div class="st2s-manage-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-3 3-2-2"/></svg>
+        </div>
+        <div>
+          <div class="t">用户管理</div>
+          <div class="d">Lv.1 入门 → Lv.50 资深, 共 ${userLevel} 级</div>
+        </div>
+        <span class="badge">·</span>
+      </div>
+      <div class="st2s-manage-card">
+        <div class="st2s-manage-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div>
+          <div class="t">数据看板</div>
+          <div class="d">日活 / 帖子 / 签到 / 打榜</div>
+        </div>
+        <span class="badge">·</span>
+      </div>
+      <div class="st2s-manage-card">
+        <div class="st2s-manage-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+        </div>
+        <div>
+          <div class="t">超话设置</div>
+          <div class="d">封面 / 简介 / 主持人</div>
+        </div>
+        <span class="badge">·</span>
+      </div>
+    </div>
+  ` : `
+    <div class="st2s-sec">
+      <h4>超话管理</h4>
+      <span class="note">Lv.${userLevel} / Lv.50 解锁</span>
+    </div>
+    <div class="st2s-manage-locked">
+      <div class="st2s-manage-lock-ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div class="st2s-manage-lock-t">管理权限未解锁</div>
+      <div class="st2s-manage-lock-d">当前 Lv.${userLevel}, 达到 <b>Lv.50</b> 后可管理本超话: 删帖 / 移人 / 看数据。</div>
+      <div class="st2s-manage-lock-tip">每日签到 / 发帖 / 打榜, 即可快速升级。</div>
+      <button onclick="switchSuperTopicTab('checkin')" class="st2s-manage-lock-btn">去签到攒经验</button>
+    </div>
+  `;
+}
+window.renderSuperTopicManageTab = renderSuperTopicManageTab;
+
+// -------------------------------------------------------------------------
+// 刷新 Tab: 重新渲染当前超话动态
+// -------------------------------------------------------------------------
+function renderSuperTopicRefreshTab(char) {
+  const panel = document.getElementById('superTopicPanel');
+  if (!panel) return;
+  panel.innerHTML = `
+    <div class="st2s-refresh">
+      <div class="st2s-refresh-ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </div>
+      <div class="st2s-refresh-t">刷新「#${char.name}超话#」动态</div>
+      <div class="st2s-refresh-d">重新拉取最新帖子、签到、打榜数据。</div>
+      <button onclick="doRefreshSuperTopic('${char.id}')" class="st2s-refresh-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        立即刷新
+      </button>
+      <div id="spRefreshResult" class="st2s-refresh-result"></div>
+    </div>
+  `;
+}
+window.renderSuperTopicRefreshTab = renderSuperTopicRefreshTab;
+
+function doRefreshSuperTopic(charId) {
+  const btn = document.querySelector('.st2s-refresh-btn');
+  if (btn) btn.disabled = true;
+  if (window.LumaDataHub && typeof window.LumaDataHub.flush === 'function') {
+    try { window.LumaDataHub.flush(); } catch (_) {}
+  }
+  setTimeout(() => {
+    if (btn) btn.disabled = false;
+    const r = document.getElementById('spRefreshResult');
+    if (r) {
+      r.innerHTML = `<div class="ok">已刷新 · ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}</div>`;
+    }
+    showToast('刷新成功', 'ok');
+    setTimeout(() => switchSuperTopicTab('posts'), 600);
+  }, 800);
+}
+window.doRefreshSuperTopic = doRefreshSuperTopic;
+
+// -------------------------------------------------------------------------
+// 帖子详情 (同面板切换, 不入 PageStack)
+// -------------------------------------------------------------------------
+function openSuperTopicPostDetail(postId) {
+  const char = getActiveChar();
+  if (!char) return;
+  const panel = document.getElementById('superTopicPanel');
+  if (!panel) return;
+  const posts = topicPostsFor(char);
+  const post = posts.find(p => String(p.id) === String(postId));
+  if (!post) { showToast('帖子不存在', 'warn'); return; }
+  currentSuperTopicTab = 'post_detail';
+  panel.dataset.mode = 'detail';
+  panel.innerHTML = renderSuperTopicPostDetail(post, char);
+}
+window.openSuperTopicPostDetail = openSuperTopicPostDetail;
+
+function closePostDetail() {
+  currentSuperTopicTab = 'posts';
+  const panel = document.getElementById('superTopicPanel');
+  if (panel) { panel.dataset.mode = 'list'; }
+  renderSuperTopicTab();
+}
+window.closePostDetail = closePostDetail;
+
+function renderSuperTopicPostDetail(post, char) {
+  const hasImage = !!post.image;
+  const comments = (post.commentTree && post.commentTree.length) ? post.commentTree : [];
+  return `
+    <div class="st2s-detail">
+      <div class="st2s-detail-bar">
+        <button onclick="closePostDetail()" class="st2s-detail-back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+          返回动态
+        </button>
+        <span class="st2s-detail-meta">帖子详情 · ${postTime(post)}</span>
+      </div>
+      <article class="st2s-detail-card">
+        <header class="st2s-detail-head">
+          <img class="st2s-detail-av" src="${post.author.avatar || ''}" alt="">
+          <div>
+            <div class="st2s-detail-name">
+              <b>${post.author.name}</b>
+              ${post.author.badge ? `<span class="st2s-detail-bd">${post.author.badge}</span>` : ''}
+            </div>
+            <div class="st2s-detail-tag">${post.tag || ''} ${post.mention || ''}</div>
+          </div>
+        </header>
+        <p class="st2s-detail-text">${post.content || ''}</p>
+        ${hasImage ? `<div class="st2s-detail-img-wrap"><img class="st2s-detail-img" src="${post.image}" alt=""></div>` : ''}
+        <div class="st2s-detail-bar2">
+          <span>${new Date(post.createdAt || Date.now()).toLocaleString('zh-CN', { hour12: false })}</span>
+        </div>
+        <div class="st2s-detail-actions">
+          <button onclick="handlePostAction('${post.id}','like')" class="st2s-detail-act ${post.stats.isLiked ? 'is-on' : ''}">
+            <svg viewBox="0 0 24 24" fill="${post.stats.isLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            <span>${post.stats.likes || 0}</span>
+          </button>
+          <button onclick="handlePostAction('${post.id}','repost')" class="st2s-detail-act">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            <span>${post.stats.reposts || 0}</span>
+          </button>
+          <button class="st2s-detail-act">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>${post.stats.comments || 0}</span>
+          </button>
+          ${hasImage ? `<a href="${post.image}" download="${(post.author.name || 'image').replace(/[^\w一-龥]/g, '_')}_${post.id}.png" class="st2s-detail-act">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>下载</span>
+          </a>` : ''}
+        </div>
+      </article>
+      <div class="st2s-detail-comments">
+        <h5>评论 <span>${comments.length}</span></h5>
+        ${comments.length ? comments.map(c => `
+          <div class="st2s-detail-cm">
+            <img class="st2s-detail-cm-av" src="${c.avatar || ''}" alt="">
+            <div>
+              <div class="st2s-detail-cm-name">${c.name || '匿名'}</div>
+              <div class="st2s-detail-cm-text">${c.text || ''}</div>
+            </div>
+          </div>
+        `).join('') : '<div class="st2s-detail-cm-empty">还没有评论, 快来抢沙发</div>'}
+      </div>
+    </div>
+  `;
+}
+window.renderSuperTopicPostDetail = renderSuperTopicPostDetail;
