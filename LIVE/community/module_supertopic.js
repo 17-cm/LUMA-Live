@@ -708,23 +708,19 @@ function handleSuperTopicFollow(hostName) {
   if (!char) return;
   const topicId = String(char.id);
   if (!window.followedSuperTopics) window.followedSuperTopics = [];
-  if (!window.followedHosts) window.followedHosts = [];
   const idx = window.followedSuperTopics.indexOf(topicId);
   const adding = idx === -1;
   if (adding) {
     window.followedSuperTopics.push(topicId);
-    if (!window.followedHosts.includes(topicId)) window.followedHosts.push(topicId);
     if (api && api.ui) api.ui.toast(`已成功关注【${hostName}】超话！`);
   } else {
     window.followedSuperTopics.splice(idx, 1);
-    window.followedHosts = window.followedHosts.filter(id => String(id) !== topicId);
     if (api && api.ui) api.ui.toast(`已取消关注【${hostName}】超话`);
   }
+  // 超话关注是帖子级别，与主播关注(followedHosts)互不写入
   try { localStorage.setItem('luma_followed_supertopics', JSON.stringify(window.followedSuperTopics)); } catch (e) {}
-  try { localStorage.setItem('luma_followed_hosts', JSON.stringify(window.followedHosts)); } catch (e) {}
   if (typeof dbUpsert === 'function') {
     try { dbUpsert("luma_supertopic_follows", 'user', { topics: window.followedSuperTopics }); } catch (e) {}
-    try { dbUpsert("luma_host_follows", 'user', { ids: window.followedHosts }); } catch (e) {}
   }
   if (typeof syncFollowCountDisplay === 'function') syncFollowCountDisplay();
   // 粉丝数据源全应用统一：刷新所有粉丝展示

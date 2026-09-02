@@ -46,10 +46,10 @@
         hub.setFans(id, fans);
       }
 
-      // 如果玩家关注了该主播（含：直播间关注 followedHosts + 超话关注 followedSuperTopics），额外加 1
+      // 如果玩家关注了该主播（仅直播间关注 followedHosts），额外加 1
+      // 注意：超话关注 followedSuperTopics 是帖子级别的，不等于主播关注，不计入粉丝
       const followedHosts = window.followedHosts || [];
-      const followedSuperTopics = window.followedSuperTopics || [];
-      const isFollowed = followedHosts.includes(id) || followedSuperTopics.includes(id);
+      const isFollowed = followedHosts.includes(id);
       return fans + (isFollowed ? 1 : 0);
     },
 
@@ -173,8 +173,8 @@
       }
 
       // 3. 个人主页玩家粉丝数展示
+      const myFans = this.getFans('user');
       if (!targetId || targetId === 'user') {
-        const myFans = this.getFans('user');
         const userFanEl = document.getElementById('displayUserFans');
         if (userFanEl) userFanEl.textContent = hub.formatNumber(myFans);
       }
@@ -184,6 +184,22 @@
         const btnFans = document.getElementById('btnRankTabFans');
         if (btnFans && btnFans.classList.contains('active')) {
           window.renderCommunityRanking('fans');
+        }
+      }
+
+      // 5. 我的专属超话 (module_mytopic.js)
+      if (typeof window.renderMyTopicView === 'function') {
+        const myTopicEl = document.getElementById('communityMyTopicView');
+        if (myTopicEl && !myTopicEl.classList.contains('hidden')) {
+          window.renderMyTopicView();
+        }
+      }
+
+      // 6. 超话详情页玩家粉丝数展示 (module_supertopic.js)
+      if (!targetId || targetId === 'user') {
+        const userFansInSuperTopic = document.getElementById('displayUserFans');
+        if (userFansInSuperTopic) {
+          userFansInSuperTopic.textContent = hub.formatNumber(myFans);
         }
       }
     }

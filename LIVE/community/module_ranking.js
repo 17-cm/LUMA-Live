@@ -55,14 +55,16 @@ function renderCommunityRanking(tabType = 'fans') {
       name: c.name,
       avatar: c.avatar,
       badge: c.tag || '人气主播',
-      score: c.fans,
+      score: (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function')
+        ? window.LumaFansManager.getFans(c.id, c) : (c.fans || 0),
       scoreLabel: '粉丝'
     }));
     rankedItems.push({
       name: uName + ' (你)',
       avatar: uAvatar,
       badge: uProfile.tag || '新人主播',
-      score: uProfile.fans || 128,
+      score: (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function')
+        ? window.LumaFansManager.getFans('user') : (uProfile.fans || 0),
       scoreLabel: '粉丝',
       isUser: true
     });

@@ -17,6 +17,8 @@ function renderMyTopicView() {
   const uAvatar = (window.currentUser && window.currentUser.avatar) || getAvatar((window.currentUser && window.currentUser.name) || null, 'first');
   const uProfile = window.userProfileData || {};
   const checkIn = window.getSuperTopicCheckInInfo('player_user_self');
+  const uFans = (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function')
+    ? window.LumaFansManager.getFans('user') : 0;
 
   const allPosts = window.weiboPosts || [];
   const myPosts = allPosts.filter(p => p.author && p.author.name === uName);
@@ -46,7 +48,7 @@ function renderMyTopicView() {
             </div>
             <p class="text-[10px] text-slate-300 mt-1 truncate">${uProfile.bio || '理性看播，感性砸车。'}</p>
             <div class="flex items-center gap-3 mt-1.5 text-[10px] text-slate-400">
-              <span>粉丝 <strong class="text-white">${uProfile.fanCount || 520}</strong></span>
+              <span>粉丝 <strong class="text-white">${uFans.toLocaleString()}</strong></span>
               <span>发帖 <strong class="text-white">${myPosts.length}</strong></span>
             </div>
           </div>
