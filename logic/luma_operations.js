@@ -443,67 +443,87 @@ function rollSeconds(minSecs, maxSecs) {
   maxSecs = Math.max(minSecs, Math.floor(maxSecs));
   return minSecs + Math.floor(Math.random() * (maxSecs - minSecs + 1));
 }
-function drawRestSeconds(minRestMins, maxRestMins) {
-  return rollSeconds(minRestMins * 60, maxRestMins * 60);
-}
-function drawLiveSeconds(minLiveMins, maxLiveMins) {
-  return rollSeconds(minLiveMins * 60, maxLiveMins * 60);
-}
+
 
 // =========================================================================
-// 【每刻哈希概率模型】(v1.5 - 替代"每日固定决定"+"轮询骰子")
-// 目标：把角色当真人——"想不想播、想播多久、何时播"每时每刻都在变化。
-// 实现(真正的"时间哈希")：把钟表切成固定长度的时间槽 LIVE_SLOT_MS(10 分钟)，
-//   每个槽位用 seededHash(角色ID::槽号) 掷一枚确定性骰子 slotRoll ∈ [0,1)，
-//   与"倾向基线 + 比例式增长"算出的开播/下播概率比较：
-//     · 同槽内骰子固定 → 槽内稳定，绝不"一秒开一秒关"闪断
-//     · 跨槽骰子重掷   → 决策每刻在变，像真人"状态波动"
-//     · 概率含比例式增长 → 休息越久越想播、播得越久越想停，保底收敛
-//   · 播多久："下播时刻"不在开播时写死，而是每个槽位用哈希重掷一次
-//     "我该继续吗"，计划时长随槽位每刻漂移，天然错落、因人而异。
-//   · 防闪断双保险：最短直播锁(刚开播不能秒关) + 强制休息锁(下播后不能秒开)。
-// 全程不调 AI/API，只靠人设种子 + 时钟推导，离线在线同款公式、结果可复现。
+// 【轮询评估器】(恢复 76a5f13 的"倾向 + 比例式增长"决策公式)
+// 在线轮询与离线补跑共用同一套评估，统一口径：
+//   直播中 → 下播倾向分 = min(100, 下播倾向/2 + 已播分钟/上限×50)
+//   休息中 → 开播倾向分 = min(100, 开播倾向/2 + 已休息分钟/上限×50)
+//   每轮掷 0~100 骰子：骰子 < 倾向分 → 下播/开播
+//   达到时长上限(必)：已播>上限必收 / 已休息>上限必开
+// 说明：全程纯 JS 决策、不调 AI；nowTime 用作模拟时间，离线补跑时传入以便重建历史。
 // =========================================================================
-const LIVE_SLOT_MS = 10 * 60 * 1000; // 时间槽：10 分钟一掷，够细见"在变"，够粗防闪断
-window.LIVE_SLOT_MS = LIVE_SLOT_MS;
+async function evaluateLivePoll(nowTime = null) {
+  const now = nowTime || Date.now();
+  const allChars = window.allCharacters || [];
+  if (!allChars.length) return;
+  if (!window.charSchedulesMap) window.charSchedulesMap = {};
+  const params = window.appParams || {};
+  const maxLiveMins = params.maxLiveDuration || 240;
+  const maxRestMins = params.maxRestDuration || 480;
+  const minRestMins = params.minRestDuration || 10;
+  const dailyLimit = ((params.dailyLiveLimit ?? 0) > 0) ? Number(params.dailyLiveLimit) : Infinity;
 
-function liveSlotIndex(now) {
-  return Math.floor(now / LIVE_SLOT_MS);
+  const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
+  const streamingIds = new Set(sessions.map(s => s.characterId));
+
+  // ── 直播中：评估下播 ──
+  for (const s of sessions) {
+    const cid = s.characterId;
+    const startTs = Number(s.startTime) || now;
+    const liveMins = Math.max(0, (now - startTs) / 60000);
+    const urgent = liveMins >= maxLiveMins;
+    // 下播倾向值取二分之一折算为 0~50 分；未获取则基础分计 0
+    let score = 0;
+    try {
+      const t = await getCharTendency(cid);
+      if (t && t.stopTendency != null) score = Number(t.stopTendency) / 2;
+    } catch (e) {}
+    const timeScore = Math.round((liveMins / maxLiveMins) * 50);
+    const stopScore = urgent ? 100 : Math.min(100, score + timeScore);
+    const dice = Math.round(Math.random() * 100);
+    if (dice < stopScore) {
+      await lumaOpsGateway.requestStopLive({
+        characterId: cid,
+        reason: urgent ? "达到直播时长上限" : "下播倾向(1/2)+时长增长 决定下播",
+        source: "ticker"
+      }, nowTime);
+    }
+  }
+
+  // ── 休息中：评估开播 ──
+  for (const c of allChars) {
+    const cid = c.id;
+    if (!cid || streamingIds.has(cid)) continue;
+    const sched = window.charSchedulesMap[cid];
+    const lastEndTime = sched?.lastEndTime;
+    const restMins = lastEndTime ? Math.max(0, (now - lastEndTime) / 60000) : 9999;
+    // 强制休息期：休息未够最短时长，或仍在网关强制休息锁内 → 一律不开播
+    if (restMins < minRestMins) continue;
+    if (sched?.forcedRestUntil != null && now < sched.forcedRestUntil) continue;
+    // 每日场次上限兜底
+    if (dailyLimit !== Infinity) {
+      try {
+        if ((await getDailyStartCount(cid)) >= dailyLimit) continue;
+      } catch (e) {}
+    }
+    const urgent = restMins >= maxRestMins;
+    // 开播倾向值取二分之一折算为 0~50 分；未获取则基础分计 0
+    let score = 0;
+    try {
+      const t = await getCharTendency(cid);
+      if (t && t.startTendency != null) score = Number(t.startTendency) / 2;
+    } catch (e) {}
+    const timeScore = Math.round((restMins / maxRestMins) * 50);
+    const startScore = urgent ? 100 : Math.min(100, score + timeScore);
+    const dice = Math.round(Math.random() * 100);
+    if (dice < startScore) {
+      await lumaOpsGateway.requestStartLive({ characterId: cid, source: "ticker" }, nowTime);
+    }
+  }
 }
-window.liveSlotIndex = liveSlotIndex;
-
-function clamp01(x) { return x < 0 ? 0 : (x > 1 ? 1 : x); }
-
-// 当天"状态分"：一个角色一天一个稳定基调，制造"今天状态好/差"的差异感
-function getDailyFlavor(characterId) {
-  const nowD = new Date();
-  const key = `${nowD.getFullYear()}-${nowD.getMonth() + 1}-${nowD.getDate()}`;
-  const cid = String(characterId || 'char');
-  return {
-    dayKey: key,
-    mood: seededHash(`${cid}::mood::${key}`),          // 状态分 [0,1)：越高越想播、越难被劝下播
-    wantsToday: seededHash(`${cid}::shy::${key}`) >= 0.08 // 约 8% 天彻底没状态，今天不播
-  };
-}
-window.getDailyFlavor = getDailyFlavor;
-
-// 开播概率 = 倾向基线(受今日情绪加权) + 比例式增长(休息越久越趋近封顶)
-function hashOpenProb(characterId, slot, startTendency, mood, elapsedRestMs, maxBlueMs) {
-  const base = (startTendency != null && startTendency >= 0 ? startTendency / 200 : 0) * (0.4 + mood * 0.6);
-  const r = clamp01(elapsedRestMs / Math.max(maxBlueMs, 1));      // 比例式增长自变量 = 已休息占比
-  const growth = 0.62 * (1 - Math.pow(1 - r, 2));                 // 缓起步、中段加速、封顶 0.62
-  return clamp01(base + growth);
-}
-window.hashOpenProb = hashOpenProb;
-
-// 下播概率 = 倾向基线(受今日情绪负向加权) + 比例式增长(已播时长占比 → 封顶)
-function hashStopProb(characterId, slot, stopTendency, mood, liveMins, maxLiveMins) {
-  const base = (stopTendency != null && stopTendency >= 0 ? stopTendency / 200 : 0.12) * (0.4 + (1 - mood) * 0.6);
-  const r = clamp01(liveMins / Math.max(maxLiveMins, 1));         // 已播时长占最大时长的比例
-  const growth = 0.75 * (1 - Math.pow(1 - r, 2));                 // 越久越容易下播，趋近 0.75
-  return clamp01(base + growth);
-}
-window.hashStopProb = hashStopProb;
+window.evaluateLivePoll = evaluateLivePoll;
 
 // 升级 charSchedulesMap 中"只有轮询残留字段"的旧条目为结算器需要的形状
 function ensureSchedEntry(sched) {
@@ -520,96 +540,6 @@ function ensureSchedEntry(sched) {
   sched.nextOpenAt = sched.nextOpenAt ?? null;
   sched.nextCloseAt = sched.nextCloseAt ?? null;
   return sched;
-}
-
-// 结算单一角色：从 lastSeen 推演到 now，返回 { name, liveMins, ... }
-// 离线：倾向固定忽略，纯秒级随机倒计时，照表(nextOpenAt/nextCloseAt)推进，可复现
-async function settleOneChar(char, now, lastSeen) {
-  const cid = char.id;
-  if (!cid) return null;
-  const params = window.appParams || {};
-  const maxLiveMins = params.maxLiveDuration || 240;   // 直播上限（分钟）
-  const minLiveMins = Math.max(15, Math.round(maxLiveMins * 0.35)); // 单场直播最短时长
-  const maxRestMins = params.maxRestDuration || 480;
-  const minRestMins = params.minRestDuration || 10;
-  const dailyLimit = ((params.dailyLiveLimit ?? 0) > 0) ? Number(params.dailyLiveLimit) : Infinity;
-
-  const sched = ensureSchedEntry(window.charSchedulesMap[cid]);
-
-  // 当前场次
-  const sessions = await api.db.list("live_sessions", { limit: 500 }).catch(() => []) || [];
-  let session = sessions.find(s => s.characterId === cid) || null;
-
-  const flavor = getDailyFlavor(cid);
-  const startOfDay = (function () { const d = new Date(); d.setHours(6, 0, 0, 0); return d.getTime(); }());
-  // 休息起点：上次收官时刻；正在播则以开播时刻为后续休息起点
-  let restBase = sched.lastEndTime || (session ? (Number(session.startTime) || lastSeen) : null);
-
-  // ── 每刻哈希-离线重放：把 [lastSeen, now] 切成 10 分钟槽逐槽判定 ──
-  // 每个槽用 seededHash(角色ID::槽号) 重掷一次骰子，与在线节拍器同款公式，
-  // 槽内稳定、跨槽变化 → 离线重放与在线运行完全一致、可复现。
-  sched.nextOpenAt = null;
-  sched.nextCloseAt = null;
-  let cursor = lastSeen;
-  let guard = 0;
-  while (cursor <= now && guard++ < 2000) {
-    const slot = liveSlotIndex(cursor);
-    const slotStart = slot * LIVE_SLOT_MS;
-    const t = Math.max(slotStart, cursor);          // 本槽判定时刻（槽起点）
-    if (t > now) break;
-    const slotRoll = seededHash(`${cid}::slot::${slot}`);
-
-    if (session) {
-      // ── 直播中：本槽是否自主下播（须播够最短时长，达最大时长必收）──
-      const startTs = Number(session.startTime) || t;
-      const liveMins = Math.max(0, (t - startTs) / 60000);
-      const overMax = liveMins >= maxLiveMins;
-      const overMin = liveMins >= minLiveMins;
-      if (overMax || (overMin && slotRoll < hashStopProb(cid, slot, null, flavor.mood, liveMins, maxLiveMins))) {
-        const closeAt = Math.min(t + LIVE_SLOT_MS, now);
-        const lastStart = startTs;
-        await closeAndArchive(char, session, closeAt);
-        session = null;
-        sched.isLive = false;
-        sched.currentSessionId = null;
-        sched.lastEndTime = closeAt;
-        sched.lastStartTime = sched.lastStartTime || lastStart;
-        restBase = closeAt;
-        try { await incrementDailyStartCount(cid); } catch (e) {}
-        cursor = closeAt;
-      } else {
-        cursor = slotStart + LIVE_SLOT_MS;          // 本槽继续播，走到下一槽再看
-      }
-      continue;
-    }
-
-    // ── 休息中：本槽是否自主开播 ──
-    if (!flavor.wantsToday) break;                  // 今天彻底没状态，全天空过
-    const sinceEnd = restBase != null ? (t - restBase) : (t - startOfDay);
-    if (restBase != null && sinceEnd < minRestMins * 60000) { cursor = slotStart + LIVE_SLOT_MS; continue; } // 强制休息锁
-    if (dailyLimit !== Infinity) {
-      try { if ((await getDailyStartCount(cid)) >= dailyLimit) break; } catch (e) {}
-    }
-    if (slotRoll < hashOpenProb(cid, slot, null, flavor.mood, Math.max(0, sinceEnd), maxRestMins * 60000)) {
-      const openAt = Math.max(t, restBase != null ? restBase + minRestMins * 60000 : t);
-      if (openAt > now) break;                       // 开播时刻落在将来，不在此窗内开
-      session = await openLiveFromHistory(char, openAt);
-      if (!session) break;
-      sched.isLive = true;
-      sched.currentSessionId = session.id;
-      sched.lastStartTime = sched.lastStartTime || openAt;
-      sched.lastEndTime = null;                      // 直播中
-      cursor = openAt;
-    } else {
-      cursor = slotStart + LIVE_SLOT_MS;
-    }
-    continue;
-  }
-
-  window.charSchedulesMap[cid] = sched;
-  try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
-
-  return { name: char.name || cid, liveMins: session ? Math.round((now - (Number(session.startTime) || now)) / 60000) : 0, isLive: !!session };
 }
 
 // 给历史场次写归档：从 live_sessions 移除，写入 streamer_history
@@ -656,45 +586,9 @@ async function closeAndArchive(char, session, endTime) {
   } catch (e) {}
 }
 
-// 历史时刻开播：用给定历史时间戳创建场次（unsaved startTime 为历史值）
-async function openLiveFromHistory(char, startAt, category, topic, durationMins) {
-  try {
-    const cid = char.id;
-    const allChars = window.allCharacters || [];
-    const character = allChars.find(c => c.id === cid);
-    const charName = character?.name || '主播';
-
-    let chosenCat = category, chosenSubTag = null, chosenTopic = null;
-    if (!chosenCat) {
-      if (typeof pickRandomLiveCategory === 'function') {
-        const picked = pickRandomLiveCategory();
-        chosenCat = picked.mainCat; chosenSubTag = picked.subCat;
-      } else { chosenCat = '随性杂谈'; chosenSubTag = '日常唠嗑'; }
-    }
-    if (topic) chosenTopic = `【${charName}】${topic}`;
-    if (!chosenTopic) chosenTopic = `【${charName}】的精彩直播`;
-
-    const newSession = {
-      characterId: cid,
-      name: charName,
-      avatar: character?.avatar || char?.avatar || '',
-      cover: character?.cover || character?.avatar || '',
-      category: chosenCat,
-      subTag: chosenSubTag || '日常唠嗑',
-      topic: chosenTopic,
-      heat: Math.floor(seededHash(`heat:${startAt}`) * 80000 + 20000),
-      roomId: Math.floor(seededHash(`room:${startAt}`) * 899999 + 100000),
-      startTime: startAt,
-      endTime: startAt + 60 * 60 * 1000,
-      isNPC: false
-    };
-
-    const created = await api.db.create("live_sessions", newSession);
-    return created;
-  } catch (e) { return null; }
-}
-
 // 主结算入口：APP 打开时执行，返回统计摘要
+// 离线期间没有轮询，这里按轮询间隔逐段补推演历史决策，模拟"后台一直在跑"，
+// 与在线节拍器共用同一个评估器 evaluateLivePoll（倾向值/2 + 比例式增长 + 掷骰），口径完全一致。
 async function settleAllLive() {
   try {
     const now = Date.now();
@@ -713,22 +607,49 @@ async function settleAllLive() {
       try { await bootstrapWorldInitialState(window.allCharacters || [], window.appParams || {}); } catch (e) {}
     }
 
-    const chars = window.allCharacters || [];
-    const results = [];
-    for (const c of chars) {
+    const params = window.appParams || {};
+    const maxLiveMins = params.maxLiveDuration || 240;
+    const pollIntervalMs = ((params.opsPollInterval || 3) * 60 * 1000);
+
+    // ── 离线补跑：把 [lastSeen, now] 按轮询间隔切成若干历史时刻，逐段调用评估器推演 ──
+    // 每个历史时刻都是真实时间戳，开播/下播落在历史，直播时长真实累计。
+    // 上限 6000 步仅作防呆（覆盖数天），远大于旧版 30 步导致的"离线超限不收盘"。
+    const elapsed = now - lastSeen;
+    const steps = Math.min(Math.max(1, Math.ceil(elapsed / pollIntervalMs)), 6000);
+    let replayedStop = 0;
+    for (let i = 1; i <= steps; i++) {
+      const simulatedNow = lastSeen + i * pollIntervalMs;
+      if (simulatedNow > now) break;
       try {
-        const r = await settleOneChar(c, now, lastSeen);
-        if (r) results.push(r);
+        const before = await (api.db.list("live_sessions", { limit: 500 }).catch(() => [])) || [];
+        await evaluateLivePoll(simulatedNow);
+        const after = await (api.db.list("live_sessions", { limit: 500 }).catch(() => [])) || [];
+        // 统计本次补跑收盘了多少场次（下播即从 live_sessions 移除）
+        replayedStop += Math.max(0, before.length - after.length);
       } catch (e) {}
+    }
+
+    // ── 硬性安全网：无论补跑结果如何，仍超出最大直播时长的场次直接收盘，杜绝"离线显示7小时直播" ──
+    const sessions = await api.db.list("live_sessions", { limit: 500 }).catch(() => []) || [];
+    const allChars = window.allCharacters || [];
+    for (const s of sessions) {
+      const cid = s.characterId;
+      const liveMins = Math.max(0, (now - (Number(s.startTime) || now)) / 60000);
+      if (liveMins >= maxLiveMins) {
+        const char = allChars.find(c => c.id === cid) || { id: cid };
+        try { await closeAndArchive(char, s, now); } catch (e) {}
+        replayedStop++;
+      }
     }
 
     // 结算完成后用真实时间同步一次状态到角色日程，再刷新列表
     try { await syncCharStatusToChat(now); } catch (e) {}
-    await syncLiveSessions();
+    try { await syncLiveSessions(); } catch (e) {}
 
     try { await saveDbSetting("last_poll_time", now); } catch (e) {}
 
-    return { settled: true, elapsedMs: now - lastSeen, chars: results.length, live: results.filter(r => r.isLive).length };
+    const liveNow = await (api.db.list("live_sessions", { limit: 500 }).catch(() => [])) || [];
+    return { settled: true, elapsedMs: now - lastSeen, steps, stopped: replayedStop, live: liveNow.length };
   } catch (e) {
     return { settled: false, reason: "error", error: String(e) };
   }
@@ -802,14 +723,15 @@ async function syncCharStatusToChat(nowTime = null) {
 window.syncCharStatusToChat = syncCharStatusToChat;
 
 // =========================================================================
-// 【在线节拍器】APP 运行期间每 30 秒检查一次，推动角色按作息自动开播/下播
-// 与结算器共用同一套 rollToggleAt 概率判定：倾向 + 比例式增长总概率 × 哈希随机源
-// 同一时间块编号哈希值确定 → 在线实时判定与离线补账重放结果完全一致
-// 休息中 → 该时间块触发开播 → requestStartLive
-// 直播中 → 该时间块触发下播 → requestStopLive
+// 【在线节拍器】APP 运行期间定时检查，推动角色按作息自动开播/下播
+// 与离线补跑共用同一个评估器 evaluateLivePoll：
+//   倾向值(开播/下播)/2 + 比例式增长(已持续/上限×50) → 掷骰判定
+// 休息中 → 触发开播 → requestStartLive
+// 直播中 → 触发下播 → requestStopLive
 // =========================================================================
 let __lumaLiveTicker = null;
 let __lumaLiveTickerBusy = false;
+let __lumaLastPollAt = 0;
 
 async function tickLiveLifecycle() {
   if (__lumaLiveTickerBusy) return;
@@ -820,91 +742,17 @@ async function tickLiveLifecycle() {
 
     const now = Date.now();
     const params = window.appParams || {};
-    const maxLiveMins = params.maxLiveDuration || 240;
-    const minLiveMins = Math.max(15, Math.round(maxLiveMins * 0.35));
-    const maxRestMins = params.maxRestDuration || 480;
-    const minRestMins = params.minRestDuration || 10;
-    const dailyLimit = ((params.dailyLiveLimit ?? 0) > 0) ? Number(params.dailyLiveLimit) : Infinity;
+    const pollIntervalMs = ((params.opsPollInterval || 3) * 60 * 1000);
 
-    const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
-
-    for (const c of allChars) {
-      const cid = c.id;
-      if (!cid) continue;
-      const sched = window.charSchedulesMap[cid];
-      // 未初始化过（没结算也没 bootstrap 兜底）的角色跳过，交给结算器兜底
-      if (!sched || sched.initialized === false) continue;
-
-      const session = sessions.find(s => s.characterId === cid) || null;
-
-      // 倾向值读取（在线时倾向可能变化，实时参与"改签"判定）；未获取按 null
-      let stopTendency = null, startTendency = null;
-      try {
-        const t = await getCharTendency(cid);
-        stopTendency = (t && t.stopTendency != null) ? t.stopTendency : null;
-        startTendency = (t && t.startTendency != null) ? t.startTendency : null;
-      } catch (e) {}
-
-      if (session) {
-        // ── 直播中：最短直播锁 + 每刻哈希概率判定下播 ──
-        const startTs = Number(session.startTime) || now;
-        const liveMins = Math.max(0, (now - startTs) / 60000);
-        // 最短直播锁：刚开播还没播够最短时长，绝不下播（杜绝"开播几秒就关"）
-        if (liveMins < minLiveMins) continue;
-        const slot = liveSlotIndex(now);
-        const slotRoll = seededHash(`${cid}::slot::${slot}`);   // 每刻重掷一枚确定性骰子
-        const flavor = getDailyFlavor(cid);
-        // 每刻哈希概率：达最大时长必收；未到最大则随"倾向+比例式增长"看本槽骰子
-        const pStop = hashStopProb(cid, slot, stopTendency, flavor.mood, liveMins, maxLiveMins);
-        if (slotRoll < pStop) {
-          await lumaOpsGateway.requestStopLive({
-            characterId: cid,
-            reason: "到点自动下播（运营组判定已到）",
-            source: "ticker"
-          });
-          // 下播 → 上强制休息锁：至少休息 minRest 分钟，期间绝不开播（杜绝"下播几秒又开播"）
-          sched.forcedRestUntil = now + minRestMins * 60000;
-          sched.lastEndTime = now;
-          sched.nextOpenAt = null;
-          sched.nextCloseAt = null;
-          try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
-        }
-        continue;
-      }
-
-      // ── 休息中：强制休息锁 + 每刻哈希概率判定自主开播 ──
-      const flavor = getDailyFlavor(cid);
-      if (!flavor.wantsToday) continue;              // 今天彻底没状态，不排
-      // 强制休息锁：刚下播未满最短休息 → 概率再高也不开
-      if (sched.forcedRestUntil != null && now < sched.forcedRestUntil) continue;
-      // 每日场次上限（全局 dailyLimit 兜底，防"全天疯播"）
-      if (dailyLimit !== Infinity) {
-        try {
-          const todayCount = await getDailyStartCount(cid);
-          if (todayCount >= dailyLimit) continue;
-        } catch (e) {}
-      }
-      // 休息增长：休息越久增长越大 → 迟早越过骰子自主开播
-      const restBaseMs = sched.lastEndTime || sched.lastStartTime || null;
-      const elapsedRestMs = restBaseMs
-        ? Math.max(0, now - restBaseMs)
-        : (now - (function () { const d = new Date(); d.setHours(6, 0, 0, 0); return d.getTime(); }()));
-      const slot = liveSlotIndex(now);
-      const slotRoll = seededHash(`${cid}::slot::${slot}`);   // 每刻重掷
-      const pOpen = hashOpenProb(cid, slot, startTendency, flavor.mood, elapsedRestMs, maxRestMins * 60000);
-      // 每刻哈希概率：本槽骰子 < 开播概率 → 自主开播
-      if (slotRoll < pOpen) {
-        await lumaOpsGateway.requestStartLive({
-          characterId: cid,
-          source: "ticker"
-        });
-        sched.forcedRestUntil = null;
-        sched.lastStartTime = now;
-        sched.nextOpenAt = null;
-        sched.nextCloseAt = null;
-        try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
-      }
+    // 按轮询间隔节流：到节奏才真正做一次开播/下播决策，
+    // 与离线补跑共用同一个评估器 evaluateLivePoll（倾向值/2 + 比例式增长 + 掷骰），口径完全一致
+    if (now - __lumaLastPollAt >= pollIntervalMs) {
+      __lumaLastPollAt = now;
+      await evaluateLivePoll(null);
     }
+
+    // 每次节拍都刷新 last_poll_time，下次离线时据此补跑离线窗口
+    try { await saveDbSetting("last_poll_time", now); } catch (e) {}
   } catch (e) {
     console.warn("[LUMA Live] 在线节拍器异常:", e);
   } finally {
