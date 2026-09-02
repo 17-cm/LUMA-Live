@@ -4769,32 +4769,29 @@ input:checked + .switch-slider:before {
 [id="communityLiveSettingsView"] ::selection, [id="communityLiveMusicView"] ::selection { background: rgba(255, 42, 109, 0.18); color: #0f172a; }
 
 /* =========================================================================
-   【浅色光晕卡片 · 复用设计】
-   共享与 .st3-hero 相同的多色径向光晕 + 玻璃白底
-   用于: 社区首页导览卡 / 直播广场偶遇野生主播卡
+   【浅色光晕背景 · 复用】
+   仅在原卡片样式上叠加多色径向光晕, 不改动其他任何视觉
+   用法: 跟原 class 一起使用
+     - 社区导览:    <div class="luxe-card st3-glow-bg ...">
+     - 偶遇野生主播: <div class="holo-wild-card st3-glow-bg ...">
    ========================================================================= */
-.st3-glow-card {
+.st3-glow-bg {
   position: relative;
-  border-radius: 22px;
-  background: #fff;
-  border: 1px solid var(--st3-line, rgba(15, 23, 42, 0.08));
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
-  padding: 14px;
-  overflow: hidden;
   isolation: isolate;
+  overflow: hidden;
 }
-.st3-glow-card::before {
+.st3-glow-bg::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: 0;
   background:
-    radial-gradient(60% 90% at 0% 0%, rgba(255, 42, 109, 0.18) 0%, transparent 60%),
-    radial-gradient(70% 100% at 100% 100%, rgba(121, 40, 202, 0.18) 0%, transparent 65%),
+    radial-gradient(60% 90% at 0% 0%, rgba(255, 42, 109, 0.20) 0%, transparent 60%),
+    radial-gradient(70% 100% at 100% 100%, rgba(121, 40, 202, 0.20) 0%, transparent 65%),
     radial-gradient(50% 60% at 95% 5%, rgba(217, 119, 6, 0.10) 0%, transparent 70%);
   pointer-events: none;
 }
-.st3-glow-card::after {
+.st3-glow-bg::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -4802,152 +4799,4 @@ input:checked + .switch-slider:before {
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.4) 0%, rgba(250, 250, 247, 0) 60%);
   pointer-events: none;
 }
-.st3-glow-card > * { position: relative; z-index: 1; }
-
-/* 顶部一行: icon + title + 副标 + 右侧按钮 */
-.st3-glow-head {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-}
-.st3-glow-ic {
-  width: 44px; height: 44px;
-  flex-shrink: 0;
-  border-radius: 15px;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  background: linear-gradient(145deg, #ff5e62, #ff2a6d 45%, #7928ca);
-  box-shadow:
-    0 6px 14px -4px rgba(255, 42, 109, 0.35),
-    0 2px 6px rgba(121, 40, 202, 0.2);
-  position: relative;
-  overflow: hidden;
-}
-.st3-glow-ic::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(60% 60% at 30% 20%, rgba(255, 255, 255, 0.4) 0%, transparent 70%),
-    radial-gradient(40% 40% at 100% 100%, rgba(217, 119, 6, 0.25) 0%, transparent 70%);
-  pointer-events: none;
-}
-.st3-glow-ic svg {
-  width: 19px; height: 19px;
-  position: relative; z-index: 1;
-  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.18));
-}
-.st3-glow-ic.is-violet { background: linear-gradient(145deg, #a855f7, #7928ca 50%, #ff2a6d); }
-.st3-glow-ic.is-amber  { background: linear-gradient(145deg, #fbbf24, #d97706 50%, #ff2a6d); }
-
-.st3-glow-tt {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.st3-glow-tt h3 {
-  font-size: 14px;
-  font-weight: 900;
-  color: #0f172a;
-  letter-spacing: -.03em;
-  line-height: 1.1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.st3-glow-tt p {
-  font-size: 10px;
-  color: #475569;
-  font-weight: 700;
-  letter-spacing: -.005em;
-  line-height: 1.4;
-}
-
-.st3-glow-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 900;
-  letter-spacing: -.005em;
-  color: #fff;
-  background: linear-gradient(135deg, #ff5e62, #ff2a6d);
-  box-shadow: 0 4px 10px -2px rgba(255, 42, 109, 0.4);
-  border: 0;
-  cursor: pointer;
-  transition: transform .15s ease, box-shadow .2s ease;
-  flex-shrink: 0;
-}
-.st3-glow-cta:active { transform: scale(0.95); }
-.st3-glow-cta.is-violet { background: linear-gradient(135deg, #a855f7, #7928ca); box-shadow: 0 4px 10px -2px rgba(121, 40, 202, 0.4); }
-
-/* 底部胶囊行 */
-.st3-glow-pills {
-  margin-top: 11px;
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  no-scrollbar: 1;
-  scrollbar-width: none;
-  padding-bottom: 1px;
-}
-.st3-glow-pills::-webkit-scrollbar { display: none; }
-.st3-glow-pill {
-  display: inline-flex;
-  align-items: center;
-  font-size: 9.5px;
-  font-weight: 800;
-  padding: 4px 9px;
-  border-radius: 999px;
-  color: #fff;
-  flex-shrink: 0;
-  letter-spacing: -.005em;
-  box-shadow: 0 2px 5px -1px rgba(15, 23, 42, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-}
-.st3-glow-pill.is-rose   { background: linear-gradient(135deg, #ff5e62, #ff2a6d); }
-.st3-glow-pill.is-amber  { background: linear-gradient(135deg, #fbbf24, #d97706); }
-.st3-glow-pill.is-violet { background: linear-gradient(135deg, #a855f7, #7928ca); }
-
-/* 紧凑 badge(右上角 NEW / COMMUNITY 之类) */
-.st3-glow-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: 7.5px;
-  font-weight: 900;
-  letter-spacing: .12em;
-  padding: 2.5px 6px;
-  border-radius: 999px;
-  color: #fff;
-  background: linear-gradient(135deg, #ff5e62, #ff2a6d);
-  text-transform: uppercase;
-  box-shadow: 0 1px 3px rgba(255, 42, 109, 0.3);
-}
-.st3-glow-badge.is-violet { background: linear-gradient(135deg, #a855f7, #7928ca); box-shadow: 0 1px 3px rgba(121, 40, 202, 0.3); }
-.st3-glow-badge.is-amber  { background: linear-gradient(135deg, #fbbf24, #d97706); box-shadow: 0 1px 3px rgba(217, 119, 6, 0.3); }
-
-/* 召唤胶囊 (wild card 右侧) */
-.st3-summon {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 900;
-  color: #fff;
-  background: linear-gradient(135deg, #a855f7, #7928ca);
-  box-shadow: 0 4px 10px -2px rgba(121, 40, 202, 0.4);
-  border: 0;
-  flex-shrink: 0;
-  cursor: pointer;
-  transition: transform .15s ease, box-shadow .2s ease;
-}
-.st3-summon:active { transform: scale(0.95); }
-.st3-summon svg { width: 9px; height: 9px; }
+.st3-glow-bg > * { position: relative; z-index: 1; }

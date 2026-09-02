@@ -4,19 +4,23 @@
   // 注入页面 HTML
   document.getElementById('pages-root').insertAdjacentHTML('beforeend', `
 <div id="tab-live" class="tab-page h-full overflow-y-auto no-scrollbar px-4 pb-28 space-y-3.5">
-      <div onclick="handleGenerateWildNPC()" class="st3-glow-card" style="cursor:pointer;">
-        <div class="st3-glow-head">
-          <div class="st3-glow-ic is-violet">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+      <div onclick="handleGenerateWildNPC()" class="holo-wild-card st3-glow-bg p-3.5 flex items-center justify-between cursor-pointer active:scale-98 transition shadow-sm">
+        <div class="flex items-center gap-3 relative z-10">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-500 via-purple-600 to-cyan-400 p-0.5 shadow-md">
+            <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-white text-base font-bold">
+              <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+            </div>
           </div>
-          <div class="st3-glow-tt">
-            <h3>偶遇野生主播<span class="st3-glow-badge is-violet">AI · NEW</span></h3>
-            <p>召唤专属虚拟主播(自动套用生图参数)</p>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <h3 class="text-xs font-black text-slate-900">偶遇野生主播 · AI 生图</h3>
+              <span class="text-[8px] bg-purple-100 text-purple-700 font-extrabold px-1.5 py-0.2 rounded-full">NEW</span>
+            </div>
+            <p class="text-[10px] text-slate-500 mt-0.5">召唤专属虚拟主播（自动套用生图参数）</p>
           </div>
-          <div id="btnSummonWildBadge" class="st3-summon">
-            <span>召唤</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="9 18 15 12 9 6"></polyline></svg>
-          </div>
+        </div>
+        <div id="btnSummonWildBadge" class="relative z-10 flex items-center gap-1 bg-white/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-white text-rose-600 text-[10px] font-black shadow-sm">
+          <span>召唤</span><span>›</span>
         </div>
       </div>
 
