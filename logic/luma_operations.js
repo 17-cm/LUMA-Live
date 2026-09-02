@@ -444,8 +444,20 @@ async function evaluateLivePoll(nowTime = null) {
   const minRestMins = params.minRestDuration || 10;
   const dailyLimit = ((params.dailyLiveLimit ?? 0) > 0) ? Number(params.dailyLiveLimit) : Infinity;
 
+  // ── 轮询日志初始化（记录本轮所有决定与汇总，保留最近 50 轮，对齐 76a5f13）──
+  if (!window.lumaOpsLog) window.lumaOpsLog = [];
+  window.__lumaPollCycle = (window.__lumaPollCycle || 0) + 1;
+  const cycleLog = {
+    time: new Date(now).toLocaleTimeString(),
+    cycle: window.__lumaPollCycle,
+    params: { maxLiveMins, maxRestMins, minRestMins, dailyLimit: dailyLimit === Infinity ? '不限制' : dailyLimit },
+    decisions: [],
+    summary: { totalChars: allChars.length, streaming: 0, started: 0, stopped: 0, evaluated: 0, offlineSim: !!nowTime }
+  };
+
   const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
   const streamingIds = new Set(sessions.map(s => s.characterId));
+  cycleLog.summary.streaming = sessions.length;
 
   // ── 直播中：评估下播 ──
   for (const s of sessions) {
@@ -455,14 +467,23 @@ async function evaluateLivePoll(nowTime = null) {
     const urgent = liveMins >= maxLiveMins;
     // 下播倾向值取二分之一折算为 0~50 分；未获取则基础分计 0
     let score = 0;
+    let rawTendency = null;
     try {
       const t = await getCharTendency(cid);
-      if (t && t.stopTendency != null) score = Number(t.stopTendency) / 2;
+      if (t && t.stopTendency != null) { rawTendency = Number(t.stopTendency); score = rawTendency / 2; }
     } catch (e) {}
     const timeScore = Math.round((liveMins / maxLiveMins) * 50);
     const stopScore = urgent ? 100 : Math.min(100, score + timeScore);
     const dice = Math.round(Math.random() * 100);
-    if (dice < stopScore) {
+    const willStop = dice < stopScore;
+    cycleLog.decisions.push({
+      char: s.name || cid, state: '直播中', liveMins: Math.round(liveMins),
+      tendency: rawTendency != null ? `${rawTendency} (折算${Math.round(rawTendency / 2)})` : '暂未获取',
+      score: stopScore, dice, result: willStop ? '下播' : '继续播'
+    });
+    cycleLog.summary.evaluated++;
+    if (willStop) {
+      cycleLog.summary.stopped++;
       await lumaOpsGateway.requestStopLive({
         characterId: cid,
         reason: urgent ? "达到直播时长上限" : "下播倾向(1/2)+时长增长 决定下播",
@@ -490,17 +511,31 @@ async function evaluateLivePoll(nowTime = null) {
     const urgent = restMins >= maxRestMins;
     // 开播倾向值取二分之一折算为 0~50 分；未获取则基础分计 0
     let score = 0;
+    let rawTendency = null;
     try {
       const t = await getCharTendency(cid);
-      if (t && t.startTendency != null) score = Number(t.startTendency) / 2;
+      if (t && t.startTendency != null) { rawTendency = Number(t.startTendency); score = rawTendency / 2; }
     } catch (e) {}
     const timeScore = Math.round((restMins / maxRestMins) * 50);
     const startScore = urgent ? 100 : Math.min(100, score + timeScore);
     const dice = Math.round(Math.random() * 100);
-    if (dice < startScore) {
+    const willStart = dice < startScore;
+    const charName = c.name || c.displayName || c.username || cid;
+    cycleLog.decisions.push({
+      char: charName, state: '休息中', restMins: restMins >= 9999 ? '蓄势(未插播过)' : Math.round(restMins),
+      tendency: rawTendency != null ? `${rawTendency} (折算${Math.round(rawTendency / 2)})` : '暂未获取',
+      score: startScore, dice, result: willStart ? '开播' : '继续休'
+    });
+    cycleLog.summary.evaluated++;
+    if (willStart) {
+      cycleLog.summary.started++;
       await lumaOpsGateway.requestStartLive({ characterId: cid, source: "ticker" }, nowTime);
     }
   }
+
+  // ── 写入轮询日志（保留最近 50 轮）──
+  window.lumaOpsLog.unshift(cycleLog);
+  if (window.lumaOpsLog.length > 50) window.lumaOpsLog.pop();
 }
 window.evaluateLivePoll = evaluateLivePoll;
 
