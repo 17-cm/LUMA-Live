@@ -1,7 +1,8 @@
 // =========================================================================
-// 【模块二·社区子文档2·主播超话系统】LIVE/社区/module_supertopic.js
-// 深度复刻微博超话：点击头像切换超话 + 个人主页式分段导航（动态 | 签到 | 打榜 | 贡献榜）
-// 贡献值三渠道（送礼1:1·签到+100·打榜花钱）统一计入同一张 (我→主播) 贡献矩阵，展示均在超话贡献榜/主页守护榜
+// 【模块二·社区子文档2·主播超话系统 v2.0】LIVE/社区/module_supertopic.js
+// 以「超话 / #」为符号重构精致全息界面（深空玻璃视觉），保留全部原有功能：
+//   动态 | 签到打卡 | 打榜应援 | 贡献榜 | 关注 | 切换超话左拉抽屉
+// 数据接口与业务逻辑保持原样：贡献三渠道(送礼1:1·签到+100·打榜)统一计入贡献矩阵。
 // =========================================================================
 var api = window.api || {};
 let currentActiveSuperTopicCharId = null;
@@ -50,6 +51,34 @@ function currentUserName() {
 function currentUserAvatar() {
   return (window.currentUser && window.currentUser.avatar) || getAvatarFor(currentUserName(), 'first');
 }
+// 由超话 id 派生稳定双色主调，让每个超话拥有专属视觉
+function topicHues(id) {
+  const palettes = [
+    ['#ff2a6d', '#22d3ee'],
+    ['#f97316', '#f43f5e'],
+    ['#a855f7', '#f0abfc'],
+    ['#2dd4bf', '#60a5fa'],
+    ['#f5b301', '#ff6b9d'],
+    ['#7c3aed', '#ff2a6d'],
+    ['#3b82f6', '#22d3ee'],
+    ['#ec4899', '#fbbf24']
+  ];
+  const s = String(id || '');
+  let n = 0;
+  for (let i = 0; i < s.length; i++) n = (n * 31 + s.charCodeAt(i)) >>> 0;
+  return palettes[n % palettes.length];
+}
+function postTime(post) {
+  if (post.time) return post.time;
+  if (post.createdAt) {
+    try {
+      if (window.formatDynamicTime) {
+        return window.formatDynamicTime(post.createdAt) + ' · 来自 ' + (window.getFloatClientTag ? window.getFloatClientTag(true) : '小手机');
+      }
+    } catch (e) {}
+  }
+  return '刚刚';
+}
 
 // -------------------------------------------------------------------------
 // 超话右上角「···」菜单
@@ -69,7 +98,7 @@ document.addEventListener('click', function(e) {
 });
 
 // -------------------------------------------------------------------------
-// 主视图渲染：Hero + 分段导航 + 内容面板
+// 主视图渲染：Hero 封面 + 数据带 + 分段导航 + 内容面板
 // -------------------------------------------------------------------------
 function renderSuperTopicView(charId = null) {
   const container = document.getElementById('communitySuperTopicContent');
@@ -86,94 +115,84 @@ function renderSuperTopicView(charId = null) {
   const fansCount = (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function')
     ? window.LumaFansManager.getFans(char.id, char) : (char.fans || 0);
   const contribution = getCharContribution(char.id);
-  const supportCoin = getMyWalletBalance(char.id);
   const topicPosts = topicPostsFor(char);
   const todayDiscuss = topicPosts.length + 18;
   const heatValue = (fansCount * 3 + contribution).toLocaleString();
+  const [a, b] = topicHues(char.id);
 
   const headerTitle = document.getElementById('superTopicHeaderTitle');
   if (headerTitle) headerTitle.textContent = `#${char.name}超话#`;
 
   container.innerHTML = `
-    <!-- 1. 顶部封面头图（同个人主页·朋友圈风格封面，随内容滚动） -->
-    <div class="relative -mx-4 h-[150px] overflow-hidden bg-slate-900 rounded-b-2xl">
-      <div class="absolute inset-0 bg-gradient-to-tr from-rose-500/45 via-purple-500/30 to-cyan-400/35 pointer-events-none"></div>
-      <img src="${char.avatar || ''}" class="absolute inset-0 w-full h-full object-cover opacity-75" alt="超话封面" loading="lazy">
-      <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent pointer-events-none"></div>
-      <!-- 右上：关注/更多 -->
-      <div class="absolute top-2.5 right-3 z-10 flex items-center gap-2">
-        <button onclick="handleSuperTopicFollow('${char.name}')" class="px-3 py-1.5 rounded-full text-[11px] font-black transition active:scale-95 shadow-md ${isFollowed ? 'bg-white/20 text-white border border-white/30 backdrop-blur' : 'bg-gradient-to-r from-rose-500 to-purple-600 text-white shadow-rose-500/30'}">
-          ${isFollowed ? '✓ 已关注' : '+ 关注'}
+    <!-- 1. 全息封面 Hero -->
+    <section class="st2-hero" style="--st2-a:${a};--st2-b:${b}">
+      <div class="st2-hero-top">
+        <div class="st2-kickers">
+          <span class="st2-kicker is-hot"># 明星超话 #</span>
+          <span class="st2-kicker">${char.category || '官方超话'}</span>
+        </div>
+        <div class="st2-hero-act">
+          <button onclick="handleSuperTopicFollow('${char.name.replace(/'/g, "\\'")}')" class="st2-follow ${isFollowed ? 'is-followed' : ''}">
+            ${isFollowed
+              ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> 已关注'
+              : '+ 关注'}
+          </button>
+        </div>
+      </div>
+      <div class="st2-hero-foot">
+        <button class="st2-avatar" onclick="toggleSuperTopicDrawer()" title="切换超话">
+          <img src="${char.avatar}" alt="超话头像">
+          <span class="st2-switch-chip"># 切换</span>
         </button>
-      </div>
-      <!-- 左下：超话名称与主持人信息 -->
-      <div class="absolute bottom-2.5 left-4 right-4 z-10 flex items-end justify-between gap-2">
-        <div class="min-w-0">
-          <h2 class="text-base font-black text-white tracking-tight drop-shadow truncate max-w-[200px]">#${char.name}超话#</h2>
-          <p class="text-[10px] text-white/85 font-medium mt-0.5 flex items-center gap-1 truncate">
-            <span class="text-rose-300 font-bold">主持人</span> @${char.name}后援会 · 官方认证
-          </p>
-        </div>
-        <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[9px] font-black bg-white/15 text-white border border-white/25 backdrop-blur">超话·${char.category || '明星'}</span>
-      </div>
-    </div>
-
-    <!-- 2. 白色资料卡（同个人主页风格：头像+金V+数据宫格） -->
-    <div class="relative -mt-6 z-10 bg-white rounded-3xl px-4 pb-3 pt-5 shadow-sm border border-slate-100">
-      <div class="flex items-center gap-3 min-w-0">
-        <!-- 头像：点击切换超话 -->
-        <div class="relative flex-shrink-0 cursor-pointer active:scale-95 transition" onclick="toggleSuperTopicDrawer()" title="切换超话">
-          <div class="profile-avatar-wrapper" style="margin-top:0;">
-            <img src="${char.avatar}" class="profile-avatar-img" alt="超话头像">
-            <div class="v-badge-gold" title="官方认证金V" style="width:16px;height:16px;bottom:1px;right:1px;">
-              <svg class="w-2 h-2 fill-current" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-            </div>
+        <div class="st2-id">
+          <div class="st2-id-name">
+            <h2>#${char.name}超话#</h2>
+            <span class="st2-goldv"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
           </div>
-          <span class="absolute -bottom-1 -right-1 text-[8px] bg-slate-900/90 text-rose-300 font-extrabold px-1.5 py-0.5 rounded-full border border-rose-500/40 shadow-sm z-10">切换</span>
-        </div>
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <h2 class="text-[15px] font-black text-slate-900 tracking-tight truncate max-w-[130px]">#${char.name}超话#</h2>
-            <span class="text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-900 text-amber-300 border border-amber-400/40 shrink-0">金V认证</span>
-          </div>
-          <div class="flex items-center gap-1.5 text-[10px] text-amber-600 font-bold mt-1">
-            <svg class="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-            <span class="truncate">明星超话 · 官方认证蓝标</span>
+          <div class="st2-id-sub">
+            <span class="dot"></span>
+            <b>主持人</b>
+            <span class="t">@${char.name}后援会 · 官方认证</span>
           </div>
         </div>
       </div>
+    </section>
 
-      <!-- 4合1 数据矩阵（微博经典宫格） -->
-      <div class="grid grid-cols-4 gap-2 mt-3 py-2.5 px-1 rounded-2xl bg-slate-50 border border-slate-100 text-center">
-        <div>
-          <span class="block text-sm font-black text-slate-900 tracking-tight">${fansCount.toLocaleString()}</span>
-          <span class="text-[9px] text-slate-400 font-medium">粉丝</span>
-        </div>
-        <div class="border-l border-slate-200">
-          <span class="block text-sm font-black text-slate-900 tracking-tight">${todayDiscuss}</span>
-          <span class="text-[9px] text-slate-400 font-medium">今日讨论</span>
-        </div>
-        <div class="border-l border-slate-200">
-          <span class="block text-sm font-black text-rose-600 tracking-tight">${contribution.toLocaleString()}</span>
-          <span class="text-[9px] text-slate-400 font-medium">我的贡献</span>
-        </div>
-        <div class="border-l border-slate-200">
-          <span class="block text-sm font-black text-amber-600 tracking-tight">${heatValue}</span>
-          <span class="text-[9px] text-slate-400 font-medium">超话热度</span>
-        </div>
+    <!-- 2. 数据关注带 -->
+    <section class="st2-ribbon">
+      <div class="st2-ribbon-item">
+        <span class="st2-ribbon-n is-cyan">${fansCount.toLocaleString()}</span>
+        <span class="st2-ribbon-l">粉丝</span>
       </div>
-    </div>
+      <div class="st2-ribbon-item">
+        <span class="st2-ribbon-n">${todayDiscuss}</span>
+        <span class="st2-ribbon-l">今日讨论</span>
+      </div>
+      <div class="st2-ribbon-item">
+        <span class="st2-ribbon-n is-rose">${contribution.toLocaleString()}</span>
+        <span class="st2-ribbon-l">我的贡献</span>
+      </div>
+      <div class="st2-ribbon-item">
+        <span class="st2-ribbon-n is-gold">${heatValue}</span>
+        <span class="st2-ribbon-l">超话热度</span>
+      </div>
+    </section>
 
-    <!-- 3. 微博 Tab 导航条（个人主页同款粘性导航·红色下划线） -->
-    <div class="sticky top-0 z-20 bg-white/95 backdrop-blur border-y border-slate-100 flex items-center justify-around px-2 shadow-xs -mx-4 mt-3">
+    <!-- 3. 分段导航胶囊 -->
+    <nav class="st2-tabs">
       ${['posts', 'checkin', 'support', 'contribute'].map(k => {
-        const label = { posts: '动态', checkin: '签到', support: '打榜', contribute: '贡献榜' }[k];
-        return `<div id="spTabBtn_${k}" onclick="switchSuperTopicTab('${k}')" class="weibo-tab-item ${currentSuperTopicTab === k ? 'active' : ''}">${label}</div>`;
+        const cfg = {
+          posts: { label: '动态', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg>' },
+          checkin: { label: '签到', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="3" y="4" width="18" height="18" rx="3"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><polyline points="9 16 11 18 15 14"></polyline></svg>' },
+          support: { label: '打榜', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2 9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"></path></svg>' },
+          contribute: { label: '贡献榜', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="8" r="6"></circle><path d="M15.5 13 17 22l-5-3-5 3 1.5-9"></path></svg>' }
+        }[k];
+        return `<button id="spTabBtn_${k}" onclick="switchSuperTopicTab('${k}')" class="st2-tab ${currentSuperTopicTab === k ? 'active' : ''}">${cfg.ic}<span>${cfg.label}</span></button>`;
       }).join('')}
-    </div>
+    </nav>
 
-    <!-- 4. 内容面板（随分段导航刷新的挂载点） -->
-    <div id="superTopicPanel" class="space-y-3 mt-3 pb-24"></div>
+    <!-- 4. 内容面板挂载点 -->
+    <div id="superTopicPanel" class="st2-panel"></div>
   `;
 
   renderSuperTopicTab();
@@ -231,52 +250,53 @@ function renderSuperTopicPostsTab(charId) {
   }
 
   panel.innerHTML = `
-    <div class="flex items-center justify-between px-1">
-      <h3 class="text-sm font-black text-slate-900">超话动态</h3>
-      <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">${posts.length} 篇</span>
+    <div class="st2-sec">
+      <h4><span class="sharp">#</span>超话动态</h4>
+      <span class="note">TOTAL ${posts.length}</span>
     </div>
+
     ${posts.map(post => `
-      <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 transition active:scale-[0.99] cursor-pointer" onclick="openTrendDetail('${post.id}')">
-        <div class="flex items-center justify-between" onclick="event.stopPropagation()">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <img src="${post.author.avatar}" class="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-sm flex-shrink-0">
-            <div class="min-w-0">
-              <div class="flex items-center gap-1.5">
-                <h5 class="text-xs font-black text-slate-900 truncate">${post.author.name}</h5>
-                ${post.author.badge ? `<span class="text-[8px] px-1.5 py-0.2 rounded bg-gradient-to-r from-rose-50 to-purple-50 text-rose-600 font-extrabold border border-rose-200/50">${post.author.badge}</span>` : ''}
-              </div>
-              <p class="text-[9px] text-slate-400 mt-0.5">${post.time || (post.createdAt ? (function(){ try { return (window.formatDynamicTime ? window.formatDynamicTime(post.createdAt) : '刚刚') + ' · 来自 ' + (window.getFloatClientTag ? window.getFloatClientTag(true) : '小手机'); } catch(e){ return '刚刚'; } })() : '刚刚')}</p>
+      <article class="st2-post" onclick="openTrendDetail('${post.id}')">
+        <div class="st2-post-hd">
+          <img class="st2-post-av" src="${post.author.avatar}" alt="">
+          <div class="st2-post-au">
+            <div class="st2-post-name">
+              <h5>${post.author.name}</h5>
+              ${post.author.badge ? `<i>${post.author.badge}</i>` : ''}
             </div>
+            <div class="st2-post-meta">${postTime(post)}</div>
           </div>
-          <span class="text-[10px] text-rose-500 font-black bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100 flex-shrink-0">#${char.name}超话#</span>
+          <span class="st2-post-tag">#${char.name}超话#</span>
         </div>
-        <p class="text-xs text-slate-800 leading-relaxed mt-2.5 font-normal">
-          <span class="text-rose-600 font-bold mr-1">#${char.name}超话#</span>${post.content}
+        <p class="st2-post-body">
+          <span class="hash">#${char.name}超话#</span> ${post.content}
         </p>
-        ${post.image ? `<div class="rounded-xl overflow-hidden aspect-video bg-slate-100 mt-2.5 shadow-inner"><img src="${post.image}" class="w-full h-full object-cover" loading="lazy"></div>` : ''}
-        <div class="flex items-center justify-between pt-2.5 mt-2.5 border-t border-slate-100 text-slate-500 text-xs" onclick="event.stopPropagation()">
-          <div onclick="handlePostAction('${post.id}', 'repost')" class="flex items-center gap-1.5 hover:text-slate-800 transition active:scale-90 p-1">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
-            <span class="text-[10px] font-bold">${post.stats.reposts}</span>
-          </div>
-          <div onclick="openTrendDetail('${post.id}')" class="flex items-center gap-1.5 hover:text-slate-800 transition active:scale-90 p-1">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            <span class="text-[10px] font-bold">${post.stats.comments}</span>
-          </div>
-          <div onclick="handlePostAction('${post.id}', 'like')" class="flex items-center gap-1.5 transition active:scale-90 p-1 ${post.stats.isLiked ? 'text-rose-500 font-black' : 'hover:text-rose-500'}">
-            <svg class="w-3.5 h-3.5 ${post.stats.isLiked ? 'fill-rose-500' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
-            <span class="text-[10px] font-bold">${post.stats.likes}</span>
-          </div>
+        ${post.image ? `
+        <div class="st2-post-media">
+          <img src="${post.image}" loading="lazy" alt="超话动态配图">
+        </div>` : ''}
+        <div class="st2-post-ft" onclick="event.stopPropagation()">
+          <button onclick="handlePostAction('${post.id}','repost')" class="st2-act">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+            ${post.stats.reposts}
+          </button>
+          <button onclick="openTrendDetail('${post.id}')" class="st2-act">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            ${post.stats.comments}
+          </button>
+          <button onclick="handlePostAction('${post.id}','like')" class="st2-act ${post.stats.isLiked ? 'is-liked' : ''}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
+            ${post.stats.likes}
+          </button>
         </div>
-      </div>
+      </article>
     `).join('')}
 
-    <!-- 底部发布动态快捷栏 -->
-    <div class="bg-white rounded-2xl p-3 flex items-center gap-2.5 border border-slate-100 shadow-sm" onclick="openCreatePostModal('#${char.name}超话#', '@${char.name}')">
-      <div class="flex-1 bg-slate-50 text-slate-400 text-xs font-bold px-3.5 py-2 rounded-full">说点什么，为主播打 call...</div>
-      <button class="w-9 h-9 rounded-full bg-gradient-to-tr from-rose-500 to-purple-600 text-white flex items-center justify-center shadow-md shadow-rose-500/30 flex-shrink-0">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-      </button>
+    <div class="st2-composer" onclick="openCreatePostModal('#${char.name}超话#', '@${char.name}')">
+      <span class="ph">说点什么，为主播 #${char.name}# 打 call…</span>
+      <span class="send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      </span>
     </div>
   `;
 }
@@ -295,12 +315,15 @@ function renderSuperTopicCheckinTab(char) {
   const weekDays = ['一', '二', '三', '四', '五', '六', '日'];
   let calendar = '';
   for (let i = 0; i < 7; i++) {
-    let cls = 'text-slate-300 bg-slate-50 border border-slate-100';
-    if (i < dayOfWeek) cls = 'text-rose-500 bg-rose-50 border border-rose-200 font-bold';
-    else if (i === dayOfWeek) cls = checkIn.isCheckedToday
-      ? 'text-rose-500 bg-rose-50 border border-rose-200 font-black ring-1 ring-rose-300'
-      : 'text-rose-600 bg-white border-2 border-dashed border-rose-400 font-black animate-pulse';
-    calendar += `<div class="flex-1 aspect-square rounded-lg flex flex-col items-center justify-center text-[10px] ${cls}">${weekDays[i]}</div>`;
+    let cls = 'st2-week-d';
+    let mark = '<span class="mark"></span>';
+    if (i < dayOfWeek) { cls += ' is-past'; mark = '<span class="mark">✓</span>'; }
+    else if (i === dayOfWeek) {
+      cls += ' is-now';
+      mark = '<span class="mark">今</span>';
+      if (checkIn.isCheckedToday) { cls += ' is-done'; }
+    }
+    calendar += `<div class="${cls}"><span>${weekDays[i]}</span>${mark}</div>`;
   }
 
   const rankList = (window.LumaCheckinManager && typeof window.LumaCheckinManager.getTopicCheckInRankList === 'function')
@@ -308,70 +331,70 @@ function renderSuperTopicCheckinTab(char) {
 
   panel.innerHTML = `
     <!-- 签到主卡 -->
-    <div class="bg-gradient-to-br from-emerald-50 via-teal-50 to-white border border-emerald-200/80 p-4 rounded-3xl shadow-sm space-y-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="text-xl">📅</span>
+    <section class="st2-sign">
+      <div class="st2-sign-hd">
+        <div class="st2-sign-l">
+          <span class="st2-sign-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="3" y="4" width="18" height="18" rx="3"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </span>
           <div>
-            <h4 class="text-xs font-black text-emerald-950">#${char.name}# 每日签到</h4>
-            <p class="text-[9px] text-emerald-700 mt-0.5">一天一次 · 签到即得 贡献 +100</p>
+            <h4>#${char.name}# 每日签到</h4>
+            <p>一天一次 · 签到即得 贡献 +100</p>
           </div>
         </div>
-        <button onclick="handleSuperTopicCheckIn('${char.id}', '${char.name}')" class="px-3.5 py-2 rounded-xl text-xs font-black transition active:scale-95 shadow-md ${checkIn.isCheckedToday ? 'bg-emerald-100 text-emerald-700 shadow-none cursor-default' : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-emerald-500/20'}">
-          ${checkIn.isCheckedToday ? '✓ 今日已签到' : '立即签到'}
+        <button onclick="handleSuperTopicCheckIn('${char.id}','${char.name.replace(/'/g, "\\'")}')" class="st2-sign-btn ${checkIn.isCheckedToday ? 'is-done' : ''}">
+          ${checkIn.isCheckedToday ? `已签 ${checkIn.streakDays || 0} 天` : '立即签到'}
         </button>
       </div>
 
-      <!-- 本周签到日历 -->
-      <div class="flex items-center gap-1.5 mt-1">${calendar}</div>
+      <div class="st2-week">${calendar}</div>
 
-      <div class="grid grid-cols-2 gap-2 pt-2 border-t border-emerald-100 text-center">
-        <div class="bg-white/70 rounded-xl py-2">
-          <span class="block text-lg font-black text-emerald-600 leading-none">${checkIn.streakDays || 0} 天</span>
-          <span class="text-[8px] text-slate-400 font-bold mt-1 block">连续签到</span>
+      <div class="st2-sign-stat">
+        <div>
+          <b>${checkIn.streakDays || 0} 天</b>
+          <span>连续签到</span>
         </div>
-        <div class="bg-white/70 rounded-xl py-2">
-          <span class="block text-lg font-black text-slate-800 leading-none">${checkIn.totalDays || 0} 天</span>
-          <span class="text-[8px] text-slate-400 font-bold mt-1 block">累计已签到</span>
+        <div>
+          <b class="gold">${checkIn.totalDays || 0} 天</b>
+          <span>累计已签到</span>
+        </div>
+        <div>
+          <b class="violet">Lv.${checkIn.level || 1}</b>
+          <span>超话等级</span>
         </div>
       </div>
-
-      <!-- 我 已签到 x 天 -->
-      <div class="flex items-center justify-center gap-1.5 text-[10px] text-slate-500 bg-white/70 rounded-xl py-2 font-bold">
-        <span class="text-rose-500">我已签到 <b class="text-rose-600">${checkIn.totalDays || 0}</b> 天</span>
-        <span class="w-1 h-1 rounded-full bg-slate-300"></span>
-        <span>连签 <b class="text-emerald-600">${checkIn.streakDays || 0}</b> 天</span>
-        <span class="w-1 h-1 rounded-full bg-slate-300"></span>
-        <span>贡献 <b class="text-purple-600">${contribution.toLocaleString()}</b></span>
-      </div>
-    </div>
+      <p style="text-align:center;margin-top:10px;font-size:9.5px;color:rgba(223,247,238,.6);font-weight:700;">
+        累计贡献 <b style="color:#8ff3cd;">${contribution.toLocaleString()}</b>
+        <span style="opacity:.5;"> · 已签 ${checkIn.totalDays || 0} 天</span>
+      </p>
+    </section>
 
     <!-- 签到排行榜 -->
-    <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100">
-      <div class="flex items-center justify-between mb-2.5">
-        <div class="flex items-center gap-1.5 text-xs font-black text-slate-900"><span class="text-sm">🏆</span><span>连续签到榜 TOP</span></div>
-        <span class="text-[9px] text-slate-400 font-bold">按连签天数排序</span>
+    <section class="st2-card" style="padding:12px 11px;">
+      <div class="st2-sec">
+        <h4><span class="sharp">#</span>连续签到榜 TOP</h4>
+        <span class="note">按连签天数排序</span>
       </div>
-      ${rankList.length ? rankList.map((item, idx) => `
-        <div class="py-2 flex items-center justify-between border-b border-slate-50 last:border-0 ${item.isUser ? 'ring-1 ring-emerald-300 rounded-xl my-0.5 px-2 bg-emerald-50/40' : ''}">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <span class="w-5 text-center text-xs font-black ${idx === 0 ? 'text-amber-500' : 'text-slate-400'}">${idx + 1}</span>
-            <img src="${item.avatar}" class="w-7 h-7 rounded-full object-cover border border-slate-200 flex-shrink-0">
-            <div class="min-w-0">
-              <div class="flex items-center gap-1.5"><h5 class="text-[11px] font-black text-slate-900 truncate">${item.name}</h5></div>
-              <p class="text-[8px] text-slate-400 font-bold">Lv.${item.level || 1} ${item.badge || '签到打卡'}</p>
+      <div style="margin-top:8px;">
+        ${rankList.length ? rankList.map((item, idx) => `
+          <div class="st2-row ${item.isUser ? 'me' : ''}">
+            <span class="rk ${idx === 0 ? 'top' : ''}">${idx + 1}</span>
+            <img src="${item.avatar}" alt="">
+            <div class="who">
+              <h6>${item.name}</h6>
+              <p>Lv.${item.level || 1} · ${item.badge || '签到打卡'}</p>
             </div>
+            <div class="val"><b>${item.days} 天</b><span>连签</span></div>
           </div>
-          <span class="text-xs font-black text-emerald-600 shrink-0">${item.days} 天</span>
-        </div>
-      `).join('') : '<p class="text-center text-[10px] text-slate-400 py-3 font-bold">暂时还没有人签到，快来抢首签！</p>'}
-    </div>
+        `).join('') : `<div class="st2-empty" style="padding:16px 0;"><p style="color:rgba(223,247,238,.5);">暂时还没有人签到，快来抢首签！</p></div>`}
+      </div>
+    </section>
   `;
 }
 window.renderSuperTopicCheckinTab = renderSuperTopicCheckinTab;
 
 // -------------------------------------------------------------------------
-// 打榜/周边应援 Tab（消耗应援币 → 增长贡献值）
+// 打榜/应援 Tab（消耗应援币 → 增长贡献值）
 // -------------------------------------------------------------------------
 function renderSuperTopicSupportTab(char) {
   const panel = document.getElementById('superTopicPanel');
@@ -382,43 +405,40 @@ function renderSuperTopicSupportTab(char) {
     ? window.LumaFansManager.getFans(char.id, char) : (char.fans || 0);
 
   panel.innerHTML = `
-    <div class="bg-gradient-to-br from-rose-600 via-pink-600 to-purple-700 rounded-3xl p-4 text-white shadow-xl space-y-2.5 relative overflow-hidden">
-      <div class="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10 blur-2xl pointer-events-none"></div>
-      <div class="relative z-10 flex items-center justify-between">
-        <span class="text-[10px] font-black bg-white/20 px-2.5 py-0.5 rounded-full border border-white/20">明星超话 · 周边应援中心</span>
-        <span class="text-xs font-black text-amber-200">应援币余额：${supportCoin.toLocaleString()}</span>
+    <section class="st2-support-hero">
+      <div class="sup-hd">
+        <span class="st2-kicker is-hot"># 周边应援中心</span>
+        <span class="bal">应援币 ${supportCoin.toLocaleString()}</span>
       </div>
-      <div class="relative z-10">
-        <h4 class="text-sm font-black">为主播 #${char.name}# 应援</h4>
-        <p class="text-[10px] text-rose-100 leading-relaxed mt-1">每日签到领取应援币，用于购买主播周边应援物。每一份应援都将 1:1 转化为主播的专属贡献值！</p>
+      <h4>为主播 #${char.name}# 应援打榜</h4>
+      <p>每日签到领取应援币，购买应援物 1:1 转化为专属贡献值，助推超话热度。</p>
+      <div class="sup-stats">
+        <div><span>我贡献的应援值</span><b>${contribution.toLocaleString()}</b></div>
+        <div><span>超话总热度</span><b style="color:#ffcf5c;">${(fansCount * 3 + contribution).toLocaleString()}</b></div>
       </div>
-      <div class="relative z-10 flex items-center gap-4 text-xs pt-2.5 mt-2 border-t border-white/15">
-        <div><span class="text-[9px] text-rose-200 font-medium">我贡献的应援值</span><p class="font-black text-white text-sm">${contribution.toLocaleString()} 点</p></div>
-        <div><span class="text-[9px] text-rose-200 font-medium">超话总热度</span><p class="font-black text-amber-200 text-sm">${(fansCount * 3 + contribution).toLocaleString()}</p></div>
-      </div>
+    </section>
+
+    <div class="st2-sec">
+      <h4><span class="sharp">#</span>选择应援周边</h4>
+      <span class="note">TAP TO SELECT</span>
     </div>
 
-    <div class="space-y-2.5">
-      <h5 class="text-xs font-black text-slate-900 px-1">选择应援周边</h5>
-      <div class="grid grid-cols-2 gap-2.5">
-        ${(window.SUPPORT_GIFTS || []).map(g => `
-          <div class="bg-white rounded-2xl p-3 border transition active:scale-95 cursor-pointer shadow-sm ${selectedSupportGiftId === g.id ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : 'border-slate-100 hover:border-slate-200'}" onclick="selectSupportGiftDirect('${g.id}', '${char.id}')">
-            <div class="text-2xl mb-1">${g.icon}</div>
-            <h6 class="text-xs font-black text-slate-900">${g.name}</h6>
-            <p class="text-[9px] text-slate-400 mt-0.5">${g.desc}</p>
-            <div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
-              <span class="font-black text-rose-600">${g.exp} 贡献</span>
-              <span class="text-[8px] bg-amber-50 text-amber-600 font-bold px-1.5 py-0.5 rounded">${g.price} 应援币</span>
-            </div>
+    <div class="st2-gift-grid">
+      ${(window.SUPPORT_GIFTS || []).map(g => `
+        <div class="st2-gift ${selectedSupportGiftId === g.id ? 'sel' : ''}" onclick="selectSupportGiftDirect('${g.id}','${char.id}')">
+          <span class="g-ic">${g.icon}</span>
+          <h6>${g.name}</h6>
+          <span class="g-desc">${g.desc}</span>
+          <div class="g-btm">
+            <span class="g-exp">+${g.exp} 贡献</span>
+            <span class="g-price">${g.price} 币</span>
           </div>
-        `).join('')}
-      </div>
+        </div>
+      `).join('')}
     </div>
 
-    <button onclick="executeSupportGift()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-rose-500 via-pink-500 to-purple-600 text-white text-xs font-black shadow-lg shadow-rose-500/25 active:scale-98 transition mb-2">
-      立即应援打榜（消耗应援币 · 涨贡献）
-    </button>
-    <p class="text-center text-[9px] text-slate-400 font-bold pb-2">应援币不足？去「签到」栏每日签到领取 +100</p>
+    <button onclick="executeSupportGift()" class="st2-cta">立即应援打榜</button>
+    <p class="st2-hint">应援币不足？去「签到」每日打卡即可领取 +100</p>
   `;
 }
 window.renderSuperTopicSupportTab = renderSuperTopicSupportTab;
@@ -460,11 +480,11 @@ function renderSuperTopicContributeTab(char) {
 
   if (supporters.length === 0) {
     panel.innerHTML = `
-      <div class="bg-white rounded-2xl p-8 text-center border border-slate-100 shadow-sm">
-        <div class="text-3xl">💎</div>
-        <p class="text-xs font-black text-slate-900 mt-2">#${char.name}# 暂无贡献记录</p>
-        <p class="text-[10px] text-slate-400 mt-1 font-bold">去「送礼 / 签到 / 打榜」为主播贡献，即可上榜</p>
-        <button onclick="switchSuperTopicTab('support')" class="mt-3 px-4 py-2 rounded-full bg-gradient-to-r from-rose-500 to-purple-600 text-white text-[10px] font-black shadow-md active:scale-95">去应援</button>
+      <div class="st2-card st2-empty">
+        <div class="glyph">💎</div>
+        <h5>#${char.name}# 暂无贡献记录</h5>
+        <p>去「送礼 / 签到 / 打榜」为主播贡献，即可上榜</p>
+        <button class="go" onclick="switchSuperTopicTab('support')">去应援</button>
       </div>
     `;
     return;
@@ -473,44 +493,47 @@ function renderSuperTopicContributeTab(char) {
   supporters.sort((a, b) => b.score - a.score);
   const top1 = supporters[0], top2 = supporters[1], top3 = supporters[2];
   const rest = supporters.slice(3);
+  const podium = [
+    { col: 'c1', rank: '1', item: top1, crown: '👑' },
+    { col: 'c2', rank: '2', item: top2, crown: '🥈' },
+    { col: 'c3', rank: '3', item: top3, crown: '🥉' }
+  ].filter(p => p.item);
 
   panel.innerHTML = `
-    <div class="bg-gradient-to-br from-purple-900 via-indigo-950 to-slate-900 rounded-2xl p-4 text-white shadow-lg border border-purple-800/40 relative overflow-hidden">
-      <div class="flex items-center justify-between relative z-10">
-        <div class="flex items-center gap-2 min-w-0">
-          <span class="text-xl">💎</span>
-          <div class="min-w-0">
-            <h5 class="font-black text-xs text-white">#${char.name}# 专属守护·贡献总榜</h5>
-            <p class="text-[9px] text-purple-200 mt-0.5 truncate">所有粉丝对 @${char.name} 的贡献值（含你）· 送礼/签到/打榜全计入</p>
+    <!-- 领奖台 Hero -->
+    <section class="st2-podium">
+      <div class="p-hd">
+        <h4><span style="color:#ffcf5c;">#</span>${char.name} · 守护贡献榜</h4>
+        <span>送礼 / 签到 / 打榜全计入</span>
+      </div>
+      <div class="st2-podium-grid">
+        ${podium.map(p => `
+          <div class="st2-pod-col ${p.col}">
+            <div class="p-av"><img src="${p.item.avatar}" alt=""><em>${p.crown}</em></div>
+            <div class="p-name">${p.item.name}</div>
+            <div class="p-val">${p.item.score.toLocaleString()} 贡献</div>
+            <div class="p-base">${p.rank}</div>
           </div>
-        </div>
-        <button onclick="switchSuperTopicTab('support')" class="px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 text-[10px] font-black shadow-md active:scale-95 flex-shrink-0">去应援</button>
+        `).join('')}
       </div>
+    </section>
 
-      <!-- 领奖台 -->
-      <div class="grid grid-cols-3 gap-2 items-end pt-5 pb-1 text-center relative z-10">
-        ${top2 ? `<div class="flex flex-col items-center"><div class="relative mb-1.5"><div class="w-11 h-11 rounded-full p-0.5 bg-slate-300 shadow-md"><img src="${top2.avatar}" class="w-full h-full rounded-full object-cover"></div><span class="absolute -top-2 -right-1 text-xs">🥈</span></div><span class="text-[11px] font-black text-slate-200 truncate max-w-[80px]">${top2.name}</span><span class="text-[9px] text-purple-300 font-bold mt-0.5">${top2.score.toLocaleString()} 贡献</span><div class="w-full mt-2 py-1 bg-white/10 backdrop-blur-md rounded-t-xl font-black text-slate-300 text-xs border-t border-white/20">2</div></div>` : '<div></div>'}
-        ${top1 ? `<div class="flex flex-col items-center"><div class="relative mb-1.5"><div class="w-13 h-13 rounded-full p-0.5 bg-gradient-to-tr from-amber-300 via-amber-400 to-amber-500 shadow-lg"><img src="${top1.avatar}" class="w-full h-full rounded-full object-cover"></div><span class="absolute -top-3 -right-1 text-sm animate-bounce">👑</span></div><span class="text-xs font-black text-amber-300 truncate max-w-[90px]">${top1.name}</span><span class="text-[9px] font-bold text-amber-200 mt-0.5">${top1.score.toLocaleString()} 贡献</span><div class="w-full mt-2 py-2 bg-gradient-to-t from-amber-500/30 to-amber-400/20 backdrop-blur-md rounded-t-xl font-black text-amber-300 text-sm border-t border-amber-400/40">1</div></div>` : '<div></div>'}
-        ${top3 ? `<div class="flex flex-col items-center"><div class="relative mb-1.5"><div class="w-11 h-11 rounded-full p-0.5 bg-amber-700/60 shadow-md"><img src="${top3.avatar}" class="w-full h-full rounded-full object-cover"></div><span class="absolute -top-2 -right-1 text-xs">🥉</span></div><span class="text-[11px] font-black text-slate-200 truncate max-w-[80px]">${top3.name}</span><span class="text-[9px] text-purple-300 font-bold mt-0.5">${top3.score.toLocaleString()} 贡献</span><div class="w-full mt-2 py-0.5 bg-white/10 backdrop-blur-md rounded-t-xl font-black text-amber-600 text-xs border-t border-white/20">3</div></div>` : '<div></div>'}
-      </div>
-    </div>
-
-    <div class="space-y-2 mt-2">
+    <!-- 其余榜单 -->
+    <div class="st2-card" style="padding:10px 9px;${rest.length ? '' : 'display:none;'}">
       ${rest.map((item, idx) => `
-        <div class="bg-white rounded-2xl p-3 flex items-center justify-between border border-slate-100 shadow-sm ${item.isUser ? 'ring-1 ring-rose-400 bg-rose-50/30' : ''}">
-          <div class="flex items-center gap-3 min-w-0">
-            <span class="w-5 text-center text-xs font-black text-slate-400">${idx + 4}</span>
-            <img src="${item.avatar}" class="w-8 h-8 rounded-full object-cover border border-slate-200 flex-shrink-0">
-            <div class="min-w-0">
-              <div class="flex items-center gap-1.5"><h5 class="text-xs font-black text-slate-900 truncate">${item.name}</h5><span class="text-[8px] bg-purple-50 text-purple-700 font-bold px-1.5 py-0.2 rounded">${item.badge}</span></div>
-              ${item.isUser ? '<p class="text-[8px] text-rose-500 font-bold mt-0.5">由你的送礼 / 签到 / 打榜积累</p>' : ''}
-            </div>
+        <div class="st2-row ${item.isUser ? 'me' : ''}">
+          <span class="rk">${idx + 4}</span>
+          <img src="${item.avatar}" alt="">
+          <div class="who">
+            <h6>${item.name}</h6>
+            <p>${item.badge}</p>
           </div>
-          <div class="text-right flex-shrink-0"><span class="text-xs font-black text-rose-600">${item.score.toLocaleString()}</span><p class="text-[8px] text-slate-400 font-bold">贡献值</p></div>
+          <div class="val rose"><b>${item.score.toLocaleString()}</b><span>贡献值</span></div>
         </div>
       `).join('')}
     </div>
-    <p class="text-center text-[9px] text-slate-400 font-bold pt-1 pb-2">累计贡献 = 直播间送礼 1:1 + 每日签到 +100 + 打榜应援</p>
+
+    <p class="st2-hint">累计贡献 = 直播间送礼 1:1 + 每日签到 +100 + 打榜应援</p>
   `;
 }
 window.renderSuperTopicContributeTab = renderSuperTopicContributeTab;
@@ -597,7 +620,7 @@ function executeSupportGift() {
 window.executeSupportGift = executeSupportGift;
 
 // -------------------------------------------------------------------------
-// 打榜弹窗（可选入口）
+// 打榜弹窗（可选入口，兼容保留）
 // -------------------------------------------------------------------------
 function openSuperTopicSupportModal() {
   const modal = document.getElementById('superTopicSupportModal');
@@ -672,7 +695,7 @@ function handleSuperTopicFollow(hostName) {
 window.handleSuperTopicFollow = handleSuperTopicFollow;
 
 // -------------------------------------------------------------------------
-// 切换超话抽屉
+// 切换超话抽屉（左拉）
 // -------------------------------------------------------------------------
 function toggleSuperTopicDrawer(forceState) {
   const backdrop = document.getElementById('superTopicDrawerBackdrop');
@@ -682,11 +705,11 @@ function toggleSuperTopicDrawer(forceState) {
   const nextState = (typeof forceState === 'boolean') ? forceState : !isOpen;
   if (nextState) {
     renderSuperTopicDrawer();
-    backdrop.classList.remove('hidden');
+    backdrop.classList.add('show');
     panel.classList.add('open');
   } else {
     panel.classList.remove('open');
-    backdrop.classList.add('hidden');
+    backdrop.classList.remove('show');
   }
 }
 window.toggleSuperTopicDrawer = toggleSuperTopicDrawer;
@@ -698,23 +721,25 @@ function renderSuperTopicDrawer() {
   const container = document.getElementById('superTopicDrawerCharList');
   if (!container) return;
   const chars = window.getAvailableCharsList();
+  const totalEl = document.getElementById('superTopicDrawerTotal');
+  if (totalEl) totalEl.textContent = chars.length;
+
   container.innerHTML = chars.map(c => {
     const isCurrent = (String(c.id) === String(currentActiveSuperTopicCharId));
     const contribution = getCharContribution(c.id);
     return `
-      <div onclick="selectSuperTopicChar('${c.id}')" class="p-3 rounded-2xl flex items-center justify-between cursor-pointer active:scale-98 transition ${isCurrent ? 'bg-gradient-to-r from-rose-50 to-purple-50 border border-rose-200 shadow-sm' : 'hover:bg-slate-50 border border-transparent'}">
-        <div class="flex items-center gap-3 min-w-0">
-          <div class="relative flex-shrink-0">
-            <img src="${c.avatar}" class="w-10 h-10 rounded-full object-cover border border-slate-200">
-            ${c.isLive ? '<span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white animate-pulse"></span>' : ''}
-          </div>
-          <div class="min-w-0">
-            <div class="flex items-center gap-1.5"><h5 class="text-xs font-black text-slate-900 truncate">#${c.name}超话#</h5>${isCurrent ? '<span class="text-[8px] bg-rose-100 text-rose-600 font-bold px-1.5 py-0.2 rounded-full">当前</span>' : ''}</div>
-            <p class="text-[9px] text-slate-400 mt-0.5 truncate">${c.category || '明星超话'} · 我的贡献 ${contribution.toLocaleString()}</p>
-          </div>
-        </div>
-        <svg class="w-4 h-4 text-slate-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
-      </div>
+      <button onclick="selectSuperTopicChar('${c.id}')" class="st2-drow ${isCurrent ? 'cur' : ''}">
+        <span class="d-av">
+          <img src="${c.avatar}" alt="">
+          ${c.isLive ? '<span class="live"></span>' : ''}
+        </span>
+        <span class="d-tt">
+          <h6>#${c.name}超话#</h6>
+          <p>${c.category || '明星超话'} · 我的贡献 ${contribution.toLocaleString()}</p>
+        </span>
+        ${isCurrent ? '<span class="d-cur">当前</span>' : ''}
+        <svg class="d-arrow" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
     `;
   }).join('');
 }

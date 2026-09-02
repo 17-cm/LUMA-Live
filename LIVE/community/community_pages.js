@@ -49,55 +49,66 @@
     </div>
   </div>
 
-  <!-- 子页面 2: 主播超话专区 全屏子页 (深度复刻微博超话 UI) -->
-  <div id="communitySuperTopicView" class="full-page-view hidden">
-    <div class="page-nav-bar">
-      <button onclick="closeCommunitySubPage()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+  <!-- 子页面 2: 主播超话专区 全屏子页 (超话 2.0 · 全息深空 UI) -->
+  <div id="communitySuperTopicView" class="full-page-view st2-page hidden">
+    <!-- 顶部导览 -->
+    <div class="st2-nav">
+      <button onclick="closeCommunitySubPage()" class="st2-nav-ic" aria-label="返回">
+        <svg viewBox="0 0 256 256" fill="currentColor"><path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"/></svg>
       </button>
-      <div class="text-center">
-        <h3 class="text-xs font-black text-slate-900 leading-none" id="superTopicHeaderTitle">主播超话专区</h3>
-        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">SUPER TOPICS · 粉丝主场</span>
+      <div class="st2-nav-c">
+        <span class="st2-nav-mark">#</span>
+        <div class="st2-nav-tt">
+          <h3 id="superTopicHeaderTitle">主播超话专区</h3>
+          <small>SUPER TOPIC · 粉丝主场</small>
+        </div>
       </div>
       <div class="relative">
-        <button onclick="toggleSuperTopicMenu()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
+        <button onclick="toggleSuperTopicMenu()" class="st2-nav-ic" aria-label="更多">
+          <svg viewBox="0 0 256 256" fill="currentColor"><circle cx="128" cy="52" r="14"></circle><circle cx="128" cy="128" r="14"></circle><circle cx="128" cy="204" r="14"></circle></svg>
         </button>
-        <div id="superTopicMenuPopup" class="hidden absolute right-0 top-10 w-40 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50 overflow-hidden">
-          <button onclick="toggleSuperTopicDrawer(true);toggleSuperTopicMenu()" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition">
-            <svg class="w-4 h-4 text-purple-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+        <div id="superTopicMenuPopup" class="st2-pop hidden">
+          <button onclick="toggleSuperTopicDrawer(true);toggleSuperTopicMenu()" class="st2-pop-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
             切换超话
           </button>
-          <button onclick="toggleSuperTopicMenu()" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition">
-            <svg class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          <button onclick="toggleSuperTopicMenu()" class="st2-pop-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
             超话规则
           </button>
-          <button onclick="toggleSuperTopicMenu()" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition">
-            <svg class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
+          <button onclick="toggleSuperTopicMenu()" class="st2-pop-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
             举报超话
           </button>
         </div>
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-3" id="communitySuperTopicContent">
-      <!-- 动态渲染微博超话完整视图 (包含 Header、4大子Tab及对应面板) -->
+    <!-- 内容滚动区 -->
+    <div class="st2-body" id="communitySuperTopicContent">
+      <!-- 动态渲染超话视图 (Hero + 分段导航 + 内容面板) -->
     </div>
   </div>
 
-  <!-- 超话左侧主播切换抽屉 -->
-  <div id="superTopicDrawerBackdrop" class="drawer-backdrop hidden" onclick="closeSuperTopicDrawer()"></div>
-  <div id="superTopicDrawerPanel" class="drawer-panel">
-    <div class="px-5 pb-3 border-b border-slate-100 flex items-center justify-between">
-      <div>
-        <h3 class="text-sm font-black text-slate-900 leading-none">主播超话列表</h3>
-        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-1 block">CHOOSE SUPER TOPIC</span>
+  <!-- 超话左侧切换抽屉（修复 z-index：置于全屏页栈之上） -->
+  <div id="superTopicDrawerBackdrop" class="st2-backdrop" onclick="closeSuperTopicDrawer()"></div>
+  <div id="superTopicDrawerPanel" class="st2-drawer">
+    <div class="st2-drawer-hd">
+      <span class="st2-nav-mark">#</span>
+      <div class="t">
+        <h3>切换超话</h3>
+        <p>SUPER TOPIC</p>
       </div>
-      <button onclick="closeSuperTopicDrawer()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs text-slate-500 font-bold">✕</button>
+      <button onclick="closeSuperTopicDrawer()" class="st2-drawer-close" aria-label="关闭">✕</button>
     </div>
-    <div class="flex-1 overflow-y-auto no-scrollbar p-3 space-y-1.5" id="superTopicDrawerCharList">
-      <!-- 动态填充角色列表 -->
+    <div class="st2-drawer-sub">
+      <span id="superTopicDrawerCount">粉丝超话列表</span>
+      <span>共 <b id="superTopicDrawerTotal">0</b> 个</span>
     </div>
+    <div class="st2-drawer-list" id="superTopicDrawerCharList">
+      <!-- 动态填充角色超话 -->
+    </div>
+    <div class="st2-drawer-ft"># 关注主播 · 加入她的超话应援</div>
   </div>
 
   <!-- 子页面 3: 排行榜 全屏子页 -->
