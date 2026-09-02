@@ -5,32 +5,23 @@
   document.getElementById('pages-root').insertAdjacentHTML('beforeend', `
 <div id="tab-trends" class="tab-page hidden h-full overflow-y-auto no-scrollbar px-4 pb-28 space-y-4">
       
-      <!-- 探索·社区 导览大卡片 -->
-      <div class="luxe-card p-4 space-y-3">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-11 h-11 rounded-full p-0.5 bg-gradient-to-tr from-rose-500 via-purple-500 to-amber-400 shadow-md flex-shrink-0">
-              <div class="w-full h-full bg-slate-950 rounded-full flex items-center justify-center text-white">
-                <svg class="w-5 h-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
-              </div>
-            </div>
-            <div>
-              <div class="flex items-center gap-1.5">
-                <h3 class="text-sm font-black text-slate-900 leading-none">探索 · 社区</h3>
-                <span class="text-[8px] bg-rose-50 text-rose-600 font-extrabold px-1.5 py-0.5 rounded border border-rose-200">COMMUNITY</span>
-              </div>
-              <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-1 block">全服应援 · 粉丝超话 · 实时风向</span>
-            </div>
+      <!-- 探索·社区 导览大卡片 · 浅色杂志感光晕版 -->
+      <div class="st3-glow-card">
+        <div class="st3-glow-head">
+          <div class="st3-glow-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
           </div>
-          <button onclick="openCreatePostModal()" class="btn-brand text-xs !py-1.5 !px-3.5 shadow-sm">
-            <span>+ 发动态</span>
-          </button>
+          <div class="st3-glow-tt">
+            <h3>探索 · 社区<span class="st3-glow-badge">COMMUNITY</span></h3>
+            <p>全服应援 · 粉丝超话 · 实时风向</p>
+          </div>
+          <button onclick="openCreatePostModal()" class="st3-glow-cta">+ 发动态</button>
         </div>
 
-        <div class="flex gap-2 overflow-x-auto no-scrollbar py-0.5" id="hotTrendPills">
-          <span class="text-[10px] bg-rose-50 text-rose-600 font-bold px-2.5 py-1 rounded-full border border-rose-200 flex-shrink-0">🔥 活跃动态 1,840+ 条</span>
-          <span class="text-[10px] bg-amber-50 text-amber-700 font-bold px-2.5 py-1 rounded-full border border-amber-200 flex-shrink-0">🪐 超话今日待打卡</span>
-          <span class="text-[10px] bg-purple-50 text-purple-700 font-bold px-2.5 py-1 rounded-full border border-purple-200 flex-shrink-0">🏆 全服榜单实时刷新</span>
+        <div class="st3-glow-pills" id="hotTrendPills">
+          <span class="st3-glow-pill is-rose">🔥 活跃动态 1,840+ 条</span>
+          <span class="st3-glow-pill is-amber">🪐 超话今日待打卡</span>
+          <span class="st3-glow-pill is-violet">🏆 全服榜单实时刷新</span>
         </div>
       </div>
 
