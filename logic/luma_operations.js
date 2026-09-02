@@ -256,21 +256,17 @@ const lumaOpsGateway = {
     const character = allChars.find(c => c.id === characterId);
     await closeAndArchive(character, session, now);
 
-    // 下播后强制进入休息期：拧一条全新秒级随机"下次开播"倒计时并加"强制休息锁"，
-    // 锁期内节拍器/改签/Tool 一律不得提前重开，杜绝"刚下播下一秒又开播"。
+    // 下播后强制进入休息期：加"强制休息锁"，锁期内轮询/改签/Tool 一律不得提前重开，
+    // 杜绝"刚下播下一秒又开播"。真正生效的是 forcedRestUntil + 最短休息判定。
     const sparams = window.appParams || {};
     const sMinRestMs = (sparams.minRestDuration || 10) * 60 * 1000;
-    const sMaxRestMs = (sparams.maxRestDuration || 480) * 60 * 1000;
     if (!window.charSchedulesMap) window.charSchedulesMap = {};
     let sched = window.charSchedulesMap[characterId] || (window.charSchedulesMap[characterId] = { initialized: true });
     sched.isLive = false;
     sched.currentSessionId = null;
     sched.plannedEndTime = null;
     sched.lastEndTime = now;
-    sched.nextCloseAt = null;
     sched.forcedRestUntil = now + sMinRestMs; // 强制休息锁：锁期内禁止任何提前开播
-    // 始终在 [最短休息, 最长休息] 内抽一条精确到秒的新倒计时（覆盖旧值）
-    sched.nextOpenAt = now + rollSeconds(sMinRestMs / 1000, sMaxRestMs / 1000) * 1000;
     try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
     lumaOpsNotify("下播完成", `【${session.name || '主播'}】${reason || '正常下播'}`, "approve");
     if (typeof syncLiveSessions === 'function') await syncLiveSessions();
@@ -427,23 +423,6 @@ function seededHash(str) {
   h ^= h >>> 16;
   return (h >>> 0) / 4294967296;
 }
-
-// =========================================================================
-// 【秒级随机倒计时模型】所有直播开播/下播共用的决策核心（替代原来的轮询骰子）
-// 放弃"每个时间块抛 seededHash 骰子碰概率"，改为每角色一根秒级随机倒计时：
-//   · 下播结算时 → 在 [最短休息, 最长休息] 内抽一个精确到秒的随机"下次开播"倒计时
-//   · 开播时     → 在 [最短直播, 最长直播] 内抽一个精确到秒的随机"下播"倒计时
-//   · nextOpenAt / nextCloseAt 持久化在 charSchedulesMap：
-//       - 离线重放照表推进 → 稳定可复现（不再每次重抽，因此不需要骰子）
-//       - 在线节拍器按秒校验 → 秒级精度天然错落，真正随机
-// =========================================================================
-// 秒级随机时长（精确到秒）：闭区间内均匀取整
-function rollSeconds(minSecs, maxSecs) {
-  minSecs = Math.max(0, Math.floor(minSecs));
-  maxSecs = Math.max(minSecs, Math.floor(maxSecs));
-  return minSecs + Math.floor(Math.random() * (maxSecs - minSecs + 1));
-}
-
 
 // =========================================================================
 // 【轮询评估器】(恢复 76a5f13 的"倾向 + 比例式增长"决策公式)
