@@ -1194,7 +1194,7 @@ function renderSuperTopicPostDetail(post, char) {
   const hasImage = !!post.image;
   const comments = (post.commentTree && post.commentTree.length) ? post.commentTree : [];
   const primaryTag = post.primaryTag || `#${char.name}超话#`;
-  const subTags = (post.subTags || []).join(' ');
+  const subTags = (post.subTags || []).map(t => `<span class="tag">${t}</span>`).join('');
   const mentions = (post.mentions || []).join(' ');
   return `
     <div class="st2s-detail">

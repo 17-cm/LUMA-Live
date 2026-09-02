@@ -3305,9 +3305,9 @@ input:checked + .switch-slider:before {
 .st2s-hero-stats {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-top: 12px;
-  padding-top: 10px;
+  gap: 20px;
+  margin-top: 18px;
+  padding-top: 12px;
   border-top: 1px solid var(--st2s-line-soft);
 }
 .st2s-hero-stats > div {
