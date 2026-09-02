@@ -1831,6 +1831,23 @@ window.checkDeepLinkParams = checkDeepLinkParams;
 window.addEventListener('hashchange', checkDeepLinkParams);
 
 
+// =========================================================================
+// 【野生主播 · 兜底占位】原 handleGenerateWildNPC 未实现, 这里加一个简易反馈
+// 后续接入 AI 生图时直接替换此函数体即可
+// =========================================================================
+window.handleGenerateWildNPC = function() {
+  try {
+    var tip = document.createElement('div');
+    tip.textContent = '野生 NPC 生成中, 敬请期待';
+    tip.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(15,23,42,.88);color:#fff;padding:10px 18px;border-radius:14px;font-size:12px;font-weight:800;letter-spacing:.02em;z-index:99999;backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,.2);';
+    document.body.appendChild(tip);
+    setTimeout(function() { tip.remove(); }, 1800);
+  } catch (e) {
+    alert('野生 NPC 生成中, 敬请期待');
+  }
+};
+
+
 
 // =========================================================================
 // 【统一页面栈注册】个人主页
