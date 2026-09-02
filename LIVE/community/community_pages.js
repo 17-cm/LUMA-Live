@@ -144,14 +144,11 @@
       <button onclick="closeCommunitySubPage()" class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm active:scale-90 transition">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </button>
-      <div class="text-center">
-        <h3 class="text-xs font-black text-slate-900 leading-none">直播设置</h3>
-        <span class="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5 block">STREAMER STUDIO</span>
-      </div>
+      <div></div>
       <div class="w-8"></div>
     </div>
 
-    <div id="liveSettingsModuleArea" class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-4">
+    <div id="liveSettingsModuleArea" class="flex-1 overflow-y-auto no-scrollbar px-4 pt-2 pb-24 space-y-4">
       <!-- 各模块由模块文件动态渲染 -->
     </div>
   </div>

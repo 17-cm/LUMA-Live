@@ -9,44 +9,68 @@
 
     area.innerHTML = '';
 
-    var header = document.createElement('div');
-    header.className = 'p-4 bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-700 rounded-3xl text-white shadow-md space-y-2';
-    header.innerHTML =
-      '<div class="flex items-center gap-2">' +
-        '<span class="text-base">&#x1F3AC;</span>' +
-        '<h4 class="text-sm font-black">直播画面背景</h4>' +
-      '</div>' +
-      '<p class="text-xs text-purple-100 leading-relaxed">选择主播，上传视频作为直播间全屏背景。每位主播最多 3 个视频。</p>';
-    area.appendChild(header);
+    // 1. 浅色杂志感 hero：白底玻璃 + 玫瑰金/紫罗兰 暖色光晕 + 数字概览
+    var hero = document.createElement('section');
+    hero.className = 'st3-hero';
+    hero.innerHTML =
+      '<div class="st3-hero-bg"></div>' +
+      '<div class="st3-hero-tint"></div>' +
+      '<div class="st3-hero-inner">' +
+        '<div class="st3-hero-top">' +
+          '<span class="st3-kicker"># STREAMER STUDIO</span>' +
+          '<span class="st3-kicker is-rose">主播控制台</span>' +
+        '</div>' +
+        '<h2 class="st3-hero-title">直播设置</h2>' +
+        '<p class="st3-hero-sub">管理每位主播的直播间画面、音乐与粉丝增长策略</p>' +
+        '<div class="st3-hero-stat">' +
+          '<div><b>背景</b><span>每主播 ≤ 3 视频</span></div>' +
+          '<div><b>音乐</b><span>歌单添氛围</span></div>' +
+          '<div><b>增长</b><span>下播按区间</span></div>' +
+        '</div>' +
+      '</div>';
+    area.appendChild(hero);
 
-    var charSection = document.createElement('div');
-    charSection.className = 'luxe-card p-3 bg-white';
+    // 2. 选择主播 (背景画面)
+    var charSection = document.createElement('section');
+    charSection.className = 'st3-card';
     charSection.innerHTML =
-      '<label class="text-[10px] font-bold text-slate-500 mb-2 block">选择主播</label>' +
-      '<div class="flex gap-2 overflow-x-auto no-scrollbar pb-1" id="liveSettingsCharList"><div class="text-[11px] text-slate-400 py-4 text-center w-full">加载中…</div></div>';
+      '<div class="st3-card-hd">' +
+        '<span class="st3-card-ic is-violet">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"></rect><polygon points="10 9 15 12 10 15 10 9"></polygon></svg>' +
+        '</span>' +
+        '<div class="st3-card-hd-tt">' +
+          '<h4>直播画面背景</h4>' +
+          '<p>为主播上传视频，作为直播间全屏背景</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="st3-card-body">' +
+        '<div class="st3-sec-row">' +
+          '<h6><span class="sharp">#</span>选择主播</h6>' +
+          '<span class="st3-note">点击上传</span>' +
+        '</div>' +
+        '<div class="flex gap-2.5 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1" id="liveSettingsCharList">' +
+          '<div class="st3-loading">加载中…</div>' +
+        '</div>' +
+      '</div>';
     area.appendChild(charSection);
 
-    // 直播间音乐 入口卡
-    var musicCard = document.createElement('div');
-    musicCard.className = 'luxe-card p-3 bg-white active:scale-[0.99] transition cursor-pointer';
+    // 3. 直播音乐入口
+    var musicCard = document.createElement('button');
+    musicCard.type = 'button';
+    musicCard.className = 'st3-card is-row';
     musicCard.onclick = function () { if (typeof window.openLiveMusicSubPage === 'function') window.openLiveMusicSubPage(); };
     musicCard.innerHTML =
-      '<div class="flex items-center gap-3">' +
-        '<div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-fuchsia-500 via-pink-500 to-rose-500 flex items-center justify-center shadow-md flex-shrink-0">' +
-          '<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>' +
-        '</div>' +
-        '<div class="flex-1 min-w-0">' +
-          '<div class="flex items-center gap-1.5">' +
-            '<h4 class="text-sm font-black text-slate-900">直播间音乐</h4>' +
-            '<span class="text-[9px] bg-fuchsia-100 text-fuchsia-700 px-1.5 py-0.5 rounded-full font-bold">BETA</span>' +
-          '</div>' +
-          '<p class="text-[11px] text-slate-500 mt-0.5">管理歌单，让直播更有氛围</p>' +
-        '</div>' +
-        '<svg class="w-4 h-4 text-slate-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
-      '</div>';
+      '<span class="st3-card-ic is-rose">' +
+        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>' +
+      '</span>' +
+      '<span class="st3-card-hd-tt">' +
+        '<h4>直播间音乐 <span class="st3-pill">BETA</span></h4>' +
+        '<p>管理歌单，让直播更有氛围</p>' +
+      '</span>' +
+      '<svg class="st3-card-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
     area.appendChild(musicCard);
 
-    // 直播粉丝增长区间 设置卡（排在音乐按键下方）
+    // 4. 直播粉丝增长区间
     area.appendChild(buildFansGrowthSettingCard());
 
     try {
@@ -54,7 +78,7 @@
       renderCharList(chars);
     } catch (e) {
       var cl = document.getElementById('liveSettingsCharList');
-      if (cl) cl.innerHTML = '<div class="text-[11px] text-slate-400 py-4 text-center w-full">加载失败，请重试</div>';
+      if (cl) cl.innerHTML = '<div class="st3-loading is-err">加载失败，请重试</div>';
     }
   };
 
@@ -62,21 +86,24 @@
     var container = document.getElementById('liveSettingsCharList');
     if (!container) return;
     if (!chars || chars.length === 0) {
-      container.innerHTML = '<div class="text-[11px] text-slate-400 py-4 text-center w-full">暂无主播</div>';
+      container.innerHTML = '<div class="st3-loading">暂无主播</div>';
       return;
     }
     container.innerHTML = chars.map(function (c) {
       var avatar = c.avatar || '';
-      return '<div onclick="showLiveSettingsUploadSheet(\'' + c.id + '\',\'' + (c.name || c.id).replace(/'/g, "\\'") + '\')" class="flex-shrink-0 w-16 text-center cursor-pointer active:scale-95 transition">' +
-        '<div class="w-14 h-14 mx-auto rounded-full overflow-hidden ring-1 ring-slate-200">' +
-          '<img src="' + avatar + '" class="w-full h-full object-cover">' +
+      return '<div onclick="showLiveSettingsUploadSheet(\'' + c.id + '\',\'' + (c.name || c.id).replace(/'/g, "\\'") + '\')" class="st3-char-cell">' +
+        '<div class="st3-char-av">' +
+          '<img src="' + avatar + '" alt="">' +
+          '<span class="st3-char-add">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+          '</span>' +
         '</div>' +
-        '<span class="text-[10px] font-bold text-slate-700 mt-1 block truncate">' + (c.name || c.id) + '</span>' +
+        '<span class="st3-char-name">' + (c.name || c.id) + '</span>' +
       '</div>';
     }).join('');
   }
 
-  // 直播粉丝增长区间设置卡：每场直播结束按区间随机增粉（默认 1000-5000）
+  // 直播粉丝增长区间设置卡：与 st3-card 骨架统一
   function buildFansGrowthSettingCard() {
     var p = window.appParams || {};
     var range = window.LiveStatsManager && window.LiveStatsManager.getGainRange
@@ -85,37 +112,42 @@
     var minVal = Number(p.fansGainMin) || range.min;
     var maxVal = Number(p.fansGainMax) || range.max;
 
-    var card = document.createElement('div');
-    card.className = 'luxe-card p-3 bg-white space-y-2.5';
+    var card = document.createElement('section');
+    card.className = 'st3-card';
     card.id = 'fansGrowthSettingCard';
     card.innerHTML =
-      '<div class="flex items-center gap-3">' +
-        '<div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 flex items-center justify-center shadow-md flex-shrink-0">' +
-          '<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M3 22v-4a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v4"></path><circle cx="9" cy="8" r="3.5"></circle><path d="M17 11.2a3.5 3.5 0 1 0-2.4-.2"></path><path d="M17 14v4"></path><path d="M15 16h4"></path></svg>' +
+      '<div class="st3-card-hd">' +
+        '<span class="st3-card-ic is-amber">' +
+          '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 22v-4a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v4"></path><circle cx="9" cy="8" r="3.5"></circle><path d="M17 11.2a3.5 3.5 0 1 0-2.4-.2"></path><path d="M17 14v4"></path><path d="M15 16h4"></path></svg>' +
+        '</span>' +
+        '<div class="st3-card-hd-tt">' +
+          '<h4>直播粉丝增长 <span class="st3-pill is-amber">结算联动</span></h4>' +
+          '<p>每场直播结束后，按区间随机增长的粉丝数量</p>' +
         '</div>' +
-        '<div class="flex-1 min-w-0">' +
-          '<div class="flex items-center gap-1.5">' +
-            '<h4 class="text-sm font-black text-slate-900">直播粉丝增长</h4>' +
-            '<span class="text-[9px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded-full font-bold">结算联动</span>' +
+      '</div>' +
+      '<div class="st3-card-body">' +
+        '<div class="st3-range">' +
+          '<div class="st3-range-cell">' +
+            '<label>最低增粉</label>' +
+            '<div class="st3-input-wrap">' +
+              '<input type="number" id="fansGainMin" min="0" value="' + minVal + '" class="st3-input">' +
+              '<span class="st3-input-unit">粉</span>' +
+            '</div>' +
           '</div>' +
-          '<p class="text-[11px] text-slate-500 mt-0.5">每场直播结束后，按区间随机增长的粉丝数量</p>' +
+          '<span class="st3-range-sep">~</span>' +
+          '<div class="st3-range-cell">' +
+            '<label>最高增粉</label>' +
+            '<div class="st3-input-wrap">' +
+              '<input type="number" id="fansGainMax" min="0" value="' + maxVal + '" class="st3-input">' +
+              '<span class="st3-input-unit">粉</span>' +
+            '</div>' +
+          '</div>' +
         '</div>' +
-      '</div>' +
-      '<div class="h-[1px] bg-slate-100"></div>' +
-      '<div class="flex items-center gap-2.5" id="fansGrowthRangeInputs">' +
-        '<div class="flex-1">' +
-          '<label class="text-[10px] font-bold text-slate-500 block mb-1">最低增粉</label>' +
-          '<input type="number" id="fansGainMin" min="0" value="' + minVal + '" class="input-ins !py-2 text-center text-xs font-bold">' +
-        '</div>' +
-        '<span class="text-slate-300 font-black text-sm pt-5">~</span>' +
-        '<div class="flex-1">' +
-          '<label class="text-[10px] font-bold text-slate-500 block mb-1">最高增粉</label>' +
-          '<input type="number" id="fansGainMax" min="0" value="' + maxVal + '" class="input-ins !py-2 text-center text-xs font-bold">' +
-        '</div>' +
-      '</div>' +
-      '<button onclick="saveFansGrowthSetting()" class="btn-brand w-full py-2 justify-center text-xs font-bold shadow-sm">' +
-        '<span>保存粉丝增长区间</span>' +
-      '</button>';
+        '<button onclick="saveFansGrowthSetting()" type="button" class="st3-cta is-amber">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' +
+          '<span>保存区间</span>' +
+        '</button>' +
+      '</div>';
 
     // 输入限幅：避免最高被拉低到低于最低
     var minInput = card.querySelector('#fansGainMin');
@@ -131,7 +163,7 @@
   }
   window.buildFansGrowthSettingCard = buildFansGrowthSettingCard;
 
-  // 保存粉丝增长区间到宿主持久库（app_settings.global_params）
+  // 保存粉丝增长区间到宿主持久库
   async function saveFansGrowthSetting() {
     var minEl = document.getElementById('fansGainMin');
     var maxEl = document.getElementById('fansGainMax');
@@ -154,35 +186,56 @@
   }
   window.saveFansGrowthSetting = saveFansGrowthSetting;
 
+  // 上传弹窗：底部 sheet（与超话抽屉一致的入场动效）
   window.showLiveSettingsUploadSheet = function (charId, charName) {
     var overlay = document.getElementById('liveSettingsUploadSheet');
     if (overlay) overlay.remove();
 
     overlay = document.createElement('div');
     overlay.id = 'liveSettingsUploadSheet';
-    overlay.className = 'fixed inset-0 z-[9999] flex items-center justify-center px-4';
-    overlay.style.backgroundColor = 'rgba(0,0,0,0.45)';
-    overlay.style.paddingTop = 'var(--ai-phone-app-safe-top, 88px)';
-    overlay.style.paddingBottom = 'var(--ai-phone-app-safe-bottom, 24px)';
-    overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
+    overlay.className = 'st3-sheet';
+    overlay.onclick = function (e) { if (e.target === overlay) closeSheet(); };
 
     var sheet = document.createElement('div');
-    sheet.className = 'w-full max-w-[400px] bg-white rounded-3xl px-6 pt-6 pb-7 space-y-4 shadow-2xl';
+    sheet.className = 'st3-sheet-panel';
     sheet.innerHTML =
-      '<h4 class="text-base font-black text-slate-900 text-center">为 ' + charName + ' 上传视频</h4>' +
-      '<p class="text-[11px] text-slate-500 text-center leading-relaxed">请选择一段不超过 30 秒的视频作为直播间全屏背景</p>' +
-      '<div class="flex gap-3 pt-2">' +
-        '<button id="lsUploadCancelBtn" class="flex-1 min-h-[44px] py-3 rounded-2xl bg-slate-100 text-slate-600 text-xs font-bold active:scale-95 transition">取消</button>' +
-        '<button id="lsUploadConfirmBtn" class="flex-1 min-h-[44px] py-3 rounded-2xl bg-gradient-to-r from-violet-500 to-indigo-600 text-white text-xs font-bold shadow-md active:scale-95 transition">上传</button>' +
+      '<div class="st3-sheet-grabber"></div>' +
+      '<div class="st3-sheet-hd">' +
+        '<span class="st3-kicker is-violet"># 上传直播画面</span>' +
+        '<h4>为 ' + (charName || '该主播') + ' 上传视频</h4>' +
+        '<p>请选择一段不超过 30 秒的视频作为直播间全屏背景</p>' +
+      '</div>' +
+      '<div class="st3-sheet-body">' +
+        '<div class="st3-sheet-tip">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>' +
+          '<div>' +
+            '<b>视频要求</b>' +
+            '<span>MP4/MOV 格式 · 时长 ≤ 30 秒 · 大小建议 ≤ 30MB</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="st3-sheet-btns">' +
+          '<button id="lsUploadCancelBtn" type="button" class="st3-btn is-ghost">取消</button>' +
+          '<button id="lsUploadConfirmBtn" type="button" class="st3-btn is-violet">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>' +
+            '<span>选择视频上传</span>' +
+          '</button>' +
+        '</div>' +
       '</div>';
 
     overlay.appendChild(sheet);
     document.body.appendChild(overlay);
 
-    document.getElementById('lsUploadCancelBtn').onclick = function () { overlay.remove(); };
+    requestAnimationFrame(function () { overlay.classList.add('show'); });
+
+    document.getElementById('lsUploadCancelBtn').onclick = closeSheet;
     document.getElementById('lsUploadConfirmBtn').onclick = function () {
       startUpload(charId, charName, overlay);
     };
+
+    function closeSheet() {
+      overlay.classList.remove('show');
+      setTimeout(function () { overlay.remove(); }, 280);
+    }
   };
 
   async function startUpload(charId, charName, sheetOverlay) {
@@ -216,7 +269,10 @@
       data.videos.push({ ref: stored.ref, mime: stored.mime || 'video/mp4', uploadedAt: Date.now() });
       await saveVideoGallery(charId, data);
 
-      if (sheetOverlay) sheetOverlay.remove();
+      if (sheetOverlay) {
+        sheetOverlay.classList.remove('show');
+        setTimeout(function () { sheetOverlay.remove(); }, 280);
+      }
 
       if (window.api && window.api.ui && window.api.ui.toast) {
         window.api.ui.toast('已上传至 ' + charName + ' 主页相册，可前往查看，或在直播间点击「画面比例」切换');
