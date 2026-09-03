@@ -51,9 +51,14 @@
 
   <!-- 子页面 2: 主播超话专区 全屏子页 (超话 2.0 · 全息深空 UI) -->
   <div id="communitySuperTopicView" class="full-page-view st2-page hidden">
-      <!-- 顶部导览 (返回按钮) -->
+      <!-- 顶部导览 (返回按钮) - 圆形 SVG 图标 -->
     <div class="st2-nav">
-      <button onclick="closeCommunitySubPage()" class="st2s-nav-back">退出</button>
+      <button onclick="closeCommunitySubPage()" class="st2s-nav-back" aria-label="退出">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
       <div class="w-8"></div>
     </div>
 

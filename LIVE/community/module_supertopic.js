@@ -310,7 +310,7 @@ function renderSuperTopicPostsTab(charId) {
           <article class="st2s-feed-item" onclick="openSuperTopicPostDetail('${post.id}')">
             <div class="st2s-feed-full">
               <div class="st2s-feed-head">
-                <img class="st2s-feed-av" src="${post.author.avatar}" alt="">
+                <img class="st2s-feed-av" src="${window.getPostAuthorAvatar ? window.getPostAuthorAvatar(post) : (post.author.avatar || '')}" alt="">
                 <div class="st2s-feed-name">
                   <b>${post.author.name}</b>
                   ${post.author.badge ? `<span class="st2s-feed-bd">${post.author.badge}</span>` : ''}
@@ -1203,68 +1203,99 @@ function renderSuperTopicPostDetail(post, char) {
   const hasImage = !!post.image;
   const comments = (post.commentTree && post.commentTree.length) ? post.commentTree : [];
   const primaryTag = post.primaryTag || `#${char.name}超话#`;
-  const subTags = (post.subTags || []).map(t => `<span class="tag">${t}</span>`).join('');
-  const mentions = (post.mentions || []).join(' ');
+  const subTags = (post.subTags || []);
+  const mentions = (post.mentions || []);
+  const authorAvatar = (typeof window.getPostAuthorAvatar === 'function')
+    ? window.getPostAuthorAvatar(post)
+    : (post.author.avatar || '');
+  const timeText = post.createdAt
+    ? (window.formatDynamicTime ? window.formatDynamicTime(post.createdAt) : '刚刚')
+    : (post.time || '刚刚');
+
   return `
     <div class="st2s-detail">
-      <div class="st2s-detail-bar">
-        <button onclick="closePostDetail()" class="st2s-detail-back">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
-          返回动态
-        </button>
-        <span class="st2s-detail-meta">帖子详情 · ${postTime(post)}</span>
-      </div>
-      <article class="st2s-detail-card">
-        <header class="st2s-detail-head">
-          <img class="st2s-detail-av" src="${post.author.avatar || ''}" alt="">
-          <div>
-            <div class="st2s-detail-name">
-              <b>${post.author.name}</b>
-              ${post.author.badge ? `<span class="st2s-detail-bd">${post.author.badge}</span>` : ''}
+      <!-- 帖子主正文卡片 · 仿热搜详情 -->
+      <div class="luxe-card p-4 space-y-3.5 bg-white shadow-xs">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="relative">
+              <img src="${authorAvatar}" class="w-10 h-10 rounded-full object-cover border border-slate-200">
+              ${post.author.verified ? `<span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center text-[8px] text-white font-black">V</span>` : ''}
             </div>
-            <div class="st2s-detail-tag">
-              <span class="hash">${primaryTag}</span>
-              ${mentions ? `<span class="mention">${mentions}</span>` : ''}
-            </div>
-          </div>
-        </header>
-        <p class="st2s-detail-text">${post.content || ''}</p>
-        ${subTags ? `<div class="st2s-detail-subtags">${subTags}</div>` : ''}
-        ${hasImage ? `<div class="st2s-detail-img-wrap"><img class="st2s-detail-img" src="${post.image}" alt=""></div>` : ''}
-        <div class="st2s-detail-bar2">
-          <span>${new Date(post.createdAt || Date.now()).toLocaleString('zh-CN', { hour12: false })}</span>
-        </div>
-        <div class="st2s-detail-actions">
-          <button onclick="handlePostAction('${post.id}','like')" class="st2s-detail-act ${post.stats.isLiked ? 'is-on' : ''}">
-            <svg viewBox="0 0 24 24" fill="${post.stats.isLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-            <span>${post.stats.likes || 0}</span>
-          </button>
-          <button onclick="handlePostAction('${post.id}','repost')" class="st2s-detail-act">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-            <span>${post.stats.reposts || 0}</span>
-          </button>
-          <button class="st2s-detail-act">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            <span>${post.stats.comments || 0}</span>
-          </button>
-          ${hasImage ? `<a href="${post.image}" download="${(post.author.name || 'image').replace(/[^\w一-龥]/g, '_')}_${post.id}.png" class="st2s-detail-act">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span>下载</span>
-          </a>` : ''}
-        </div>
-      </article>
-      <div class="st2s-detail-comments">
-        <h5>评论 <span>${comments.length}</span></h5>
-        ${comments.length ? comments.map(c => `
-          <div class="st2s-detail-cm">
-            <img class="st2s-detail-cm-av" src="${c.avatar || ''}" alt="">
             <div>
-              <div class="st2s-detail-cm-name">${c.name || '匿名'}</div>
-              <div class="st2s-detail-cm-text">${c.text || ''}</div>
+              <div class="flex items-center gap-1.5">
+                <h4 class="text-xs font-black text-slate-900">${post.author.name}</h4>
+                ${post.author.badge ? `<span class="text-[8px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.2 rounded">${post.author.badge}</span>` : ''}
+              </div>
+              <p class="text-[9px] text-slate-400 mt-0.5">${timeText}</p>
             </div>
           </div>
-        `).join('') : '<div class="st2s-detail-cm-empty">还没有评论, 快来抢沙发</div>'}
+
+          <button onclick="handlePostAction('${post.id}', 'download')" class="p-1 text-slate-400 active:scale-95">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          </button>
+        </div>
+
+        <div class="flex flex-wrap gap-1.5 text-xs">
+          <span class="weibo-tag">${primaryTag}</span>
+          ${mentions.length ? mentions.map(m => `<span class="weibo-mention">${m}</span>`).join('') : ''}
+        </div>
+
+        <p class="text-xs text-slate-800 leading-relaxed text-justify">${post.content || ''}</p>
+
+        ${subTags.length ? `<div class="st2s-detail-subtags">${subTags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+
+        ${hasImage ? `
+          <div class="rounded-2xl overflow-hidden bg-slate-950 shadow-inner">
+            <img src="${post.image}" class="w-full h-auto object-contain block" alt="">
+          </div>
+        ` : ''}
+
+        <div class="social-action-bar !border-t-0 !pt-1">
+          <div onclick="handlePostAction('${post.id}', 'repost')" class="social-action-btn">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+            <span>${post.stats.reposts || 0}</span>
+          </div>
+          <div class="social-action-btn">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            <span>${post.stats.comments || 0}</span>
+          </div>
+          <div onclick="handlePostAction('${post.id}', 'like')" class="social-action-btn ${post.stats.isLiked ? 'liked' : ''}">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
+            <span>${post.stats.likes || 0}</span>
+          </div>
+        </div>
       </div>
+
+      <!-- 评论区分隔条 -->
+      <div class="flex items-center justify-between px-1 pt-1">
+        <h4 class="text-xs font-black text-slate-900">全部评论 (${comments.length})</h4>
+        <span class="text-[10px] text-slate-400">实时互动流</span>
+      </div>
+
+      ${comments.length === 0 ? `
+        <div class="luxe-card p-6 text-center text-xs text-slate-400 bg-white">
+          暂无评论，快来抢首评吧～
+        </div>
+      ` : comments.map(c => `
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-xs space-y-2.5">
+          <div class="flex items-start justify-between">
+            <div class="flex gap-2.5 min-w-0">
+              <img src="${c.avatar || (window.getAvatar ? window.getAvatar(c.name || '匿名', 'emoji') : '')}" class="w-8 h-8 rounded-full object-cover border border-slate-200 flex-shrink-0">
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <h5 class="text-xs font-black text-slate-900">${c.name || '匿名'}</h5>
+                  <span class="text-[9px] text-slate-400">· ${c.ip || ''}</span>
+                </div>
+                <p class="text-xs text-slate-800 leading-relaxed mt-1">${c.text || ''}</p>
+                <div class="flex items-center gap-3 mt-1.5 text-[9px] text-slate-400">
+                  <span>${c.time || '刚刚'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('')}
     </div>
   `;
 }
