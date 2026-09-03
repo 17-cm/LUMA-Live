@@ -18,8 +18,47 @@ function showToast(msg, type) {
   console.log(`[Toast ${type}]`, msg);
   if (window.showMessage) window.showMessage(msg);
 }
+// 玩家身份缓存：发帖/评论一律使用当前真实玩家(主页已同步或宿主 SDK)，不再出现“游客用户”占位
+let _hostUserCache = null;
+async function syncHostUserProfile() {
+  try {
+    const sdk = window.AiPhone || window.api;
+    if (sdk && sdk.user && typeof sdk.user.getProfile === 'function') {
+      const u = await sdk.user.getProfile();
+      if (u) {
+        const name = u.name || u.nickname || '';
+        const avatar = u.avatar || u.avatarUrl || u.icon || '';
+        _hostUserCache = {
+          id: u.id || 'user_001',
+          name: name || '玩家',
+          avatar: avatar || (typeof window.getAvatar === 'function' ? window.getAvatar(name || '玩家', 'first') : ''),
+          badge: u.badge || '',
+          verified: !!u.verified
+        };
+        return _hostUserCache;
+      }
+    }
+  } catch (e) { console.warn('[SuperTopic] 获取玩家资料失败:', e); }
+  return null;
+}
 function getCurrentUser() {
-  return { id: 'user_001', name: '游客用户', avatar: '/assets/default-avatar.png' };
+  const src = _hostUserCache || window.currentUser || null;
+  if (src && src.name) {
+    return {
+      id: src.id || 'user_001',
+      name: src.name,
+      avatar: src.avatar || src.avatarUrl || (typeof window.getAvatar === 'function' ? window.getAvatar(src.name, 'first') : ''),
+      badge: src.badge || '',
+      verified: !!src.verified
+    };
+  }
+  return {
+    id: 'user_001',
+    name: '玩家',
+    avatar: (typeof window.getAvatar === 'function') ? window.getAvatar('玩家', 'first') : '',
+    badge: '',
+    verified: false
+  };
 }
 function getCharContribution(charId) {
   try { return (window.getCharContributionScore && window.getCharContributionScore(charId)) || 0; } catch (e) { return 0; }
@@ -301,29 +340,38 @@ function renderSuperTopicPostsTab(charId) {
 
     <div class="st2s-feed">
       ${posts.map(post => {
-        const primaryTag = post.primaryTag || `#${char.name}超话#`;
-        const subTags = (post.subTags || []).join(' ');
-        const mentions = (post.mentions || []).join(' ');
-        const content = post.content || '';
-        const truncated = content.length > 80 ? (content.slice(0, 80) + '…') : content;
+        const author = post.author || {};
+        const avatarSrc = (typeof window.getPostAuthorAvatar === 'function')
+          ? window.getPostAuthorAvatar(post)
+          : (author.avatar || (typeof window.getAvatar === 'function' ? window.getAvatar(author.name, 'emoji') : ''));
+        const tagList = (post.primaryTag ? [post.primaryTag] : (post.tag ? [post.tag] : [])).concat(post.subTags || []);
+        const mentionList = (post.mentions && post.mentions.length) ? post.mentions : (post.mention ? [post.mention] : []);
+        const deviceTag = (typeof window.getFloatClientTag === 'function') ? window.getFloatClientTag(true) : 'Float 客户端';
+        const tagHtml = tagList.map(t => `<span class="hash">${t}</span>`).join('');
+        const mentionHtml = mentionList.map(m => `<span class="mention">${m}</span>`).join('');
+        const verifiedHtml = author.verified ? '<span class="st2s-feed-verified">V</span>' : '';
         return `
           <article class="st2s-feed-item" onclick="openSuperTopicPostDetail('${post.id}')">
-            <div class="st2s-feed-full">
-              <div class="st2s-feed-head">
-                <img class="st2s-feed-av" src="${window.getPostAuthorAvatar ? window.getPostAuthorAvatar(post) : (post.author.avatar || '')}" alt="">
+            <div class="st2s-feed-head">
+              <div class="st2s-feed-av-wrap">
+                ${avatarSrc
+                  ? `<img class="st2s-feed-av" src="${avatarSrc}" alt="">`
+                  : `<div class="st2s-feed-av st2s-feed-av-fallback">${(author.name || '?').charAt(0)}</div>`}
+                ${verifiedHtml}
+              </div>
+              <div class="st2s-feed-meta">
                 <div class="st2s-feed-name">
-                  <b>${post.author.name}</b>
-                  ${post.author.badge ? `<span class="st2s-feed-bd">${post.author.badge}</span>` : ''}
+                  <b>${author.name || ''}</b>
+                  ${author.badge ? `<span class="st2s-feed-bd">${author.badge}</span>` : ''}
                 </div>
-                <span class="st2s-feed-time">${postTime(post)}</span>
+                <div class="st2s-feed-device">${postTime(post)} · 来自 ${deviceTag}</div>
               </div>
-              <div class="st2s-feed-tags">
-                <span class="hash">${primaryTag}</span>
-                ${mentions ? `<span class="mention">${mentions}</span>` : ''}
-              </div>
-              <p class="st2s-feed-text">${truncated}</p>
-              ${subTags ? `<div class="st2s-feed-subtags">${subTags}</div>` : ''}
             </div>
+            <p class="st2s-feed-line">
+              ${tagHtml}
+              ${mentionHtml}
+              <span class="txt">${post.content || ''}</span>
+            </p>
           </article>
         `;
       }).join('')}
@@ -885,7 +933,7 @@ function clearComposeImage() {
 }
 window.clearComposeImage = clearComposeImage;
 
-function submitSuperTopicPost(charId) {
+async function submitSuperTopicPost(charId) {
   const char = (window.getAvailableCharsList() || []).find(c => String(c.id) === String(charId));
   if (!char) return;
   const content = (document.getElementById('cpContent') && document.getElementById('cpContent').value || '').trim();
@@ -895,6 +943,7 @@ function submitSuperTopicPost(charId) {
   const imageDesc = (document.getElementById('cpImageDesc') && document.getElementById('cpImageDesc').value || '').trim();
   const prev = document.getElementById('cpPreview');
   const image = (prev && !prev.classList.contains('hidden')) ? prev.src : '';
+  await syncHostUserProfile();
   const user = getCurrentUser();
   const primaryTag = `#${char.name}超话#`;
   const subTagParts = [];
@@ -905,12 +954,13 @@ function submitSuperTopicPost(charId) {
     });
   }
   const mentionParts = mention ? mention.split(/\s+/).filter(Boolean).map(m => m.startsWith('@') ? m : ('@' + m)) : [];
+  const postAvatar = user.avatar || (typeof window.getAvatar === 'function' ? window.getAvatar(user.name || '玩家', 'first') : (char.avatar || ''));
   const post = {
     id: 'st_post_' + Date.now(),
     charId: char.id,
     author: {
       name: user.name || '我',
-      avatar: user.avatar || (char.avatar || ''),
+      avatar: postAvatar,
       badge: user.badge || 'Lv.1 新粉',
       verified: false
     },
@@ -939,12 +989,28 @@ window.submitSuperTopicPost = submitSuperTopicPost;
 
 
 
-// 启动时恢复用户帖子
+// 启动时恢复用户帖子 (顺带把历史“游客用户/无头像”占位帖作者刷成当前真实玩家)
 (function restoreUserPosts() {
   try {
     const raw = localStorage.getItem('st_user_posts');
     if (!raw) return;
     const all = JSON.parse(raw);
+    const me = getCurrentUser();
+    if (me && me.name && me.name !== '游客用户') {
+      Object.keys(all).forEach(charId => {
+        const arr = all[charId];
+        if (!Array.isArray(arr)) return;
+        arr.forEach(p => {
+          const a = p && p.author;
+          if (!a) return;
+          if (!a.name || a.name === '游客用户' || !a.avatar || a.avatar === '/assets/default-avatar.png') {
+            a.name = me.name;
+            a.avatar = me.avatar;
+            a.badge = a.badge || me.badge || 'Lv.1 新粉';
+          }
+        });
+      });
+    }
     window.__SUPERTOPIC_POSTS__ = all;
   } catch (_) {}
 })();

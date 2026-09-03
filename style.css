@@ -3687,8 +3687,7 @@ input:checked + .switch-slider:before {
 }
 .st2s-row.me .who b { color: var(--st2s-rose); }
 
-/* 11. 动态帖子 (用 .st2s-card 通用壳) */
-/* L 站风帖子流 · 头像+名+时间+正文+横线 (无图, 点进详情看) */
+/* 11. 动态帖子 · 广场流 (L 站风: 头像+机型+斜体下划线正文, 点进详情看全文) */
 .st2s-feed {
   display: flex;
   flex-direction: column;
@@ -3701,28 +3700,55 @@ input:checked + .switch-slider:before {
   padding: 13px 14px;
   cursor: pointer;
   transition: background .15s ease;
-  border-bottom: 1px solid var(--st2s-line-soft);
+  border-bottom: 1px solid var(--st2s-line);
 }
 .st2s-feed-item:last-child { border-bottom: none; }
 .st2s-feed-item:active { background: var(--st2s-line-soft); }
-.st2s-feed-full {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
 .st2s-feed-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 2px;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+.st2s-feed-av-wrap {
+  position: relative;
+  flex-shrink: 0;
 }
 .st2s-feed-av {
-  width: 32px; height: 32px;
-  border-radius: 10px;
+  width: 40px; height: 40px;
+  border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  background: var(--st2s-ink-mute);
-  box-shadow: 0 0 0 1px var(--st2s-line-soft);
+  display: block;
+  background: var(--st2s-line-soft);
+  box-shadow: 0 0 0 1px var(--st2s-line);
+}
+.st2s-feed-av-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--st2s-ink-soft);
+  background: var(--st2s-line-soft);
+}
+.st2s-feed-verified {
+  position: absolute;
+  bottom: -1px; right: -1px;
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  border: 2px solid #fff;
+  color: #fff;
+  font-size: 7px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.st2s-feed-meta {
+  flex: 1;
+  min-width: 0;
 }
 .st2s-feed-name {
   display: flex;
@@ -3731,7 +3757,6 @@ input:checked + .switch-slider:before {
   font-size: 12.5px;
   font-weight: 900;
   color: var(--st2s-ink);
-  flex: 1;
   min-width: 0;
 }
 .st2s-feed-name b { font-weight: 900; }
@@ -3744,6 +3769,16 @@ input:checked + .switch-slider:before {
   border-radius: 3px;
   letter-spacing: 0.04em;
 }
+.st2s-feed-device {
+  font-size: 10px;
+  color: var(--st2s-ink-mute);
+  font-weight: 600;
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .st2s-feed-time {
   font-size: 10px;
   color: var(--st2s-ink-mute);
@@ -3751,35 +3786,34 @@ input:checked + .switch-slider:before {
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
-.st2s-feed-tags {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  font-size: 11px;
-  font-weight: 700;
-  margin-bottom: 3px;
-}
-.st2s-feed-tags .hash {
-  color: var(--st2s-rose);
-}
-.st2s-feed-tags .mention {
-  color: var(--st2s-ink-soft);
-}
-.st2s-feed-text {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--st2s-ink);
-  line-height: 1.6;
+
+/* 正文流: tag + @ + 正文 同一段, 斜体 + 下划线, 最多两行省略 */
+.st2s-feed-line {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13px;
+  font-style: italic;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  line-height: 1.65;
   margin: 0;
-  white-space: pre-wrap;
-  word-wrap: break-word;
+  word-break: break-word;
+  white-space: normal;
 }
-.st2s-feed-subtags {
-  font-size: 10.5px;
+.st2s-feed-line .hash {
+  color: var(--st2s-rose);
   font-weight: 700;
-  color: var(--st2s-ink-mute);
-  margin-top: 3px;
+}
+.st2s-feed-line .mention {
+  color: var(--st2s-violet);
+  font-weight: 700;
+}
+.st2s-feed-line .txt {
+  color: var(--st2s-ink);
+  font-weight: 500;
 }
 
 /* 12. 原 composer (改到发帖 tab) */
