@@ -8,6 +8,7 @@
 var api = window.api || {};
 let currentActiveSuperTopicCharId = null;
 let currentSuperTopicTab = 'posts';
+let superTopicDetailPostId = null;
 let selectedSupportGiftId = 'gift_flower';
 let superTopicVirtualScrollerInstance = null;
 
@@ -141,7 +142,7 @@ function postTime(post) {
   if (post.createdAt) {
     try {
       if (window.formatDynamicTime) {
-        return window.formatDynamicTime(post.createdAt) + ' · 来自 ' + (window.getFloatClientTag ? window.getFloatClientTag(true) : '小手机');
+        return window.formatDynamicTime(post.createdAt);
       }
     } catch (e) {}
   }
@@ -258,13 +259,8 @@ window.renderSuperTopicView = renderSuperTopicView;
 // 分段导航切换 (侧边栏 tab)
 // -------------------------------------------------------------------------
 function switchSuperTopicTab(tabKey) {
-  // 详情页直接切回动态
-  if (currentSuperTopicTab === 'post_detail') {
-    currentSuperTopicTab = tabKey;
-    closePostDetail();
-  } else {
-    currentSuperTopicTab = tabKey;
-  }
+  superTopicDetailPostId = null;
+  currentSuperTopicTab = tabKey;
 
   // 同步顶部 meta-strip 的 tab 文字
   const stripTab = document.querySelector('.st2s-meta-tab');
@@ -298,6 +294,15 @@ window.switchSuperTopicSubTab = switchSuperTopicTab;
 function renderSuperTopicTab() {
   const char = getActiveChar();
   if (!char) return;
+  if (superTopicDetailPostId) {
+    const posts = topicPostsFor(char);
+    const post = posts.find(p => String(p.id) === String(superTopicDetailPostId));
+    if (post) {
+      renderSuperTopicPostDetail(post, char);
+      return;
+    }
+    superTopicDetailPostId = null;
+  }
   if (currentSuperTopicTab === 'posts') renderSuperTopicPostsTab(char.id);
   else if (currentSuperTopicTab === 'compose') renderSuperTopicComposeTab(char);
   else if (currentSuperTopicTab === 'rules') renderSuperTopicRulesTab(char);
@@ -344,11 +349,13 @@ function renderSuperTopicPostsTab(charId) {
         const avatarSrc = (typeof window.getPostAuthorAvatar === 'function')
           ? window.getPostAuthorAvatar(post)
           : (author.avatar || (typeof window.getAvatar === 'function' ? window.getAvatar(author.name, 'emoji') : ''));
-        const tagList = (post.primaryTag ? [post.primaryTag] : (post.tag ? [post.tag] : [])).concat(post.subTags || []);
+        const primaryTag = post.primaryTag || (post.tag || '');
+        const subTags = post.subTags || [];
         const mentionList = (post.mentions && post.mentions.length) ? post.mentions : (post.mention ? [post.mention] : []);
         const deviceTag = (typeof window.getFloatClientTag === 'function') ? window.getFloatClientTag(true) : 'Float 客户端';
-        const tagHtml = tagList.map(t => `<span class="hash">${t}</span>`).join('');
+        const primaryTagHtml = primaryTag ? `<span class="hash">${primaryTag}</span>` : '';
         const mentionHtml = mentionList.map(m => `<span class="mention">${m}</span>`).join('');
+        const subTagHtml = subTags.map(t => `<span class="hash">${t}</span>`).join('');
         const verifiedHtml = author.verified ? '<span class="st2s-feed-verified">V</span>' : '';
         return `
           <article class="st2s-feed-item" onclick="openSuperTopicPostDetail('${post.id}')">
@@ -368,9 +375,10 @@ function renderSuperTopicPostsTab(charId) {
               </div>
             </div>
             <p class="st2s-feed-line">
-              ${tagHtml}
+              ${primaryTagHtml}
               ${mentionHtml}
               <span class="txt">${post.content || ''}</span>
+              ${subTagHtml}
             </p>
           </article>
         `;
@@ -1246,21 +1254,24 @@ window.doRefreshSuperTopic = doRefreshSuperTopic;
 function openSuperTopicPostDetail(postId) {
   const char = getActiveChar();
   if (!char) return;
-  const panel = document.getElementById('superTopicPanel');
-  if (!panel) return;
   const posts = topicPostsFor(char);
   const post = posts.find(p => String(p.id) === String(postId));
   if (!post) { showToast('帖子不存在', 'warn'); return; }
-  currentSuperTopicTab = 'post_detail';
-  panel.dataset.mode = 'detail';
-  panel.innerHTML = renderSuperTopicPostDetail(post, char);
+  superTopicDetailPostId = post.id;
+  currentSuperTopicTab = 'posts';
+  // 同步侧边栏高亮与顶部元条：详情来自动态，保持「动态」高亮
+  SUPERTOPIC_TAB_ORDER.forEach(k => {
+    const btn = document.getElementById(`spTabBtn_${k}`);
+    if (btn) btn.classList.toggle('on', k === 'posts');
+  });
+  const stripTab = document.querySelector('.st2s-meta-tab');
+  if (stripTab) stripTab.textContent = 'POSTS · 动态';
+  renderSuperTopicTab();
 }
 window.openSuperTopicPostDetail = openSuperTopicPostDetail;
 
 function closePostDetail() {
-  currentSuperTopicTab = 'posts';
-  const panel = document.getElementById('superTopicPanel');
-  if (panel) { panel.dataset.mode = 'list'; }
+  superTopicDetailPostId = null;
   renderSuperTopicTab();
 }
 window.closePostDetail = closePostDetail;
@@ -1270,99 +1281,238 @@ function renderSuperTopicPostDetail(post, char) {
   const comments = (post.commentTree && post.commentTree.length) ? post.commentTree : [];
   const primaryTag = post.primaryTag || `#${char.name}超话#`;
   const subTags = (post.subTags || []);
-  const mentions = (post.mentions || []);
+  const mentions = (post.mentions && post.mentions.length) ? post.mentions : (post.mention ? [post.mention] : []);
   const authorAvatar = (typeof window.getPostAuthorAvatar === 'function')
     ? window.getPostAuthorAvatar(post)
     : (post.author.avatar || '');
   const timeText = post.createdAt
     ? (window.formatDynamicTime ? window.formatDynamicTime(post.createdAt) : '刚刚')
     : (post.time || '刚刚');
+  const stats = post.stats || (post.stats = { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false });
+
+  const primaryTagHtml = `<span class="hash">${primaryTag}</span>`;
+  const mentionHtml = mentions.map(m => `<span class="mention">${m}</span>`).join('');
+  const subTagHtml = subTags.map(t => `<span class="hash">${t}</span>`).join('');
 
   return `
     <div class="st2s-detail">
-      <!-- 帖子主正文卡片 · 仿热搜详情 -->
-      <div class="luxe-card p-4 space-y-3.5 bg-white shadow-xs">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2.5">
-            <div class="relative">
-              <img src="${authorAvatar}" class="w-10 h-10 rounded-full object-cover border border-slate-200">
-              ${post.author.verified ? `<span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center text-[8px] text-white font-black">V</span>` : ''}
-            </div>
-            <div>
-              <div class="flex items-center gap-1.5">
-                <h4 class="text-xs font-black text-slate-900">${post.author.name}</h4>
-                ${post.author.badge ? `<span class="text-[8px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.2 rounded">${post.author.badge}</span>` : ''}
-              </div>
-              <p class="text-[9px] text-slate-400 mt-0.5">${timeText}</p>
-            </div>
+      <!-- 顶部返回 + 时间 -->
+      <div class="st2s-detail-topbar">
+        <button class="st2s-detail-back" onclick="closePostDetail()" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          <span>返回动态</span>
+        </button>
+        <span class="st2s-detail-time">${timeText}</span>
+      </div>
+
+      <!-- 作者条 -->
+      <div class="st2s-detail-author">
+        ${authorAvatar
+          ? `<img src="${authorAvatar}" class="st2s-detail-avatar" alt="">`
+          : `<div class="st2s-detail-avatar st2s-feed-av-fallback">${(post.author.name || '?').charAt(0)}</div>`}
+        <div class="st2s-detail-author-meta">
+          <div class="st2s-detail-name">
+            <b>${post.author.name || '匿名'}</b>
+            ${post.author.badge ? `<span class="st2s-feed-bd">${post.author.badge}</span>` : ''}
+            ${post.author.verified ? '<span class="st2s-feed-verified">V</span>' : ''}
           </div>
-
-          <button onclick="handlePostAction('${post.id}', 'download')" class="p-1 text-slate-400 active:scale-95">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-          </button>
-        </div>
-
-        <div class="flex flex-wrap gap-1.5 text-xs">
-          <span class="weibo-tag">${primaryTag}</span>
-          ${mentions.length ? mentions.map(m => `<span class="weibo-mention">${m}</span>`).join('') : ''}
-        </div>
-
-        <p class="text-xs text-slate-800 leading-relaxed text-justify">${post.content || ''}</p>
-
-        ${subTags.length ? `<div class="st2s-detail-subtags">${subTags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
-
-        ${hasImage ? `
-          <div class="rounded-2xl overflow-hidden bg-slate-950 shadow-inner">
-            <img src="${post.image}" class="w-full h-auto object-contain block" alt="">
-          </div>
-        ` : ''}
-
-        <div class="social-action-bar !border-t-0 !pt-1">
-          <div onclick="handlePostAction('${post.id}', 'repost')" class="social-action-btn">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
-            <span>${post.stats.reposts || 0}</span>
-          </div>
-          <div class="social-action-btn">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            <span>${post.stats.comments || 0}</span>
-          </div>
-          <div onclick="handlePostAction('${post.id}', 'like')" class="social-action-btn ${post.stats.isLiked ? 'liked' : ''}">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
-            <span>${post.stats.likes || 0}</span>
-          </div>
+          <div class="st2s-detail-author-sub">${timeText} · 来自 ${(typeof window.getFloatClientTag === 'function') ? window.getFloatClientTag(true) : 'Float 客户端'}</div>
         </div>
       </div>
 
-      <!-- 评论区分隔条 -->
-      <div class="flex items-center justify-between px-1 pt-1">
-        <h4 class="text-xs font-black text-slate-900">全部评论 (${comments.length})</h4>
-        <span class="text-[10px] text-slate-400">实时互动流</span>
+      <!-- 内容：主tag + 艾特 + 正文 + 副tag -->
+      <div class="st2s-detail-line">
+        ${primaryTagHtml}
+        ${mentionHtml}
+        <span class="txt">${post.content || ''}</span>
+        ${subTagHtml}
+      </div>
+
+      ${hasImage ? `
+        <div class="st2s-detail-image">
+          <img src="${post.image}" alt="">
+        </div>
+      ` : ''}
+
+      <!-- 四个操作键：转发 / 评论 / 点赞 / 下载 -->
+      <div class="st2s-detail-actions social-action-bar">
+        <div class="social-action-btn" onclick="handleSuperTopicPostAction('${post.id}', 'repost')" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+          <span>${stats.reposts || 0}</span>
+        </div>
+        <div class="social-action-btn" onclick="focusSuperTopicCommentInput()" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          <span>${stats.comments || 0}</span>
+        </div>
+        <div class="social-action-btn ${stats.isLiked ? 'liked' : ''}" onclick="handleSuperTopicPostAction('${post.id}', 'like')" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
+          <span>${stats.likes || 0}</span>
+        </div>
+        <div class="social-action-btn ${stats.isDownloaded ? 'downloaded' : ''}" onclick="handleSuperTopicPostAction('${post.id}', 'download')" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>下载</span>
+        </div>
+      </div>
+
+      <!-- 评论区 -->
+      <div class="st2s-detail-comments-head">
+        <h4>全部评论 (${comments.length})</h4>
+        <span>实时互动流</span>
       </div>
 
       ${comments.length === 0 ? `
-        <div class="luxe-card p-6 text-center text-xs text-slate-400 bg-white">
-          暂无评论，快来抢首评吧～
-        </div>
-      ` : comments.map(c => `
-        <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-xs space-y-2.5">
-          <div class="flex items-start justify-between">
-            <div class="flex gap-2.5 min-w-0">
-              <img src="${c.avatar || (window.getAvatar ? window.getAvatar(c.name || '匿名', 'emoji') : '')}" class="w-8 h-8 rounded-full object-cover border border-slate-200 flex-shrink-0">
-              <div>
-                <div class="flex items-center gap-1.5">
-                  <h5 class="text-xs font-black text-slate-900">${c.name || '匿名'}</h5>
-                  <span class="text-[9px] text-slate-400">· ${c.ip || ''}</span>
-                </div>
-                <p class="text-xs text-slate-800 leading-relaxed mt-1">${c.text || ''}</p>
-                <div class="flex items-center gap-3 mt-1.5 text-[9px] text-slate-400">
-                  <span>${c.time || '刚刚'}</span>
-                </div>
+        <div class="st2s-detail-empty">暂无评论，快来抢首评吧～</div>
+      ` : comments.map(c => {
+        const cName = c.name || c.user || '匿名';
+        const cAvatar = c.avatar || (window.getAvatar ? window.getAvatar(cName, 'emoji') : '');
+        const cText = c.text || c.content || '';
+        const cTime = c.time || (c.createdAt ? (window.formatDynamicTime ? window.formatDynamicTime(c.createdAt) : '刚刚') : '刚刚');
+        return `
+          <div class="st2s-detail-comment">
+            <div class="st2s-detail-cmt-left">
+              ${cAvatar
+                ? `<img src="${cAvatar}" class="st2s-detail-cmt-av" alt="">`
+                : `<div class="st2s-detail-cmt-av st2s-feed-av-fallback">${cName.charAt(0)}</div>`}
+            </div>
+            <div class="st2s-detail-cmt-right">
+              <div class="st2s-detail-cmt-name">
+                <b>${cName}</b>
+                ${c.ip ? `<span class="st2s-detail-cmt-ip">· ${c.ip}</span>` : ''}
               </div>
+              <p class="st2s-detail-cmt-text">${cText}</p>
+              <div class="st2s-detail-cmt-meta">${cTime}</div>
             </div>
           </div>
-        </div>
-      `).join('')}
+        `;
+      }).join('')}
+
+      <!-- 评论输入框 + 发送 -->
+      <div class="st2s-detail-inputbar">
+        <input id="st2sCommentInput" type="text" placeholder="发条温暖善意的评论..." maxlength="200" autocomplete="off">
+        <button type="button" class="st2s-detail-send" onclick="submitSuperTopicComment()">发送</button>
+      </div>
     </div>
   `;
 }
 window.renderSuperTopicPostDetail = renderSuperTopicPostDetail;
+
+// -----------------------------------------------------------------------------
+// 超话帖子操作 (覆盖 __SUPERTOPIC_POSTS__ 与 weiboPosts 两个来源)
+// -----------------------------------------------------------------------------
+function findSuperTopicPost(postId) {
+  const char = getActiveChar();
+  if (!char) return null;
+  const userArr = (window.__SUPERTOPIC_POSTS__ || {})[char.id];
+  if (Array.isArray(userArr)) {
+    const p = userArr.find(x => String(x.id) === String(postId));
+    if (p) return { post: p, source: 'user', charId: char.id };
+  }
+  const weibo = (window.weiboPosts || []).find(x => String(x.id) === String(postId));
+  if (weibo) return { post: weibo, source: 'weibo' };
+  return null;
+}
+
+function persistSuperTopicPost(found) {
+  if (!found) return;
+  const { post, source, charId } = found;
+  if (source === 'user') {
+    try {
+      const all = window.__SUPERTOPIC_POSTS__ = window.__SUPERTOPIC_POSTS__ || {};
+      all[charId] = all[charId] || [];
+      const idx = all[charId].findIndex(x => String(x.id) === String(post.id));
+      if (idx >= 0) all[charId][idx] = post;
+      localStorage.setItem('st_user_posts', JSON.stringify(all));
+    } catch (_) {}
+    if (window.LumaDataHub && typeof window.LumaDataHub.put === 'function') {
+      try { window.LumaDataHub.put('super_topic_posts', post.id, post); } catch (_) {}
+    }
+  } else if (source === 'weibo') {
+    try {
+      if (typeof window.persistPostToDb === 'function') {
+        window.persistPostToDb(post);
+      } else if (window.api && api.db) {
+        api.db.create('app_posts', post).catch(() => {
+          api.db.update('app_posts', post.id, post).catch(() => {});
+        });
+      }
+    } catch (_) {}
+  }
+}
+
+function handleSuperTopicPostAction(postId, action) {
+  const found = findSuperTopicPost(postId);
+  if (!found) { showToast('帖子不存在', 'warn'); return; }
+  const post = found.post;
+  post.stats = post.stats || { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false };
+
+  if (action === 'like') {
+    post.stats.isLiked = !post.stats.isLiked;
+    post.stats.likes += post.stats.isLiked ? 1 : -1;
+  } else if (action === 'download') {
+    post.stats.isDownloaded = !post.stats.isDownloaded;
+    if (typeof window.downloadPostImageToLocal === 'function') {
+      try { window.downloadPostImageToLocal(post); } catch (_) {}
+    } else {
+      showToast('已开始下载', 'ok');
+    }
+  } else if (action === 'repost') {
+    post.stats.reposts = (post.stats.reposts || 0) + 1;
+    if (typeof window.openSharePickerModal === 'function') {
+      try { window.openSharePickerModal(); } catch (_) {}
+    } else {
+      showToast('已转发', 'ok');
+    }
+  }
+
+  persistSuperTopicPost(found);
+  if (superTopicDetailPostId && String(superTopicDetailPostId) === String(postId)) {
+    const char = getActiveChar();
+    if (char) renderSuperTopicPostDetail(post, char);
+  }
+}
+window.handleSuperTopicPostAction = handleSuperTopicPostAction;
+
+function focusSuperTopicCommentInput() {
+  const input = document.getElementById('st2sCommentInput');
+  if (input) input.focus();
+}
+window.focusSuperTopicCommentInput = focusSuperTopicCommentInput;
+
+function submitSuperTopicComment() {
+  if (!superTopicDetailPostId) return;
+  const input = document.getElementById('st2sCommentInput');
+  if (!input) return;
+  const val = (input.value || '').trim();
+  if (!val) { showToast('评论内容不能为空', 'warn'); return; }
+
+  const found = findSuperTopicPost(superTopicDetailPostId);
+  if (!found) { showToast('帖子不存在', 'warn'); return; }
+  const post = found.post;
+  post.commentTree = post.commentTree || [];
+  post.stats = post.stats || { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false };
+
+  const uName = (window.currentUser && window.currentUser.name) || currentUserName() || '玩家';
+  const uAvatar = (window.currentUser && window.currentUser.avatar) || (typeof window.getAvatar === 'function' ? window.getAvatar(uName, 'first') : '');
+  const uIp = (window.userProfileData && window.userProfileData.ip) || 'LUMA';
+
+  post.commentTree.unshift({
+    id: 'c_' + Date.now(),
+    name: uName,
+    user: uName,
+    avatar: uAvatar,
+    ip: uIp,
+    text: val,
+    content: val,
+    time: '刚刚',
+    createdAt: Date.now()
+  });
+  post.stats.comments = (post.stats.comments || 0) + 1;
+  input.value = '';
+
+  persistSuperTopicPost(found);
+  showToast('评论已发表', 'ok');
+
+  const char = getActiveChar();
+  if (char) renderSuperTopicPostDetail(post, char);
+}
+window.submitSuperTopicComment = submitSuperTopicComment;
