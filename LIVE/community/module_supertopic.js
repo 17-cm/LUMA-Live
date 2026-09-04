@@ -317,12 +317,43 @@ function renderSuperTopicTab() {
 // -------------------------------------------------------------------------
 // 动态 Tab
 // -------------------------------------------------------------------------
+// ⚠⚠⚠【临时 · 预览种子帖】⚠⚠⚠
+// 只为方便验收动态广场排版。定稿后请整段删除本函数，
+// 以及 renderSuperTopicPostsTab 里那一行 concat(DEMO) 调用。
+function supertopicDemoPosts(char) {
+  const now = Date.now();
+  const mk = (name, agoMin, content, opts) => {
+    opts = opts || {};
+    return {
+      id: 'demo_post_' + char.id + '_' + name,
+      author: { name: name, avatar: getAvatarFor(name, 'first'), verified: !!opts.verified },
+      createdAt: now - agoMin * 60000,
+      tag: '#' + char.name + '超话#',
+      mentions: opts.mention ? ['@' + char.name] : [],
+      subTags: opts.subs || [],
+      device: opts.device || 'Float 客户端',
+      content: content,
+      stats: { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false },
+      commentTree: []
+    };
+  };
+  return [
+    mk('夜航西飞', 4, '今晚八点准时开播，打一把排位就下。', {}),
+    mk('糖渍青柠', 17, '刚看完回放，第三波那波团战决策是真的离谱，明明可以直接拿大龙却在野区绕了二十秒。', { mention: 1, subs: ['#赛事复盘#'], verified: 1 }),
+    mk('Momo', 46, '主播今天状态好好，声音听起来睡了很久', { subs: ['#日常#'] }),
+    mk('雾都旧事', 95, '整理了一份从开局到成型的完整路线，包含装备顺序、时间节点和三种逆风局的处理办法，太长就不贴了，评论区第一条有链接，需要的自取。另外上周说的那个键位改法我已经换成侧键了，实测连续闪避的手感提升很明显，推荐同样手小的朋友也试试，默认那套确实够不着。', { subs: ['#攻略#', '#干货#'] }),
+    mk('拾柒', 180, '签到第四十七天', { device: 'iPhone 15 Pro' }),
+    mk('荔枝罐头', 320, '有没有一起蹲明天联动活动的，两个人做日常效率高一点', { mention: 1, subs: ['#组队#'], device: '小米 14 Ultra' })
+  ];
+}
+
 function renderSuperTopicPostsTab(charId) {
   const panel = document.getElementById('superTopicPanel');
   if (!panel) return;
   const chars = window.getAvailableCharsList();
   const char = chars.find(c => String(c.id) === String(charId)) || chars[0];
   let posts = topicPostsFor(char);
+  posts = supertopicDemoPosts(char).concat(posts); // ⚠【临时】定稿后删除本行
   if (posts.length === 0) {
     posts = [{
       id: `topic_post_${char.id}`,
@@ -352,34 +383,25 @@ function renderSuperTopicPostsTab(charId) {
         const primaryTag = post.primaryTag || (post.tag || '');
         const subTags = post.subTags || [];
         const mentionList = (post.mentions && post.mentions.length) ? post.mentions : (post.mention ? [post.mention] : []);
-        const deviceTag = (typeof window.getFloatClientTag === 'function') ? window.getFloatClientTag(true) : 'Float 客户端';
+        const deviceTag = post.device || ((typeof window.getFloatClientTag === 'function') ? window.getFloatClientTag(true) : 'Float 客户端');
         const primaryTagHtml = primaryTag ? `<span class="hash">${primaryTag}</span>` : '';
         const mentionHtml = mentionList.map(m => `<span class="mention">${m}</span>`).join('');
-        const subTagHtml = subTags.map(t => `<span class="hash">${t}</span>`).join('');
+        const subTagHtml = subTags.map(t => `<span class="sub">${t}</span>`).join('');
         const verifiedHtml = author.verified ? '<span class="st2s-feed-verified">V</span>' : '';
         return `
           <article class="st2s-feed-item" onclick="openSuperTopicPostDetail('${post.id}')">
-            <div class="st2s-feed-head">
-              <div class="st2s-feed-av-wrap">
-                ${avatarSrc
-                  ? `<img class="st2s-feed-av" src="${avatarSrc}" alt="">`
-                  : `<div class="st2s-feed-av st2s-feed-av-fallback">${(author.name || '?').charAt(0)}</div>`}
-                ${verifiedHtml}
-              </div>
+            <div class="st2s-feed-av-wrap">
+              ${avatarSrc
+                ? `<img class="st2s-feed-av" src="${avatarSrc}" alt="">`
+                : `<div class="st2s-feed-av st2s-feed-av-fallback">${(author.name || '?').charAt(0)}</div>`}
+              ${verifiedHtml}
+            </div>
+            <div class="st2s-feed-body">
+              <p class="st2s-feed-line">${primaryTagHtml}${mentionHtml}<span class="txt">${post.content || ''}</span></p>
               <div class="st2s-feed-meta">
-                <div class="st2s-feed-name">
-                  <b>${author.name || ''}</b>
-                  ${author.badge ? `<span class="st2s-feed-bd">${author.badge}</span>` : ''}
-                </div>
-                <div class="st2s-feed-device">${postTime(post)} · 来自 ${deviceTag}</div>
+                <span class="who">${author.name || ''}</span><span class="sep">·</span><span class="tm">${postTime(post)}</span><span class="sep">·</span><span class="dev">${deviceTag}</span>${subTagHtml}
               </div>
             </div>
-            <p class="st2s-feed-line">
-              ${primaryTagHtml}
-              ${mentionHtml}
-              <span class="txt">${post.content || ''}</span>
-              ${subTagHtml}
-            </p>
           </article>
         `;
       }).join('')}
