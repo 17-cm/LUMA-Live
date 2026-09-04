@@ -380,12 +380,9 @@ function renderSuperTopicPostsTab(charId) {
         const avatarSrc = (typeof window.getPostAuthorAvatar === 'function')
           ? window.getPostAuthorAvatar(post)
           : (author.avatar || (typeof window.getAvatar === 'function' ? window.getAvatar(author.name, 'emoji') : ''));
-        const primaryTag = post.primaryTag || (post.tag || '');
         const subTags = post.subTags || [];
-        const mentionList = (post.mentions && post.mentions.length) ? post.mentions : (post.mention ? [post.mention] : []);
         const deviceTag = post.device || ((typeof window.getFloatClientTag === 'function') ? window.getFloatClientTag(true) : 'Float 客户端');
-        const primaryTagHtml = primaryTag ? `<span class="hash">${primaryTag}</span>` : '';
-        const mentionHtml = mentionList.map(m => `<span class="mention">${m}</span>`).join('');
+        // 广场列表不显示主 tag / @（只留一行正文），它们连同彩色样式一起放到详情页
         const subTagHtml = subTags.map(t => `<span class="sub">${t}</span>`).join('');
         const verifiedHtml = author.verified ? '<span class="st2s-feed-verified">V</span>' : '';
         return `
@@ -397,7 +394,7 @@ function renderSuperTopicPostsTab(charId) {
               ${verifiedHtml}
             </div>
             <div class="st2s-feed-body">
-              <p class="st2s-feed-line">${primaryTagHtml}${mentionHtml}<span class="txt">${post.content || ''}</span></p>
+              <p class="st2s-feed-line"><span class="txt">${post.content || ''}</span></p>
               <div class="st2s-feed-meta">
                 <span class="who">${author.name || ''}</span><span class="sep">·</span><span class="tm">${postTime(post)}</span><span class="sep">·</span><span class="dev">${deviceTag}</span>${subTagHtml}
               </div>
