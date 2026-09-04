@@ -3128,7 +3128,7 @@ input:checked + .switch-slider:before {
   --st2s-violet: #7928ca;
 }
 
-/* 0. 整体布局 · 46px 侧边栏 + 主区 (全平：无白底，只有一条通栏竖线) */
+/* 0. 整体布局 · 64px 侧边栏 + 主区 (全平：无白底，只有一条通栏竖线) */
 .st2s-layout {
   display: flex;
   gap: 0;
@@ -3142,19 +3142,19 @@ input:checked + .switch-slider:before {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 46px;
+  left: 64px;
   width: 1px;
   background: var(--st2s-line);
   pointer-events: none;
 }
 .st2s-side {
-  width: 46px;
+  width: 64px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 6px 0 14px;
+  gap: 3px;
+  padding: 8px 0 16px;
   background: transparent;
   border-right: 0;
   position: sticky;
@@ -3162,7 +3162,7 @@ input:checked + .switch-slider:before {
   align-self: flex-start;
 }
 .st2s-side-btn {
-  width: 34px; height: 34px;
+  width: 48px; height: 48px;
   flex-shrink: 0;
   border: 0;
   padding: 0;
@@ -3176,33 +3176,33 @@ input:checked + .switch-slider:before {
 }
 .st2s-side-btn:active { transform: scale(0.92); }
 .st2s-side-btn:hover { background: var(--st2s-line-soft); color: var(--st2s-ink); }
-.st2s-side-btn svg { width: 15px; height: 15px; }
+.st2s-side-btn svg { width: 18px; height: 18px; }
 .st2s-side-divider {
-  width: 20px; height: 1px;
+  width: 28px; height: 1px;
   background: var(--st2s-line);
-  margin: 5px 0;
+  margin: 6px 0;
   flex-shrink: 0;
 }
 .st2s-side-tab {
   position: relative;
-  width: 34px;
-  padding: 5px 0 4px;
+  width: 48px;
+  padding: 7px 0 6px;
   border: 0;
   background: transparent;
   color: var(--st2s-ink-mute);
   font-family: inherit;
-  font-size: 8.5px;
+  font-size: 10px;
   font-weight: 400;
-  letter-spacing: .01em;
-  border-radius: 3px;
+  letter-spacing: .02em;
+  border-radius: 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   cursor: pointer;
   transition: color .15s ease;
 }
-.st2s-side-tab svg { width: 15px; height: 15px; }
+.st2s-side-tab svg { width: 17px; height: 17px; }
 .st2s-side-tab-lb { line-height: 1; }
 .st2s-side-tab:hover { color: var(--st2s-ink-soft); }
 .st2s-side-tab:active { transform: scale(0.94); }
@@ -3213,9 +3213,10 @@ input:checked + .switch-slider:before {
 .st2s-side-tab.on::before {
   content: '';
   position: absolute;
-  left: 39px;
-  top: 6px;
-  bottom: 6px;
+  /* 按钮左沿 x=8，竖线 x=64 → 55 起 2px 宽正好压在竖线上 (63..65) */
+  left: 55px;
+  top: 8px;
+  bottom: 8px;
   width: 2px;
   background: var(--st2s-rose);
   border-radius: 2px;
