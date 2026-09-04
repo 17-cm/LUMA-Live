@@ -53,10 +53,10 @@
   <div id="communitySuperTopicView" class="full-page-view st2-page hidden">
       <!-- 顶部导览 (返回按钮) - 圆形 SVG 图标 -->
     <div class="st2-nav">
-      <button onclick="closeCommunitySubPage()" class="st2s-nav-back" aria-label="退出">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
+      <button onclick="closeCommunitySubPage()" class="st2s-nav-back" aria-label="返回">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="20" y1="12" x2="4" y2="12"></line>
+          <polyline points="11 19 4 12 11 5"></polyline>
         </svg>
       </button>
       <div class="w-8"></div>
