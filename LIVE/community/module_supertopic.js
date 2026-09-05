@@ -3,7 +3,8 @@
 // 浅色杂志感版：暖白底 + 玻璃拟态 + 玫瑰金/紫罗兰品牌电压 + Playfair 衬线 Display。
 // 沿用 LUMA 主页语言：.luxe-card 玻璃面板 + btn-brand 玫瑰金 + 系统 sans body。
 // 保留全部原有功能：动态 | 签到 | 打榜 | 贡献榜 | 关注 | 左拉切换抽屉
-// 数据接口与业务逻辑保持原样：贡献三渠道(送礼1:1·签到+100·打榜)统一计入贡献矩阵。
+// 贡献三渠道(送礼1:1 / 签到 / 发帖 / 评论)统一计入贡献矩阵，具体产出见
+// supertopic_privilege.js 的 ST2S_EARN，所有对外文案都从 st2sEarnSummary() 取。
 // =========================================================================
 var api = window.api || {};
 let currentActiveSuperTopicCharId = null;
@@ -12,6 +13,8 @@ let superTopicDetailPostId = null;
 // 详情页交互状态：展开中的楼层 id 集合 / 当前回复目标楼层 id
 let st2sExpandedComments = new Set();
 let st2sReplyTarget = null;
+let st2sEditingPostId = null;      // 正在原地编辑的帖子
+let st2sRulesEditing = false;        // 守则原地编辑模式
 let selectedSupportGiftId = 'gift_flower';
 let superTopicVirtualScrollerInstance = null;
 
@@ -276,6 +279,8 @@ window.renderSuperTopicView = renderSuperTopicView;
 // 分段导航切换 (侧边栏 tab)
 // -------------------------------------------------------------------------
 function switchSuperTopicTab(tabKey) {
+  st2sRulesEditing = false;      // 离开就退出守则编辑态
+  st2sEditingPostId = null;
   // 锁住的 tab 不切换，只提示门槛
   const chGuard = getActiveChar();
   if (chGuard) {
@@ -401,7 +406,7 @@ function renderSuperTopicPostsTab(charId) {
 window.renderSuperTopicPostsTab = renderSuperTopicPostsTab;
 
 // -------------------------------------------------------------------------
-// 签到 Tab（一天一次，贡献值+100、应援币+100，真实连续天数）
+// 签到 Tab（一天一次，贡献值按 ST2S_EARN.checkin、应援币+100，真实连续天数）
 // -------------------------------------------------------------------------
 // 补签卡：数量与来源都留好接口，等聊天链路做完直接接上
 function st2sCardPassCount(charId) {
@@ -448,7 +453,7 @@ function renderSuperTopicCheckinTab(char) {
       <div class="st2s-row-flex">
         <div class="st2s-t">
           <h4>#${char.name}# 每日签到</h4>
-          <p>一天一次 · 签到即得贡献 <b>+100</b></p>
+          <p>一天一次 · 签到即得贡献 <b>+${ST2S_EARN.checkin.toLocaleString()}</b></p>
         </div>
         <button onclick="handleSuperTopicCheckIn('${char.id}','${char.name.replace(/'/g, "\\'")}')" class="st2s-btn ${checkIn.isCheckedToday ? 'is-on' : ''}">
           ${checkIn.isCheckedToday ? `已签 ${checkIn.streakDays || 0} 天` : '立即签到'}
@@ -577,7 +582,7 @@ function renderSuperTopicContributeTab(char) {
   if (!panel) return;
 
   // 真实数据：统一贡献矩阵中所有「别人 → 该角色（含我自己）」的贡献记录
-  // 三大渠道统一累计：直播间送礼 1:1 + 每日签到 +100 + 超话打榜 1:1
+  // 三大渠道统一累计：直播间送礼 1:1 + 每日签到(见 ST2S_EARN) + 超话打榜 1:1
   let supporters = [];
   if (window.LumaGuardManager && typeof window.LumaGuardManager.getTopSupportersForChar === 'function') {
     try {
@@ -645,7 +650,7 @@ function renderSuperTopicContributeTab(char) {
       `).join('')}
     </div>
 
-    <p class="st2s-hint">累计贡献 = 直播间送礼 1:1 + 每日签到 +100 + 超话打榜 1:1</p>
+    <p class="st2s-hint">累计贡献 = ${st2sEarnSummary()}</p>
   `;
 }
 window.renderSuperTopicContributeTab = renderSuperTopicContributeTab;
@@ -1070,10 +1075,10 @@ const SUPERTOPIC_RULES = [
   { n: '03', t: '图片规范', d: '上传图片必须与 ${name} 本人相关(直播截图、舞台照、应援物料等), 严禁盗图。' },
   { n: '04', t: '发言礼貌', d: '请尊重其他粉丝、不同意见请理性讨论; 严禁@主播本人催更、催播、催互动。' },
   { n: '05', t: '原创激励', d: '原创图文 / 视频 / 二创 / 应援打榜贴, 视内容质量给予 50 - 200 贡献值奖励。' },
-  { n: '06', t: '等级权限', d: '每 10000 贡献升 1 级, 各超话独立计算。产出: 签到 +5000 / 发帖 +8000 / 评论 +2000 / 送礼按价格 1:1。Lv.1(关注即得): 点赞 / 评论 / 签到 / 应援; Lv.10: 发帖; Lv.20: 编辑自己的帖子; Lv.50: 超话管理(删除任意帖子与评论、修改本守则)。' },
+  { n: '06', t: '等级权限', d: '每 ${perLv} 贡献升 1 级, 各超话独立计算。产出: ${earn}。Lv.1(关注即得): 点赞 / 评论 / 签到 / 应援; Lv.10: 发帖; Lv.20: 编辑自己的帖子; Lv.50: 超话管理(删除任意帖子与评论、修改本守则)。' },
   { n: '07', t: '违规处理', d: '初犯: 警告 + 禁言 24h; 再犯: 永久禁言 + 移出超话; 严重者上报平台封号。' },
   { n: '08', t: '申诉通道', d: '如对处理有异议, 请通过侧栏「举报」旁的反馈通道联系 @${name}后援会会长。' },
-  { n: '09', t: '签到说明', d: '每日 00:00 重置, 断签会重新计数, 签到贡献 +5000。补签卡唯一获取途径是 ${name} 本人在聊天中赠送, 平台不对外发放, 收到后会自动出现在这里。' },
+  { n: '09', t: '签到说明', d: '每日 00:00 重置, 断签会重新计数, 签到贡献 +${earnCheckin}。补签卡唯一获取途径是 ${name} 本人在聊天中赠送, 平台不对外发放, 收到后会自动出现在这里。' },
   { n: '10', t: '应援规范', d: '打榜送礼纯属自愿, 严禁任何形式的集资、垫付、攀比晒单; 未成年人请在监护人同意下参与。' },
   { n: '11', t: '发帖分类', d: '发帖请至少带一个副 tag 标明内容类型(如 #日常# #攻略# #二创#), 便于他人检索与版务归档。' },
   { n: '12', t: '转载注明', d: '搬运二创必须注明原作者与出处链接, 未授权商用素材一律删除; 三次违规取消发帖权限。' },
@@ -1081,75 +1086,134 @@ const SUPERTOPIC_RULES = [
   { n: '14', t: '理性追星', d: '不围堵、不跟拍私人行程、不拨打工作电话; 主播下播后的时间属于主播自己。' },
   { n: '15', t: '版务生效', d: '本守则由 @${name}后援会制定并保留最终解释权, 修订后于本页面公示, 公示即生效。' }
 ];
+// 原地编辑要把内容塞进 value / textarea，必须转义，否则正文里的引号会截断属性
+function escHtml(t) {
+  return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function escAttr(t) {
+  return escHtml(t).replace(/"/g, '&quot;');
+}
+// 守则正文里的占位符统一在此展开，改产出/门槛只需动一处
+function st2sFillRule(text, char) {
+  return String(text)
+    .replace(/\$\{name\}/g, char ? char.name : '')
+    .replace(/\$\{perLv\}/g, (window.CONTRIB_PER_LEVEL || 10000).toLocaleString())
+    .replace(/\$\{earnCheckin\}/g, ST2S_EARN.checkin.toLocaleString())
+    .replace(/\$\{earn\}/g, st2sEarnSummary());
+}
 function renderSuperTopicRulesTab(char) {
   const panel = document.getElementById('superTopicPanel');
   if (!panel) return;
   const custom = st2sHasCustomRules(char.id);
+  const editing = st2sRulesEditing && custom;
   const rules = st2sRulesFor(char.id, SUPERTOPIC_RULES).map(r => ({
-    n: r.n, t: r.t, d: r.d.replace(/\$\{name\}/g, char.name)
+    n: r.n, t: r.t, d: st2sFillRule(r.d, char)
   }));
   const canManage = st2sCan(char.id, 'manage').ok;
   panel.innerHTML = `
     <div class="st2s-sec">
       <h4>超话守则</h4>
-      <span class="note">${rules.length} 条 · 适用于 #${char.name}超话#${custom ? ' · 已由版务修订' : ''}</span>
-      ${canManage ? `<button type="button" class="st2s-sec-act" title="修改守则" onclick="st2sEditRules('${char.id}')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+      <span class="note">${editing
+        ? '编辑中 · 改完点空白处自动保存'
+        : rules.length + ' 条 · 适用于 #' + char.name + '超话#' + (custom ? ' · 已由版务修订' : '')}</span>
+      ${canManage ? `<button type="button" class="st2s-sec-act ${editing ? 'is-on' : ''}" title="${editing ? '完成编辑' : '修改守则'}" onclick="st2sToggleRulesEdit('${char.id}')">
+        ${editing
+          ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg>`
+          : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>`}
       </button>` : ''}
     </div>
-    <div class="st2s-rules">
-      ${rules.map(r => `
+    <div class="st2s-rules ${editing ? 'is-editing' : ''}">
+      ${rules.map((r, i) => editing ? `
+        <div class="st2s-rule is-edit">
+          <div class="st2s-rule-no">${r.n}</div>
+          <div class="st2s-rule-body">
+            <input class="st2s-rule-t-in" value="${escAttr(r.t)}" autocomplete="off"
+                   onchange="st2sRuleField('${char.id}', ${i}, 't', this.value)">
+            <textarea class="st2s-rule-d-in" rows="2"
+                      onchange="st2sRuleField('${char.id}', ${i}, 'd', this.value)">${escHtml(r.d)}</textarea>
+          </div>
+          <button type="button" class="st2s-rule-del" title="删除这条" onclick="st2sRuleDel('${char.id}', ${i})">&times;</button>
+        </div>` : `
         <div class="st2s-rule">
           <div class="st2s-rule-no">${r.n}</div>
           <div class="st2s-rule-body">
             <div class="st2s-rule-t">${r.t}</div>
             <div class="st2s-rule-d">${r.d}</div>
           </div>
-        </div>
-      `).join('')}
+        </div>`).join('')}
     </div>
+    ${editing ? `
+    <div class="st2s-rules-ft">
+      <button type="button" onclick="st2sRuleAdd('${char.id}')">+ 新增一条</button>
+      <button type="button" class="is-danger" onclick="st2sRuleRestoreDefault('${char.id}')">恢复默认守则</button>
+    </div>` : ''}
   `;
 }
 window.renderSuperTopicRulesTab = renderSuperTopicRulesTab;
 
-// 管理员改守则：一行一条，「标题 | 内容」，清空即回落默认
-function st2sEditRules(charId) {
-  if (!st2sGuard(charId, 'manage')) return;
+// ── 守则原地编辑（照热搜那套：切换后文字变输入框，失焦即存）──
+function st2sToggleRulesEdit(charId) {
   const char = getCharById(charId);
   if (!char) return;
-  const cur = st2sRulesFor(charId, SUPERTOPIC_RULES)
-    .map(r => r.t + ' | ' + r.d.replace(/\$\{name\}/g, char.name)).join('\n');
+  if (st2sRulesEditing) { st2sRulesEditing = false; renderSuperTopicRulesTab(char); return; }
+  if (!st2sGuard(charId, 'manage')) return;
+  // 一旦开始编辑就接管为自定义守则，默认守则保持原样可随时回落
+  if (!st2sHasCustomRules(charId)) {
+    st2sSaveRules(charId, SUPERTOPIC_RULES.map(r => ({ n: r.n, t: r.t, d: st2sFillRule(r.d, char) })));
+  }
+  st2sRulesEditing = true;
+  renderSuperTopicRulesTab(char);
+}
+function st2sRuleField(charId, idx, field, value) {
+  const list = (st2sRulesFor(charId, SUPERTOPIC_RULES) || []).slice();
+  if (!list[idx]) return;
+  list[idx][field] = String(value || '').trim();
+  st2sSaveRules(charId, list);
+}
+function st2sRuleAdd(charId) {
+  const list = (st2sRulesFor(charId, SUPERTOPIC_RULES) || []).slice();
+  list.push({ n: '', t: '新规则', d: '' });
+  st2sSaveRules(charId, st2sRenumber(list));
+  renderSuperTopicRulesTab(getCharById(charId));
+  setTimeout(() => {
+    const all = document.querySelectorAll('.st2s-rule-d-in');
+    const last = all[all.length - 1];
+    if (last) last.focus();
+  }, 60);
+}
+function st2sRuleDel(charId, idx) {
+  const list = (st2sRulesFor(charId, SUPERTOPIC_RULES) || []).slice();
+  list.splice(idx, 1);
+  st2sSaveRules(charId, st2sRenumber(list));
+  renderSuperTopicRulesTab(getCharById(charId));
+}
+function st2sRuleRestoreDefault(charId) {
   st2sOpenModal({
-    title: '修改超话守则',
-    textarea: true,
-    tall: true,
-    value: cur,
-    maxlength: 6000,
-    hint: '每行一条，格式：标题 | 内容。全部清空并保存即恢复默认守则。',
-    ok: '保存',
-    onOk: function (val) {
-      const lines = String(val || '').split('\n').map(x => x.trim()).filter(Boolean);
-      if (!lines.length) {
-        st2sSaveRules(charId, null);
-        showToast('已恢复默认守则', 'ok');
-        renderSuperTopicRulesTab(char);
-        return;
-      }
-      const parsed = lines.map(function (ln, i) {
-        const at = ln.indexOf('|');
-        return {
-          n: String(i + 1).padStart(2, '0'),
-          t: (at >= 0 ? ln.slice(0, at) : ln).trim(),
-          d: (at >= 0 ? ln.slice(at + 1) : '').trim()
-        };
-      });
-      st2sSaveRules(charId, parsed);
-      showToast('守则已更新', 'ok');
-      renderSuperTopicRulesTab(char);
+    title: '恢复默认守则',
+    body: '将丢弃本版务的全部修改，恢复为平台默认的 ' + SUPERTOPIC_RULES.length + ' 条守则。',
+    ok: '恢复', onOk: function () {
+      st2sSaveRules(charId, null);
+      st2sRulesEditing = false;
+      showToast('已恢复默认守则', 'ok');
+      renderSuperTopicRulesTab(getCharById(charId));
     }
   });
 }
-window.st2sEditRules = st2sEditRules;
+// 从管理面板跳到规则页并直接进入编辑态
+function st2sGoEditRules(charId) {
+  if (!st2sGuard(charId, 'manage')) return;
+  switchSuperTopicTab('rules');
+  st2sToggleRulesEdit(charId);
+}
+function st2sRenumber(list) {
+  return list.map((r, i) => ({ n: String(i + 1).padStart(2, '0'), t: r.t, d: r.d }));
+}
+window.st2sToggleRulesEdit = st2sToggleRulesEdit;
+window.st2sGoEditRules = st2sGoEditRules;
+window.st2sRuleField = st2sRuleField;
+window.st2sRuleAdd = st2sRuleAdd;
+window.st2sRuleDel = st2sRuleDel;
+window.st2sRuleRestoreDefault = st2sRuleRestoreDefault;
 
 // -------------------------------------------------------------------------
 // 举报 Tab
@@ -1237,7 +1301,7 @@ function renderSuperTopicManageTab(char) {
   const tiers = [
     { k: 'like',    t: '点赞',     d: '给他人帖子点赞' },
     { k: 'comment', t: '评论',     d: '发表评论与回复' },
-    { k: 'checkin', t: '签到',     d: '每日签到, 贡献 +100' },
+    { k: 'checkin', t: '签到',     d: '每日签到, 贡献 +' + ST2S_EARN.checkin.toLocaleString() },
     { k: 'support', t: '应援',     d: '送礼打榜, 贡献按 1:1 累计' },
     { k: 'report',  t: '举报',     d: '举报违规内容' },
     { k: 'post',    t: '发帖',     d: '发布新帖' },
@@ -1291,7 +1355,7 @@ function renderSuperTopicManageTab(char) {
         <h4>管理操作</h4>
         <span class="note">Lv.${ST2S_PERMS.manage.lv}+ 已解锁</span>
       </div>
-      <div class="st2s-tier is-act" onclick="st2sEditRules('${char.id}')">
+      <div class="st2s-tier is-act" onclick="st2sGoEditRules('${char.id}')">
         <div class="st2s-tier-main">
           <div class="t">修改超话守则</div>
           <div class="d">编辑后对本超话所有访客生效</div>
@@ -1414,27 +1478,36 @@ function st2sRemoveComment(postId, key) {
 function st2sEditPost(postId) {
   const found = findSuperTopicPost(postId);
   if (!found || !st2sGuard(found.charId, 'editOwn')) return;
-  const cur = String(found.post.content || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  st2sOpenModal({
-    title: '编辑正文',
-    textarea: true,
-    value: cur,
-    maxlength: 500,
-    hint: 'tag 与附图不可改动',
-    ok: '保存',
-    onOk: function (val) {
-      const v = (val || '').trim();
-      if (!v) { showToast('正文不能为空', 'warn'); return false; }
-      found.post.content = v;
-      persistSuperTopicPost(found);
-      showToast('已保存', 'ok');
-      rerenderSuperTopicDetail();
-    }
-  });
+  st2sEditingPostId = (st2sEditingPostId === postId) ? null : postId;
+  rerenderSuperTopicDetail();
+  if (st2sEditingPostId) {
+    setTimeout(() => {
+      const ta = document.getElementById('st2sEditTa');
+      if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    }, 50);
+  }
+}
+function st2sCancelEditPost() {
+  st2sEditingPostId = null;
+  rerenderSuperTopicDetail();
+}
+function st2sSaveEditPost(postId) {
+  const ta = document.getElementById('st2sEditTa');
+  const v = (ta && ta.value || '').trim();
+  if (!v) { showToast('正文不能为空', 'warn'); return; }
+  const found = findSuperTopicPost(postId);
+  if (!found || !st2sGuard(found.charId, 'editOwn')) return;
+  found.post.content = v;
+  persistSuperTopicPost(found);
+  st2sEditingPostId = null;
+  showToast('已保存', 'ok');
+  rerenderSuperTopicDetail();
 }
 window.st2sRemovePost = st2sRemovePost;
-window.st2sRemoveComment = st2sRemoveComment;
 window.st2sEditPost = st2sEditPost;
+window.st2sCancelEditPost = st2sCancelEditPost;
+window.st2sSaveEditPost = st2sSaveEditPost;
+window.st2sRemoveComment = st2sRemoveComment;
 
 function closePostDetail() {
   if (typeof closeSuperTopicReplyModal === 'function') closeSuperTopicReplyModal();
@@ -1489,7 +1562,7 @@ window.st2sSetReplyTarget = st2sSetReplyTarget;
 // ── 回复二级弹窗 ────────────────────────────────────────────
 function closeSuperTopicReplyModal(keepTarget) {
   const m = document.getElementById('st2sReplyModal');
-  if (m) m.remove();
+  if (m) { if (m._st2sStopKb) m._st2sStopKb(); m.remove(); }
   if (!keepTarget) st2sReplyTarget = null;
 }
 function renderSuperTopicReplyModal() {
@@ -1520,6 +1593,7 @@ function renderSuperTopicReplyModal() {
   // 点遮罩关闭
   wrap.addEventListener('click', () => closeSuperTopicReplyModal());
   document.body.appendChild(wrap);
+  wrap._st2sStopKb = st2sTrackKeyboard(wrap);   // 输入法弹起时把框顶到键盘上方
   setTimeout(() => {
     const t = document.getElementById('st2sReplyText');
     if (t) t.focus();
@@ -1583,7 +1657,9 @@ function renderSuperTopicPostDetail(post, char) {
   // 正文一整段：主tag → @ → 正文 → 副tag，用空格连成 inline 流，绝不分行
   const parts = [`<span class="hash">${primaryTag}</span>`]
     .concat(mentions.map(m => `<span class="mention">${m}</span>`))
-    .concat([`<span class="txt">${post.content || ''}</span>`])
+    .concat([st2sEditingPostId === post.id
+      ? `<textarea id="st2sEditTa" class="st2s-edit-inline" rows="3">${escHtml(post.content || '')}</textarea>`
+      : `<span class="txt">${post.content || ''}</span>`])
     .concat(subTags.map(t => `<span class="hash">${t}</span>`));
   const bodyHtml = parts.join(' ');
 
@@ -1664,6 +1740,11 @@ function renderSuperTopicPostDetail(post, char) {
       </div>
 
       <div class="st2s-detail-line">${bodyHtml}</div>
+      ${st2sEditingPostId === post.id ? `
+      <div class="st2s-inline-act">
+        <button type="button" onclick="st2sCancelEditPost()">取消</button>
+        <button type="button" class="is-primary" onclick="st2sSaveEditPost('${post.id}')">保存</button>
+      </div>` : ''}
 
       ${post.image ? `
         <div class="st2s-detail-image"><img src="${post.image}" alt=""></div>

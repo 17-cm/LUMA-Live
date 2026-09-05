@@ -206,10 +206,40 @@
   // ── 通用弹窗（确认 / 多行编辑） ──────────────────────────
   function st2sCloseModal() {
     const m = document.getElementById('st2sConfirmModal');
-    if (m) m.remove();
+    if (m) { if (m._st2sStopKb) m._st2sStopKb(); m.remove(); }
     document.removeEventListener('keydown', st2sEscHandler);
   }
   function st2sEscHandler(e) { if (e.key === 'Escape') st2sCloseModal(); }
+
+  // ── 软键盘顶起弹窗 ──────────────────────────────────────
+  // Android webview 默认 adjustResize 不生效，键盘是盖在页面之上的，
+  // 居中的弹窗会被压在键盘底下看不见。用 visualViewport 量出键盘高度，
+  // 把弹窗改成贴底并抬到键盘上沿。
+  function st2sTrackKeyboard(wrap) {
+    const vv = window.visualViewport;
+    if (!vv) return function () {};
+    const apply = function () {
+      const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      if (kb > 40) {
+        wrap.style.bottom = kb + 'px';
+        wrap.classList.add('is-kb');
+      } else {
+        wrap.style.bottom = '';
+        wrap.classList.remove('is-kb');
+      }
+    };
+    vv.addEventListener('resize', apply);
+    vv.addEventListener('scroll', apply);
+    // 软键盘有弹出动画，部分 webview 的 resize 来得很慢，focus 后补测两次
+    const onFocusIn = function () { setTimeout(apply, 150); setTimeout(apply, 420); };
+    wrap.addEventListener('focusin', onFocusIn);
+    apply();
+    return function () {
+      vv.removeEventListener('resize', apply);
+      vv.removeEventListener('scroll', apply);
+      wrap.removeEventListener('focusin', onFocusIn);
+    };
+  }
 
   function st2sOpenModal(opt) {
     st2sCloseModal();
@@ -242,6 +272,8 @@
       st2sCloseModal();
     });
     document.addEventListener('keydown', st2sEscHandler);
+    const stopKb = st2sTrackKeyboard(wrap);
+    wrap._st2sStopKb = stopKb;
     setTimeout(function () {
       const ta = document.getElementById('st2sModalText');
       if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
@@ -285,6 +317,15 @@
   window.st2sOpenModal = st2sOpenModal;
   window.st2sCloseModal = st2sCloseModal;
   window.st2sConfirmDelete = st2sConfirmDelete;
+  window.st2sTrackKeyboard = st2sTrackKeyboard;
+
+  // 贡献产出一句话摘要：所有对外文案都从这里取，避免数字散落各处改漏
+  window.st2sEarnSummary = function () {
+    const e = ST2S_EARN;
+    return '直播间送礼 1:1 + 每日签到 +' + e.checkin.toLocaleString()
+         + ' + 发帖 +' + e.post.toLocaleString()
+         + ' + 评论 +' + e.comment.toLocaleString();
+  };
 
   st2sLoadTomb();
 })();

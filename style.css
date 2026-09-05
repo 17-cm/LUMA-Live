@@ -6014,6 +6014,119 @@ input:checked + .switch-slider:before {
 .st2s-refresh-result .ok { color: #059669; }
 
 
+
+/* ═════ 原地编辑 ═════ */
+
+/* 帖子正文就地改：tag/@ 不动，只有正文变成贴着文字的一块输入区 */
+.st2s-edit-inline {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+  border: 1px solid var(--st2s-line-soft);
+  border-radius: 8px;
+  background: transparent;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--st2s-ink);
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+.st2s-edit-inline:focus { border-color: var(--st2s-ink-mute); }
+/* 就地操作行：跟在正文下面，不弹层 */
+.st2s-inline-act {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin: -2px 0 2px;
+}
+.st2s-inline-act button {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--st2s-line-soft);
+  background: transparent;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--st2s-ink-soft);
+  cursor: pointer;
+}
+.st2s-inline-act button.is-primary { border-color: var(--st2s-ink); color: var(--st2s-ink); }
+.st2s-inline-act button:active { transform: scale(.96); }
+
+/* 守则编辑态：文字换成输入框，右侧挂删除叉 */
+.st2s-rule.is-edit { align-items: flex-start; }
+.st2s-rule.is-edit .st2s-rule-no { padding-top: 9px; }
+.st2s-rule-t-in,
+.st2s-rule-d-in {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px dashed var(--st2s-line-soft);
+  background: transparent;
+  padding: 3px 1px;
+  font-family: inherit;
+  outline: none;
+  color: var(--st2s-ink);
+  transition: border-color .15s ease;
+}
+.st2s-rule-t-in {
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.st2s-rule-d-in {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--st2s-ink-soft);
+  line-height: 1.65;
+  resize: vertical;
+  min-height: 34px;
+}
+.st2s-rule-t-in:focus,
+.st2s-rule-d-in:focus { border-bottom-color: var(--st2s-ink-mute); border-bottom-style: solid; }
+.st2s-rule-del {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  margin-top: 2px;
+  border: 1px solid var(--st2s-line-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--st2s-ink-mute);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.st2s-rule-del:active { color: #b4423f; border-color: rgba(180,66,63,.25); }
+.st2s-rules-ft {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 10px 16px;
+  margin: 0 -14px 0 -16px;
+  border-top: 1px solid var(--st2s-line-soft);
+}
+.st2s-rules-ft button {
+  flex: 1;
+  padding: 9px 0;
+  border-radius: 10px;
+  border: 1px solid var(--st2s-line-soft);
+  background: transparent;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--st2s-ink-soft);
+  cursor: pointer;
+}
+.st2s-rules-ft button.is-danger { color: #b4423f; border-color: rgba(180, 66, 63, 0.22); }
+.st2s-rules-ft button:active { transform: scale(.98); }
+/* 铅笔切换成对勾时给一点"正在编辑"的暗示 */
+.st2s-sec-act.is-on { border-color: var(--st2s-ink); color: var(--st2s-ink); }
+
 /* ═════ 等级与权限 ═════ */
 
 /* hero 标题旁的等级徽章 */
@@ -6636,7 +6749,10 @@ input:checked + .switch-slider:before {
 .st2s-modal {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  /* page-stack.js:90 给每个页面内联设了 zIndex = 100 + index，
+     弹窗挂在 body 上但层级若低于页面就会被超话页整个盖住（表现为
+     「点了没反应，退出页面才看见弹窗」）。抬到页面栈之上。 */
+  z-index: 9000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6646,6 +6762,7 @@ input:checked + .switch-slider:before {
 }
 @keyframes st2sModalIn { from { opacity: 0 } to { opacity: 1 } }
 /* 浮层需要自身底色才能和身后内容分层，这是唯一保留填充的地方 */
+.st2s-modal.is-kb { align-items: flex-end; }
 .st2s-modal-box {
   width: 100%;
   max-width: 330px;
