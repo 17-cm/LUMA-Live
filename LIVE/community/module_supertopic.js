@@ -442,8 +442,8 @@ function renderSuperTopicPostsTab(charId) {
           <article class="st2s-feed-item" onclick="openSuperTopicPostDetail('${post.id}')">
             <div class="st2s-feed-av-wrap">
               ${avatarSrc
-                ? `<img class="st2s-feed-av" src="${avatarSrc}" alt="">`
-                : `<div class="st2s-feed-av st2s-feed-av-fallback">${(author.name || '?').charAt(0)}</div>`}
+                ? `<img class="st2s-feed-av${author.isChar ? ' is-char' : ''}" src="${avatarSrc}" alt="">`
+                : `<div class="st2s-feed-av st2s-feed-av-fallback${author.isChar ? ' is-char' : ''}">${(author.name || '?').charAt(0)}</div>`}
               ${verifiedHtml}
             </div>
             <div class="st2s-feed-body">
@@ -1438,7 +1438,7 @@ function renderSuperTopicRefreshTab(char) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
       </div>
       <div class="st2s-refresh-t">刷新「#${char.name}超话#」动态</div>
-      <div class="st2s-refresh-d">调用模型按本超话预设生成 3~5 条新动态，并逐条铺开评论区。约需十几秒。</div>
+      <div class="st2s-refresh-d">调用模型按超话预设生成 5~7 条新动态 —— 主 tag 由模型自己挑，会铺到<b>所有</b>超话而不只是这一个，再逐条铺开评论区。约需十几秒。</div>
       <button onclick="doRefreshSuperTopic('${char.id}')" class="st2s-refresh-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         立即刷新
@@ -1468,10 +1468,8 @@ window.doRefreshSuperTopic = doRefreshSuperTopic;
 
 // 详情页评论区小刷新键：只给这一条帖子追加更多评论
 async function st2sRefreshComments(postId) {
-  const btn = document.getElementById('st2sCmtRefresh');
-  if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
+  // 不在这里碰 DOM：moreComments 首尾各重绘一次，按钮态由 cmtBusy 推导
   await window.st2sGen.moreComments(postId);
-  if (btn) { btn.disabled = false; btn.classList.remove('is-loading'); }
 }
 window.st2sRefreshComments = st2sRefreshComments;
 
@@ -1683,6 +1681,9 @@ function renderSuperTopicPostDetail(post, char) {
   const isMine = String(post.id).indexOf('st_post_') === 0;
   const canEditOwn = isMine && st2sCan(char.id, 'editOwn').ok;
   const cmtPerm = st2sCan(char.id, 'comment');
+  // 生成中要重绘本体，按钮的 loading 态必须从引擎状态推导，
+  // 直接给旧 DOM 节点加 class 会在重绘瞬间被冲掉
+  const cmtBusy = !!(window.st2sGen && window.st2sGen.isBusy(post.id));
   const primaryTag = post.primaryTag || post.tag || ('#' + char.name + '超话#');
   const subTags = post.subTags || [];
   const mentions = (post.mentions && post.mentions.length) ? post.mentions : (post.mention ? [post.mention] : []);
@@ -1717,6 +1718,9 @@ function renderSuperTopicPostDetail(post, char) {
     });
     return out;
   };
+  // char 本人或当前用户出现的楼层，给一道焦点
+  const isFocus = c => !!(c && (c.isChar
+    || (window.st2sGen && window.st2sGen.isMe(c.user || c.name))));
   const fmtTime = c => c.time || (c.createdAt
     ? (window.formatDynamicTime ? window.formatDynamicTime(c.createdAt) : '刚刚') : '刚刚');
   const avImg = (name, src, cls) => src
@@ -1735,6 +1739,7 @@ function renderSuperTopicPostDetail(post, char) {
     const text = c.text || c.content || '';
     return {
       name,
+      sig: c.isChar ? '<span class="st2s-cmt-charsig">本人</span>' : '',
       ip: c.ip ? `<span class="st2s-detail-cmt-ip">· ${c.ip}</span>` : '',
       text: (c.replyTo ? `<span class="st2s-cmt-replyto">回复 @${c.replyTo}：</span>` : '') + text
     };
@@ -1744,10 +1749,10 @@ function renderSuperTopicPostDetail(post, char) {
   const renderReply = (r) => {
     const b = bodyOf(r);
     return `
-      <div class="st2s-cmt-reply">
+      <div class="st2s-cmt-reply${isFocus(r) ? ' is-focus' : ''}">
         ${avImg(b.name, r.avatar || (window.getAvatar ? window.getAvatar(b.name, 'emoji') : ''), 'st2s-cmt-reply-av')}
         <div class="st2s-cmt-reply-main">
-          <div class="st2s-detail-cmt-name"><span>${b.name}</span>${b.ip}</div>
+          <div class="st2s-detail-cmt-name"><span>${b.name}</span>${b.sig}${b.ip}</div>
           <p class="st2s-detail-cmt-text">${b.text}</p>
           ${actRow(r)}
         </div>
@@ -1766,13 +1771,13 @@ function renderSuperTopicPostDetail(post, char) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
       </button>` : '';
     return `
-      <div class="st2s-detail-comment">
+      <div class="st2s-detail-comment${isFocus(c) ? ' is-focus' : ''}">
         <span class="st2s-cmt-floor">${floorLabel}</span>
         <div class="st2s-detail-cmt-left">
           ${avImg(b.name, c.avatar || (window.getAvatar ? window.getAvatar(b.name, 'emoji') : ''), 'st2s-detail-cmt-av')}
         </div>
         <div class="st2s-detail-cmt-right">
-          <div class="st2s-detail-cmt-name"><span>${b.name}</span>${b.ip}</div>
+          <div class="st2s-detail-cmt-name"><span>${b.name}</span>${b.sig}${b.ip}</div>
           <p class="st2s-detail-cmt-text">${b.text}</p>
           ${actRow(c)}
           ${shown.length ? `<div class="st2s-cmt-replies">${shown.map(renderReply).join('')}</div>` : ''}
@@ -1793,8 +1798,8 @@ function renderSuperTopicPostDetail(post, char) {
 
       <div class="st2s-detail-author">
         ${authorAvatar
-          ? `<img src="${authorAvatar}" class="st2s-detail-avatar" alt="">`
-          : `<div class="st2s-detail-avatar st2s-feed-av-fallback">${(post.author.name || '?').charAt(0)}</div>`}
+          ? `<img src="${authorAvatar}" class="st2s-detail-avatar${post.author.isChar ? ' is-char' : ''}" alt="">`
+          : `<div class="st2s-detail-avatar st2s-feed-av-fallback${post.author.isChar ? ' is-char' : ''}">${(post.author.name || '?').charAt(0)}</div>`}
         <div class="st2s-detail-author-meta">
           <div class="st2s-detail-name">
             <span>${post.author.name || '匿名'}</span>
@@ -1802,7 +1807,6 @@ function renderSuperTopicPostDetail(post, char) {
           </div>
           <div class="st2s-detail-author-sub">${timeText} · 来自 ${deviceTag}</div>
         </div>
-        ${(canEditOwn || canManage) ? `
         <div class="st2s-detail-tools">
           ${canEditOwn ? `<button type="button" class="st2s-tool-btn" title="编辑正文" onclick="st2sEditPost('${post.id}')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
@@ -1810,7 +1814,12 @@ function renderSuperTopicPostDetail(post, char) {
           ${canManage ? `<button type="button" class="st2s-tool-btn is-danger" title="删除帖子" onclick="st2sRemovePost('${post.id}')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
           </button>` : ''}
-        </div>` : ''}
+          <button type="button" class="st2s-tool-btn ${cmtBusy ? 'is-loading' : ''}" id="st2sCmtRefresh"
+                  ${cmtBusy ? 'disabled' : ''} title="生成更多评论（20~30 条）"
+                  onclick="st2sRefreshComments('${post.id}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </button>
+        </div>
       </div>
 
       <div class="st2s-detail-line">${bodyHtml}</div>
@@ -1846,11 +1855,6 @@ function renderSuperTopicPostDetail(post, char) {
       <div class="st2s-detail-comments-head">
         <h4>全部评论</h4>
         <span>${totalComments} 条</span>
-        <button type="button" class="st2s-cmt-refresh" id="st2sCmtRefresh"
-                title="让模型再写几条这条帖子的评论" onclick="st2sRefreshComments('${post.id}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-          <span>更多</span>
-        </button>
       </div>
 
       <!-- 输入框固定在评论区顶部（标题之下、一楼之上）；

@@ -3101,37 +3101,6 @@ input:checked + .switch-slider:before {
   to { transform: scaleY(1); opacity: 1; }
 }
 
-/* =========================================================================
-   【超话 2.0 · SUPER TOPIC】浅色杂志感视觉
-   - 暖白底 (#fafaf7) + 玻璃拟态 + 玫瑰金/紫罗兰品牌电压
-   - 全部使用系统无衬线字体栈(不含 Playfair 衬线)
-   - 4 个 Tab 整段面板染浅色: 动态=玫红 / 签到=琥珀 / 打榜=紫罗兰 / 贡献榜=翠绿
-   - 全部使用独立 st2-* 命名空间，不与旧样式耦合
-   ========================================================================= */
-
-/* =========================================================================
-   【超话 极简版 v3】st2s-* 系列
-   - Hero 96px 横排, 无光晕, 1px 描边
-   - 4 tab 文字下划线 (保留用户喜欢的 SVG 图标)
-   - 全部卡片 1px 描边白底, 取消整段面板色染
-   - 颜色极浅 (alpha 0.04-0.10), 品牌色仅在 tab 底线 + 关注按钮 + 1 个数字
-   ========================================================================= */
-.st2s-page, #communitySuperTopicContent {
-  --st2s-ink: #0f172a;
-  --st2s-ink-soft: #475569;
-  --st2s-ink-mute: #94a3b8;
-  --st2s-line: rgba(15, 23, 42, 0.08);
-  --st2s-line-soft: rgba(15, 23, 42, 0.12);
-  --st2s-rose: #ff2a6d;
-  /* tag / @ 专用色：由 #ff2a6d、#6b4cff 降饱和压暗而来，
-     明度贴近正文墨色，有色但不抢视线 */
-  --st2s-tag: #9d4f68;
-  --st2s-mention: #5a6f96;
-  --st2s-rose-soft: rgba(255, 42, 109, 0.06);
-  --st2s-amber: #d97706;
-  --st2s-violet: #7928ca;
-}
-
 /* 0. 整体布局 · 64px 侧边栏 + 主区 (全平：无白底，只有一条通栏竖线) */
 .st2s-layout {
   display: flex;
@@ -3846,39 +3815,6 @@ input:checked + .switch-slider:before {
   border-radius: 0;
   letter-spacing: 0.04em;
 }
-
-/* 12. 原 composer (改到发帖 tab) */
-.st2s-composer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #fff;
-  border: 1px solid var(--st2s-line);
-  border-radius: 14px;
-  padding: 11px 12px 11px 14px;
-  margin: 4px 0 8px;
-  cursor: pointer;
-  transition: background .15s ease;
-}
-.st2s-composer:active { background: var(--st2s-line-soft); }
-.st2s-composer .ph {
-  flex: 1;
-  font-size: 11.5px;
-  color: var(--st2s-ink-mute);
-  font-weight: 400;
-  letter-spacing: -.005em;
-}
-.st2s-composer .ph b { color: var(--st2s-ink); font-weight: 500; }
-.st2s-composer .send {
-  width: 26px; height: 26px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: var(--st2s-ink);
-  color: #fff;
-  flex-shrink: 0;
-}
-.st2s-composer .send svg { width: 13px; height: 13px; }
 
 /* 13. 礼物格子 (打榜) */
 .st2s-gift-grid {
@@ -6129,27 +6065,35 @@ input:checked + .switch-slider:before {
 
 
 
-/* 评论区「更多」—— 只给这一条帖子追加评论，做得很轻，不抢评论区标题 */
-.st2s-cmt-refresh {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 6px;
-  margin-bottom: -2px;
-  border: 1px solid var(--st2s-line-soft);
-  border-radius: 4px;
-  background: transparent;
-  font-family: inherit;
-  font-size: 9.5px; font-weight: 400;
-  color: var(--st2s-ink-mute);
-  cursor: pointer;
-}
-.st2s-cmt-refresh svg { width: 10px; height: 10px; }
-.st2s-cmt-refresh:active { opacity: .55; }
-.st2s-cmt-refresh:disabled { cursor: default; opacity: .5; }
-.st2s-cmt-refresh.is-loading svg { animation: st2s-spin .9s linear infinite; }
+
+
+
+/* 刷新评论：并入作者行的工具组，生成中整圈转 */
+.st2s-tool-btn.is-loading { color: var(--st2s-ink); border-color: var(--st2s-ink); }
+.st2s-tool-btn.is-loading svg { animation: st2s-spin .85s linear infinite; }
+.st2s-tool-btn:disabled { cursor: default; opacity: .6; }
 @keyframes st2s-spin { to { transform: rotate(360deg); } }
-.st2s-refresh-btn.is-loading svg { animation: st2s-spin .9s linear infinite; }
-.st2s-refresh-result .run { color: var(--st2s-ink-soft); }
-.st2s-refresh-result .err { color: #b4423f; }
+
+/* 焦点：char 本人或当前用户开口的楼层，只加一道左边线，不做卡片 */
+.st2s-detail-comment.is-focus,
+.st2s-cmt-reply.is-focus {
+  background: linear-gradient(to right, rgba(20, 18, 16, 0.035), rgba(20, 18, 16, 0) 78%);
+  box-shadow: inset 2px 0 0 var(--st2s-ink);
+}
+.st2s-cmt-reply.is-focus { padding-left: 8px; margin-left: -9px; }
+.st2s-cmt-charsig {
+  font-size: 9px; font-weight: 400;
+  color: var(--st2s-ink);
+  border: 1px solid var(--st2s-line-soft);
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-left: 5px;
+  letter-spacing: .04em;
+}
+/* 作者本人发帖时，头像加一道实心描边，跟粉丝的方头像区分 */
+.st2s-feed-av.is-char, .st2s-detail-avatar.is-char {
+  box-shadow: 0 0 0 1.5px var(--st2s-ink);
+}
 
 /* ═════ 会长公告（展示贴）═════
    不是卡片，是一张能读的东西：正文段落 + 键值条目 + 细线分隔 */
@@ -6453,16 +6397,6 @@ input:checked + .switch-slider:before {
 }
 .st2s-modal-ta.is-tall { min-height: 210px; font-size: 11.5px; line-height: 1.7; }
 .st2s-modal-ok.is-danger { border-color: #b4423f; color: #b4423f; }
-
-/* ----- 帖子详情页 (同面板) ----- */
-.st2s-detail-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 0 10px;
-  border-bottom: 1px solid var(--st2s-line);
-  margin-bottom: 4px;
-}
 .st2s-detail-back {
   display: inline-flex;
   align-items: center;
@@ -6477,26 +6411,6 @@ input:checked + .switch-slider:before {
   cursor: pointer;
 }
 .st2s-detail-back svg { width: 12px; height: 12px; }
-.st2s-detail-meta {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--st2s-ink-mute);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.st2s-detail-card {
-  background: #fff;
-  border: 1px solid var(--st2s-line);
-  border-radius: 14px;
-  padding: 14px 14px 10px;
-}
-.st2s-detail-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
 .st2s-detail-av {
   width: 40px; height: 40px;
   border-radius: 12px;
@@ -6510,68 +6424,6 @@ input:checked + .switch-slider:before {
   font-size: 13px;
   font-weight: 900;
   color: var(--st2s-ink);
-}
-.st2s-detail-bd {
-  font-size: 9.5px;
-  font-weight: 800;
-  color: var(--st2s-rose);
-  background: var(--st2s-rose-soft);
-  padding: 1px 5px;
-  border-radius: 4px;
-  letter-spacing: 0.04em;
-}
-.st2s-detail-tag {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--st2s-rose);
-  margin-top: 1px;
-}
-.st2s-detail-text {
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--st2s-ink);
-  line-height: 1.65;
-  margin: 4px 0 8px;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-.st2s-detail-subtags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 6px 0;
-}
-.st2s-detail-subtags .tag {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--st2s-rose);
-  background: var(--st2s-rose-soft);
-  padding: 3px 8px;
-  border-radius: 6px;
-  letter-spacing: -.005em;
-}
-.st2s-detail-img-wrap {
-  margin: 8px 0 6px;
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--st2s-line-soft);
-}
-.st2s-detail-img {
-  display: block;
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 80vh;
-  object-fit: contain;
-  margin: 0 auto;
-}
-.st2s-detail-bar2 {
-  font-size: 10px;
-  color: var(--st2s-ink-mute);
-  font-weight: 600;
-  padding: 6px 0 4px;
-  border-top: 1px solid var(--st2s-line-soft);
-  font-variant-numeric: tabular-nums;
 }
 .st2s-detail-actions {
   display: flex;
@@ -6626,32 +6478,6 @@ input:checked + .switch-slider:before {
   display: flex;
   gap: 10px;
   padding: 10px 0;
-  border-top: 1px solid var(--st2s-line-soft);
-}
-.st2s-detail-cm-av {
-  width: 28px; height: 28px;
-  border-radius: 8px;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-.st2s-detail-cm-name {
-  font-size: 11.5px;
-  font-weight: 800;
-  color: var(--st2s-ink);
-  margin-bottom: 2px;
-}
-.st2s-detail-cm-text {
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--st2s-ink-soft);
-  line-height: 1.55;
-}
-.st2s-detail-cm-empty {
-  padding: 20px 0;
-  text-align: center;
-  font-size: 11px;
-  color: var(--st2s-ink-mute);
-  font-weight: 600;
   border-top: 1px solid var(--st2s-line-soft);
 }
 

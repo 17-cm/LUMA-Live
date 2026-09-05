@@ -3,16 +3,18 @@
 
    两阶段生成
    ─────────
-   一次让模型吐出「3~5 条帖子 + 每条 20 条评论」约 100 个对象，几乎必然被
-   截断或偷工减料。所以拆成：
-     阶段一  ①②③④ 预设 → 只出帖子骨架（comments 为空）
-     阶段二  ⑤⑥ 预设 → 逐条帖子单独出评论区
-   两条路径都通过 aiGenerate 的 presetIds 精确点名预设，不整册下发。
+   一次让模型吐「5~7 条帖子 × 每条 20 条评论」约 150 个对象，必然被截断。
+   所以拆成：阶段一只出帖子骨架，阶段二逐条出评论区。
+   两条路径通过 aiGenerate 的 presetIds 精确点名预设。
 
-   上下文三件套（用户明确要求）
-     1. 区域预设      —— appPresets.supertopic
-     2. 上下文        —— 当前时间 / 是否在播 / 本超话已有话题（避免重复）
-     3. 世界书与角色信息 —— api.characters.get + api.world.list
+   职责边界（用户明确要求）
+     我们只规范 风格 / 语言 / 整体趋势，不规范题材。
+     primaryTag 由模型自己挑 —— 一批 5~7 条铺给所有超话，不是只给当前这个。
+
+   身份铁律
+     NPC 绝不能占用任何一个 char 的名字（整份名单，不只是当前这位）。
+     反过来，模型一旦以 char 本人身份发言，必须回查宿主 SDK 取真名与真头像，
+     绝不允许用昵称哈希出来的占位头像冒充本人。
    ========================================================================== */
 (function () {
   'use strict';
@@ -21,22 +23,22 @@
     '湖南', '河南', '福建', '辽宁', '陕西', '黑龙江', '云南', '贵州', '广西', '赛博星云'];
   const BADGE_POOL = ['Lv.1 新粉', 'Lv.8 铁粉', 'Lv.23 老粉', '超话主持人', '后援会成员',
     '签到500天', '优质粉丝', '大粉', '路人', '', '', ''];
+  // 兜底昵称池：模型给的名字撞了角色名、或干脆没给名字时用
+  const NPC_POOL = ['糖渍青柠', '夜航西飞', '起名废', '先睡为敬', 'momo', '在逃观众',
+    '半糖去冰', '荔枝罐头', '白开', '廿三', '专业蹲坑二十年', '摆烂一级选手',
+    '屿', '九块', '蒜香法棍', '路过打个卡', '今天也不想说话', '拾柒'];
 
   const busy = { feed: false, posts: {} };
+  const avatarCache = {};   // charId → 已解析出的真实头像
 
   function rnd(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
-
-  // 按主 tag 投递：模型若判定这条其实在聊别人，就送到那个人的超话广场去
-  function st2sRouteByTag(primaryTag, fallbackChar) {
-    const tag = String(primaryTag || '').replace(/#/g, '').trim();
-    if (!tag) return fallbackChar;
-    const list = window.getAvailableCharsList() || [];
-    const hit = list.find(c => tag === `${c.name}超话` || tag === c.name);
-    return hit || fallbackChar;
-  }
   function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-  function avatarOf(name) {
-    try { return (window.getAvatar && window.getAvatar(name, 'first')) || ''; } catch (e) { return ''; }
+  function roster() { try { return window.getAvailableCharsList() || []; } catch (e) { return []; } }
+  function charNames() { return roster().map(c => String(c.name || '').trim()).filter(Boolean); }
+  function findCharByName(n) {
+    const key = String(n || '').trim();
+    if (!key) return null;
+    return roster().find(c => String(c.name || '').trim() === key) || null;
   }
   function fmtTime(ts) {
     try { return window.formatDynamicTime ? window.formatDynamicTime(ts) : '刚刚'; } catch (e) { return '刚刚'; }
@@ -44,22 +46,71 @@
   function toast(msg, kind) {
     try { if (typeof window.showToast === 'function') window.showToast(msg, kind || 'info'); } catch (e) {}
   }
+  function npcAvatar(name) {
+    try { return (window.getAvatar && window.getAvatar(name, 'first')) || ''; } catch (e) { return ''; }
+  }
+  function flatten(list, out) {
+    (list || []).forEach(c => { out.push(c); if (c.replies) flatten(c.replies, out); });
+    return out;
+  }
 
-  // ── 上下文组装 ───────────────────────────────────────────
-  async function st2sBuildContext(char, extra) {
+  // ── 本人头像：必须走 SDK，拿不到就不认这条身份 ────────────
+  async function realAvatar(ch) {
+    if (!ch) return '';
+    const id = String(ch.characterId || ch.id || '');
+    if (avatarCache[id]) return avatarCache[id];
+    let url = String(ch.avatar || ch.cover || '').trim();
+    if (!url && window.api && api.characters && typeof api.characters.get === 'function') {
+      try {
+        const full = await api.characters.get(id);
+        url = String((full && (full.avatar || full.avatarUrl || full.cover)) || '').trim();
+      } catch (e) {}
+    }
+    if (url) avatarCache[id] = url;
+    return url;
+  }
+
+  // ── NPC 命名守卫（代码层硬拦，不依赖模型自觉）─────────────
+  // 完全等于任一角色名 → 直接弃用重造；含角色名 → 剥掉后太短也重造。
+  function sanitizeNpcName(raw) {
+    let n = String(raw || '').trim().slice(0, 24);
+    const names = charNames();
+    if (!n) return pick(NPC_POOL);
+    // 只要含任一角色名就整条重造：剥掉名字会留下「的老粉」这种残渣，
+    // 而这类昵称本身就是假本人的变体，不该留
+    if (names.some(cn => n === cn || n.indexOf(cn) >= 0)) return pick(NPC_POOL);
+    if (n.length < 2) return pick(NPC_POOL);
+    return n;
+  }
+
+  // ── 上下文：候选名单 + 世界书 + 各 char 人设 + 实时语境 ────
+  async function st2sRosterText() {
+    const list = roster().slice(0, 10);
+    if (!list.length) return '';
+    const rows = await Promise.all(list.map(async c => {
+      let persona = '';
+      try {
+        if (window.api && api.characters && typeof api.characters.get === 'function') {
+          const full = await api.characters.get(String(c.characterId || c.id));
+          persona = String((full && (full.persona || full.description)) || '');
+        }
+      } catch (e) {}
+      return { name: c.name, category: c.category || '', tag: c.tag || '',
+               isLive: !!c.isLive, persona: persona.slice(0, 260) };
+    }));
+    return '【本次候选名单】primaryTag 只能从这里挑，名字一字不差：\n'
+      + rows.map(r => `- ${r.name}（${r.category}${r.tag ? ' / ' + r.tag : ''}${r.isLive ? ' / 正在直播' : ''}）`
+          + (r.persona ? `\n    人设：${r.persona}` : '\n    人设：（无）'))
+        .join('\n');
+  }
+
+  async function st2sBuildContext(anchor, extra) {
     const parts = [];
-    parts.push(`【当前超话】#${char.name}超话#　【主播】${char.name}　【分区】${char.category || '综合'}`);
+    parts.push(`【本次锚定超话】#${anchor.name}超话#（用户是在这个超话点的刷新，`
+      + `但这一批帖子不必都归它，primaryTag 由你按每条在写谁来定）`);
+    const r = await st2sRosterText();
+    if (r) parts.push(r);
 
-    // 角色信息（人设是底线，生成内容不得与之冲突）
-    try {
-      if (window.api && api.characters && typeof api.characters.get === 'function') {
-        const full = await api.characters.get(char.id);
-        const persona = full && (full.persona || full.description);
-        if (persona) parts.push(`【角色设定】\n${String(persona).slice(0, 700)}`);
-      }
-    } catch (e) {}
-
-    // 世界书
     try {
       if (window.api && api.world && typeof api.world.list === 'function') {
         const ws = (await api.world.list()) || [];
@@ -70,26 +121,9 @@
       }
     } catch (e) {}
 
-    // 实时直播状态
-    try {
-      if (window.api && api.db && typeof api.db.list === 'function') {
-        const sessions = (await api.db.list('live_sessions', { limit: 50 })) || [];
-        const mine = sessions.filter(x => x && String(x.characterId) === String(char.id));
-        const sess = mine.length ? mine[0] : (sessions.length ? sessions[Math.floor(Math.random() * sessions.length)] : null);
-        if (sess) {
-          const dur = sess.startTime ? Math.floor((Date.now() - sess.startTime) / 60000) : 0;
-          parts.push(`【实时状态】${sess.name || char.name} 的直播：赛道 ${sess.category || '日常'}（${sess.subTag || '杂谈'}），`
-            + `标题「${sess.topic || '无'}」，已播 ${dur} 分钟，热度 ${sess.heat || 0}。`
-            + (dur > 0 ? '刚下播或正在播的内容可以直接成为话题。' : ''));
-        } else {
-          parts.push('【实时状态】当前没有进行中的直播，话题可来自往期内容、日常观察与粉丝之间的互动。');
-        }
-      }
-    } catch (e) {}
-
     const d = new Date();
     const hh = d.getHours();
-    const slot = hh < 6 ? '凌晨（发帖少而情绪化）' : hh < 11 ? '上午（零星人流，多为上班族摸鱼）'
+    const slot = hh < 6 ? '凌晨（发帖少而情绪化）' : hh < 11 ? '上午（零星人流，多为摸鱼）'
       : hh < 14 ? '午间（话多，吃饭时段）' : hh < 18 ? '下午（平稳）'
       : hh < 23 ? '晚间高峰（人流最大，话题最杂）' : '深夜（容易感性、容易吵架）';
     parts.push(`【当前时间】${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} `
@@ -99,147 +133,229 @@
     return parts.join('\n\n');
   }
 
-  // 把已有帖子标题列给模型，防止它反复写同一件事
-  function st2sAvoidEcho(char) {
+  // 已有话题回喂，防止反复写同一件事（跨所有超话取样）
+  function st2sAvoidEcho() {
     try {
-      const list = (typeof window.topicPostsFor === 'function' ? window.topicPostsFor(char) : [])
-        .slice(0, 12)
-        .map(p => String(p.content || '').replace(/\s+/g, ' ').slice(0, 28));
-      if (!list.length) return '';
-      return `【本超话已有话题，禁止重复或近似】\n${list.map(x => '- ' + x).join('\n')}`;
+      const seen = [];
+      roster().slice(0, 6).forEach(c => {
+        try {
+          (window.topicPostsFor ? window.topicPostsFor(c) : []).slice(0, 4).forEach(p =>
+            seen.push(String(p.content || '').replace(/\s+/g, ' ').slice(0, 26)));
+        } catch (e) {}
+      });
+      if (!seen.length) return '';
+      return `【已存在的话题，禁止重复或近似】\n${seen.slice(0, 18).map(x => '- ' + x).join('\n')}`;
     } catch (e) { return ''; }
   }
 
-  // ── 评论树归一化 ─────────────────────────────────────────
-  function normComment(raw, baseTs, depth) {
-    const name = (raw && (raw.user || raw.name)) || `网友_${rnd(1000, 9999)}`;
-    const text = (raw && (raw.text || raw.content)) || '';
-    const ts = Number(raw && raw.createdAt) || baseTs;
-    const kids = Array.isArray(raw && raw.replies) ? raw.replies : [];
-    return {
-      id: 'c' + ts.toString(36) + '_' + Math.random().toString(36).slice(2, 7),
+  // ── 评论归一化：身份解析在这里完成 ────────────────────────
+  async function normComment(raw, baseTs, depth, ctx) {
+    raw = raw || {};
+    const claimed = String(raw.user || raw.name || '').trim();
+    const isChar = !!raw.isChar && !!ctx.char;
+    let name, avatar, charId = '';
+    let isCharLike = false;
+
+    if (isChar) {
+      // 以本人身份发的，一律回查 SDK 取真名真头像；查不到就降级成普通网友
+      const ch = findCharByName(claimed) || ctx.char;
+      const url = await realAvatar(ch);
+      if (ch && url) {
+        name = String(ch.name).trim(); avatar = url;
+        charId = String(ch.characterId || ch.id || '');
+      } else { name = sanitizeNpcName(claimed); avatar = npcAvatar(name); }
+    } else {
+      name = sanitizeNpcName(claimed);
+      avatar = npcAvatar(name);
+    }
+
+    const isAuthor = !!raw.isAuthor && !isChar;
+    if (isAuthor && ctx.authorName) {
+      name = ctx.authorName;
+      if (ctx.authorAvatar) avatar = ctx.authorAvatar;
+      // 楼主本身就是 char 时，他下场回帖仍是「本人发言」，
+      // 不能只标 isAuthor —— 否则顶着角色名却配了张占位头像
+      if (ctx.authorIsChar) { isCharLike = true; charId = ctx.authorCharId || ''; }
+    }
+
+    const out = {
+      id: 'c' + baseTs.toString(36) + '_' + Math.random().toString(36).slice(2, 7),
       user: name, name: name,
-      avatar: avatarOf(name),
-      ip: (raw && raw.ip) || pick(IP_POOL),
-      text: text, content: text,
-      replyTo: (raw && raw.replyTo) || '',
-      createdAt: ts,
-      time: fmtTime(ts),
-      likes: Number(raw && raw.likes) || rnd(0, 40),
+      avatar: avatar,
+      ip: String(raw.ip || '').trim() || pick(IP_POOL),
+      text: String(raw.text || raw.content || '').trim(),
+      content: String(raw.text || raw.content || '').trim(),
+      replyTo: String(raw.replyTo || '').trim(),
+      createdAt: Number(raw.createdAt) || baseTs,
+      time: fmtTime(baseTs),
+      likes: Number(raw.likes) >= 0 ? Number(raw.likes) : rnd(0, 40),
       isLiked: false,
-      // 只保留两层原始嵌套，第三层往后一律拍平上提 —— 前端本来就是拍平显示的
-      replies: depth >= 2 ? [] : kids.map(k => normComment(k, ts + rnd(1000, 60000), depth + 1))
+      isChar: !!charId, charId: charId,
+      isAuthor: isAuthor
     };
+    const kids = Array.isArray(raw.replies) ? raw.replies : [];
+    out.replies = [];
+    if (depth < 2) {
+      for (const k of kids) {
+        out.replies.push(await normComment(k, out.createdAt + rnd(20000, 90000), depth + 1, ctx));
+      }
+    }
+    return out;
   }
   function countComments(list) {
     return (list || []).reduce((n, c) => n + 1 + countComments(c.replies), 0);
   }
 
   // ── 阶段二：给一条帖子生成评论区 ─────────────────────────
-  async function st2sGenCommentSet(char, post, opts) {
+  async function st2sGenCommentSet(ownerChar, post, opts) {
     opts = opts || {};
-    const existing = (post.commentTree || []).slice(0, 10)
+    const authorName = (post.author && post.author.name) || '';
+    const existing = (post.commentTree || []).slice(0, 12)
       .map(c => `${c.user || c.name}：${String(c.text || '').slice(0, 30)}`).join('\n');
+
+    // 本人是否下场：当前超话帖 40% 概率
+    const charJoins = opts.charJoins !== undefined ? !!opts.charJoins : (Math.random() < 0.4);
+    const me = (typeof window.getCurrentUser === 'function' && window.getCurrentUser()) || {};
+
     const extra = [
-      `【帖子作者】${(post.author && post.author.name) || '匿名'}`,
+      `【帖子所在超话】#${ownerChar.name}超话#`,
+      `【帖子作者(楼主)】${authorName}`,
+      `【本人是否下场】` + (charJoins
+        ? `本次允许 ${ownerChar.name} 本人在评论区出现，最多 1~2 条，用 isChar:true 标记，`
+          + 'user 原样填他的名字。他话很少很短，不解释自己，不挨个道谢，可能只留一句就走。'
+        : `本次 ${ownerChar.name} 本人不出场：所有评论 isChar 必须为 false，`
+          + '且任何昵称都不得等于他的名字。'),
+      `【楼主是否下场】允许楼主本人下场回几条，用 isAuthor:true 标记。`,
+      me.name ? `【当前用户】${me.name}（可出现 0~1 条，出现时语气跟对别人一样，不必被特殊对待）` : '',
       `【帖子正文】\n${post.content || ''}`,
       post.imageDesc ? `【帖子配图说明】${post.imageDesc}` : '',
       existing ? `【已有评论，新评论必须与之衔接、不得重复语气与观点】\n${existing}` : '',
-      opts.more ? `【本次任务】这条帖子已有评论区，请再生成 ${rnd(6, 12)} 条新评论（含楼中楼），`
-        + '时间必须晚于已有评论，允许出现新话题、新分歧、以及老评论的后续。' : ''
+      opts.more
+        ? `【本次任务】这条帖子已有评论区，请新增 20~30 条评论（含楼中楼）。`
+          + '时间必须晚于已有评论；新评论既可以开新楼，也可以挂在上面「已有评论」里的某条下面'
+          + '（replyTo 直接指向那些旧昵称）。允许出现新话题、新分歧、以及旧评论的后续。'
+        : `【本次任务】这是新帖，生成约 20 条评论（含楼中楼）。`
     ].filter(Boolean).join('\n\n');
 
-    const instruction = await st2sBuildContext(char, extra);
     const res = await window.aiGenerate({
-      characterId: char.id,
+      characterId: String(ownerChar.characterId || ownerChar.id),
       appTags: ['supertopic'],
       presetIds: ['luma_st_comment_tree', 'luma_st_comments_protocol'],
-      instruction: instruction
+      instruction: await st2sBuildContext(ownerChar, extra)
     });
     const parsed = window.extractJsonFromText && res && res.text
       ? window.extractJsonFromText(res.text) : null;
     let raw = parsed && Array.isArray(parsed.comments) ? parsed.comments
       : (Array.isArray(parsed) ? parsed : null);
-    if (!raw || !raw.length) return 0;
+    if (!raw || !raw.length) return { added: 0, charJoined: false };
 
     const now = Date.now();
-    const span = opts.more ? 6 * 3600 * 1000 : 3 * 3600 * 1000;
-    const start = opts.more ? now - rnd(60, 240) * 60000 : (post.createdAt || now) + 60000;
+    const span = opts.more ? 8 * 3600 * 1000 : 3 * 3600 * 1000;
+    const start = opts.more ? now - rnd(30, 180) * 60000 : (post.createdAt || now) + 60000;
     const step = raw.length > 1 ? Math.max(60000, Math.floor(span / raw.length)) : 60000;
-    const made = raw.map((c, i) => normComment(c, start + i * step + rnd(0, 30000), 0));
+
+    const ctx = { char: ownerChar, authorName: authorName,
+                  authorAvatar: (post.author && post.author.avatar) || '',
+                  authorIsChar: !!(post.author && post.author.isChar),
+                  authorCharId: (post.author && post.author.charId) || '' };
+    const made = [];
+    for (let i = 0; i < raw.length; i++) {
+      made.push(await normComment(raw[i], start + i * step + rnd(0, 30000), 0, ctx));
+    }
 
     post.commentTree = (post.commentTree || []).concat(made);
     post.commentTree.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     post.stats = post.stats || {};
     post.stats.comments = countComments(post.commentTree);
-    return made.length;
+    return { added: made.length, charJoined: flatten(made, []).some(c => c.isChar) };
   }
 
   // ── 生图（可选，约三成）──────────────────────────────────
-  async function st2sMaybeImage(char, post) {
+  async function st2sMaybeImage(owner, post) {
     const prompt = String(post.imagePrompt || '').trim();
     if (!prompt) return;
     try {
       if (!window.api || !api.ai || typeof api.ai.generateImage !== 'function') return;
-      const got = await window.aiGenerateImage({ prompt: prompt, characterId: char.id });
+      const got = await window.aiGenerateImage({
+        prompt: prompt, characterId: String(owner.characterId || owner.id)
+      });
       const url = got && (got.dataUrl || got.url || got.imageUrl);
       if (url) post.image = url;
-    } catch (e) {
-      console.warn('[st2s] 生图失败，帖子降级为无图:', e);
-    }
+    } catch (e) { console.warn('[st2s] 生图失败，帖子降级为无图:', e); }
   }
 
-  // ── 阶段一：刷新广场 ─────────────────────────────────────
-  async function st2sGenFeed(charId) {
-    const char = (window.getAvailableCharsList() || []).find(c => String(c.id) === String(charId));
-    if (!char) return;
+  // ── 按主 tag 投递 ───────────────────────────────────────
+  function st2sRouteByTag(primaryTag, fallback) {
+    const tag = String(primaryTag || '').replace(/#/g, '').trim();
+    if (!tag) return fallback;
+    const list = roster();
+    return list.find(c => tag === `${c.name}超话` || tag === String(c.name).trim()) || fallback;
+  }
+
+  // ── 阶段一：刷新广场（跨所有超话）────────────────────────
+  async function st2sGenFeed(anchorCharId) {
+    const list = roster();
+    const anchor = list.find(c => String(c.id) === String(anchorCharId)) || list[0];
+    if (!anchor) return;
     if (busy.feed) { toast('正在生成中，稍等一下', 'warn'); return; }
-    if (window.api && api.ui && typeof api.ui.setLoading === 'function') {
-      try { api.ui.setLoading(true); } catch (e) {}
-    }
     busy.feed = true;
+    try { if (window.api && api.ui) api.ui.setLoading(true); } catch (e) {}
     toast('正在生成超话新动态…');
+
     try {
       const extra = [
-        st2sAvoidEcho(char),
-        `【本次任务】为 #${char.name}超话# 生成 3~5 条新帖子（条数你自己随机决定），`
-        + 'comments 一律给空数组，评论区稍后单独生成。'
+        st2sAvoidEcho(),
+        `【本次任务】生成 5~7 条超话帖子（具体几条你定），primaryTag 从候选名单里自由分配，`
+        + '不必都落在锚定超话上。作者也可以是名单里的 char 本人（用 author.isChar 标记），'
+        + '他既能在自己超话发，也能去别人的超话发。comments 一律给空数组。'
       ].filter(Boolean).join('\n\n');
 
       const res = await window.aiGenerate({
-        characterId: char.id,
+        characterId: String(anchor.characterId || anchor.id),
         appTags: ['supertopic'],
         presetIds: ['luma_st_plaza_ecosystem', 'luma_st_persona_pool',
                     'luma_st_voice_corpus', 'luma_st_posts_protocol'],
-        instruction: await st2sBuildContext(char, extra)
+        instruction: await st2sBuildContext(anchor, extra)
       });
       const parsed = window.extractJsonFromText && res && res.text
         ? window.extractJsonFromText(res.text) : null;
-      let list = parsed && Array.isArray(parsed.posts) ? parsed.posts
+      let raw = parsed && Array.isArray(parsed.posts) ? parsed.posts
         : (Array.isArray(parsed) ? parsed : null);
-      if (!list || !list.length) { toast('生成格式异常，请再试一次', 'warn'); return; }
+      if (!raw || !raw.length) { toast('生成格式异常，请再试一次', 'warn'); return; }
 
       const now = Date.now();
       const made = [];
-      for (let i = 0; i < list.length; i++) {
-        const p = list[i];
-        if (!p || !(p.content || '').trim()) continue;
-        const author = p.author || {};
-        const aName = String(author.name || p.user || '匿名').trim().slice(0, 24);
-        // 时间倒序铺开：最新的刚发，最旧的在一两小时内
+      for (let i = 0; i < raw.length; i++) {
+        const p = raw[i] || {};
+        if (!(p.content || '').trim()) continue;
+        const owner = st2sRouteByTag(p.primaryTag, anchor);
+        const ar = p.author || {};
+
+        // 作者可以是 char 本人：他既能在自己超话发，也能去别人超话发
+        let aName, aAvatar, aCharId = '', aBadge, aVerified = false;
+        if (ar.isChar) {
+          const ch = findCharByName(ar.name) || owner;
+          const url = await realAvatar(ch);
+          if (ch && url) {
+            aName = String(ch.name).trim(); aAvatar = url;
+            aCharId = String(ch.characterId || ch.id || '');
+            aBadge = '本人'; aVerified = true;
+          } else { aName = sanitizeNpcName(ar.name); aAvatar = npcAvatar(aName); aBadge = pick(BADGE_POOL); }
+        } else {
+          aName = sanitizeNpcName(ar.name);
+          aAvatar = npcAvatar(aName);
+          aBadge = (typeof ar.badge === 'string' && ar.badge && charNames().indexOf(ar.badge) < 0)
+            ? ar.badge : pick(BADGE_POOL);
+          aVerified = !!ar.verified;
+        }
+
         const ts = now - i * rnd(9, 26) * 60000 - rnd(0, 7) * 60000;
-        const owner = st2sRouteByTag(p.primaryTag, char);
-        // needImage 是一次性决策，不入库：入库后重进超话不该又生一张
-        const wantImage = !!p.needImage;
+        const wantImage = !!p.needImage;   // 一次性决策，不入库
         const post = {
           id: 'st_ai_' + ts.toString(36) + '_' + i + '_' + Math.random().toString(36).slice(2, 6),
           charId: owner.id,
-          author: {
-            name: aName,
-            avatar: avatarOf(aName),
-            badge: (typeof author.badge === 'string' && author.badge) || pick(BADGE_POOL),
-            verified: !!author.verified
-          },
+          author: { name: aName, avatar: aAvatar, badge: aBadge, verified: aVerified,
+                    isChar: !!aCharId, charId: aCharId },
           createdAt: ts,
           primaryTag: p.primaryTag || `#${owner.name}超话#`,
           subTags: Array.isArray(p.subTags) ? p.subTags.filter(Boolean).slice(0, 2) : [],
@@ -258,47 +374,44 @@
           commentTree: []
         };
         if (wantImage) await st2sMaybeImage(owner, post);
-        made.push({ post, owner });
+        made.push({ post: post, owner: owner });
       }
       if (!made.length) { toast('没生成出有效内容', 'warn'); return; }
 
-      // 逐条补评论区：一条一次调用，失败不影响其他条
       for (let i = 0; i < made.length; i++) {
         try { await st2sGenCommentSet(made[i].owner, made[i].post, {}); }
         catch (e) { console.warn('[st2s] 评论区生成失败，帖子仍入库:', e); }
         window.st2sStore.save(made[i].post);
       }
 
-      toast(`已生成 ${made.length} 条新动态`, 'ok');
-      if (String(window.currentActiveSuperTopicCharId) === String(charId)
-          && typeof window.renderSuperTopicView === 'function') {
-        window.renderSuperTopicView(charId);
+      const spread = new Set(made.map(x => x.post.charId)).size;
+      toast(`已生成 ${made.length} 条新动态 · 分布在 ${spread} 个超话`, 'ok');
+      if (typeof window.renderSuperTopicView === 'function' && window.currentActiveSuperTopicCharId) {
+        window.renderSuperTopicView(window.currentActiveSuperTopicCharId);
       }
     } catch (e) {
       console.error('[st2s] 广场生成失败:', e);
       toast('生成失败，请检查模型配置', 'warn');
     } finally {
       busy.feed = false;
-      if (window.api && api.ui && typeof api.ui.setLoading === 'function') {
-        try { api.ui.setLoading(false); } catch (e) {}
-      }
+      try { if (window.api && api.ui) api.ui.setLoading(false); } catch (e) {}
     }
   }
 
-  // ── 详情页小刷新：给这条帖子追加更多评论 ─────────────────
+  // ── 详情页追加评论 ──────────────────────────────────────
   async function st2sGenMoreComments(postId) {
     const found = (typeof window.findSuperTopicPost === 'function') ? window.findSuperTopicPost(postId) : null;
     if (!found) { toast('帖子不存在', 'warn'); return; }
     if (busy.posts[postId]) { toast('这条正在生成评论，稍等', 'warn'); return; }
-    const char = (window.getAvailableCharsList() || []).find(c => String(c.id) === String(found.charId));
-    if (!char) return;
+    const owner = roster().find(c => String(c.id) === String(found.charId));
+    if (!owner) return;
     busy.posts[postId] = true;
     if (typeof window.rerenderSuperTopicDetail === 'function') window.rerenderSuperTopicDetail();
     try {
-      const n = await st2sGenCommentSet(char, found.post, { more: true });
-      if (!n) { toast('这次没生成出评论，再试一次', 'warn'); return; }
+      const r = await st2sGenCommentSet(owner, found.post, { more: true });
+      if (!r.added) { toast('这次没生成出评论，再试一次', 'warn'); return; }
       window.st2sStore.save(found.post);
-      toast(`新增 ${n} 条评论`, 'ok');
+      toast(`新增 ${r.added} 条评论` + (r.charJoined ? ' · 本人来了' : ''), 'ok');
     } catch (e) {
       console.error('[st2s] 追加评论失败:', e);
       toast('生成失败，请重试', 'warn');
@@ -310,11 +423,11 @@
 
   // ── 用户发帖后主动生成回应 ───────────────────────────────
   async function st2sRespondToUserPost(post) {
-    const char = (window.getAvailableCharsList() || []).find(c => String(c.id) === String(post.charId));
-    if (!char) return;
+    const owner = roster().find(c => String(c.id) === String(post.charId));
+    if (!owner) return;
     try {
-      const n = await st2sGenCommentSet(char, post, { more: false });
-      if (n) {
+      const r = await st2sGenCommentSet(owner, post, {});
+      if (r.added) {
         window.st2sStore.save(post);
         if (String(window.superTopicDetailPostId) === String(post.id)
             && typeof window.rerenderSuperTopicDetail === 'function') {
@@ -328,8 +441,14 @@
     feed: st2sGenFeed,
     moreComments: st2sGenMoreComments,
     respondToUserPost: st2sRespondToUserPost,
-    isBusy: function (postId) {
-      return postId ? !!busy.posts[postId] : busy.feed;
-    }
+    isBusy: function (postId) { return postId ? !!busy.posts[postId] : busy.feed; },
+    // 供渲染层判定「这条是不是本人 / 是不是我」，以及取真实头像
+    isMe: function (name) {
+      const me = (typeof window.getCurrentUser === 'function' && window.getCurrentUser()) || {};
+      return !!me.name && String(name || '').trim() === String(me.name).trim();
+    },
+    charAvatar: realAvatar,
+    findCharByName: findCharByName,
+    npcName: sanitizeNpcName
   };
 })();
