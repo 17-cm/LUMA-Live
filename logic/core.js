@@ -836,7 +836,14 @@ window.extractJsonFromText = extractJsonFromText;
 // 品牌固定为 Float，型号随机（17 Pro / 17 Pro Max / 17 Ultra / 17 mini / 17）
 // =========================================================================
 window.FLOAT_BRAND = 'Float';
-window.FLOAT_MODEL_POOL = ['17 Pro', '17 Pro Max', '17 Ultra', '17 mini', '17'];
+// 品牌固定 Float，只有后缀变化 —— 数字 / Pro / Plus / Max / Ultra / Air /
+// Note / SE / Mini / GT / Turbo 混着来，看起来像不同人在不同设备上发的
+window.FLOAT_MODEL_POOL = [
+  '12', '15', '16 Pro', '17 Pro Max', '20 Plus', '30 Pro', '40 Ultra',
+  '50 Pro+', '60', '60 Plus', '70 Max', '80 Pro', '90 Max', '90 Pro',
+  'Air', 'Air 5', 'Note 11', 'Note 12 Pro', 'X Ultra', 'Neo 9',
+  'Play 6', 'Magic 5', 'SE', 'Mini 4', 'GT 7', 'Turbo 9', '13 Pro'
+];
 function getFloatClientTag(useModel) {
   const brand = window.FLOAT_BRAND || 'Float';
   if (useModel) {
@@ -847,6 +854,18 @@ function getFloatClientTag(useModel) {
   return `${brand} 客户端`;
 }
 window.getFloatClientTag = getFloatClientTag;
+
+// 机型标签（稳定版）：getFloatClientTag(true) 每次调用都会重新随机，而列表 /
+// 详情在点赞、评论、展开回复时都会整块重渲染 → 机型跟着跳。
+// 用这个：首次抽一个并写回 post.device，之后只读不再抽。
+function postDeviceTag(post) {
+  if (post && !post.device) {
+    post.device = (typeof getFloatClientTag === 'function')
+      ? getFloatClientTag(true) : 'Float 客户端';
+  }
+  return (post && post.device) || 'Float 客户端';
+}
+window.postDeviceTag = postDeviceTag;
 
 // =========================================================================
 // 【统一头像资源站】getAvatar(name, style)

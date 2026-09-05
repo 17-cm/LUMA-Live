@@ -93,20 +93,10 @@ function topicPostsFor(char) {
     (p.tag && p.tag.includes(char.name)) || (p.mention && p.mention.includes(char.name))
   );
   const user = (window.__SUPERTOPIC_POSTS__ || {})[char.id] || [];
-  return supertopicDemoPosts(char).concat(user, fromFeed);   // ⚠【临时】定稿后改回 user.concat(fromFeed)
+  return user.concat(fromFeed);
 }
 function getAvatarFor(name, seed) {
   try { return window.getAvatar ? window.getAvatar(name, seed || 'first') : ''; } catch (e) { return ''; }
-}
-// 机型标签：getFloatClientTag(true) 内部是 Math.random()，每次调用重新抽一个。
-// 而点赞 / 评论 / 展开回复都会整块重渲染，所以机型会跟着跳。
-// 正确做法：抽一次就钉在 post.device 上，之后只读不再抽。
-function st2sPostDevice(post) {
-  if (!post.device) {
-    post.device = (typeof window.getFloatClientTag === 'function')
-      ? window.getFloatClientTag(true) : 'Float 客户端';
-  }
-  return post.device;
 }
 function currentUserName() {
   return (window.currentUser && window.currentUser.name) || '玩家';
@@ -330,100 +320,6 @@ function renderSuperTopicTab() {
 // -------------------------------------------------------------------------
 // 动态 Tab
 // -------------------------------------------------------------------------
-// ⚠⚠⚠【临时 · 预览种子数据】⚠⚠⚠
-// 只为方便验收广场列表与帖子详情。定稿后删三处：本整块函数、
-// topicPostsFor 里标 ⚠【临时】的那行、findSuperTopicPost 里标 ⚠【临时】的那段。
-const st2sDemoCache = {};
-function supertopicDemoPosts(char) {
-  if (st2sDemoCache[char.id]) return st2sDemoCache[char.id];   // 同一对象，点赞/评论本次会话内可留存
-  const now = Date.now();
-  const ago = m => now - m * 60000;
-  const av = n => getAvatarFor(n, 'first');
-  const rp = (name, m, text, replyTo) => ({
-    name: name, user: name, avatar: av(name), ip: 'LUMA',
-    text: text, content: text, time: '', createdAt: ago(m),
-    replyTo: replyTo || null, replies: []
-  });
-  const cm = (name, m, text, replies) => Object.assign(rp(name, m, text, null), {
-    replies: replies || []
-  });
-  const mk = (i, name, m, content, o) => ({
-    id: 'demo_post_' + char.id + '_' + i,
-    author: { name: name, avatar: av(name), verified: !!(o && o.verified) },
-    createdAt: ago(m),
-    tag: '#' + char.name + '超话#',
-    mentions: (o && o.mention) ? ['@' + char.name] : [],
-    subTags: (o && o.subs) || [],
-    device: (o && o.device) || null,   // null → 由 st2sPostDevice 抽一次后钉死
-    content: content,
-    image: (o && o.image) || null,
-    stats: { reposts: (o && o.rep) || 0, comments: 0, likes: (o && o.like) || 0, isLiked: false, isDownloaded: false },
-    commentTree: (o && o.cmts) || []
-  });
-  const list = [
-    mk(1, '夜航西飞', 4, '今晚八点准时开播，打一把排位就下。', { like: 12, cmts: [
-      cm('糖渍青柠', 3, '收到，蹲一个直播链接', [ rp('夜航西飞', 2, '点了关注就有推送', '糖渍青柠') ]),
-      cm('Momo', 1, '今天状态看着不错')
-    ]}),
-    mk(2, '糖渍青柠', 17, '刚看完回放，第三波那波团战决策是真的离谱，明明可以直接拿大龙却在野区绕了二十秒。', { mention: 1, subs: ['#赛事复盘#'], verified: 1, like: 47, rep: 6, cmts: [
-      cm('雾都旧事', 14, '那二十秒我也看到了，问题是指挥根本没沟通', [
-        rp('糖渍青柠', 13, '对，麦里完全没声音', '雾都旧事'),
-        rp('拾柒', 12, '他们最近一直这样，不是第一次了'),
-        rp('夜航西飞', 10, '其实是视野问题，绕的那边没眼'),
-        rp('糖渍青柠', 8, '视野也没做就更离谱了', '夜航西飞'),
-        rp('荔枝罐头', 5, '复盘视频我放评论区了，需要的自取')
-      ]),
-      cm('Momo', 9, '笑死，我当时直接关了直播')
-    ]}),
-    mk(3, 'Momo', 46, '主播今天状态好好，声音听起来睡了很久', { subs: ['#日常#'], like: 8, image: char.avatar }),
-    mk(4, '雾都旧事', 95, '整理了一份从开局到成型的完整路线，包含装备顺序、时间节点和三种逆风局的处理办法，太长就不贴了，评论区第一条有链接，需要的自取。另外上周说的那个键位改法我已经换成侧键了，实测连续闪避的手感提升很明显，推荐同样手小的朋友也试试，默认那套确实够不着。', { subs: ['#攻略#', '#干货#'], like: 203, rep: 31, cmts: [
-      cm('拾柒', 60, '链接呢链接呢'),
-      cm('荔枝罐头', 40, '侧键那个我也换了，手小救星', [ rp('雾都旧事', 35, '握手感确实好很多', '荔枝罐头') ])
-    ]}),
-    mk(5, '拾柒', 180, '签到第四十七天', { device: 'iPhone 15 Pro', like: 3 }),
-    mk(6, '荔枝罐头', 320, '有没有一起蹲明天联动活动的，两个人做日常效率高一点', { mention: 1, subs: ['#组队#'], device: '小米 14 Ultra', like: 15, cmts: [
-      cm('夜航西飞', 300, '我我我，我晚上八点后都在', [
-        rp('荔枝罐头', 290, '那说好了，明天见', '夜航西飞'),
-        rp('Momo', 250, '加一个加一个')
-      ])
-    ]})
-  ];
-  st2sDemoCache[char.id] = list;
-  return list;
-}
-
-// -------------------------------------------------------------------------
-// 动态 Tab
-// -------------------------------------------------------------------------
-// ⚠⚠⚠【临时 · 预览种子帖】⚠⚠⚠
-// 只为方便验收动态广场排版。定稿后请整段删除本函数，
-// 以及 renderSuperTopicPostsTab 里那一行 concat(DEMO) 调用。
-function supertopicDemoPosts(char) {
-  const now = Date.now();
-  const mk = (name, agoMin, content, opts) => {
-    opts = opts || {};
-    return {
-      id: 'demo_post_' + char.id + '_' + name,
-      author: { name: name, avatar: getAvatarFor(name, 'first'), verified: !!opts.verified },
-      createdAt: now - agoMin * 60000,
-      tag: '#' + char.name + '超话#',
-      mentions: opts.mention ? ['@' + char.name] : [],
-      subTags: opts.subs || [],
-      device: opts.device || 'Float 客户端',
-      content: content,
-      stats: { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false },
-      commentTree: []
-    };
-  };
-  return [
-    mk('夜航西飞', 4, '今晚八点准时开播，打一把排位就下。', {}),
-    mk('糖渍青柠', 17, '刚看完回放，第三波那波团战决策是真的离谱，明明可以直接拿大龙却在野区绕了二十秒。', { mention: 1, subs: ['#赛事复盘#'], verified: 1 }),
-    mk('Momo', 46, '主播今天状态好好，声音听起来睡了很久', { subs: ['#日常#'] }),
-    mk('雾都旧事', 95, '整理了一份从开局到成型的完整路线，包含装备顺序、时间节点和三种逆风局的处理办法，太长就不贴了，评论区第一条有链接，需要的自取。另外上周说的那个键位改法我已经换成侧键了，实测连续闪避的手感提升很明显，推荐同样手小的朋友也试试，默认那套确实够不着。', { subs: ['#攻略#', '#干货#'] }),
-    mk('拾柒', 180, '签到第四十七天', { device: 'iPhone 15 Pro' }),
-    mk('荔枝罐头', 320, '有没有一起蹲明天联动活动的，两个人做日常效率高一点', { mention: 1, subs: ['#组队#'], device: '小米 14 Ultra' })
-  ];
-}
 
 function renderSuperTopicPostsTab(charId) {
   const panel = document.getElementById('superTopicPanel');
@@ -458,7 +354,7 @@ function renderSuperTopicPostsTab(charId) {
           ? window.getPostAuthorAvatar(post)
           : (author.avatar || (typeof window.getAvatar === 'function' ? window.getAvatar(author.name, 'emoji') : ''));
         const subTags = post.subTags || [];
-        const deviceTag = st2sPostDevice(post);
+        const deviceTag = postDeviceTag(post);
         // 广场列表不显示主 tag / @（只留一行正文），它们连同彩色样式一起放到详情页
         const subTagHtml = subTags.map(t => `<span class="sub">${t}</span>`).join('');
         const verifiedHtml = author.verified ? '<span class="st2s-feed-verified">V</span>' : '';
@@ -1069,7 +965,7 @@ async function submitSuperTopicPost(charId) {
     content,
     image,
     imageDesc,
-    device: st2sPostDevice({}),   // 发布瞬间定一次，之后不再变
+    device: postDeviceTag({}),   // 发布瞬间定一次，之后不再变
     stats: { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false },
     commentTree: []
   };
@@ -1125,7 +1021,14 @@ const SUPERTOPIC_RULES = [
   { n: '05', t: '原创激励', d: '原创图文 / 视频 / 二创 / 应援打榜贴, 视内容质量给予 50 - 200 贡献值奖励。' },
   { n: '06', t: '等级权限', d: 'Lv.1 - 9: 签到 / 浏览; Lv.10 - 49: 发帖 / 评论; Lv.50+: 管理 / 删帖 / 移出。' },
   { n: '07', t: '违规处理', d: '初犯: 警告 + 禁言 24h; 再犯: 永久禁言 + 移出超话; 严重者上报平台封号。' },
-  { n: '08', t: '申诉通道', d: '如对处理有异议, 请通过侧栏「举报」旁的反馈通道联系 @${name}后援会会长。' }
+  { n: '08', t: '申诉通道', d: '如对处理有异议, 请通过侧栏「举报」旁的反馈通道联系 @${name}后援会会长。' },
+  { n: '09', t: '签到说明', d: '每日 00:00 重置, 连续签到不满 7 天不清零但断签会重新计数; 补签卡每月限用 3 张。' },
+  { n: '10', t: '应援规范', d: '打榜送礼纯属自愿, 严禁任何形式的集资、垫付、攀比晒单; 未成年人请在监护人同意下参与。' },
+  { n: '11', t: '发帖分类', d: '发帖请至少带一个副 tag 标明内容类型(如 #日常# #攻略# #二创#), 便于他人检索与版务归档。' },
+  { n: '12', t: '转载注明', d: '搬运二创必须注明原作者与出处链接, 未授权商用素材一律删除; 三次违规取消发帖权限。' },
+  { n: '13', t: '隐私保护', d: '严禁公开他人真实姓名、住址、行程、账号密码等隐私信息, 人肉行为直接永久移出并上报。' },
+  { n: '14', t: '理性追星', d: '不围堵、不跟拍私人行程、不拨打工作电话; 主播下播后的时间属于主播自己。' },
+  { n: '15', t: '版务生效', d: '本守则由 @${name}后援会制定并保留最终解释权, 修订后于本页面公示, 公示即生效。' }
 ];
 function renderSuperTopicRulesTab(char) {
   const panel = document.getElementById('superTopicPanel');
@@ -1136,7 +1039,7 @@ function renderSuperTopicRulesTab(char) {
   panel.innerHTML = `
     <div class="st2s-sec">
       <h4>超话守则</h4>
-      <span class="note">8 条 · 适用于 #${char.name}超话#</span>
+      <span class="note">${rules.length} 条 · 适用于 #${char.name}超话#</span>
     </div>
     <div class="st2s-rules">
       ${rules.map(r => `
@@ -1362,6 +1265,7 @@ function openSuperTopicPostDetail(postId) {
 window.openSuperTopicPostDetail = openSuperTopicPostDetail;
 
 function closePostDetail() {
+  if (typeof closeSuperTopicReplyModal === 'function') closeSuperTopicReplyModal();
   superTopicDetailPostId = null;
   renderSuperTopicTab();
 }
@@ -1391,11 +1295,6 @@ function paintSuperTopicDetail(post, char) {
   if (!panel || !post) return;
   panel.dataset.tab = 'posts';
   panel.innerHTML = renderSuperTopicPostDetail(post, char);
-  // innerHTML 重建会丢焦点，回复态下把光标还回去
-  if (st2sReplyTarget) {
-    const el = document.getElementById('st2sCommentInput');
-    if (el) el.focus();
-  }
 }
 function rerenderSuperTopicDetail() {
   if (!superTopicDetailPostId) return;
@@ -1409,11 +1308,79 @@ function st2sToggleReplies(cid) {
   rerenderSuperTopicDetail();
 }
 function st2sSetReplyTarget(cid) {
-  st2sReplyTarget = (st2sReplyTarget === cid) ? null : cid;
-  rerenderSuperTopicDetail();
+  st2sReplyTarget = cid;
+  renderSuperTopicReplyModal();
 }
 window.st2sToggleReplies = st2sToggleReplies;
 window.st2sSetReplyTarget = st2sSetReplyTarget;
+
+// ── 回复二级弹窗 ────────────────────────────────────────────
+function closeSuperTopicReplyModal(keepTarget) {
+  const m = document.getElementById('st2sReplyModal');
+  if (m) m.remove();
+  if (!keepTarget) st2sReplyTarget = null;
+}
+function renderSuperTopicReplyModal() {
+  closeSuperTopicReplyModal(true);
+  const found = findSuperTopicPost(superTopicDetailPostId);
+  if (!found) return;
+  st2sAssignCommentIds(found.post.commentTree, 'f');
+  const target = st2sFindComment(found.post.commentTree, st2sReplyTarget);
+  if (!target) return;
+  const tName = target.name || target.user || '匿名';
+  const tText = target.text || target.content || '';
+  const wrap = document.createElement('div');
+  wrap.id = 'st2sReplyModal';
+  wrap.className = 'st2s-modal';
+  wrap.innerHTML = `
+    <div class="st2s-modal-box" onclick="event.stopPropagation()">
+      <div class="st2s-modal-head">
+        <span>回复 <b>@${tName}</b></span>
+        <button type="button" class="st2s-modal-x" onclick="closeSuperTopicReplyModal()" aria-label="关闭">&times;</button>
+      </div>
+      ${tText ? `<div class="st2s-modal-quote">${tText}</div>` : ''}
+      <textarea id="st2sReplyText" class="st2s-modal-ta" maxlength="200"></textarea>
+      <div class="st2s-modal-ft">
+        <button type="button" class="st2s-modal-cancel" onclick="closeSuperTopicReplyModal()">取消</button>
+        <button type="button" class="st2s-modal-ok" onclick="submitSuperTopicReply()">发送</button>
+      </div>
+    </div>`;
+  // 点遮罩关闭
+  wrap.addEventListener('click', () => closeSuperTopicReplyModal());
+  document.body.appendChild(wrap);
+  setTimeout(() => {
+    const t = document.getElementById('st2sReplyText');
+    if (t) t.focus();
+  }, 60);
+}
+function submitSuperTopicReply() {
+  const box = document.getElementById('st2sReplyText');
+  const val = (box && box.value || '').trim();
+  if (!val) { showToast('回复内容不能为空', 'warn'); return; }
+  const found = findSuperTopicPost(superTopicDetailPostId);
+  if (!found) { showToast('帖子不存在', 'warn'); return; }
+  const post = found.post;
+  st2sAssignCommentIds(post.commentTree, 'f');
+  const parent = st2sFindComment(post.commentTree, st2sReplyTarget);
+  if (!parent) { closeSuperTopicReplyModal(); return; }
+  const uName = (window.currentUser && window.currentUser.name) || currentUserName() || '玩家';
+  const uAvatar = (window.currentUser && window.currentUser.avatar) || (typeof window.getAvatar === 'function' ? window.getAvatar(uName, 'first') : '');
+  parent.replies = parent.replies || [];
+  parent.replies.push({
+    name: uName, user: uName, avatar: uAvatar,
+    ip: (window.userProfileData && window.userProfileData.ip) || 'LUMA',
+    text: val, content: val, time: '', createdAt: Date.now(),
+    replyTo: parent.name || parent.user || '匿名', replies: []
+  });
+  st2sExpandedComments.add(parent.id);   // 回完自动展开，让人看见自己那条
+  closeSuperTopicReplyModal();
+  persistSuperTopicPost(found);
+  showToast('回复已发表', 'ok');
+  rerenderSuperTopicDetail();
+}
+window.closeSuperTopicReplyModal = closeSuperTopicReplyModal;
+window.renderSuperTopicReplyModal = renderSuperTopicReplyModal;
+window.submitSuperTopicReply = submitSuperTopicReply;
 
 function renderSuperTopicPostDetail(post, char) {
   st2sAssignCommentIds(post.commentTree, 'f');
@@ -1428,7 +1395,7 @@ function renderSuperTopicPostDetail(post, char) {
   const timeText = post.createdAt
     ? (window.formatDynamicTime ? window.formatDynamicTime(post.createdAt) : '刚刚')
     : (post.time || '刚刚');
-  const deviceTag = st2sPostDevice(post);
+  const deviceTag = postDeviceTag(post);
   const stats = post.stats || (post.stats = { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false });
 
   // 正文一整段：主tag → @ → 正文 → 副tag，用空格连成 inline 流，绝不分行
@@ -1478,13 +1445,6 @@ function renderSuperTopicPostDetail(post, char) {
         </div>
       </div>`;
   };
-
-  const target = st2sReplyTarget ? st2sFindComment(comments, st2sReplyTarget) : null;
-  const hintHtml = target ? `
-      <div class="st2s-detail-replyhint">
-        <span>回复 <b>@${target.name || target.user || '匿名'}</b></span>
-        <button type="button" onclick="st2sSetReplyTarget(null)" aria-label="取消回复">&times;</button>
-      </div>` : '';
 
   return `
     <div class="st2s-detail">
@@ -1539,17 +1499,17 @@ function renderSuperTopicPostDetail(post, char) {
         <span>${totalComments} 条</span>
       </div>
 
-      ${comments.length === 0 ? `
-        <div class="st2s-detail-empty">还没有人评论，坐个一楼吧</div>
-      ` : comments.map((c, i) => renderCmt(c, (i + 1) + 'L', false)).join('')}
-
-      <div style="height:14px"></div>
-${hintHtml}
+      <!-- 输入框固定在评论区顶部（标题之下、一楼之上）；
+           往下滑想回复某人时走「回复」按钮的二级弹窗，不依赖这个框 -->
       <div class="st2s-detail-inputbar">
-        <input id="st2sCommentInput" type="text" placeholder="${target ? '回复 @' + (target.name || target.user || '匿名') : '发条温暖善意的评论...'}" maxlength="200" autocomplete="off"
+        <input id="st2sCommentInput" type="text" placeholder="发条温暖善意的评论..." maxlength="200" autocomplete="off"
                onkeydown="if(event.key==='Enter'){event.preventDefault();submitSuperTopicComment();}">
         <button type="button" class="st2s-detail-send" onclick="submitSuperTopicComment()">发送</button>
       </div>
+
+      ${comments.length === 0 ? `
+        <div class="st2s-detail-empty">还没有人评论，坐个一楼吧</div>
+      ` : comments.map((c, i) => renderCmt(c, (i + 1) + 'L', false)).join('')}
     </div>
   `;
 }
@@ -1566,9 +1526,6 @@ function findSuperTopicPost(postId) {
     const p = userArr.find(x => String(x.id) === String(postId));
     if (p) return { post: p, source: 'user', charId: char.id };
   }
-  const demo = st2sDemoCache[char.id] || [];                       // ⚠【临时】
-  const d = demo.find(x => String(x.id) === String(postId));       // ⚠【临时】
-  if (d) return { post: d, source: 'demo', charId: char.id };      // ⚠【临时】
   const weibo = (window.weiboPosts || []).find(x => String(x.id) === String(postId));
   if (weibo) return { post: weibo, source: 'weibo' };
   return null;
@@ -1660,21 +1617,12 @@ function submitSuperTopicComment() {
     text: val, content: val, time: '', createdAt: Date.now(), replies: []
   };
 
-  const parent = st2sReplyTarget ? st2sFindComment(post.commentTree, st2sReplyTarget) : null;
-  if (parent) {
-    node.replyTo = parent.name || parent.user || '匿名';
-    parent.replies = parent.replies || [];
-    parent.replies.push(node);
-    st2sExpandedComments.add(parent.id);   // 回完自动展开，让人看见自己那条
-    st2sReplyTarget = null;
-  } else {
-    // 追加到末尾而不是插到最前 —— 有楼层号之后，1L 必须永远是最早那条
-    post.commentTree.push(node);
-  }
+  // 追加到末尾而不是插到最前 —— 有楼层号之后，1L 必须永远是最早那条
+  post.commentTree.push(node);
   input.value = '';
 
   persistSuperTopicPost(found);
-  showToast(parent ? '回复已发表' : '评论已发表', 'ok');
+  showToast('评论已发表', 'ok');
   rerenderSuperTopicDetail();
 }
 

@@ -6494,22 +6494,75 @@ input:checked + .switch-slider:before {
 .st2s-cmt-reply .st2s-detail-cmt-text { font-size: 12px; margin: 2px 0 4px; }
 .st2s-cmt-replyto { color: var(--st2s-mention); }
 
-/* 回复对象提示条 */
-.st2s-detail-replyhint {
+/* ----- 回复二级弹窗 ----- */
+.st2s-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 26px;
+  background: rgba(15, 23, 42, 0.30);
+  animation: st2sModalIn .16s ease;
+}
+@keyframes st2sModalIn { from { opacity: 0 } to { opacity: 1 } }
+/* 浮层需要自身底色才能和身后内容分层，这是唯一保留填充的地方 */
+.st2s-modal-box {
+  width: 100%;
+  max-width: 330px;
+  background: #fbfbf9;
+  border: 1px solid var(--st2s-line-soft);
+  border-radius: 12px;
+  padding: 12px 14px 14px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.16);
+  animation: st2sModalUp .18s cubic-bezier(.2,.8,.3,1);
+}
+@keyframes st2sModalUp { from { transform: translateY(8px); opacity: .5 } to { transform: none; opacity: 1 } }
+.st2s-modal-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px;
-  padding: 5px 9px;
-  margin: 0 14px 7px 16px;
-  border-left: 2px solid var(--st2s-mention);
-  background: rgba(90, 111, 150, 0.07);
-  font-size: 10.5px; color: var(--st2s-ink-soft);
+  padding-bottom: 9px;
+  margin-bottom: 9px;
+  border-bottom: 1px solid var(--st2s-line);
+  font-size: 12px; font-weight: 400; color: var(--st2s-ink-soft);
 }
-.st2s-detail-replyhint b { font-weight: 500; }
-.st2s-detail-replyhint button {
+.st2s-modal-head b { font-weight: 500; color: var(--st2s-ink); }
+.st2s-modal-x {
   border: 0; background: transparent; cursor: pointer;
-  color: var(--st2s-ink-mute); font-size: 14px; line-height: 1;
+  color: var(--st2s-ink-mute); font-size: 19px; line-height: 1;
   padding: 0 2px; font-family: inherit;
 }
+.st2s-modal-quote {
+  font-size: 11px; color: var(--st2s-ink-mute); line-height: 1.55;
+  padding: 1px 0 1px 9px;
+  margin-bottom: 9px;
+  border-left: 2px solid var(--st2s-line-soft);
+  display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+.st2s-modal-ta {
+  width: 100%;
+  border: 1px solid var(--st2s-line);
+  border-radius: 8px;
+  background: transparent;
+  padding: 9px 11px;
+  font-family: inherit; font-size: 12.5px; font-weight: 400;
+  color: var(--st2s-ink); line-height: 1.6;
+  resize: none; outline: none; min-height: 74px;
+  transition: border-color .15s ease;
+}
+.st2s-modal-ta:focus { border-color: var(--st2s-ink-mute); }
+/* 底部两等长按键，与发帖页同一套 */
+.st2s-modal-ft { display: flex; gap: 8px; margin-top: 11px; }
+.st2s-modal-ft > button {
+  flex: 1; padding: 9px 0; border-radius: 10px;
+  font-family: inherit; font-size: 12px; font-weight: 400;
+  cursor: pointer; transition: transform .15s ease;
+}
+.st2s-modal-cancel { background: transparent; border: 1px solid var(--st2s-line-soft); color: var(--st2s-ink-soft); }
+.st2s-modal-ok    { background: transparent; border: 1px solid var(--st2s-ink);     color: var(--st2s-ink); }
+.st2s-modal-ft > button:active { transform: scale(.97); }
 
 /* 输入区：幽灵描边，不用白卡片 */
 .st2s-detail-inputbar {
