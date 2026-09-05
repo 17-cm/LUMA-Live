@@ -95,10 +95,14 @@ function topicPostsFor(char) {
   const fromFeed = (window.weiboPosts || []).filter(p =>
     (p.tag && p.tag.includes(char.name)) || (p.mention && p.mention.includes(char.name))
   );
-  const user = (window.__SUPERTOPIC_POSTS__ || {})[char.id] || [];
+  const user = st2sStore.postsOf(char.id);   // 含用户帖与 AI 生成帖，同一套入库
   // 管理员删过的帖子（含 weiboPosts 种子帖）靠墓碑过滤，重启也不会复活
   return user.concat(fromFeed).filter(p => !st2sIsDeletedPost(p.id));
 }
+// 供 supertopic_generate.js 跨文件调用：不挂 window 的话，
+// 生成引擎里的 typeof 守卫会静默跳过 → 防重复列表失效、详情页刷新键报「帖子不存在」
+window.topicPostsFor = topicPostsFor;
+
 function getAvatarFor(name, seed) {
   try { return window.getAvatar ? window.getAvatar(name, seed || 'first') : ''; } catch (e) { return ''; }
 }
@@ -346,30 +350,81 @@ function renderSuperTopicTab() {
 // 动态 Tab
 // -------------------------------------------------------------------------
 
+// ── 会长公告（展示贴）────────────────────────────────────
+// 不是帖子，不进 commentTree、不参与点赞，纯粹是超话开出来时的一张门面。
+// 口吻：后援会会长写给第一个点进来的人。只讲玩法和氛围，
+// 禁令与等级表在「规则」里，这里刻意不重复。
+function st2sWelcomePanel(char) {
+  const nm = String(char.name || '').replace(/'/g, "\\'");
+  return `
+  <div class="st2s-welcome">
+    <div class="st2s-welcome-head">
+      <span class="st2s-welcome-pin">置顶</span>
+      <h3>写给刚点进来的你</h3>
+      <p class="st2s-welcome-by">—— @${nm}后援会会长 · 本超话版务</p>
+    </div>
+
+    <div class="st2s-welcome-body">
+      <p>你好，我是会长。这个超话从开服撑到今天，一直是我在打理。</p>
+      <p>你现在看到的是一片空地。也说明 —— 第一个发帖的人，很可能就是你。</p>
+
+      <div class="st2s-wl">
+        <div class="k">这里都在聊什么</div>
+        <div class="v">直播间的切片和名场面、舞台上下两种样子、看不懂的攻略和打得漂亮的一局、
+          画的手写的剪的二创、蹲活动的搭子。也包括今天特别开心、或者特别不开心，
+          只想找个懂的人说一句的那种帖子。这里都收。</div>
+      </div>
+
+      <div class="st2s-wl">
+        <div class="k">怎么融进来最快</div>
+        <div class="v">先点右上角<b>关注</b>，不关注是纯看的状态。然后<b>签到</b>，
+          一天一次别断。第三件事才是重点：<b>别急着发第一帖，先去别人底下冒个泡</b>。
+          评论是这里认识人最快的路，比发帖管用得多。</div>
+      </div>
+
+      <div class="st2s-wl">
+        <div class="k">第一帖写什么好</div>
+        <div class="v">不用憋大题目。今天他哪句话把你逗笑了，或者你为一个操作拍了一下桌子 ——
+          就写那个。短没关系，越具体越有人回。
+          写「签到第 47 天」是打卡，写「今天他声音听着有点哑」才是记录。</div>
+      </div>
+
+      <div class="st2s-wl">
+        <div class="k">会长的一点私心</div>
+        <div class="v">追星这件事，外人看着是数据，我们自己知道是日子。
+          你在这里写下的东西，主要是写给半年后的自己看的。
+          到时候翻回来，你会感谢当时肯动笔的你。</div>
+      </div>
+
+      <p class="st2s-welcome-end">就这样。想说话就说话，这里一直有人。</p>
+    </div>
+
+    <div class="st2s-welcome-ft">
+      <button type="button" onclick="handleSuperTopicFollow('${nm}')">关注超话</button>
+      <button type="button" class="is-primary" onclick="switchSuperTopicTab('checkin')">今天签到</button>
+    </div>
+  </div>`;
+}
+window.st2sWelcomePanel = st2sWelcomePanel;
+
 function renderSuperTopicPostsTab(charId) {
   const panel = document.getElementById('superTopicPanel');
   if (!panel) return;
   const chars = window.getAvailableCharsList();
   const char = chars.find(c => String(c.id) === String(charId)) || chars[0];
-  let posts = topicPostsFor(char);
+  const posts = topicPostsFor(char);
+
+  // 空超话不再塞一条模板帖冒充内容 —— 那玩意儿既不能点也不能评论，
+  // 只会让广场看起来像坏了。改成一张完整的会长公告面板，有帖即自动消失。
   if (posts.length === 0) {
-    posts = [{
-      id: `topic_post_${char.id}`,
-      author: { name: `${char.name}后援会会长`, avatar: char.avatar, badge: '超话大咖', verified: true },
-      createdAt: Date.now(),
-      tag: `#${char.name}超话#`,
-      mention: `@${char.name}`,
-      content: `欢迎来到【${char.name}】粉丝专属超话！每天签到打卡、为主播送礼或花钱打榜应援，均可登上超话守护贡献总榜！`,
-      image: char.avatar,
-      stats: { reposts: 180, comments: 24, likes: 680, isLiked: false, isDownloaded: false },
-      commentTree: []
-    }];
+    panel.innerHTML = st2sWelcomePanel(char);
+    return;
   }
 
   panel.innerHTML = `
     <div class="st2s-sec">
       <h4>超话动态</h4>
-      <span class="note">${posts.length} 条 · 加载更多</span>
+      <span class="note">${posts.length} 条 · 下拉加载更多</span>
     </div>
 
     <div class="st2s-feed">
@@ -1027,11 +1082,12 @@ async function submitSuperTopicPost(charId) {
   const all = window.__SUPERTOPIC_POSTS__ = window.__SUPERTOPIC_POSTS__ || {};
   all[char.id] = all[char.id] || [];
   all[char.id].unshift(post);
-  try { localStorage.setItem('st_user_posts', JSON.stringify(all)); } catch (_) {}
-  if (window.LumaDataHub && typeof window.LumaDataHub.put === 'function') {
-    try { window.LumaDataHub.put('super_topic_posts', post.id, post); } catch (_) {}
-  }
+  // 原来这两行都是死代码：localStorage 在沙盒不可用，LumaDataHub 没有 put 方法
+  st2sStore.save(post);
   st2sEarn(char.id, 'post');
+  // 自己发的帖子不该一直空着：后台按本超话预设生成一轮回应，写完就地刷新详情。
+  // 不 await —— 用户点完发布就该看到帖子，评论慢慢来。
+  if (window.st2sGen) { try { window.st2sGen.respondToUserPost(post); } catch (e) {} }
   showToast('发布成功', 'ok');
   currentSuperTopicTab = 'posts';
   renderSuperTopicView(char.id);   // 贡献变了，等级条要一起刷
@@ -1040,31 +1096,8 @@ window.submitSuperTopicPost = submitSuperTopicPost;
 
 
 
-// 启动时恢复用户帖子 (顺带把历史“游客用户/无头像”占位帖作者刷成当前真实玩家)
-(function restoreUserPosts() {
-  try {
-    const raw = localStorage.getItem('st_user_posts');
-    if (!raw) return;
-    const all = JSON.parse(raw);
-    const me = getCurrentUser();
-    if (me && me.name && me.name !== '游客用户') {
-      Object.keys(all).forEach(charId => {
-        const arr = all[charId];
-        if (!Array.isArray(arr)) return;
-        arr.forEach(p => {
-          const a = p && p.author;
-          if (!a) return;
-          if (!a.name || a.name === '游客用户' || !a.avatar || a.avatar === '/assets/default-avatar.png') {
-            a.name = me.name;
-            a.avatar = me.avatar;
-            a.badge = a.badge || me.badge || 'Lv.1 新粉';
-          }
-        });
-      });
-    }
-    window.__SUPERTOPIC_POSTS__ = all;
-  } catch (_) {}
-})();
+// 用户帖与生成帖统一由 supertopic_store.js 从宿主 api.db 拉回，见 st2sStore.load()
+
 
 // -------------------------------------------------------------------------
 // 规则 Tab
@@ -1405,7 +1438,7 @@ function renderSuperTopicRefreshTab(char) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
       </div>
       <div class="st2s-refresh-t">刷新「#${char.name}超话#」动态</div>
-      <div class="st2s-refresh-d">重新拉取最新帖子、签到、打榜数据。</div>
+      <div class="st2s-refresh-d">调用模型按本超话预设生成 3~5 条新动态，并逐条铺开评论区。约需十几秒。</div>
       <button onclick="doRefreshSuperTopic('${char.id}')" class="st2s-refresh-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         立即刷新
@@ -1416,23 +1449,31 @@ function renderSuperTopicRefreshTab(char) {
 }
 window.renderSuperTopicRefreshTab = renderSuperTopicRefreshTab;
 
-function doRefreshSuperTopic(charId) {
+async function doRefreshSuperTopic(charId) {
   const btn = document.querySelector('.st2s-refresh-btn');
-  if (btn) btn.disabled = true;
-  if (window.LumaDataHub && typeof window.LumaDataHub.flush === 'function') {
-    try { window.LumaDataHub.flush(); } catch (_) {}
+  if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
+  const out = document.getElementById('spRefreshResult');
+  if (out) out.innerHTML = '<div class="run">正在调用模型生成新动态，约需十几秒…</div>';
+  try {
+    await window.st2sGen.feed(charId);
+    if (out) out.innerHTML = `<div class="ok">已生成 · ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}</div>`;
+    setTimeout(() => switchSuperTopicTab('posts'), 700);
+  } catch (e) {
+    if (out) out.innerHTML = '<div class="err">生成失败，请检查模型配置后重试</div>';
+  } finally {
+    if (btn) { btn.disabled = false; btn.classList.remove('is-loading'); }
   }
-  setTimeout(() => {
-    if (btn) btn.disabled = false;
-    const r = document.getElementById('spRefreshResult');
-    if (r) {
-      r.innerHTML = `<div class="ok">已刷新 · ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}</div>`;
-    }
-    showToast('刷新成功', 'ok');
-    setTimeout(() => switchSuperTopicTab('posts'), 600);
-  }, 800);
 }
 window.doRefreshSuperTopic = doRefreshSuperTopic;
+
+// 详情页评论区小刷新键：只给这一条帖子追加更多评论
+async function st2sRefreshComments(postId) {
+  const btn = document.getElementById('st2sCmtRefresh');
+  if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
+  await window.st2sGen.moreComments(postId);
+  if (btn) { btn.disabled = false; btn.classList.remove('is-loading'); }
+}
+window.st2sRefreshComments = st2sRefreshComments;
 
 // -------------------------------------------------------------------------
 // 帖子详情 (同面板切换, 不入 PageStack)
@@ -1665,43 +1706,76 @@ function renderSuperTopicPostDetail(post, char) {
 
   const cnt = (label, n) => label + (n ? ' ' + n : '');
 
-  // 楼层渲染（递归，回复复用同一函数）
-  const renderCmt = (c, floorLabel, isReply) => {
-    const cName = c.name || c.user || '匿名';
-    const cAvatar = c.avatar || (window.getAvatar ? window.getAvatar(cName, 'emoji') : '');
-    const cText = c.text || c.content || '';
-    const cTime = c.time || (c.createdAt ? (window.formatDynamicTime ? window.formatDynamicTime(c.createdAt) : '刚刚') : '刚刚');
-    const replies = alive(c.replies);
+  // ── 楼层渲染（抖音式）──────────────────────────────────
+  // 一层的回复全部拍平成一条列表：回复的回复不再往里缩进。
+  // 原来递归渲染，每深一层多一道左边距，两三回就变成画中画。
+  const flattenReplies = (list, out) => {
+    (list || []).forEach(c => {
+      if (st2sIsDeletedComment(cKey(c))) return;
+      out.push(c);
+      if (Array.isArray(c.replies) && c.replies.length) flattenReplies(c.replies, out);
+    });
+    return out;
+  };
+  const fmtTime = c => c.time || (c.createdAt
+    ? (window.formatDynamicTime ? window.formatDynamicTime(c.createdAt) : '刚刚') : '刚刚');
+  const avImg = (name, src, cls) => src
+    ? `<img src="${src}" class="${cls}" alt="">`
+    : `<div class="${cls} st2s-feed-av-fallback">${(name || '?').charAt(0)}</div>`;
+  const actRow = (c) => `
+    <div class="st2s-detail-cmt-meta">
+      <span>${fmtTime(c)}</span>
+      <button type="button" class="st2s-cmt-act" onclick="st2sSetReplyTarget('${c.id}')">回复</button>
+      ${canManage ? `<button type="button" class="st2s-cmt-act is-danger" title="删除这条评论" onclick="st2sRemoveComment('${post.id}','${cKey(c)}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+      </button>` : ''}
+    </div>`;
+  const bodyOf = (c) => {
+    const name = c.name || c.user || '匿名';
+    const text = c.text || c.content || '';
+    return {
+      name,
+      ip: c.ip ? `<span class="st2s-detail-cmt-ip">· ${c.ip}</span>` : '',
+      text: (c.replyTo ? `<span class="st2s-cmt-replyto">回复 @${c.replyTo}：</span>` : '') + text
+    };
+  };
+
+  // 楼中楼：小头像 + 名字 + 正文，全部同一层级，不再嵌套
+  const renderReply = (r) => {
+    const b = bodyOf(r);
+    return `
+      <div class="st2s-cmt-reply">
+        ${avImg(b.name, r.avatar || (window.getAvatar ? window.getAvatar(b.name, 'emoji') : ''), 'st2s-cmt-reply-av')}
+        <div class="st2s-cmt-reply-main">
+          <div class="st2s-detail-cmt-name"><span>${b.name}</span>${b.ip}</div>
+          <p class="st2s-detail-cmt-text">${b.text}</p>
+          ${actRow(r)}
+        </div>
+      </div>`;
+  };
+
+  const renderFloor = (c, floorLabel) => {
+    const b = bodyOf(c);
+    const flat = flattenReplies(c.replies, []).sort((x, y) => (x.createdAt || 0) - (y.createdAt || 0));
     const expanded = st2sExpandedComments.has(c.id);
-    // 折叠时露出第一条当预告（微博/贴吧习惯），展开才全给
-    const shown = (replies.length > 1 && !expanded) ? replies.slice(0, 1) : replies;
-    const toggleHtml = replies.length > 1 ? `
+    // 折叠时只露最新一条当预告，点一下才铺开整层
+    const shown = (flat.length > 1 && !expanded) ? flat.slice(-1) : flat;
+    const toggleHtml = flat.length > 1 ? `
       <button type="button" class="st2s-cmt-act chevron ${expanded ? 'open' : ''}" onclick="st2sToggleReplies('${c.id}')">
-        <span>${expanded ? '收起' : '展开其余 ' + (replies.length - 1) + ' 条回复'}</span>
+        <span>${expanded ? '收起' : '查看其余 ' + (flat.length - 1) + ' 条回复'}</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
       </button>` : '';
     return `
-      <div class="st2s-detail-comment ${isReply ? 'st2s-cmt-reply' : ''}">
-        ${isReply ? '' : `<span class="st2s-cmt-floor">${floorLabel}</span>`}
+      <div class="st2s-detail-comment">
+        <span class="st2s-cmt-floor">${floorLabel}</span>
         <div class="st2s-detail-cmt-left">
-          ${cAvatar
-            ? `<img src="${cAvatar}" class="st2s-detail-cmt-av" alt="">`
-            : `<div class="st2s-detail-cmt-av st2s-feed-av-fallback">${cName.charAt(0)}</div>`}
+          ${avImg(b.name, c.avatar || (window.getAvatar ? window.getAvatar(b.name, 'emoji') : ''), 'st2s-detail-cmt-av')}
         </div>
         <div class="st2s-detail-cmt-right">
-          <div class="st2s-detail-cmt-name">
-            <span>${cName}</span>
-            ${c.ip ? `<span class="st2s-detail-cmt-ip">· ${c.ip}</span>` : ''}
-          </div>
-          <p class="st2s-detail-cmt-text">${c.replyTo ? `<span class="st2s-cmt-replyto">回复 @${c.replyTo}：</span>` : ''}${cText}</p>
-          <div class="st2s-detail-cmt-meta">
-            <span>${cTime}</span>
-            <button type="button" class="st2s-cmt-act" onclick="st2sSetReplyTarget('${c.id}')">回复</button>
-            ${canManage ? `<button type="button" class="st2s-cmt-act is-danger" title="删除这条评论" onclick="st2sRemoveComment('${post.id}','${cKey(c)}')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
-            </button>` : ''}
-          </div>
-          ${shown.length ? `<div class="st2s-cmt-replies">${shown.map(r => renderCmt(r, '', true)).join('')}</div>` : ''}
+          <div class="st2s-detail-cmt-name"><span>${b.name}</span>${b.ip}</div>
+          <p class="st2s-detail-cmt-text">${b.text}</p>
+          ${actRow(c)}
+          ${shown.length ? `<div class="st2s-cmt-replies">${shown.map(renderReply).join('')}</div>` : ''}
           ${toggleHtml}
         </div>
       </div>`;
@@ -1772,6 +1846,11 @@ function renderSuperTopicPostDetail(post, char) {
       <div class="st2s-detail-comments-head">
         <h4>全部评论</h4>
         <span>${totalComments} 条</span>
+        <button type="button" class="st2s-cmt-refresh" id="st2sCmtRefresh"
+                title="让模型再写几条这条帖子的评论" onclick="st2sRefreshComments('${post.id}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          <span>更多</span>
+        </button>
       </div>
 
       <!-- 输入框固定在评论区顶部（标题之下、一楼之上）；
@@ -1789,7 +1868,7 @@ function renderSuperTopicPostDetail(post, char) {
 
       ${comments.length === 0 ? `
         <div class="st2s-detail-empty">还没有人评论，坐个一楼吧</div>
-      ` : comments.map((c, i) => renderCmt(c, (i + 1) + 'L', false)).join('')}
+      ` : comments.map((c, i) => renderFloor(c, (i + 1) + 'L')).join('')}
     </div>
   `;
 }
@@ -1801,7 +1880,7 @@ window.renderSuperTopicPostDetail = renderSuperTopicPostDetail;
 function findSuperTopicPost(postId) {
   const char = getActiveChar();
   if (!char) return null;
-  const userArr = (window.__SUPERTOPIC_POSTS__ || {})[char.id];
+  const userArr = st2sStore.postsOf(char.id);
   if (Array.isArray(userArr)) {
     const p = userArr.find(x => String(x.id) === String(postId));
     if (p) return { post: p, source: 'user', charId: char.id };
@@ -1811,20 +1890,13 @@ function findSuperTopicPost(postId) {
   return null;
 }
 
+window.findSuperTopicPost = findSuperTopicPost;
+
 function persistSuperTopicPost(found) {
   if (!found) return;
   const { post, source, charId } = found;
   if (source === 'user') {
-    try {
-      const all = window.__SUPERTOPIC_POSTS__ = window.__SUPERTOPIC_POSTS__ || {};
-      all[charId] = all[charId] || [];
-      const idx = all[charId].findIndex(x => String(x.id) === String(post.id));
-      if (idx >= 0) all[charId][idx] = post;
-      localStorage.setItem('st_user_posts', JSON.stringify(all));
-    } catch (_) {}
-    if (window.LumaDataHub && typeof window.LumaDataHub.put === 'function') {
-      try { window.LumaDataHub.put('super_topic_posts', post.id, post); } catch (_) {}
-    }
+    st2sStore.save(post);   // 点赞数 / 评论树 / 删除状态都靠整棵入库复原
   } else if (source === 'weibo') {
     try {
       if (typeof window.persistPostToDb === 'function') {

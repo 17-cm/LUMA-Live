@@ -6127,6 +6127,122 @@ input:checked + .switch-slider:before {
 /* 铅笔切换成对勾时给一点"正在编辑"的暗示 */
 .st2s-sec-act.is-on { border-color: var(--st2s-ink); color: var(--st2s-ink); }
 
+
+
+/* 评论区「更多」—— 只给这一条帖子追加评论，做得很轻，不抢评论区标题 */
+.st2s-cmt-refresh {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 6px;
+  margin-bottom: -2px;
+  border: 1px solid var(--st2s-line-soft);
+  border-radius: 4px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 9.5px; font-weight: 400;
+  color: var(--st2s-ink-mute);
+  cursor: pointer;
+}
+.st2s-cmt-refresh svg { width: 10px; height: 10px; }
+.st2s-cmt-refresh:active { opacity: .55; }
+.st2s-cmt-refresh:disabled { cursor: default; opacity: .5; }
+.st2s-cmt-refresh.is-loading svg { animation: st2s-spin .9s linear infinite; }
+@keyframes st2s-spin { to { transform: rotate(360deg); } }
+.st2s-refresh-btn.is-loading svg { animation: st2s-spin .9s linear infinite; }
+.st2s-refresh-result .run { color: var(--st2s-ink-soft); }
+.st2s-refresh-result .err { color: #b4423f; }
+
+/* ═════ 会长公告（展示贴）═════
+   不是卡片，是一张能读的东西：正文段落 + 键值条目 + 细线分隔 */
+.st2s-welcome {
+  margin: 0 -14px 0 -16px;
+  padding-bottom: 4px;
+}
+.st2s-welcome-head {
+  padding: 14px 14px 13px 16px;
+  border-bottom: 1px solid var(--st2s-line);
+}
+.st2s-welcome-pin {
+  display: inline-block;
+  font-size: 9.5px;
+  font-weight: 400;
+  color: var(--st2s-ink-mute);
+  border: 1px solid var(--st2s-line-soft);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-bottom: 7px;
+  letter-spacing: 0.06em;
+}
+.st2s-welcome-head h3 {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--st2s-ink);
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+.st2s-welcome-by {
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--st2s-ink-mute);
+}
+.st2s-welcome-body {
+  padding: 13px 14px 3px 16px;
+}
+.st2s-welcome-body > p {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--st2s-ink-soft);
+  line-height: 1.85;
+  margin-bottom: 11px;
+}
+.st2s-welcome-body > b, .st2s-welcome-body strong { font-weight: 500; color: var(--st2s-ink); }
+/* 键值条目：左侧短标题，右侧正文，靠细线分开 */
+.st2s-wl {
+  border-top: 1px solid var(--st2s-line-soft);
+  padding: 10px 0 11px;
+}
+.st2s-wl .k {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--st2s-ink);
+  margin-bottom: 4px;
+}
+.st2s-wl .v {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--st2s-ink-soft);
+  line-height: 1.8;
+}
+.st2s-wl .v b { font-weight: 500; color: var(--st2s-ink); }
+.st2s-welcome-end {
+  border-top: 1px solid var(--st2s-line-soft);
+  padding: 11px 0 4px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--st2s-ink);
+  line-height: 1.8;
+}
+.st2s-welcome-ft {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px 12px 16px;
+  border-top: 1px solid var(--st2s-line);
+}
+.st2s-welcome-ft button {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 10px;
+  border: 1px solid var(--st2s-line-soft);
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--st2s-ink-soft);
+  cursor: pointer;
+}
+.st2s-welcome-ft button.is-primary { border-color: var(--st2s-ink); color: var(--st2s-ink); }
+.st2s-welcome-ft button:active { transform: scale(.97); }
+
 /* ═════ 等级与权限 ═════ */
 
 /* hero 标题旁的等级徽章 */
@@ -6665,9 +6781,11 @@ input:checked + .switch-slider:before {
 
 /* 评论区标题 */
 .st2s-detail-comments-head {
-  display: flex; align-items: baseline; justify-content: space-between;
+  display: flex; align-items: baseline; gap: 8px;
   padding: 14px 14px 6px 16px;
 }
+/* 标题把计数与刷新键一起推到右边 */
+.st2s-detail-comments-head h4 { margin-right: auto; }
 .st2s-detail-comments-head h4 {
   font-size: 11px; font-weight: 400; color: var(--st2s-ink-soft);
   letter-spacing: .06em; margin: 0;
@@ -6735,14 +6853,26 @@ input:checked + .switch-slider:before {
 .st2s-cmt-act.open svg { transform: rotate(180deg); }
 
 /* 楼中楼：左侧竖线表示从属关系 */
+/* 楼中楼：只有一层缩进。回复的回复已被拍平进同一个列表，
+   所以这里不再有随深度累加的 margin —— 那正是"画中画"的来源 */
 .st2s-cmt-replies {
-  margin: 9px 14px 0 16px;
-  padding-left: 11px;
+  margin: 11px 0 0;
+  padding: 0 0 0 11px;
   border-left: 1px solid var(--st2s-line);
-  display: flex; flex-direction: column; gap: 10px;
+  display: flex; flex-direction: column; gap: 12px;
 }
+.st2s-cmt-reply { display: flex; align-items: flex-start; gap: 8px; }
+.st2s-cmt-reply-av {
+  width: 20px; height: 20px;
+  flex-shrink: 0;
+  border-radius: 0;
+  object-fit: cover;
+  margin-top: 1px;
+}
+.st2s-cmt-reply-main { flex: 1; min-width: 0; }
 .st2s-cmt-reply .st2s-detail-cmt-name { font-size: 11px; }
-.st2s-cmt-reply .st2s-detail-cmt-text { font-size: 12px; margin: 2px 0 4px; }
+.st2s-cmt-reply .st2s-detail-cmt-text { font-size: 12px; margin: 2px 0 3px; }
+.st2s-cmt-reply .st2s-detail-cmt-meta { font-size: 10px; }
 .st2s-cmt-replyto { color: var(--st2s-mention); }
 
 /* ----- 回复二级弹窗 ----- */
