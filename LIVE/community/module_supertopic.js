@@ -1663,6 +1663,7 @@ function submitSuperTopicReply() {
   st2sEarn(found.charId, 'comment');
   showToast('回复已发表', 'ok');
   rerenderSuperTopicDetail();
+  if (window.st2sGen) { try { window.st2sGen.replyToMyComment(found.post.id, val); } catch (e) {} }
 }
 window.closeSuperTopicReplyModal = closeSuperTopicReplyModal;
 window.renderSuperTopicReplyModal = renderSuperTopicReplyModal;
@@ -1989,6 +1990,8 @@ function submitSuperTopicComment() {
   st2sEarn(found.charId, 'comment');
   showToast('评论已发表', 'ok');
   rerenderSuperTopicDetail();
+  // 自己开口了不能沉底：后台叫模型派几个人来接这句
+  if (window.st2sGen) { try { window.st2sGen.replyToMyComment(found.post.id, val); } catch (e) {} }
 }
 
 window.submitSuperTopicComment = submitSuperTopicComment;

@@ -35,6 +35,18 @@
   function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
   function roster() { try { return window.getAvailableCharsList() || []; } catch (e) { return []; } }
   function charNames() { return roster().map(c => String(c.name || '').trim()).filter(Boolean); }
+  // 禁用名 = 全部角色名 + 当前用户名。
+  // 冒名顶替真人用户比冒名角色更恶劣：角色是虚构的，用户是被冒充的那一个。
+  function meName() {
+    try { return String((typeof window.getCurrentUser === 'function' && window.getCurrentUser() || {}).name || '').trim(); }
+    catch (e) { return ''; }
+  }
+  function forbiddenNames() {
+    const list = charNames();
+    const me = meName();
+    if (me && list.indexOf(me) < 0) list.push(me);
+    return list;
+  }
   function findCharByName(n) {
     const key = String(n || '').trim();
     if (!key) return null;
@@ -74,13 +86,24 @@
   // 完全等于任一角色名 → 直接弃用重造；含角色名 → 剥掉后太短也重造。
   function sanitizeNpcName(raw) {
     let n = String(raw || '').trim().slice(0, 24);
-    const names = charNames();
+    const names = forbiddenNames();
     if (!n) return pick(NPC_POOL);
-    // 只要含任一角色名就整条重造：剥掉名字会留下「的老粉」这种残渣，
+    // 只要含任一禁用名就整条重造：剥掉名字会留下「的老粉」这种残渣，
     // 而这类昵称本身就是假本人的变体，不该留
     if (names.some(cn => n === cn || n.indexOf(cn) >= 0)) return pick(NPC_POOL);
     if (n.length < 2) return pick(NPC_POOL);
     return n;
+  }
+
+  // ── 出场角色：从全名单随机挑，不局限本超话 ─────────────────────
+  // 超话是平台广场：某位角色跑到别人地盘留一句话，才是生态。
+  function pickAppearingChar(owner, prob) {
+    if (Math.random() >= (prob === undefined ? 0.3 : prob)) return null;
+    const list = roster();
+    if (!list.length) return null;
+    if (Math.random() < 0.6) return owner;          // 六成本超话那位
+    const others = list.filter(c => String(c.id) !== String(owner.id));
+    return others.length ? pick(others) : owner;    // 四成来串门
   }
 
   // ── 上下文：候选名单 + 世界书 + 各 char 人设 + 实时语境 ────
@@ -213,34 +236,57 @@
     const existing = (post.commentTree || []).slice(0, 12)
       .map(c => `${c.user || c.name}：${String(c.text || '').slice(0, 30)}`).join('\n');
 
-    // 本人是否下场：当前超话帖 40% 概率
-    const charJoins = opts.charJoins !== undefined ? !!opts.charJoins : (Math.random() < 0.4);
+    // 30% 概率有角色本人下场；是谁，从全名单随机挑
+    const appearing = (opts.appearingChar !== undefined)
+      ? opts.appearingChar
+      : (opts.focusMyComment ? null : pickAppearingChar(ownerChar, 0.3));
     const me = (typeof window.getCurrentUser === 'function' && window.getCurrentUser()) || {};
+    const guest = appearing && String(appearing.id) !== String(ownerChar.id);
+    const allNames = charNames().join('、');
 
     const extra = [
       `【帖子所在超话】#${ownerChar.name}超话#`,
       `【帖子作者(楼主)】${authorName}`,
-      `【本人是否下场】` + (charJoins
-        ? `本次允许 ${ownerChar.name} 本人在评论区出现，最多 1~2 条，用 isChar:true 标记，`
-          + 'user 原样填他的名字。他话很少很短，不解释自己，不挨个道谢，可能只留一句就走。'
-        : `本次 ${ownerChar.name} 本人不出场：所有评论 isChar 必须为 false，`
-          + '且任何昵称都不得等于他的名字。'),
-      `【楼主是否下场】允许楼主本人下场回几条，用 isAuthor:true 标记。`,
-      me.name ? `【当前用户】${me.name}（可出现 0~1 条，出现时语气跟对别人一样，不必被特殊对待）` : '',
+      `【在场角色】这些人是本广场的网友都认识的公众人物，提到时直接叫名字：${allNames}`,
+      `【本人是否下场】` + (appearing
+        ? `本次 ${appearing.name} 会在评论区出现 1~2 条，用 isChar:true 标记，`
+          + `user 原样填「${appearing.name}」。他话很少很短，不解释自己，不挨个道谢。`
+          + (guest
+              ? `重点：他不是本超话（${ownerChar.name}）的人，是跑到别人地盘串门的 —— `
+                + `必须有人对这件事本身做出反应：「你怎么跑这儿来了」、「抓到了」、`
+                + `「你俩认识？」、有人开始磕、有人怀疑走错门、有人喊截图。`
+                + `这些反应比他说什么更重要，而他本人一句不解释。`
+              : `他是本超话的主角，他出现本身就是大事：有人不敢相信、有人喊截图、`
+                + `有人故意装没看见、有人怀疑是运营顶号。`)
+        : `本次没有任何角色本人出现：所有评论 isChar 必须为 false，`
+          + '且任何昵称都不得等于名单里任何一个角色的名字。'),
+      `【楼主是否下场】允许楼主本人下场回几条，用 isAuthor:true 标记。`
+        + `但注意：“楼主”不是日常称呼，网友直接打 ID 或者说“你”。`,
+      me.name ? `【当前用户】${me.name}。他可能已在下方已有评论里发过言。`
+        + `本次允许他再出现 0~1 条；只要他出现，就必须有别的网友回复他、@ 他、`
+        + `或者接他的话 —— 把他当空气是最不能接受的。` : '',
       `【帖子正文】\n${post.content || ''}`,
       post.imageDesc ? `【帖子配图说明】${post.imageDesc}` : '',
       existing ? `【已有评论，新评论必须与之衔接、不得重复语气与观点】\n${existing}` : '',
-      opts.more
+      opts.focusMyComment
+        ? `【本次任务】当前用户 ${me.name} 刚在这条帖子下发了一条评论：`
+          + `「${opts.focusMyComment}」。生成 4~8 条围着他这句话的回应：`
+          + `必须至少 2 条 replyTo 指向 ${me.name}，可以是接话、反驳、补充、`
+          + `把话带偏、或者只是笑一下。不许把他当空气，也不许一味附和。`
+          + `其余楼层可以继续聊帖子本身。`
+        : (opts.more
         ? `【本次任务】这条帖子已有评论区，请新增 20~30 条评论（含楼中楼）。`
           + '时间必须晚于已有评论；新评论既可以开新楼，也可以挂在上面「已有评论」里的某条下面'
           + '（replyTo 直接指向那些旧昵称）。允许出现新话题、新分歧、以及旧评论的后续。'
-        : `【本次任务】这是新帖，生成约 20 条评论（含楼中楼）。`
+        : `【本次任务】这是新帖，生成约 20 条评论（含楼中楼）。`)
     ].filter(Boolean).join('\n\n');
 
     const res = await window.aiGenerate({
       characterId: String(ownerChar.characterId || ownerChar.id),
       appTags: ['supertopic'],
-      presetIds: ['luma_st_comment_tree', 'luma_st_comments_protocol'],
+      // ③ 必须一起点名：梗密度与 AI 口癖黑名单写在 ③ 里，
+      // 只给 ⑤⑥ 的话，那套要求永远作用不到评论区
+      presetIds: ['luma_st_voice_corpus', 'luma_st_comment_tree', 'luma_st_comments_protocol'],
       instruction: await st2sBuildContext(ownerChar, extra)
     });
     const parsed = window.extractJsonFromText && res && res.text
@@ -267,7 +313,8 @@
     post.commentTree.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     post.stats = post.stats || {};
     post.stats.comments = countComments(post.commentTree);
-    return { added: made.length, charJoined: flatten(made, []).some(c => c.isChar) };
+    const who = flatten(made, []).find(c => c.isChar);
+    return { added: made.length, charJoined: !!who, charName: who ? who.user : '' };
   }
 
   // ── 生图（可选，约三成）──────────────────────────────────
@@ -306,8 +353,9 @@
       const extra = [
         st2sAvoidEcho(),
         `【本次任务】生成 5~7 条超话帖子（具体几条你定），primaryTag 从候选名单里自由分配，`
-        + '不必都落在锚定超话上。作者也可以是名单里的 char 本人（用 author.isChar 标记），'
-        + '他既能在自己超话发，也能去别人的超话发。comments 一律给空数组。'
+        + '不必都落在锚定超话上。约三成帖子由名单里的角色本人亲自发出'
+        + '（author.isChar 标记）—— 是谁随机，他可以去别人超话发，也可以在自己超话发。'
+        + 'comments 一律给空数组。'
       ].filter(Boolean).join('\n\n');
 
       const res = await window.aiGenerate({
@@ -344,7 +392,7 @@
         } else {
           aName = sanitizeNpcName(ar.name);
           aAvatar = npcAvatar(aName);
-          aBadge = (typeof ar.badge === 'string' && ar.badge && charNames().indexOf(ar.badge) < 0)
+          aBadge = (typeof ar.badge === 'string' && ar.badge && forbiddenNames().indexOf(ar.badge) < 0)
             ? ar.badge : pick(BADGE_POOL);
           aVerified = !!ar.verified;
         }
@@ -411,7 +459,7 @@
       const r = await st2sGenCommentSet(owner, found.post, { more: true });
       if (!r.added) { toast('这次没生成出评论，再试一次', 'warn'); return; }
       window.st2sStore.save(found.post);
-      toast(`新增 ${r.added} 条评论` + (r.charJoined ? ' · 本人来了' : ''), 'ok');
+      toast(`新增 ${r.added} 条评论` + (r.charName ? ` · ${r.charName} 来了` : ''), 'ok');
     } catch (e) {
       console.error('[st2s] 追加评论失败:', e);
       toast('生成失败，请重试', 'warn');
@@ -437,9 +485,25 @@
     } catch (e) { console.warn('[st2s] 用户帖回应生成失败:', e); }
   }
 
+  // 用户自己发了条评论 → 必须有人接话，不能让他沉底
+  async function st2sReplyToMyComment(postId, myText) {
+    const found = (typeof window.findSuperTopicPost === 'function') ? window.findSuperTopicPost(postId) : null;
+    if (!found) return;
+    const owner = roster().find(c => String(c.id) === String(found.charId));
+    if (!owner) return;
+    try {
+      const r = await st2sGenCommentSet(owner, found.post, { more: true, focusMyComment: String(myText || '').slice(0, 120) });
+      if (r.added) {
+        window.st2sStore.save(found.post);
+        if (typeof window.rerenderSuperTopicDetail === 'function') window.rerenderSuperTopicDetail();
+      }
+    } catch (e) { console.warn('[st2s] 评论回应生成失败:', e); }
+  }
+
   window.st2sGen = {
     feed: st2sGenFeed,
     moreComments: st2sGenMoreComments,
+    replyToMyComment: st2sReplyToMyComment,
     respondToUserPost: st2sRespondToUserPost,
     isBusy: function (postId) { return postId ? !!busy.posts[postId] : busy.feed; },
     // 供渲染层判定「这条是不是本人 / 是不是我」，以及取真实头像
