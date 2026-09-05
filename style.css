@@ -3427,9 +3427,26 @@ input:checked + .switch-slider:before {
 .st2s-sec {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  gap: 8px;
   padding: 12px 0 8px;
 }
+/* note 靠右、动作键贴最右；没有动作键时与原来 space-between 效果一致 */
+.st2s-sec .note { margin-left: auto; }
+.st2s-sec.is-inner { padding: 16px 0 8px; }
+.st2s-sec-act {
+  margin-left: 2px;
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--st2s-line-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--st2s-ink-soft);
+  cursor: pointer;
+  align-self: center;
+  flex-shrink: 0;
+}
+.st2s-sec-act svg { width: 12px; height: 12px; }
+.st2s-sec-act:active { transform: scale(.94); }
 .st2s-sec h4 {
   font-size: 11.5px;
   font-weight: 500;
@@ -5698,22 +5715,21 @@ input:checked + .switch-slider:before {
 
 /* ====== 超话 5 个新 tab 模板 + 帖子详情页 ====== */
 
-/* 侧栏 tab 锁定态 (管理 Lv<50) */
+/* 侧栏 tab 锁定态（发帖 Lv<10 / 管理 Lv<50）
+   导航项用淡化表达"进不去"是合适的，和内容按键的灰度不是一回事 */
 .st2s-side-tab.is-locked {
-  opacity: 0.35;
-  filter: grayscale(0.6);
+  opacity: 0.38;
   cursor: not-allowed;
 }
-.st2s-side-tab.is-locked .st2s-side-tab-lb::before {
-  content: '';
-  display: inline-block;
-  width: 8px; height: 8px;
-  margin-right: 3px;
-  vertical-align: middle;
-  background: var(--st2s-ink-mute);
-  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'><rect x='3' y='11' width='18' height='11' rx='2'/><path d='M7 11V7a5 5 0 0 1 10 0v4'/></svg>") no-repeat center/contain;
-  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'><rect x='3' y='11' width='18' height='11' rx='2'/><path d='M7 11V7a5 5 0 0 1 10 0v4'/></svg>") no-repeat center/contain;
+.st2s-side-tab { position: relative; }
+.st2s-side-tab-lock {
+  position: absolute;
+  right: 3px; top: 4px;
+  width: 9px; height: 9px;
+  color: var(--st2s-ink-mute);
+  pointer-events: none;
 }
+.st2s-side-tab-lock svg { width: 100%; height: 100%; }
 
 /* 通用表单容器 (规则/举报/发帖/管理 共用底) */
 .st2s-form,
@@ -5997,95 +6013,217 @@ input:checked + .switch-slider:before {
 }
 .st2s-refresh-result .ok { color: #059669; }
 
-/* ----- 管理 ----- */
-.st2s-manage-card {
+
+/* ═════ 等级与权限 ═════ */
+
+/* hero 标题旁的等级徽章 */
+.st2s-lv {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 1px 6px;
+  border: 1px solid var(--st2s-line-soft);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--st2s-ink-soft);
+  vertical-align: 2px;
+  letter-spacing: 0.02em;
+}
+.st2s-lv.is-off { color: var(--st2s-ink-mute); }
+
+/* 升级进度条（hero 与管理面板共用） */
+.st2s-lvbar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--st2s-line);
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--st2s-ink-mute);
+}
+.st2s-lvbar .lb {
+  min-width: 18px;
+  color: var(--st2s-ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.st2s-lvbar .track {
+  position: relative;
+  flex: 1;
+  height: 2px;
+  background: var(--st2s-line-soft);
+}
+.st2s-lvbar .track i {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: var(--st2s-ink-soft);
+  transition: width .3s ease;
+}
+.st2s-lvbar .tip { font-variant-numeric: tabular-nums; }
+.st2s-lvbar.is-off { justify-content: flex-start; }
+
+/* 详情页作者行右侧工具键（小铅笔 / 垃圾桶） */
+.st2s-detail-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding-top: 2px;
+}
+.st2s-tool-btn {
+  width: 26px; height: 26px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--st2s-line-soft);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--st2s-ink-soft);
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, transform .15s ease;
+}
+.st2s-tool-btn svg { width: 13px; height: 13px; }
+.st2s-tool-btn:active { transform: scale(.92); }
+.st2s-tool-btn.is-danger { color: #b4423f; border-color: rgba(180, 66, 63, 0.22); }
+
+/* 评论行的删除键：与「回复」同尺寸，只有颜色区分 */
+.st2s-cmt-act.is-danger { color: #b4423f; }
+.st2s-cmt-act.is-danger svg { width: 12px; height: 12px; vertical-align: -2px; }
+
+/* 无发言权限时替代输入框的说明条 */
+.st2s-detail-locknote {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 14px 11px 16px;
+  margin: 0 -14px 0 -16px;
+  border-top: 1px solid var(--st2s-line-soft);
+  border-bottom: 1px solid var(--st2s-line-soft);
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--st2s-ink-mute);
+}
+.st2s-detail-locknote svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+/* ── 管理面板：等级卡 + 权限阶梯 ── */
+.st2s-lvcard {
+  padding: 12px 14px 12px 16px;
   background: #fff;
   border: 1px solid var(--st2s-line);
   border-radius: 12px;
-  padding: 12px 14px;
-  transition: background .15s ease;
 }
-.st2s-manage-card:active { background: var(--st2s-line-soft); }
-.st2s-manage-ic {
-  width: 36px; height: 36px;
-  border-radius: 10px;
-  background: var(--st2s-rose-soft);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
+.st2s-lvcard-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
 }
-.st2s-manage-ic svg { width: 18px; height: 18px; color: var(--st2s-rose); }
-.st2s-manage-card .t {
-  font-size: 13px;
-  font-weight: 900;
-  color: var(--st2s-ink);
-}
-.st2s-manage-card .d {
-  font-size: 11px;
+.st2s-lvcard-top .big {
+  font-size: 20px;
   font-weight: 500;
-  color: var(--st2s-ink-mute);
-  margin-top: 1px;
+  color: var(--st2s-ink);
+  letter-spacing: -0.01em;
 }
-.st2s-manage-card .badge {
-  margin-left: auto;
+.st2s-lvcard-top .cur { font-size: 11px; color: var(--st2s-ink-mute); }
+.st2s-lvcard .st2s-lvbar { margin-top: 10px; padding-top: 9px; }
+
+/* 权限阶梯行：达标的高亮，未达标的只把门槛写在右边 */
+.st2s-tier {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px 10px 16px;
+  margin: 0 -14px 0 -16px;
+  border-top: 1px solid var(--st2s-line-soft);
+}
+.st2s-tier:first-of-type { border-top: 0; }
+.st2s-tier-main { flex: 1; min-width: 0; }
+.st2s-tier .t {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--st2s-ink);
+  margin-bottom: 2px;
+}
+.st2s-tier .d {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 400;
+  color: var(--st2s-ink-soft);
+  line-height: 1.5;
+}
+.st2s-tier-gate {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 400;
   color: var(--st2s-ink-mute);
   font-variant-numeric: tabular-nums;
 }
+.st2s-tier-gate svg { width: 13px; height: 13px; }
+.st2s-tier.is-on .st2s-tier-gate { color: var(--st2s-ink-soft); }
+.st2s-tier.is-on .st2s-tier-gate svg { color: #3f7d5c; }
+.st2s-tier.is-act { cursor: pointer; }
+.st2s-tier.is-act:active { background: var(--st2s-line-soft); }
+.st2s-tier.is-idle { opacity: .55; }
 
-.st2s-manage-locked {
+/* 补签卡：唯一来源是角色赠送，聊天链路做完前恒为 0 */
+.st2s-cardpass {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 36px 20px;
-  text-align: center;
-}
-.st2s-manage-lock-ic {
-  width: 64px; height: 64px;
-  border-radius: 18px;
-  background: var(--st2s-line-soft);
-  display: grid;
-  place-items: center;
-  margin-bottom: 4px;
-}
-.st2s-manage-lock-ic svg { width: 28px; height: 28px; color: var(--st2s-ink-mute); }
-.st2s-manage-lock-t {
-  font-size: 15px;
-  font-weight: 900;
-  color: var(--st2s-ink);
-}
-.st2s-manage-lock-d {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--st2s-ink-soft);
-  line-height: 1.6;
-  max-width: 240px;
-}
-.st2s-manage-lock-d b { color: var(--st2s-rose); font-weight: 900; }
-.st2s-manage-lock-tip {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--st2s-ink-mute);
-  background: var(--st2s-line-soft);
-  padding: 5px 10px;
-  border-radius: 6px;
-}
-.st2s-manage-lock-btn {
-  margin-top: 6px;
-  padding: 9px 18px;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--st2s-line);
   border-radius: 10px;
-  background: var(--st2s-ink);
-  color: #fff;
+  background: transparent;
+}
+.st2s-cardpass-l { flex: 1; min-width: 0; }
+.st2s-cardpass-l b {
+  display: block;
   font-size: 12px;
-  font-weight: 900;
-  border: none;
+  font-weight: 500;
+  color: var(--st2s-ink);
+  margin-bottom: 2px;
+}
+.st2s-cardpass-l span {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--st2s-ink-mute);
+  line-height: 1.5;
+}
+.st2s-cardpass-btn {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border: 1px solid var(--st2s-line-soft);
+  border-radius: 9px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--st2s-ink-soft);
   cursor: pointer;
 }
+.st2s-cardpass-btn:active { transform: scale(.96); }
+
+/* ── 通用弹窗补充：正文说明 / 高文本域 / 危险确认 ── */
+.st2s-modal-msg {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--st2s-ink-soft);
+  line-height: 1.7;
+  padding: 2px 0 4px;
+}
+.st2s-modal-msg b { font-weight: 500; color: var(--st2s-ink); }
+.st2s-modal-note {
+  margin-top: 8px;
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--st2s-ink-mute);
+  line-height: 1.55;
+}
+.st2s-modal-ta.is-tall { min-height: 210px; font-size: 11.5px; line-height: 1.7; }
+.st2s-modal-ok.is-danger { border-color: #b4423f; color: #b4423f; }
 
 /* ----- 帖子详情页 (同面板) ----- */
 .st2s-detail-bar {

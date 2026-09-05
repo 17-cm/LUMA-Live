@@ -93,7 +93,8 @@ function topicPostsFor(char) {
     (p.tag && p.tag.includes(char.name)) || (p.mention && p.mention.includes(char.name))
   );
   const user = (window.__SUPERTOPIC_POSTS__ || {})[char.id] || [];
-  return user.concat(fromFeed);
+  // 管理员删过的帖子（含 weiboPosts 种子帖）靠墓碑过滤，重启也不会复活
+  return user.concat(fromFeed).filter(p => !st2sIsDeletedPost(p.id));
 }
 function getAvatarFor(name, seed) {
   try { return window.getAvatar ? window.getAvatar(name, seed || 'first') : ''; } catch (e) { return ''; }
@@ -175,6 +176,7 @@ function renderSuperTopicView(charId = null) {
   const fansCount = (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function')
     ? window.LumaFansManager.getFans(char.id, char) : (char.fans || 0);
   const contribution = getCharContribution(char.id);
+  const lvInfo = st2sLevelInfo(char.id);
   const topicPosts = topicPostsFor(char);
   const todayDiscuss = topicPosts.length + 18;
   const heatValue = (fansCount * 3 + contribution).toLocaleString();
@@ -207,12 +209,15 @@ function renderSuperTopicView(charId = null) {
         <div class="st2s-side-divider"></div>
         ${tabOrder.map(k => {
           const c = tabCfg[k];
-          const checkIn = getCheckIn(char.id);
-          const userLevel = (checkIn && checkIn.level) || 1;
-          const isLocked = (k === 'manage' && userLevel < 50);
-          return `<button id="spTabBtn_${k}" onclick="switchSuperTopicTab('${k}')" class="st2s-side-tab ${currentSuperTopicTab === k ? 'on' : ''} ${isLocked ? 'is-locked' : ''}" title="${c.label}">
+          // 锁由权限表推导：发帖要 Lv.10，管理要 Lv.50
+          const perm = (k === 'compose') ? 'post' : (k === 'manage') ? 'manage' : null;
+          const need = perm ? ST2S_PERMS[perm].lv : 0;
+          const isLocked = !!perm && lvInfo.level < need;
+          const tip = isLocked ? `${c.label} · 需 Lv.${need}` : c.label;
+          return `<button id="spTabBtn_${k}" onclick="switchSuperTopicTab('${k}')" class="st2s-side-tab ${currentSuperTopicTab === k ? 'on' : ''} ${isLocked ? 'is-locked' : ''}" title="${tip}">
             ${c.ic}
             <span class="st2s-side-tab-lb">${c.label}</span>
+            ${isLocked ? `<span class="st2s-side-tab-lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>` : ''}
           </button>`;
         }).join('')}
       </aside>
@@ -227,7 +232,7 @@ function renderSuperTopicView(charId = null) {
               ${char.isLive ? '<span class="st2s-live"></span>' : ''}
             </button>
             <div class="st2s-hero-meta">
-              <h2>#${char.name}超话#<span class="st2s-verified" title="官方"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></h2>
+              <h2>#${char.name}超话#<span class="st2s-verified" title="官方"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span><span class="st2s-lv ${isFollowed ? '' : 'is-off'}" title="${isFollowed ? '每 ' + lvInfo.perLevel.toLocaleString() + ' 贡献升 1 级' : '关注后开启等级'}">${isFollowed ? 'Lv.' + lvInfo.level : '未关注'}</span></h2>
               <p>${char.category || '明星超话'} · 主持人 @${char.name}后援会</p>
             </div>
             <button onclick="handleSuperTopicFollow('${char.name.replace(/'/g, "\\'")}')" class="st2s-follow ${isFollowed ? 'is-on' : ''}">
@@ -240,6 +245,15 @@ function renderSuperTopicView(charId = null) {
             <div><span>我的贡献</span><b>${contribution.toLocaleString()}</b></div>
             <div><span>超话热度</span><b>${heatValue}</b></div>
           </div>
+          ${isFollowed ? `
+          <div class="st2s-lvbar">
+            <span class="lb">Lv.${lvInfo.level}</span>
+            <span class="track"><i style="width:${lvInfo.pct}%"></i></span>
+            <span class="tip">再 ${lvInfo.need.toLocaleString()} 贡献升 Lv.${lvInfo.level + 1}</span>
+          </div>` : `
+          <div class="st2s-lvbar is-off">
+            <span class="tip">关注本超话后开启等级与发言权限</span>
+          </div>`}
         </section>
 
         <!-- meta · 短句行 + 当前 tab 标签 (在主区顶) -->
@@ -262,6 +276,12 @@ window.renderSuperTopicView = renderSuperTopicView;
 // 分段导航切换 (侧边栏 tab)
 // -------------------------------------------------------------------------
 function switchSuperTopicTab(tabKey) {
+  // 锁住的 tab 不切换，只提示门槛
+  const chGuard = getActiveChar();
+  if (chGuard) {
+    const permMap = { compose: 'post', manage: 'manage' };
+    if (permMap[tabKey] && !st2sGuard(chGuard.id, permMap[tabKey])) return;
+  }
   superTopicDetailPostId = null;
   currentSuperTopicTab = tabKey;
 
@@ -383,11 +403,28 @@ window.renderSuperTopicPostsTab = renderSuperTopicPostsTab;
 // -------------------------------------------------------------------------
 // 签到 Tab（一天一次，贡献值+100、应援币+100，真实连续天数）
 // -------------------------------------------------------------------------
+// 补签卡：数量与来源都留好接口，等聊天链路做完直接接上
+function st2sCardPassCount(charId) {
+  try {
+    const m = (window.LumaCheckinManager && window.LumaCheckinManager.cardPass) || null;
+    return (m && Number(m[String(charId)])) || 0;
+  } catch (e) { return 0; }
+}
+function st2sUseCardPass(charId) {
+  const n = st2sCardPassCount(charId);
+  if (!n) { showToast('还没有补签卡 · 只能由角色在聊天中赠送', 'warn'); return; }
+  showToast('补签功能待聊天链路开放后启用', 'warn');
+}
+window.st2sCardPassCount = st2sCardPassCount;
+window.st2sUseCardPass = st2sUseCardPass;
+
 function renderSuperTopicCheckinTab(char) {
   const panel = document.getElementById('superTopicPanel');
   if (!panel) return;
   const checkIn = getCheckIn(char.id);
   const contribution = getCharContribution(char.id);
+  const lv = st2sLevelInfo(char.id);
+  const cards = st2sCardPassCount(char.id);
   const today = new Date();
   const dayOfWeek = today.getDay() === 0 ? 6 : today.getDay() - 1;
   const weekDays = ['一', '二', '三', '四', '五', '六', '日'];
@@ -430,9 +467,18 @@ function renderSuperTopicCheckinTab(char) {
           <span>累计</span>
         </div>
         <div>
-          <b>Lv.${checkIn.level || 1}</b>
+          <b>Lv.${lv.level}</b>
           <span>超话等级</span>
         </div>
+      </div>
+
+      <!-- 补签卡：唯一来源是角色在聊天中赠送，聊天链路未开放前恒为 0 -->
+      <div class="st2s-cardpass">
+        <div class="st2s-cardpass-l">
+          <b>补签卡 ${cards} 张</b>
+          <span>唯一获取途径：${char.name} 本人在聊天中赠送, 收到后自动到账</span>
+        </div>
+        <button type="button" class="st2s-cardpass-btn" onclick="st2sUseCardPass('${char.id}')">使用</button>
       </div>
     </section>
 
@@ -608,6 +654,7 @@ window.renderSuperTopicContributeTab = renderSuperTopicContributeTab;
 // 签到执行（真正的持久化 + 贡献/应援币发放 + 真实天数）
 // -------------------------------------------------------------------------
 function handleSuperTopicCheckIn(charId, charName = '') {
+  if (!st2sGuard(charId, 'checkin')) return;
   if (!window.LumaCheckinManager || typeof window.LumaCheckinManager.performCheckIn !== 'function') {
     if (api && api.ui) api.ui.toast('签到系统未就绪，请稍后再试');
     return;
@@ -628,18 +675,19 @@ function handleSuperTopicCheckIn(charId, charName = '') {
   }
   const data = res.data || {};
 
-  // 签到贡献 +100
-  let nextContribution = 0;
-  try { nextContribution = window.addCharContributionScore(topicId, 100) || 0; } catch (e) {}
+  // 签到计入贡献（产出见 ST2S_EARN）
+  const earned = st2sEarn(topicId, 'checkin');
+  const nextContribution = getCharContribution(topicId);
 
   if (api && api.ui) {
-    api.ui.toast(`🎉 签到成功！贡献 +100 · 已连续签到第 ${data.streakDays || 1} 天！`);
+    api.ui.toast(`🎉 签到成功！贡献 +${(ST2S_EARN.checkin).toLocaleString()} · 已连续签到第 ${data.streakDays || 1} 天！`);
   }
   if (window.LumaDataHub) { try { window.LumaDataHub.emit('checkin', { targetKey: topicId, storeData: data }); } catch (e) {} }
   if (typeof window.notifyCommunityDataChanged === 'function') { try { window.notifyCommunityDataChanged('checkin', { targetKey: topicId }); } catch (e) {} }
 
-  // 若正在超话视图，刷新当前面板
-  renderSuperTopicTab();
+  // 升级了要连 hero 的等级条一起刷，只刷面板会看不到变化
+  if (earned && earned.after > earned.before) renderSuperTopicView(currentActiveSuperTopicCharId);
+  else renderSuperTopicTab();
 }
 window.handleSuperTopicCheckIn = handleSuperTopicCheckIn;
 
@@ -649,6 +697,7 @@ window.handleSuperTopicCheckIn = handleSuperTopicCheckIn;
 function executeSupportGift() {
   const char = getActiveChar();
   if (!char) return;
+  if (!st2sGuard(char.id, 'support')) return;
   const gift = (window.SUPPORT_GIFTS || []).find(g => g.id === selectedSupportGiftId) || (window.SUPPORT_GIFTS || [])[0];
   if (!gift) return;
 
@@ -930,6 +979,7 @@ window.clearComposeImage = clearComposeImage;
 async function submitSuperTopicPost(charId) {
   const char = (window.getAvailableCharsList() || []).find(c => String(c.id) === String(charId));
   if (!char) return;
+  if (!st2sGuard(charId, 'post')) return;
   const content = (document.getElementById('cpContent') && document.getElementById('cpContent').value || '').trim();
   if (!content) { showToast('正文不能为空', 'warn'); return; }
   const subTag = (document.getElementById('cpSubTag') && document.getElementById('cpSubTag').value || '').trim();
@@ -976,9 +1026,10 @@ async function submitSuperTopicPost(charId) {
   if (window.LumaDataHub && typeof window.LumaDataHub.put === 'function') {
     try { window.LumaDataHub.put('super_topic_posts', post.id, post); } catch (_) {}
   }
+  st2sEarn(char.id, 'post');
   showToast('发布成功', 'ok');
   currentSuperTopicTab = 'posts';
-  renderSuperTopicTab();
+  renderSuperTopicView(char.id);   // 贡献变了，等级条要一起刷
 }
 window.submitSuperTopicPost = submitSuperTopicPost;
 
@@ -1014,15 +1065,15 @@ window.submitSuperTopicPost = submitSuperTopicPost;
 // 规则 Tab
 // -------------------------------------------------------------------------
 const SUPERTOPIC_RULES = [
-  { n: '01', t: '粉丝专属', d: '本超话仅对 #${name}# 的粉丝开放签到、打榜、发帖功能, 请先关注主播。' },
+  { n: '01', t: '粉丝专属', d: '未关注本超话时只能浏览动态与帖子详情, 不能点赞、评论、签到、应援或发帖; 点右上角「+ 关注」即可解锁发言。' },
   { n: '02', t: '内容规范', d: '禁止发布: 色情、暴力、谣言、抄袭、人身攻击、引战、刷屏、广告外链等违规内容。' },
   { n: '03', t: '图片规范', d: '上传图片必须与 ${name} 本人相关(直播截图、舞台照、应援物料等), 严禁盗图。' },
   { n: '04', t: '发言礼貌', d: '请尊重其他粉丝、不同意见请理性讨论; 严禁@主播本人催更、催播、催互动。' },
   { n: '05', t: '原创激励', d: '原创图文 / 视频 / 二创 / 应援打榜贴, 视内容质量给予 50 - 200 贡献值奖励。' },
-  { n: '06', t: '等级权限', d: 'Lv.1 - 9: 签到 / 浏览; Lv.10 - 49: 发帖 / 评论; Lv.50+: 管理 / 删帖 / 移出。' },
+  { n: '06', t: '等级权限', d: '每 10000 贡献升 1 级, 各超话独立计算。产出: 签到 +5000 / 发帖 +8000 / 评论 +2000 / 送礼按价格 1:1。Lv.1(关注即得): 点赞 / 评论 / 签到 / 应援; Lv.10: 发帖; Lv.20: 编辑自己的帖子; Lv.50: 超话管理(删除任意帖子与评论、修改本守则)。' },
   { n: '07', t: '违规处理', d: '初犯: 警告 + 禁言 24h; 再犯: 永久禁言 + 移出超话; 严重者上报平台封号。' },
   { n: '08', t: '申诉通道', d: '如对处理有异议, 请通过侧栏「举报」旁的反馈通道联系 @${name}后援会会长。' },
-  { n: '09', t: '签到说明', d: '每日 00:00 重置, 连续签到不满 7 天不清零但断签会重新计数; 补签卡每月限用 3 张。' },
+  { n: '09', t: '签到说明', d: '每日 00:00 重置, 断签会重新计数, 签到贡献 +5000。补签卡唯一获取途径是 ${name} 本人在聊天中赠送, 平台不对外发放, 收到后会自动出现在这里。' },
   { n: '10', t: '应援规范', d: '打榜送礼纯属自愿, 严禁任何形式的集资、垫付、攀比晒单; 未成年人请在监护人同意下参与。' },
   { n: '11', t: '发帖分类', d: '发帖请至少带一个副 tag 标明内容类型(如 #日常# #攻略# #二创#), 便于他人检索与版务归档。' },
   { n: '12', t: '转载注明', d: '搬运二创必须注明原作者与出处链接, 未授权商用素材一律删除; 三次违规取消发帖权限。' },
@@ -1033,13 +1084,18 @@ const SUPERTOPIC_RULES = [
 function renderSuperTopicRulesTab(char) {
   const panel = document.getElementById('superTopicPanel');
   if (!panel) return;
-  const rules = SUPERTOPIC_RULES.map(r => ({
+  const custom = st2sHasCustomRules(char.id);
+  const rules = st2sRulesFor(char.id, SUPERTOPIC_RULES).map(r => ({
     n: r.n, t: r.t, d: r.d.replace(/\$\{name\}/g, char.name)
   }));
+  const canManage = st2sCan(char.id, 'manage').ok;
   panel.innerHTML = `
     <div class="st2s-sec">
       <h4>超话守则</h4>
-      <span class="note">${rules.length} 条 · 适用于 #${char.name}超话#</span>
+      <span class="note">${rules.length} 条 · 适用于 #${char.name}超话#${custom ? ' · 已由版务修订' : ''}</span>
+      ${canManage ? `<button type="button" class="st2s-sec-act" title="修改守则" onclick="st2sEditRules('${char.id}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+      </button>` : ''}
     </div>
     <div class="st2s-rules">
       ${rules.map(r => `
@@ -1055,6 +1111,45 @@ function renderSuperTopicRulesTab(char) {
   `;
 }
 window.renderSuperTopicRulesTab = renderSuperTopicRulesTab;
+
+// 管理员改守则：一行一条，「标题 | 内容」，清空即回落默认
+function st2sEditRules(charId) {
+  if (!st2sGuard(charId, 'manage')) return;
+  const char = getCharById(charId);
+  if (!char) return;
+  const cur = st2sRulesFor(charId, SUPERTOPIC_RULES)
+    .map(r => r.t + ' | ' + r.d.replace(/\$\{name\}/g, char.name)).join('\n');
+  st2sOpenModal({
+    title: '修改超话守则',
+    textarea: true,
+    tall: true,
+    value: cur,
+    maxlength: 6000,
+    hint: '每行一条，格式：标题 | 内容。全部清空并保存即恢复默认守则。',
+    ok: '保存',
+    onOk: function (val) {
+      const lines = String(val || '').split('\n').map(x => x.trim()).filter(Boolean);
+      if (!lines.length) {
+        st2sSaveRules(charId, null);
+        showToast('已恢复默认守则', 'ok');
+        renderSuperTopicRulesTab(char);
+        return;
+      }
+      const parsed = lines.map(function (ln, i) {
+        const at = ln.indexOf('|');
+        return {
+          n: String(i + 1).padStart(2, '0'),
+          t: (at >= 0 ? ln.slice(0, at) : ln).trim(),
+          d: (at >= 0 ? ln.slice(at + 1) : '').trim()
+        };
+      });
+      st2sSaveRules(charId, parsed);
+      showToast('守则已更新', 'ok');
+      renderSuperTopicRulesTab(char);
+    }
+  });
+}
+window.st2sEditRules = st2sEditRules;
 
 // -------------------------------------------------------------------------
 // 举报 Tab
@@ -1110,6 +1205,7 @@ function renderSuperTopicReportTab(char) {
 window.renderSuperTopicReportTab = renderSuperTopicReportTab;
 
 function submitSuperTopicReport(charId) {
+  if (!st2sGuard(charId, 'report')) return;
   const reason = (document.getElementById('rpReason') || {}).value;
   const desc = (document.getElementById('rpDesc') && document.getElementById('rpDesc').value || '').trim();
   const contact = (document.getElementById('rpContact') && document.getElementById('rpContact').value || '').trim();
@@ -1133,73 +1229,105 @@ window.submitSuperTopicReport = submitSuperTopicReport;
 function renderSuperTopicManageTab(char) {
   const panel = document.getElementById('superTopicPanel');
   if (!panel) return;
-  const checkIn = getCheckIn(char.id);
-  const userLevel = (checkIn && checkIn.level) || 1;
-  const unlocked = userLevel >= 50;
-  panel.innerHTML = unlocked ? `
+  const lvInfo = st2sLevelInfo(char.id);
+  const followed = st2sFollowed(char.id);
+  const tombCount = st2sTombCount();
+
+  // 权限阶梯：与 ST2S_PERMS 同源，面板只陈述规则，真正拦截在 st2sGuard
+  const tiers = [
+    { k: 'like',    t: '点赞',     d: '给他人帖子点赞' },
+    { k: 'comment', t: '评论',     d: '发表评论与回复' },
+    { k: 'checkin', t: '签到',     d: '每日签到, 贡献 +100' },
+    { k: 'support', t: '应援',     d: '送礼打榜, 贡献按 1:1 累计' },
+    { k: 'report',  t: '举报',     d: '举报违规内容' },
+    { k: 'post',    t: '发帖',     d: '发布新帖' },
+    { k: 'editOwn', t: '编辑',     d: '改自己帖子的正文 · 详情页小铅笔' },
+    { k: 'manage',  t: '超话管理', d: '删任意帖子与评论 · 垃圾桶 / 改守则 · 铅笔' }
+  ];
+  const rowHtml = tiers.map(x => {
+    const need = ST2S_PERMS[x.k].lv;
+    const ok = followed && lvInfo.level >= need;
+    const gate = !followed ? '需关注' : (need <= 1 ? '关注即得' : 'Lv.' + need);
+    return `
+      <div class="st2s-tier ${ok ? 'is-on' : ''}">
+        <div class="st2s-tier-main">
+          <div class="t">${x.t}</div>
+          <div class="d">${x.d}</div>
+        </div>
+        <div class="st2s-tier-gate">
+          ${ok ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
+          <span>${gate}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  panel.innerHTML = `
     <div class="st2s-sec">
-      <h4>超话管理</h4>
-      <span class="note">Lv.${userLevel} · 已解锁管理权限</span>
+      <h4>超话等级</h4>
+      <span class="note">每 ${lvInfo.perLevel.toLocaleString()} 贡献升 1 级 · 各超话独立计算</span>
     </div>
     <div class="st2s-manage">
-      <div class="st2s-manage-card">
-        <div class="st2s-manage-ic">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 5-3.5 7.5-8.5 9-5-1.5-8.5-4-8.5-9V5l8.5-3 8.5 3z"/></svg>
+      <div class="st2s-lvcard">
+        <div class="st2s-lvcard-top">
+          <span class="big">${followed ? 'Lv.' + lvInfo.level : '未解锁'}</span>
+          <span class="cur">${followed ? lvInfo.contrib.toLocaleString() + ' 贡献' : '关注本超话后开始累计'}</span>
         </div>
-        <div>
-          <div class="t">违规帖子</div>
-          <div class="d">最近 7 天 0 条待审</div>
-        </div>
-        <span class="badge">0</span>
+        ${followed ? `
+        <div class="st2s-lvbar">
+          <span class="lb">${lvInfo.level}</span>
+          <span class="track"><i style="width:${lvInfo.pct}%"></i></span>
+          <span class="tip">再 ${lvInfo.need.toLocaleString()} 升 Lv.${lvInfo.level + 1}</span>
+        </div>` : ''}
       </div>
-      <div class="st2s-manage-card">
-        <div class="st2s-manage-ic">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-3 3-2-2"/></svg>
-        </div>
-        <div>
-          <div class="t">用户管理</div>
-          <div class="d">Lv.1 入门 → Lv.50 资深, 共 ${userLevel} 级</div>
-        </div>
-        <span class="badge">·</span>
+
+      <div class="st2s-sec is-inner">
+        <h4>权限阶梯</h4>
+        <span class="note">${tiers.filter(x => followed && lvInfo.level >= ST2S_PERMS[x.k].lv).length} / ${tiers.length} 已解锁</span>
       </div>
-      <div class="st2s-manage-card">
-        <div class="st2s-manage-ic">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </div>
-        <div>
-          <div class="t">数据看板</div>
-          <div class="d">日活 / 帖子 / 签到 / 打榜</div>
-        </div>
-        <span class="badge">·</span>
+      ${rowHtml}
+
+      ${followed && lvInfo.level >= ST2S_PERMS.manage.lv ? `
+      <div class="st2s-sec is-inner">
+        <h4>管理操作</h4>
+        <span class="note">Lv.${ST2S_PERMS.manage.lv}+ 已解锁</span>
       </div>
-      <div class="st2s-manage-card">
-        <div class="st2s-manage-ic">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+      <div class="st2s-tier is-act" onclick="st2sEditRules('${char.id}')">
+        <div class="st2s-tier-main">
+          <div class="t">修改超话守则</div>
+          <div class="d">编辑后对本超话所有访客生效</div>
         </div>
-        <div>
-          <div class="t">超话设置</div>
-          <div class="d">封面 / 简介 / 主持人</div>
+        <div class="st2s-tier-gate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div>
+      </div>
+      <div class="st2s-tier is-act ${tombCount ? '' : 'is-idle'}" onclick="st2sRestoreTrash()">
+        <div class="st2s-tier-main">
+          <div class="t">回收站</div>
+          <div class="d">${tombCount ? '已删除 ' + tombCount + ' 项, 点此全部恢复' : '暂无已删除内容'}</div>
         </div>
-        <span class="badge">·</span>
-      </div>
-    </div>
-  ` : `
-    <div class="st2s-sec">
-      <h4>超话管理</h4>
-      <span class="note">Lv.${userLevel} / Lv.50 解锁</span>
-    </div>
-    <div class="st2s-manage-locked">
-      <div class="st2s-manage-lock-ic">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      </div>
-      <div class="st2s-manage-lock-t">管理权限未解锁</div>
-      <div class="st2s-manage-lock-d">当前 Lv.${userLevel}, 达到 <b>Lv.50</b> 后可管理本超话: 删帖 / 移人 / 看数据。</div>
-      <div class="st2s-manage-lock-tip">每日签到 / 发帖 / 打榜, 即可快速升级。</div>
-      <button onclick="switchSuperTopicTab('checkin')" class="st2s-manage-lock-btn">去签到攒经验</button>
+        <div class="st2s-tier-gate"><span>${tombCount || '0'}</span></div>
+      </div>` : ''}
     </div>
   `;
 }
 window.renderSuperTopicManageTab = renderSuperTopicManageTab;
+
+// 回收站：墓碑计数与一键恢复（管理员误删还有回头路）
+function st2sTombCount() {
+  try { const t = st2sTombStats(); return t.posts + t.comments; } catch (e) { return 0; }
+}
+function st2sRestoreTrash() {
+  if (!st2sTombCount()) { showToast('回收站是空的', 'warn'); return; }
+  st2sOpenModal({
+    title: '恢复已删除内容',
+    body: '将恢复全部 ' + st2sTombCount() + ' 项被删除的帖子与评论。',
+    ok: '恢复',
+    onOk: function () {
+      st2sRestoreAll();
+      showToast('已恢复', 'ok');
+      renderSuperTopicView(currentActiveSuperTopicCharId);
+    }
+  });
+}
+window.st2sRestoreTrash = st2sRestoreTrash;
 
 // -------------------------------------------------------------------------
 // 刷新 Tab: 重新渲染当前超话动态
@@ -1263,6 +1391,50 @@ function openSuperTopicPostDetail(postId) {
   renderSuperTopicTab();
 }
 window.openSuperTopicPostDetail = openSuperTopicPostDetail;
+
+// ── 管理员 / 楼主动作（按键只在达标后渲染出来，这里再兜一层校验）──
+function st2sRemovePost(postId) {
+  const found = findSuperTopicPost(postId);
+  if (!found || !st2sGuard(found.charId, 'manage')) return;
+  st2sConfirmDelete('帖子', () => {
+    st2sDeletePost(postId);
+    showToast('已删除该帖子', 'ok');
+    closePostDetail();
+  });
+}
+function st2sRemoveComment(postId, key) {
+  const found = findSuperTopicPost(postId);
+  if (!found || !st2sGuard(found.charId, 'manage')) return;
+  st2sConfirmDelete('评论', () => {
+    st2sDeleteComment(key);
+    showToast('已删除该评论', 'ok');
+    rerenderSuperTopicDetail();
+  });
+}
+function st2sEditPost(postId) {
+  const found = findSuperTopicPost(postId);
+  if (!found || !st2sGuard(found.charId, 'editOwn')) return;
+  const cur = String(found.post.content || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  st2sOpenModal({
+    title: '编辑正文',
+    textarea: true,
+    value: cur,
+    maxlength: 500,
+    hint: 'tag 与附图不可改动',
+    ok: '保存',
+    onOk: function (val) {
+      const v = (val || '').trim();
+      if (!v) { showToast('正文不能为空', 'warn'); return false; }
+      found.post.content = v;
+      persistSuperTopicPost(found);
+      showToast('已保存', 'ok');
+      rerenderSuperTopicDetail();
+    }
+  });
+}
+window.st2sRemovePost = st2sRemovePost;
+window.st2sRemoveComment = st2sRemoveComment;
+window.st2sEditPost = st2sEditPost;
 
 function closePostDetail() {
   if (typeof closeSuperTopicReplyModal === 'function') closeSuperTopicReplyModal();
@@ -1375,6 +1547,7 @@ function submitSuperTopicReply() {
   st2sExpandedComments.add(parent.id);   // 回完自动展开，让人看见自己那条
   closeSuperTopicReplyModal();
   persistSuperTopicPost(found);
+  st2sEarn(found.charId, 'comment');
   showToast('回复已发表', 'ok');
   rerenderSuperTopicDetail();
 }
@@ -1384,8 +1557,17 @@ window.submitSuperTopicReply = submitSuperTopicReply;
 
 function renderSuperTopicPostDetail(post, char) {
   st2sAssignCommentIds(post.commentTree, 'f');
-  const comments = post.commentTree || [];
-  const totalComments = st2sCountComments(comments);
+  // 评论的稳定 key（不随楼层位置变），管理员删过的直接过滤掉
+  const cKey = c => st2sCommentKey(post.id, c);
+  const alive = list => (list || []).filter(c => !st2sIsDeletedComment(cKey(c)));
+  const countAlive = list => alive(list).reduce((n, c) => n + 1 + countAlive(c.replies), 0);
+  const comments = alive(post.commentTree);
+  const totalComments = countAlive(post.commentTree);
+  // 按键可见性 = 权限等级：垃圾桶要 Lv.50，小铅笔要 Lv.20
+  const canManage = st2sCan(char.id, 'manage').ok;
+  const isMine = String(post.id).indexOf('st_post_') === 0;
+  const canEditOwn = isMine && st2sCan(char.id, 'editOwn').ok;
+  const cmtPerm = st2sCan(char.id, 'comment');
   const primaryTag = post.primaryTag || post.tag || ('#' + char.name + '超话#');
   const subTags = post.subTags || [];
   const mentions = (post.mentions && post.mentions.length) ? post.mentions : (post.mention ? [post.mention] : []);
@@ -1413,7 +1595,7 @@ function renderSuperTopicPostDetail(post, char) {
     const cAvatar = c.avatar || (window.getAvatar ? window.getAvatar(cName, 'emoji') : '');
     const cText = c.text || c.content || '';
     const cTime = c.time || (c.createdAt ? (window.formatDynamicTime ? window.formatDynamicTime(c.createdAt) : '刚刚') : '刚刚');
-    const replies = Array.isArray(c.replies) ? c.replies : [];
+    const replies = alive(c.replies);
     const expanded = st2sExpandedComments.has(c.id);
     // 折叠时露出第一条当预告（微博/贴吧习惯），展开才全给
     const shown = (replies.length > 1 && !expanded) ? replies.slice(0, 1) : replies;
@@ -1439,6 +1621,9 @@ function renderSuperTopicPostDetail(post, char) {
           <div class="st2s-detail-cmt-meta">
             <span>${cTime}</span>
             <button type="button" class="st2s-cmt-act" onclick="st2sSetReplyTarget('${c.id}')">回复</button>
+            ${canManage ? `<button type="button" class="st2s-cmt-act is-danger" title="删除这条评论" onclick="st2sRemoveComment('${post.id}','${cKey(c)}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+            </button>` : ''}
           </div>
           ${shown.length ? `<div class="st2s-cmt-replies">${shown.map(r => renderCmt(r, '', true)).join('')}</div>` : ''}
           ${toggleHtml}
@@ -1467,6 +1652,15 @@ function renderSuperTopicPostDetail(post, char) {
           </div>
           <div class="st2s-detail-author-sub">${timeText} · 来自 ${deviceTag}</div>
         </div>
+        ${(canEditOwn || canManage) ? `
+        <div class="st2s-detail-tools">
+          ${canEditOwn ? `<button type="button" class="st2s-tool-btn" title="编辑正文" onclick="st2sEditPost('${post.id}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+          </button>` : ''}
+          ${canManage ? `<button type="button" class="st2s-tool-btn is-danger" title="删除帖子" onclick="st2sRemovePost('${post.id}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+          </button>` : ''}
+        </div>` : ''}
       </div>
 
       <div class="st2s-detail-line">${bodyHtml}</div>
@@ -1501,11 +1695,16 @@ function renderSuperTopicPostDetail(post, char) {
 
       <!-- 输入框固定在评论区顶部（标题之下、一楼之上）；
            往下滑想回复某人时走「回复」按钮的二级弹窗，不依赖这个框 -->
+      ${cmtPerm.ok ? `
       <div class="st2s-detail-inputbar">
         <input id="st2sCommentInput" type="text" placeholder="发条温暖善意的评论..." maxlength="200" autocomplete="off"
                onkeydown="if(event.key==='Enter'){event.preventDefault();submitSuperTopicComment();}">
         <button type="button" class="st2s-detail-send" onclick="submitSuperTopicComment()">发送</button>
-      </div>
+      </div>` : `
+      <div class="st2s-detail-locknote">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <span>${cmtPerm.reason || '当前无法评论'}</span>
+      </div>`}
 
       ${comments.length === 0 ? `
         <div class="st2s-detail-empty">还没有人评论，坐个一楼吧</div>
@@ -1561,6 +1760,9 @@ function persistSuperTopicPost(found) {
 function handleSuperTopicPostAction(postId, action) {
   const found = findSuperTopicPost(postId);
   if (!found) { showToast('帖子不存在', 'warn'); return; }
+  // 规则 01：未关注只能浏览；下载属于本地保存，不占用发言权限
+  const actPerm = { like: 'like', comment: 'comment' }[action];
+  if (actPerm && !st2sGuard(found.charId, actPerm)) return;
   const post = found.post;
   post.stats = post.stats || { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false };
 
@@ -1592,12 +1794,17 @@ window.handleSuperTopicPostAction = handleSuperTopicPostAction;
 
 function focusSuperTopicCommentInput() {
   const input = document.getElementById('st2sCommentInput');
-  if (input) input.focus();
+  if (input) { input.focus(); return; }
+  // 无权限时输入框根本没渲染，点「评论」不能静默没反应
+  const ch = getActiveChar();
+  if (ch) st2sGuard(ch.id, 'comment');
 }
 window.focusSuperTopicCommentInput = focusSuperTopicCommentInput;
 
 function submitSuperTopicComment() {
   if (!superTopicDetailPostId) return;
+  const cGate = getActiveChar();
+  if (cGate && !st2sGuard(cGate.id, 'comment')) return;
   const input = document.getElementById('st2sCommentInput');
   if (!input) return;
   const val = (input.value || '').trim();
@@ -1622,6 +1829,7 @@ function submitSuperTopicComment() {
   input.value = '';
 
   persistSuperTopicPost(found);
+  st2sEarn(found.charId, 'comment');
   showToast('评论已发表', 'ok');
   rerenderSuperTopicDetail();
 }
