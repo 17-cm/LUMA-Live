@@ -5748,31 +5748,38 @@ input:checked + .switch-slider:before {
 .st2s-compose-in,
 .st2s-compose-ta {
   width: 100%;
-  background: #fff;
-  border: 1px solid var(--st2s-line);
-  border-radius: 10px;
-  padding: 10px 12px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--st2s-line);
+  border-radius: 0;
+  padding: 8px 2px;
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 400;
   color: var(--st2s-ink);
   font-family: inherit;
   outline: none;
-  transition: border-color .15s ease, background .15s ease;
+  transition: border-color .15s ease;
 }
 .st2s-form-ta,
 .st2s-compose-ta {
   resize: vertical;
   min-height: 80px;
-  line-height: 1.55;
-  font-weight: 500;
+  line-height: 1.6;
+  font-weight: 400;
+}
+/* 正文区是多行的，一条底边线撑不住，给它完整细框（仍然无填充） */
+.st2s-compose-ta {
+  border: 1px solid var(--st2s-line);
+  border-radius: 8px;
+  padding: 10px 11px;
 }
 .st2s-form-in:focus,
 .st2s-form-sel:focus,
 .st2s-form-ta:focus,
 .st2s-compose-in:focus,
 .st2s-compose-ta:focus {
-  border-color: var(--st2s-rose);
-  background: var(--st2s-rose-soft);
+  border-color: var(--st2s-ink-mute);
+  background: transparent;
 }
 .st2s-form-sel {
   appearance: none;
@@ -5817,39 +5824,14 @@ input:checked + .switch-slider:before {
 .st2s-compose-row { display: flex; flex-direction: column; gap: 5px; }
 .st2s-compose-lb {
   font-size: 10.5px;
-  font-weight: 800;
+  font-weight: 400;
   color: var(--st2s-ink-soft);
   letter-spacing: 0.04em;
-  text-transform: uppercase;
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.st2s-compose-lb .hint { color: var(--st2s-ink-mute); font-weight: 600; text-transform: none; letter-spacing: 0; }
-.st2s-compose-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  background: var(--st2s-rose-soft);
-  border: 1px solid var(--st2s-rose-soft);
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--st2s-rose);
-  width: fit-content;
-}
-.st2s-compose-chip .lb { font-size: 9.5px; opacity: 0.7; letter-spacing: 0.06em; }
-.st2s-compose-chip .val { font-weight: 900; }
-.st2s-compose-chip .lock {
-  font-size: 9.5px;
-  background: var(--st2s-rose);
-  color: #fff;
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
+.st2s-compose-lb .hint { color: var(--st2s-ink-mute); font-weight: 400; letter-spacing: 0; }
 .st2s-compose-count {
   text-align: right;
   font-size: 10px;
@@ -5862,24 +5844,41 @@ input:checked + .switch-slider:before {
   align-items: center;
   gap: 10px;
 }
-.st2s-compose-up-btn {
+.st2s-compose-up-btn,
+.st2s-compose-send {
+  flex: 1;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 8px 12px;
-  background: #fff;
-  border: 1px solid var(--st2s-line);
+  padding: 10px 0;
   border-radius: 10px;
+  font-family: inherit;
   font-size: 12px;
-  font-weight: 700;
-  color: var(--st2s-ink-soft);
+  font-weight: 400;
   cursor: pointer;
+  transition: transform .15s ease, color .15s ease, border-color .15s ease;
 }
-.st2s-compose-up-btn svg { width: 16px; height: 16px; }
+.st2s-compose-up-btn {
+  background: transparent;
+  border: 1px solid var(--st2s-line-soft);
+  color: var(--st2s-ink-soft);
+}
+.st2s-compose-up-btn svg { width: 15px; height: 15px; }
+.st2s-compose-fname {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--st2s-ink-mute);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
 .st2s-compose-preview {
   width: 56px; height: 56px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 0;
   border: 1px solid var(--st2s-line);
 }
 .st2s-compose-clr {
@@ -5892,55 +5891,59 @@ input:checked + .switch-slider:before {
   font-weight: 700;
   cursor: pointer;
 }
-.st2s-compose-ft { display: flex; justify-content: flex-end; margin-top: 4px; }
+/* 底部两个等长按键：上传图片 / 发布 */
+.st2s-compose-ft { display: flex; gap: 8px; margin-top: 8px; }
+/* 发布用深墨描边与"上传图片"的浅描边区分主次，仍不做填充 */
 .st2s-compose-send {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 18px;
-  border-radius: 10px;
-  background: var(--st2s-rose);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 900;
-  border: none;
-  cursor: pointer;
-  transition: transform .15s ease, opacity .15s ease;
+  background: transparent;
+  border: 1px solid var(--st2s-ink);
+  color: var(--st2s-ink);
 }
-.st2s-compose-send svg { width: 13px; height: 13px; }
-.st2s-compose-send:active { transform: scale(0.96); }
-.st2s-compose-send:disabled { opacity: 0.5; }
+.st2s-compose-send svg { width: 14px; height: 14px; }
+.st2s-compose-up-btn:active,
+.st2s-compose-send:active { transform: scale(0.97); }
+.st2s-compose-send:disabled { opacity: 0.4; }
 
 /* ----- 规则列表 ----- */
+/* 规则：与广场同一语言 —— 无卡片，一条细线分隔，编号退到左侧灰色列 */
+.st2s-rules {
+  margin: 0 -14px 0 -16px;
+  gap: 0;
+  padding: 0;
+}
 .st2s-rule {
   display: flex;
+  align-items: flex-start;
   gap: 12px;
-  background: #fff;
-  border: 1px solid var(--st2s-line);
-  border-radius: 12px;
-  padding: 12px 14px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--st2s-line-soft);
+  border-radius: 0;
+  padding: 11px 14px 11px 16px;
 }
+.st2s-rule:first-child { border-top: 0; }
 .st2s-rule-no {
-  font-size: 18px;
-  font-weight: 900;
-  color: var(--st2s-rose);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--st2s-ink-mute);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
-  width: 30px;
-  letter-spacing: -0.02em;
+  width: 20px;
+  padding-top: 2px;
+  text-align: right;
 }
 .st2s-rule-body { flex: 1; min-width: 0; }
 .st2s-rule-t {
-  font-size: 13px;
-  font-weight: 900;
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--st2s-ink);
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 .st2s-rule-d {
   font-size: 11.5px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--st2s-ink-soft);
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 /* ----- 刷新 ----- */
@@ -6291,6 +6294,10 @@ input:checked + .switch-slider:before {
   flex-direction: column;
   /* 与 .st2s-feed 同理：抵消 panel 内缩，让分割线通栏接到侧栏竖线上 */
   margin: 0 -14px 0 -16px;
+  /* 覆盖 .st2s-detail 所在共用容器组的 gap:10px / padding:4px 2px ——
+     那 10px 间距会把线条之间的节奏全打乱 */
+  gap: 0;
+  padding: 4px 0 0;
 }
 
 /* 顶部：小小的返回 + 时间 */
@@ -6403,7 +6410,7 @@ input:checked + .switch-slider:before {
 .st2s-detail-actions .social-action-btn.liked svg { fill: var(--st2s-rose); stroke: var(--st2s-rose); }
 .st2s-detail-actions .social-action-btn.downloaded { color: var(--st2s-mention) !important; }
 .st2s-detail-actions .social-action-btn.downloaded svg { stroke: var(--st2s-mention); }
-.st2s-detail-actions .social-action-btn.is-stub { opacity: .45; }
+/* 转发键：功能待接，但外观与其他三键完全一致，不做禁用态 */
 
 /* 评论区标题 */
 .st2s-detail-comments-head {

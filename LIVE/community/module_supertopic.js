@@ -98,6 +98,16 @@ function topicPostsFor(char) {
 function getAvatarFor(name, seed) {
   try { return window.getAvatar ? window.getAvatar(name, seed || 'first') : ''; } catch (e) { return ''; }
 }
+// 机型标签：getFloatClientTag(true) 内部是 Math.random()，每次调用重新抽一个。
+// 而点赞 / 评论 / 展开回复都会整块重渲染，所以机型会跟着跳。
+// 正确做法：抽一次就钉在 post.device 上，之后只读不再抽。
+function st2sPostDevice(post) {
+  if (!post.device) {
+    post.device = (typeof window.getFloatClientTag === 'function')
+      ? window.getFloatClientTag(true) : 'Float 客户端';
+  }
+  return post.device;
+}
 function currentUserName() {
   return (window.currentUser && window.currentUser.name) || '玩家';
 }
@@ -344,7 +354,7 @@ function supertopicDemoPosts(char) {
     tag: '#' + char.name + '超话#',
     mentions: (o && o.mention) ? ['@' + char.name] : [],
     subTags: (o && o.subs) || [],
-    device: (o && o.device) || 'Float 客户端',
+    device: (o && o.device) || null,   // null → 由 st2sPostDevice 抽一次后钉死
     content: content,
     image: (o && o.image) || null,
     stats: { reposts: (o && o.rep) || 0, comments: 0, likes: (o && o.like) || 0, isLiked: false, isDownloaded: false },
@@ -448,7 +458,7 @@ function renderSuperTopicPostsTab(charId) {
           ? window.getPostAuthorAvatar(post)
           : (author.avatar || (typeof window.getAvatar === 'function' ? window.getAvatar(author.name, 'emoji') : ''));
         const subTags = post.subTags || [];
-        const deviceTag = post.device || ((typeof window.getFloatClientTag === 'function') ? window.getFloatClientTag(true) : 'Float 客户端');
+        const deviceTag = st2sPostDevice(post);
         // 广场列表不显示主 tag / @（只留一行正文），它们连同彩色样式一起放到详情页
         const subTagHtml = subTags.map(t => `<span class="sub">${t}</span>`).join('');
         const verifiedHtml = author.verified ? '<span class="st2s-feed-verified">V</span>' : '';
@@ -948,19 +958,12 @@ function renderSuperTopicComposeTab(char) {
     </div>
     <div class="st2s-compose">
       <div class="st2s-compose-row">
-        <div class="st2s-compose-chip is-locked">
-          <span class="lb">主 tag</span>
-          <span class="val">${primaryTag}</span>
-          <span class="lock" title="强制归属">· 固定</span>
-        </div>
-      </div>
-      <div class="st2s-compose-row">
         <label class="st2s-compose-lb">副 tag <span class="hint">(逗号分隔, 可空)</span></label>
-        <input id="cpSubTag" class="st2s-compose-in" type="text" placeholder="例: #应援打卡#  #vlog#">
+        <input id="cpSubTag" class="st2s-compose-in" type="text" autocomplete="off">
       </div>
       <div class="st2s-compose-row">
-        <label class="st2s-compose-lb">@ 提到 <span class="hint">(用 @ 触发, 可空)</span></label>
-        <input id="cpMention" class="st2s-compose-in" type="text" placeholder="例: @${char.name}  @应援团">
+        <label class="st2s-compose-lb">@ 提到 <span class="hint">(可空)</span></label>
+        <input id="cpMention" class="st2s-compose-in" type="text" autocomplete="off">
       </div>
       <div class="st2s-compose-row">
         <label class="st2s-compose-lb">正文 <span class="hint">(必填)</span></label>
@@ -968,25 +971,26 @@ function renderSuperTopicComposeTab(char) {
         <div class="st2s-compose-count"><span id="cpCount">0</span> / 500</div>
       </div>
       <div class="st2s-compose-row">
+        <label class="st2s-compose-lb">图片描述 <span class="hint">(给 AI 看, 不公开发布)</span></label>
+        <input id="cpImageDesc" class="st2s-compose-in" type="text" autocomplete="off">
+      </div>
+      <div class="st2s-compose-row">
         <label class="st2s-compose-lb">图片 <span class="hint">(可空, 1 张)</span></label>
         <div class="st2s-compose-up">
           <input id="cpImage" type="file" accept="image/*" class="hidden">
-          <button onclick="document.getElementById('cpImage').click()" class="st2s-compose-up-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-            <span id="cpImageLabel">选择图片</span>
-          </button>
           <img id="cpPreview" class="st2s-compose-preview hidden" alt="">
-          <button id="cpImageClear" class="st2s-compose-clr hidden" onclick="clearComposeImage()">移除</button>
+          <span id="cpImageLabel" class="st2s-compose-fname hidden"></span>
+          <button id="cpImageClear" class="st2s-compose-clr hidden" onclick="clearComposeImage()" type="button">移除</button>
         </div>
       </div>
-      <div class="st2s-compose-row">
-        <label class="st2s-compose-lb">图片描述 <span class="hint">(给 AI 看, 不公开发布)</span></label>
-        <input id="cpImageDesc" class="st2s-compose-in" type="text" placeholder="例: 直播截图, 表情惊讶, 背景舞台紫色灯光">
-      </div>
       <div class="st2s-compose-ft">
-        <button onclick="submitSuperTopicPost('${char.id}')" class="st2s-compose-send">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          发布
+        <button type="button" class="st2s-compose-up-btn" onclick="document.getElementById('cpImage').click()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span>上传图片</span>
+        </button>
+        <button type="button" onclick="submitSuperTopicPost('${char.id}')" class="st2s-compose-send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <span>发布</span>
         </button>
       </div>
     </div>
@@ -1007,7 +1011,7 @@ function renderSuperTopicComposeTab(char) {
       const lbl = document.getElementById('cpImageLabel');
       const clr = document.getElementById('cpImageClear');
       if (prev) { prev.src = ev.target.result; prev.classList.remove('hidden'); }
-      if (lbl) lbl.textContent = f.name;
+      if (lbl) { lbl.textContent = f.name; lbl.classList.remove('hidden'); }
       if (clr) clr.classList.remove('hidden');
     };
     reader.readAsDataURL(f);
@@ -1022,7 +1026,7 @@ function clearComposeImage() {
   const clr = document.getElementById('cpImageClear');
   if (img) img.value = '';
   if (prev) { prev.src = ''; prev.classList.add('hidden'); }
-  if (lbl) lbl.textContent = '选择图片';
+  if (lbl) { lbl.textContent = ''; lbl.classList.add('hidden'); }
   if (clr) clr.classList.add('hidden');
 }
 window.clearComposeImage = clearComposeImage;
@@ -1065,6 +1069,7 @@ async function submitSuperTopicPost(charId) {
     content,
     image,
     imageDesc,
+    device: st2sPostDevice({}),   // 发布瞬间定一次，之后不再变
     stats: { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false },
     commentTree: []
   };
@@ -1423,7 +1428,7 @@ function renderSuperTopicPostDetail(post, char) {
   const timeText = post.createdAt
     ? (window.formatDynamicTime ? window.formatDynamicTime(post.createdAt) : '刚刚')
     : (post.time || '刚刚');
-  const deviceTag = post.device || ((typeof window.getFloatClientTag === 'function') ? window.getFloatClientTag(true) : 'Float 客户端');
+  const deviceTag = st2sPostDevice(post);
   const stats = post.stats || (post.stats = { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false });
 
   // 正文一整段：主tag → @ → 正文 → 副tag，用空格连成 inline 流，绝不分行
@@ -1511,7 +1516,7 @@ function renderSuperTopicPostDetail(post, char) {
       ` : ''}
 
       <div class="st2s-detail-actions social-action-bar">
-        <div class="social-action-btn is-stub" onclick="handleSuperTopicPostAction('${post.id}', 'repost')">
+        <div class="social-action-btn" onclick="handleSuperTopicPostAction('${post.id}', 'repost')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
           <span>${cnt('转发', stats.reposts)}</span>
         </div>
@@ -1596,47 +1601,6 @@ function persistSuperTopicPost(found) {
   }
 }
 
-// 把附图落到手机：优先宿主 media.save（真能进相册），失败再回退浏览器下载
-async function saveSuperTopicImage(post) {
-  const src = post.image;
-  if (!src) { showToast('这条动态没有附图', 'warn'); return false; }
-  const name = 'luma_post_' + (post.id || Date.now()) + '.png';
-  try {
-    const hasMediaSave = window.api && api.media && typeof api.media.save === 'function';
-    let dataUrl = null;
-    if (String(src).indexOf('data:') === 0) {
-      dataUrl = src;
-    } else if (String(src).indexOf('media-store://') === 0) {
-      if (window.api && api.media && typeof api.media.get === 'function') {
-        const got = await api.media.get({ ref: src });
-        dataUrl = got && got.dataUrl;
-      }
-    } else if (hasMediaSave) {
-      const blob = await (await fetch(src)).blob();
-      dataUrl = await new Promise((ok, no) => {
-        const fr = new FileReader();
-        fr.onload = () => ok(fr.result);
-        fr.onerror = no;
-        fr.readAsDataURL(blob);
-      });
-    }
-    if (dataUrl && hasMediaSave) {
-      await api.media.save({ dataUrl: dataUrl, type: 'custom_app_media' });
-      showToast('已保存到手机', 'ok');
-      return true;
-    }
-  } catch (e) {
-    console.warn('[supertopic] media.save 未成功，回退浏览器下载：', e);
-  }
-  if (typeof window.downloadImageToLocal === 'function') {
-    window.downloadImageToLocal(src, name);
-    return true;
-  }
-  showToast('当前环境不支持保存图片', 'warn');
-  return false;
-}
-window.saveSuperTopicImage = saveSuperTopicImage;
-
 function handleSuperTopicPostAction(postId, action) {
   const found = findSuperTopicPost(postId);
   if (!found) { showToast('帖子不存在', 'warn'); return; }
@@ -1647,9 +1611,16 @@ function handleSuperTopicPostAction(postId, action) {
     post.stats.isLiked = !post.stats.isLiked;
     post.stats.likes = Math.max(0, (post.stats.likes || 0) + (post.stats.isLiked ? 1 : -1));
   } else if (action === 'download') {
-    saveSuperTopicImage(post).then(ok => {
-      if (ok) { post.stats.isDownloaded = !post.stats.isDownloaded; persistSuperTopicPost(found); rerenderSuperTopicDetail(); }
-    });
+    // 复用热搜那条已验证可用的链路 downloadPostImageToLocal：
+    // 它内部 dataURL/http/Canvas 三重兜底，且无附图时会生成卡片海报再下载，
+    // 所以永远有产物 —— 我之前那版遇到没图就 return，等于点了没反应。
+    if (typeof window.downloadPostImageToLocal !== 'function') {
+      showToast('下载模块未就绪', 'warn'); return;
+    }
+    post.stats.isDownloaded = !post.stats.isDownloaded;
+    try { window.downloadPostImageToLocal(post); } catch (e) { console.warn('[supertopic] 下载失败:', e); }
+    persistSuperTopicPost(found);
+    rerenderSuperTopicDetail();
     return;
   } else if (action === 'repost') {
     // 转发给角色：等其他入口一起做，这里先占位，不计数、不落库
