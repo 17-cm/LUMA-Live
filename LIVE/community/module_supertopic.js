@@ -9,6 +9,9 @@ var api = window.api || {};
 let currentActiveSuperTopicCharId = null;
 let currentSuperTopicTab = 'posts';
 let superTopicDetailPostId = null;
+// 详情页交互状态：展开中的楼层 id 集合 / 当前回复目标楼层 id
+let st2sExpandedComments = new Set();
+let st2sReplyTarget = null;
 let selectedSupportGiftId = 'gift_flower';
 let superTopicVirtualScrollerInstance = null;
 
@@ -90,7 +93,7 @@ function topicPostsFor(char) {
     (p.tag && p.tag.includes(char.name)) || (p.mention && p.mention.includes(char.name))
   );
   const user = (window.__SUPERTOPIC_POSTS__ || {})[char.id] || [];
-  return user.concat(fromFeed);
+  return supertopicDemoPosts(char).concat(user, fromFeed);   // ⚠【临时】定稿后改回 user.concat(fromFeed)
 }
 function getAvatarFor(name, seed) {
   try { return window.getAvatar ? window.getAvatar(name, seed || 'first') : ''; } catch (e) { return ''; }
@@ -298,7 +301,7 @@ function renderSuperTopicTab() {
     const posts = topicPostsFor(char);
     const post = posts.find(p => String(p.id) === String(superTopicDetailPostId));
     if (post) {
-      renderSuperTopicPostDetail(post, char);
+      paintSuperTopicDetail(post, char);   // 原来这里丢了返回值 → 详情页从未挂载
       return;
     }
     superTopicDetailPostId = null;
@@ -312,6 +315,71 @@ function renderSuperTopicTab() {
   else if (currentSuperTopicTab === 'manage') renderSuperTopicManageTab(char);
   else if (currentSuperTopicTab === 'report') renderSuperTopicReportTab(char);
   else if (currentSuperTopicTab === 'refresh') renderSuperTopicRefreshTab(char);
+}
+
+// -------------------------------------------------------------------------
+// 动态 Tab
+// -------------------------------------------------------------------------
+// ⚠⚠⚠【临时 · 预览种子数据】⚠⚠⚠
+// 只为方便验收广场列表与帖子详情。定稿后删三处：本整块函数、
+// topicPostsFor 里标 ⚠【临时】的那行、findSuperTopicPost 里标 ⚠【临时】的那段。
+const st2sDemoCache = {};
+function supertopicDemoPosts(char) {
+  if (st2sDemoCache[char.id]) return st2sDemoCache[char.id];   // 同一对象，点赞/评论本次会话内可留存
+  const now = Date.now();
+  const ago = m => now - m * 60000;
+  const av = n => getAvatarFor(n, 'first');
+  const rp = (name, m, text, replyTo) => ({
+    name: name, user: name, avatar: av(name), ip: 'LUMA',
+    text: text, content: text, time: '', createdAt: ago(m),
+    replyTo: replyTo || null, replies: []
+  });
+  const cm = (name, m, text, replies) => Object.assign(rp(name, m, text, null), {
+    replies: replies || []
+  });
+  const mk = (i, name, m, content, o) => ({
+    id: 'demo_post_' + char.id + '_' + i,
+    author: { name: name, avatar: av(name), verified: !!(o && o.verified) },
+    createdAt: ago(m),
+    tag: '#' + char.name + '超话#',
+    mentions: (o && o.mention) ? ['@' + char.name] : [],
+    subTags: (o && o.subs) || [],
+    device: (o && o.device) || 'Float 客户端',
+    content: content,
+    image: (o && o.image) || null,
+    stats: { reposts: (o && o.rep) || 0, comments: 0, likes: (o && o.like) || 0, isLiked: false, isDownloaded: false },
+    commentTree: (o && o.cmts) || []
+  });
+  const list = [
+    mk(1, '夜航西飞', 4, '今晚八点准时开播，打一把排位就下。', { like: 12, cmts: [
+      cm('糖渍青柠', 3, '收到，蹲一个直播链接', [ rp('夜航西飞', 2, '点了关注就有推送', '糖渍青柠') ]),
+      cm('Momo', 1, '今天状态看着不错')
+    ]}),
+    mk(2, '糖渍青柠', 17, '刚看完回放，第三波那波团战决策是真的离谱，明明可以直接拿大龙却在野区绕了二十秒。', { mention: 1, subs: ['#赛事复盘#'], verified: 1, like: 47, rep: 6, cmts: [
+      cm('雾都旧事', 14, '那二十秒我也看到了，问题是指挥根本没沟通', [
+        rp('糖渍青柠', 13, '对，麦里完全没声音', '雾都旧事'),
+        rp('拾柒', 12, '他们最近一直这样，不是第一次了'),
+        rp('夜航西飞', 10, '其实是视野问题，绕的那边没眼'),
+        rp('糖渍青柠', 8, '视野也没做就更离谱了', '夜航西飞'),
+        rp('荔枝罐头', 5, '复盘视频我放评论区了，需要的自取')
+      ]),
+      cm('Momo', 9, '笑死，我当时直接关了直播')
+    ]}),
+    mk(3, 'Momo', 46, '主播今天状态好好，声音听起来睡了很久', { subs: ['#日常#'], like: 8, image: char.avatar }),
+    mk(4, '雾都旧事', 95, '整理了一份从开局到成型的完整路线，包含装备顺序、时间节点和三种逆风局的处理办法，太长就不贴了，评论区第一条有链接，需要的自取。另外上周说的那个键位改法我已经换成侧键了，实测连续闪避的手感提升很明显，推荐同样手小的朋友也试试，默认那套确实够不着。', { subs: ['#攻略#', '#干货#'], like: 203, rep: 31, cmts: [
+      cm('拾柒', 60, '链接呢链接呢'),
+      cm('荔枝罐头', 40, '侧键那个我也换了，手小救星', [ rp('雾都旧事', 35, '握手感确实好很多', '荔枝罐头') ])
+    ]}),
+    mk(5, '拾柒', 180, '签到第四十七天', { device: 'iPhone 15 Pro', like: 3 }),
+    mk(6, '荔枝罐头', 320, '有没有一起蹲明天联动活动的，两个人做日常效率高一点', { mention: 1, subs: ['#组队#'], device: '小米 14 Ultra', like: 15, cmts: [
+      cm('夜航西飞', 300, '我我我，我晚上八点后都在', [
+        rp('荔枝罐头', 290, '那说好了，明天见', '夜航西飞'),
+        rp('Momo', 250, '加一个加一个')
+      ])
+    ]})
+  ];
+  st2sDemoCache[char.id] = list;
+  return list;
 }
 
 // -------------------------------------------------------------------------
@@ -353,7 +421,6 @@ function renderSuperTopicPostsTab(charId) {
   const chars = window.getAvailableCharsList();
   const char = chars.find(c => String(c.id) === String(charId)) || chars[0];
   let posts = topicPostsFor(char);
-  posts = supertopicDemoPosts(char).concat(posts); // ⚠【临时】定稿后删除本行
   if (posts.length === 0) {
     posts = [{
       id: `topic_post_${char.id}`,
@@ -1295,11 +1362,60 @@ function closePostDetail() {
 }
 window.closePostDetail = closePostDetail;
 
+// ── 详情辅助：楼层 id / 计数 / 查找 / 重绘 ──────────────────
+// 楼层 id 按位置生成 (f1, f1r2 …)，稳定且不含引号，可安全嵌进 onclick
+function st2sAssignCommentIds(list, prefix) {
+  (list || []).forEach((c, i) => {
+    c.id = prefix + (i + 1);
+    if (Array.isArray(c.replies)) st2sAssignCommentIds(c.replies, c.id + 'r');
+  });
+}
+function st2sCountComments(list) {
+  return (list || []).reduce((n, c) => n + 1 + st2sCountComments(c.replies), 0);
+}
+function st2sFindComment(list, id) {
+  for (const c of (list || [])) {
+    if (c.id === id) return c;
+    const hit = st2sFindComment(c.replies, id);
+    if (hit) return hit;
+  }
+  return null;
+}
+function paintSuperTopicDetail(post, char) {
+  const panel = document.getElementById('superTopicPanel');
+  if (!panel || !post) return;
+  panel.dataset.tab = 'posts';
+  panel.innerHTML = renderSuperTopicPostDetail(post, char);
+  // innerHTML 重建会丢焦点，回复态下把光标还回去
+  if (st2sReplyTarget) {
+    const el = document.getElementById('st2sCommentInput');
+    if (el) el.focus();
+  }
+}
+function rerenderSuperTopicDetail() {
+  if (!superTopicDetailPostId) return;
+  const found = findSuperTopicPost(superTopicDetailPostId);
+  const char = getActiveChar();
+  if (found && char) paintSuperTopicDetail(found.post, char);
+}
+function st2sToggleReplies(cid) {
+  if (st2sExpandedComments.has(cid)) st2sExpandedComments.delete(cid);
+  else st2sExpandedComments.add(cid);
+  rerenderSuperTopicDetail();
+}
+function st2sSetReplyTarget(cid) {
+  st2sReplyTarget = (st2sReplyTarget === cid) ? null : cid;
+  rerenderSuperTopicDetail();
+}
+window.st2sToggleReplies = st2sToggleReplies;
+window.st2sSetReplyTarget = st2sSetReplyTarget;
+
 function renderSuperTopicPostDetail(post, char) {
-  const hasImage = !!post.image;
-  const comments = (post.commentTree && post.commentTree.length) ? post.commentTree : [];
-  const primaryTag = post.primaryTag || `#${char.name}超话#`;
-  const subTags = (post.subTags || []);
+  st2sAssignCommentIds(post.commentTree, 'f');
+  const comments = post.commentTree || [];
+  const totalComments = st2sCountComments(comments);
+  const primaryTag = post.primaryTag || post.tag || ('#' + char.name + '超话#');
+  const subTags = post.subTags || [];
   const mentions = (post.mentions && post.mentions.length) ? post.mentions : (post.mention ? [post.mention] : []);
   const authorAvatar = (typeof window.getPostAuthorAvatar === 'function')
     ? window.getPostAuthorAvatar(post)
@@ -1307,107 +1423,126 @@ function renderSuperTopicPostDetail(post, char) {
   const timeText = post.createdAt
     ? (window.formatDynamicTime ? window.formatDynamicTime(post.createdAt) : '刚刚')
     : (post.time || '刚刚');
+  const deviceTag = post.device || ((typeof window.getFloatClientTag === 'function') ? window.getFloatClientTag(true) : 'Float 客户端');
   const stats = post.stats || (post.stats = { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false });
 
-  const primaryTagHtml = `<span class="hash">${primaryTag}</span>`;
-  const mentionHtml = mentions.map(m => `<span class="mention">${m}</span>`).join('');
-  const subTagHtml = subTags.map(t => `<span class="hash">${t}</span>`).join('');
+  // 正文一整段：主tag → @ → 正文 → 副tag，用空格连成 inline 流，绝不分行
+  const parts = [`<span class="hash">${primaryTag}</span>`]
+    .concat(mentions.map(m => `<span class="mention">${m}</span>`))
+    .concat([`<span class="txt">${post.content || ''}</span>`])
+    .concat(subTags.map(t => `<span class="hash">${t}</span>`));
+  const bodyHtml = parts.join(' ');
+
+  const cnt = (label, n) => label + (n ? ' ' + n : '');
+
+  // 楼层渲染（递归，回复复用同一函数）
+  const renderCmt = (c, floorLabel, isReply) => {
+    const cName = c.name || c.user || '匿名';
+    const cAvatar = c.avatar || (window.getAvatar ? window.getAvatar(cName, 'emoji') : '');
+    const cText = c.text || c.content || '';
+    const cTime = c.time || (c.createdAt ? (window.formatDynamicTime ? window.formatDynamicTime(c.createdAt) : '刚刚') : '刚刚');
+    const replies = Array.isArray(c.replies) ? c.replies : [];
+    const expanded = st2sExpandedComments.has(c.id);
+    // 折叠时露出第一条当预告（微博/贴吧习惯），展开才全给
+    const shown = (replies.length > 1 && !expanded) ? replies.slice(0, 1) : replies;
+    const toggleHtml = replies.length > 1 ? `
+      <button type="button" class="st2s-cmt-act chevron ${expanded ? 'open' : ''}" onclick="st2sToggleReplies('${c.id}')">
+        <span>${expanded ? '收起' : '展开其余 ' + (replies.length - 1) + ' 条回复'}</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>` : '';
+    return `
+      <div class="st2s-detail-comment ${isReply ? 'st2s-cmt-reply' : ''}">
+        ${isReply ? '' : `<span class="st2s-cmt-floor">${floorLabel}</span>`}
+        <div class="st2s-detail-cmt-left">
+          ${cAvatar
+            ? `<img src="${cAvatar}" class="st2s-detail-cmt-av" alt="">`
+            : `<div class="st2s-detail-cmt-av st2s-feed-av-fallback">${cName.charAt(0)}</div>`}
+        </div>
+        <div class="st2s-detail-cmt-right">
+          <div class="st2s-detail-cmt-name">
+            <span>${cName}</span>
+            ${c.ip ? `<span class="st2s-detail-cmt-ip">· ${c.ip}</span>` : ''}
+          </div>
+          <p class="st2s-detail-cmt-text">${c.replyTo ? `<span class="st2s-cmt-replyto">回复 @${c.replyTo}：</span>` : ''}${cText}</p>
+          <div class="st2s-detail-cmt-meta">
+            <span>${cTime}</span>
+            <button type="button" class="st2s-cmt-act" onclick="st2sSetReplyTarget('${c.id}')">回复</button>
+          </div>
+          ${shown.length ? `<div class="st2s-cmt-replies">${shown.map(r => renderCmt(r, '', true)).join('')}</div>` : ''}
+          ${toggleHtml}
+        </div>
+      </div>`;
+  };
+
+  const target = st2sReplyTarget ? st2sFindComment(comments, st2sReplyTarget) : null;
+  const hintHtml = target ? `
+      <div class="st2s-detail-replyhint">
+        <span>回复 <b>@${target.name || target.user || '匿名'}</b></span>
+        <button type="button" onclick="st2sSetReplyTarget(null)" aria-label="取消回复">&times;</button>
+      </div>` : '';
 
   return `
     <div class="st2s-detail">
-      <!-- 顶部返回 + 时间 -->
       <div class="st2s-detail-topbar">
         <button class="st2s-detail-back" onclick="closePostDetail()" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><line x1="20" y1="12" x2="4" y2="12"></line><polyline points="11 19 4 12 11 5"></polyline></svg>
           <span>返回动态</span>
         </button>
         <span class="st2s-detail-time">${timeText}</span>
       </div>
 
-      <!-- 作者条 -->
       <div class="st2s-detail-author">
         ${authorAvatar
           ? `<img src="${authorAvatar}" class="st2s-detail-avatar" alt="">`
           : `<div class="st2s-detail-avatar st2s-feed-av-fallback">${(post.author.name || '?').charAt(0)}</div>`}
         <div class="st2s-detail-author-meta">
           <div class="st2s-detail-name">
-            <b>${post.author.name || '匿名'}</b>
+            <span>${post.author.name || '匿名'}</span>
             ${post.author.badge ? `<span class="st2s-feed-bd">${post.author.badge}</span>` : ''}
-            ${post.author.verified ? '<span class="st2s-feed-verified">V</span>' : ''}
           </div>
-          <div class="st2s-detail-author-sub">${timeText} · 来自 ${(typeof window.getFloatClientTag === 'function') ? window.getFloatClientTag(true) : 'Float 客户端'}</div>
+          <div class="st2s-detail-author-sub">${timeText} · 来自 ${deviceTag}</div>
         </div>
       </div>
 
-      <!-- 内容：主tag + 艾特 + 正文 + 副tag -->
-      <div class="st2s-detail-line">
-        ${primaryTagHtml}
-        ${mentionHtml}
-        <span class="txt">${post.content || ''}</span>
-        ${subTagHtml}
-      </div>
+      <div class="st2s-detail-line">${bodyHtml}</div>
 
-      ${hasImage ? `
-        <div class="st2s-detail-image">
-          <img src="${post.image}" alt="">
-        </div>
+      ${post.image ? `
+        <div class="st2s-detail-image"><img src="${post.image}" alt=""></div>
       ` : ''}
 
-      <!-- 四个操作键：转发 / 评论 / 点赞 / 下载 -->
       <div class="st2s-detail-actions social-action-bar">
-        <div class="social-action-btn" onclick="handleSuperTopicPostAction('${post.id}', 'repost')" type="button">
+        <div class="social-action-btn is-stub" onclick="handleSuperTopicPostAction('${post.id}', 'repost')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
-          <span>${stats.reposts || 0}</span>
+          <span>${cnt('转发', stats.reposts)}</span>
         </div>
-        <div class="social-action-btn" onclick="focusSuperTopicCommentInput()" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-          <span>${stats.comments || 0}</span>
-        </div>
-        <div class="social-action-btn ${stats.isLiked ? 'liked' : ''}" onclick="handleSuperTopicPostAction('${post.id}', 'like')" type="button">
+        <div class="social-action-btn ${stats.isLiked ? 'liked' : ''}" onclick="handleSuperTopicPostAction('${post.id}', 'like')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
-          <span>${stats.likes || 0}</span>
+          <span>${cnt('点赞', stats.likes)}</span>
         </div>
-        <div class="social-action-btn ${stats.isDownloaded ? 'downloaded' : ''}" onclick="handleSuperTopicPostAction('${post.id}', 'download')" type="button">
+        <div class="social-action-btn" onclick="focusSuperTopicCommentInput()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          <span>${cnt('评论', totalComments)}</span>
+        </div>
+        <div class="social-action-btn ${stats.isDownloaded ? 'downloaded' : ''}" onclick="handleSuperTopicPostAction('${post.id}', 'download')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           <span>下载</span>
         </div>
       </div>
 
-      <!-- 评论区 -->
       <div class="st2s-detail-comments-head">
-        <h4>全部评论 (${comments.length})</h4>
-        <span>实时互动流</span>
+        <h4>全部评论</h4>
+        <span>${totalComments} 条</span>
       </div>
 
       ${comments.length === 0 ? `
-        <div class="st2s-detail-empty">暂无评论，快来抢首评吧～</div>
-      ` : comments.map(c => {
-        const cName = c.name || c.user || '匿名';
-        const cAvatar = c.avatar || (window.getAvatar ? window.getAvatar(cName, 'emoji') : '');
-        const cText = c.text || c.content || '';
-        const cTime = c.time || (c.createdAt ? (window.formatDynamicTime ? window.formatDynamicTime(c.createdAt) : '刚刚') : '刚刚');
-        return `
-          <div class="st2s-detail-comment">
-            <div class="st2s-detail-cmt-left">
-              ${cAvatar
-                ? `<img src="${cAvatar}" class="st2s-detail-cmt-av" alt="">`
-                : `<div class="st2s-detail-cmt-av st2s-feed-av-fallback">${cName.charAt(0)}</div>`}
-            </div>
-            <div class="st2s-detail-cmt-right">
-              <div class="st2s-detail-cmt-name">
-                <b>${cName}</b>
-                ${c.ip ? `<span class="st2s-detail-cmt-ip">· ${c.ip}</span>` : ''}
-              </div>
-              <p class="st2s-detail-cmt-text">${cText}</p>
-              <div class="st2s-detail-cmt-meta">${cTime}</div>
-            </div>
-          </div>
-        `;
-      }).join('')}
+        <div class="st2s-detail-empty">还没有人评论，坐个一楼吧</div>
+      ` : comments.map((c, i) => renderCmt(c, (i + 1) + 'L', false)).join('')}
 
-      <!-- 评论输入框 + 发送 -->
+      <div style="height:14px"></div>
+${hintHtml}
       <div class="st2s-detail-inputbar">
-        <input id="st2sCommentInput" type="text" placeholder="发条温暖善意的评论..." maxlength="200" autocomplete="off">
+        <input id="st2sCommentInput" type="text" placeholder="${target ? '回复 @' + (target.name || target.user || '匿名') : '发条温暖善意的评论...'}" maxlength="200" autocomplete="off"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();submitSuperTopicComment();}">
         <button type="button" class="st2s-detail-send" onclick="submitSuperTopicComment()">发送</button>
       </div>
     </div>
@@ -1426,6 +1561,9 @@ function findSuperTopicPost(postId) {
     const p = userArr.find(x => String(x.id) === String(postId));
     if (p) return { post: p, source: 'user', charId: char.id };
   }
+  const demo = st2sDemoCache[char.id] || [];                       // ⚠【临时】
+  const d = demo.find(x => String(x.id) === String(postId));       // ⚠【临时】
+  if (d) return { post: d, source: 'demo', charId: char.id };      // ⚠【临时】
   const weibo = (window.weiboPosts || []).find(x => String(x.id) === String(postId));
   if (weibo) return { post: weibo, source: 'weibo' };
   return null;
@@ -1458,6 +1596,47 @@ function persistSuperTopicPost(found) {
   }
 }
 
+// 把附图落到手机：优先宿主 media.save（真能进相册），失败再回退浏览器下载
+async function saveSuperTopicImage(post) {
+  const src = post.image;
+  if (!src) { showToast('这条动态没有附图', 'warn'); return false; }
+  const name = 'luma_post_' + (post.id || Date.now()) + '.png';
+  try {
+    const hasMediaSave = window.api && api.media && typeof api.media.save === 'function';
+    let dataUrl = null;
+    if (String(src).indexOf('data:') === 0) {
+      dataUrl = src;
+    } else if (String(src).indexOf('media-store://') === 0) {
+      if (window.api && api.media && typeof api.media.get === 'function') {
+        const got = await api.media.get({ ref: src });
+        dataUrl = got && got.dataUrl;
+      }
+    } else if (hasMediaSave) {
+      const blob = await (await fetch(src)).blob();
+      dataUrl = await new Promise((ok, no) => {
+        const fr = new FileReader();
+        fr.onload = () => ok(fr.result);
+        fr.onerror = no;
+        fr.readAsDataURL(blob);
+      });
+    }
+    if (dataUrl && hasMediaSave) {
+      await api.media.save({ dataUrl: dataUrl, type: 'custom_app_media' });
+      showToast('已保存到手机', 'ok');
+      return true;
+    }
+  } catch (e) {
+    console.warn('[supertopic] media.save 未成功，回退浏览器下载：', e);
+  }
+  if (typeof window.downloadImageToLocal === 'function') {
+    window.downloadImageToLocal(src, name);
+    return true;
+  }
+  showToast('当前环境不支持保存图片', 'warn');
+  return false;
+}
+window.saveSuperTopicImage = saveSuperTopicImage;
+
 function handleSuperTopicPostAction(postId, action) {
   const found = findSuperTopicPost(postId);
   if (!found) { showToast('帖子不存在', 'warn'); return; }
@@ -1466,28 +1645,20 @@ function handleSuperTopicPostAction(postId, action) {
 
   if (action === 'like') {
     post.stats.isLiked = !post.stats.isLiked;
-    post.stats.likes += post.stats.isLiked ? 1 : -1;
+    post.stats.likes = Math.max(0, (post.stats.likes || 0) + (post.stats.isLiked ? 1 : -1));
   } else if (action === 'download') {
-    post.stats.isDownloaded = !post.stats.isDownloaded;
-    if (typeof window.downloadPostImageToLocal === 'function') {
-      try { window.downloadPostImageToLocal(post); } catch (_) {}
-    } else {
-      showToast('已开始下载', 'ok');
-    }
+    saveSuperTopicImage(post).then(ok => {
+      if (ok) { post.stats.isDownloaded = !post.stats.isDownloaded; persistSuperTopicPost(found); rerenderSuperTopicDetail(); }
+    });
+    return;
   } else if (action === 'repost') {
-    post.stats.reposts = (post.stats.reposts || 0) + 1;
-    if (typeof window.openSharePickerModal === 'function') {
-      try { window.openSharePickerModal(); } catch (_) {}
-    } else {
-      showToast('已转发', 'ok');
-    }
+    // 转发给角色：等其他入口一起做，这里先占位，不计数、不落库
+    showToast('转发给角色 · 暂未开放', 'warn');
+    return;
   }
 
   persistSuperTopicPost(found);
-  if (superTopicDetailPostId && String(superTopicDetailPostId) === String(postId)) {
-    const char = getActiveChar();
-    if (char) renderSuperTopicPostDetail(post, char);
-  }
+  rerenderSuperTopicDetail();
 }
 window.handleSuperTopicPostAction = handleSuperTopicPostAction;
 
@@ -1508,30 +1679,32 @@ function submitSuperTopicComment() {
   if (!found) { showToast('帖子不存在', 'warn'); return; }
   const post = found.post;
   post.commentTree = post.commentTree || [];
-  post.stats = post.stats || { reposts: 0, comments: 0, likes: 0, isLiked: false, isDownloaded: false };
+  st2sAssignCommentIds(post.commentTree, 'f');
 
   const uName = (window.currentUser && window.currentUser.name) || currentUserName() || '玩家';
   const uAvatar = (window.currentUser && window.currentUser.avatar) || (typeof window.getAvatar === 'function' ? window.getAvatar(uName, 'first') : '');
   const uIp = (window.userProfileData && window.userProfileData.ip) || 'LUMA';
+  const node = {
+    id: '', name: uName, user: uName, avatar: uAvatar, ip: uIp,
+    text: val, content: val, time: '', createdAt: Date.now(), replies: []
+  };
 
-  post.commentTree.unshift({
-    id: 'c_' + Date.now(),
-    name: uName,
-    user: uName,
-    avatar: uAvatar,
-    ip: uIp,
-    text: val,
-    content: val,
-    time: '刚刚',
-    createdAt: Date.now()
-  });
-  post.stats.comments = (post.stats.comments || 0) + 1;
+  const parent = st2sReplyTarget ? st2sFindComment(post.commentTree, st2sReplyTarget) : null;
+  if (parent) {
+    node.replyTo = parent.name || parent.user || '匿名';
+    parent.replies = parent.replies || [];
+    parent.replies.push(node);
+    st2sExpandedComments.add(parent.id);   // 回完自动展开，让人看见自己那条
+    st2sReplyTarget = null;
+  } else {
+    // 追加到末尾而不是插到最前 —— 有楼层号之后，1L 必须永远是最早那条
+    post.commentTree.push(node);
+  }
   input.value = '';
 
   persistSuperTopicPost(found);
-  showToast('评论已发表', 'ok');
-
-  const char = getActiveChar();
-  if (char) renderSuperTopicPostDetail(post, char);
+  showToast(parent ? '回复已发表' : '评论已发表', 'ok');
+  rerenderSuperTopicDetail();
 }
+
 window.submitSuperTopicComment = submitSuperTopicComment;
