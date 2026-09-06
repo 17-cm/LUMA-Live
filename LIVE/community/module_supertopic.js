@@ -360,43 +360,41 @@ function st2sWelcomePanel(char) {
   <div class="st2s-welcome">
     <div class="st2s-welcome-head">
       <span class="st2s-welcome-pin">置顶</span>
-      <h3>写给刚点进来的你</h3>
-      <p class="st2s-welcome-by">—— @${nm}后援会会长 · 本超话版务</p>
+      <h3>新来的先看一眼</h3>
+      <p class="st2s-welcome-by">—— @${nm}后援会会长</p>
     </div>
 
     <div class="st2s-welcome-body">
-      <p>你好，我是会长。这个超话从开服撑到今天，一直是我在打理。</p>
-      <p>你现在看到的是一片空地。也说明 —— 第一个发帖的人，很可能就是你。</p>
+      <p>这个超话刚开，还没什么人。你刷到的第一条大概率就是我这篇。</p>
 
       <div class="st2s-wl">
-        <div class="k">这里都在聊什么</div>
-        <div class="v">直播间的切片和名场面、舞台上下两种样子、看不懂的攻略和打得漂亮的一局、
-          画的手写的剪的二创、蹲活动的搭子。也包括今天特别开心、或者特别不开心，
-          只想找个懂的人说一句的那种帖子。这里都收。</div>
+        <div class="k">先去关注</div>
+        <div class="v">没关注只能看，说不了话。关注完记得签到，一天一次，别断。</div>
       </div>
 
       <div class="st2s-wl">
-        <div class="k">怎么融进来最快</div>
-        <div class="v">先点右上角<b>关注</b>，不关注是纯看的状态。然后<b>签到</b>，
-          一天一次别断。第三件事才是重点：<b>别急着发第一帖，先去别人底下冒个泡</b>。
-          评论是这里认识人最快的路，比发帖管用得多。</div>
+        <div class="k">第一帖不用想太久</div>
+        <div class="v">今天他哪句话把你逗着了，或者你为一个操作拍了下桌子，就写那个。
+          短没关系，具体就行。「签到第 47 天」那是打卡，「今天他声音有点哑」才是记录。
+          半年后翻回来，你记得住的是后一种。</div>
       </div>
 
       <div class="st2s-wl">
-        <div class="k">第一帖写什么好</div>
-        <div class="v">不用憋大题目。今天他哪句话把你逗笑了，或者你为一个操作拍了一下桌子 ——
-          就写那个。短没关系，越具体越有人回。
-          写「签到第 47 天」是打卡，写「今天他声音听着有点哑」才是记录。</div>
+        <div class="k">也可以先别发</div>
+        <div class="v">去别人楼里说两句。这儿回帖的比发帖的多，你在别人底下露几次脸就有人
+          认识你了，比闷头发十帖管用。</div>
       </div>
 
       <div class="st2s-wl">
-        <div class="k">会长的一点私心</div>
-        <div class="v">追星这件事，外人看着是数据，我们自己知道是日子。
-          你在这里写下的东西，主要是写给半年后的自己看的。
-          到时候翻回来，你会感谢当时肯动笔的你。</div>
+        <div class="k">等级怎么涨</div>
+        <div class="v">每 1 万贡献升一级，每个超话单独算。签到、发帖、评论、送礼都算进去，
+          挂着不难涨。哪一级能干什么，规则那页写着。</div>
       </div>
 
-      <p class="st2s-welcome-end">就这样。想说话就说话，这里一直有人。</p>
+      <div class="st2s-wl">
+        <div class="k">最后一句</div>
+        <div class="v">规则页建议看一眼再发，删帖挺没面子的。有事找我会说，我看到就回。</div>
+      </div>
     </div>
 
     <div class="st2s-welcome-ft">
@@ -405,7 +403,7 @@ function st2sWelcomePanel(char) {
     </div>
   </div>`;
 }
-window.st2sWelcomePanel = st2sWelcomePanel;
+
 
 function renderSuperTopicPostsTab(charId) {
   const panel = document.getElementById('superTopicPanel');
@@ -447,7 +445,7 @@ function renderSuperTopicPostsTab(charId) {
               ${verifiedHtml}
             </div>
             <div class="st2s-feed-body">
-              <p class="st2s-feed-line"><span class="txt">${post.content || ''}</span></p>
+              <p class="st2s-feed-line"><span class="txt">${st2sRichText(post.content)}</span></p>
               <div class="st2s-feed-meta">
                 <span class="who">${author.name || ''}</span><span class="sep">·</span><span class="tm">${postTime(post)}</span><span class="sep">·</span><span class="dev">${deviceTag}</span>${subTagHtml}
               </div>
@@ -1105,7 +1103,7 @@ window.submitSuperTopicPost = submitSuperTopicPost;
 const SUPERTOPIC_RULES = [
   { n: '01', t: '粉丝专属', d: '未关注本超话时只能浏览动态与帖子详情, 不能点赞、评论、签到、应援或发帖; 点右上角「+ 关注」即可解锁发言。' },
   { n: '02', t: '内容规范', d: '禁止发布: 色情、暴力、谣言、抄袭、人身攻击、引战、刷屏、广告外链等违规内容。' },
-  { n: '03', t: '图片规范', d: '上传图片必须与 ${name} 本人相关(直播截图、舞台照、应援物料等), 严禁盗图。' },
+  { n: '03', t: '图片规范', d: '上传图片必须与 ${name} 本人相关(直播截图、舞台照、应援物料), 严禁盗图。' },
   { n: '04', t: '发言礼貌', d: '请尊重其他粉丝、不同意见请理性讨论; 严禁@主播本人催更、催播、催互动。' },
   { n: '05', t: '原创激励', d: '原创图文 / 视频 / 二创 / 应援打榜贴, 视内容质量给予 50 - 200 贡献值奖励。' },
   { n: '06', t: '等级权限', d: '每 ${perLv} 贡献升 1 级, 各超话独立计算。产出: ${earn}。Lv.1(关注即得): 点赞 / 评论 / 签到 / 应援; Lv.10: 发帖; Lv.20: 编辑自己的帖子; Lv.50: 超话管理(删除任意帖子与评论、修改本守则)。' },
@@ -1123,6 +1121,18 @@ const SUPERTOPIC_RULES = [
 function escHtml(t) {
   return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+// 正文富文本：先转义再包着色 span。
+// 模型输出的正文里带尖括号或引号时，裸插进 innerHTML 会直接破坏结构，
+// 所以转义必须在着色之前；着色只认空白/括号后面的 #xx# 与 @xx，避免把
+// 「C#」「@2x」这类误伤。
+function st2sRichText(t) {
+  let h = escHtml(String(t || ''));
+  h = h.replace(/(^|[\s\u3000(\uff08\u3010])(#[^#\s<>]{1,24}#)/g, '$1<span class="hash">$2</span>');
+  h = h.replace(/(^|[\s\u3000(\uff08\u3010])(@[^\s<>\u3001\uff0c\u3002\uff1b\uff1a\uff01\uff1f]{1,20})/g, '$1<span class="mention">$2</span>');
+  return h;
+}
+window.st2sRichText = st2sRichText;
+
 function escAttr(t) {
   return escHtml(t).replace(/"/g, '&quot;');
 }
@@ -1702,7 +1712,7 @@ function renderSuperTopicPostDetail(post, char) {
     .concat(mentions.map(m => `<span class="mention">${m}</span>`))
     .concat([st2sEditingPostId === post.id
       ? `<textarea id="st2sEditTa" class="st2s-edit-inline" rows="3">${escHtml(post.content || '')}</textarea>`
-      : `<span class="txt">${post.content || ''}</span>`])
+      : `<span class="txt">${st2sRichText(post.content)}</span>`])
     .concat(subTags.map(t => `<span class="hash">${t}</span>`));
   const bodyHtml = parts.join(' ');
 

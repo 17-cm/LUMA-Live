@@ -3101,6 +3101,29 @@ input:checked + .switch-slider:before {
   to { transform: scaleY(1); opacity: 1; }
 }
 
+/* ═════ 设计令牌：全部 st2s 颜色的唯一来源 ═════
+   挂在真实容器 #communitySuperTopicContent 上。
+   ⚠ 这块被删掉过一次：清理死样式时按「选择器里的 st2s 类名是否失效」判断，
+   而这里是 `.st2s-page, #communitySuperTopicContent` 的混合选择器，
+   ID 不是类名、没被检查到，于是整块被误删 —— 结果 11 个变量全部未定义，
+   所有 color: var(--st2s-*) 变成无效声明退回继承色，
+   表现为「黑色的正常、有颜色的全都不显示」。改选择器时务必保留这个 ID。 */
+#communitySuperTopicContent {
+  --st2s-ink: #0f172a;
+  --st2s-ink-soft: #475569;
+  --st2s-ink-mute: #94a3b8;
+  --st2s-line: rgba(15, 23, 42, 0.08);
+  --st2s-line-soft: rgba(15, 23, 42, 0.12);
+  --st2s-rose: #ff2a6d;
+  /* tag / @ 专用色：由 #ff2a6d、#6b4cff 降饱和压暗而来，
+     明度贴近正文墨色，有色但不抢视线 */
+  --st2s-tag: #9d4f68;
+  --st2s-mention: #5a6f96;
+  --st2s-rose-soft: rgba(255, 42, 109, 0.06);
+  --st2s-amber: #d97706;
+  --st2s-violet: #7928ca;
+}
+
 /* 0. 整体布局 · 64px 侧边栏 + 主区 (全平：无白底，只有一条通栏竖线) */
 .st2s-layout {
   display: flex;
