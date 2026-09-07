@@ -5046,10 +5046,24 @@ input:checked + .switch-slider:before {
 .st2-panel > *:nth-child(5) { animation-delay: .12s; }
 
 /* =========================================================================
-   【直播设置 · STREAMER STUDIO】浅色管理页视觉
+   【直播设置 · STREAMER STUDIO】浅色管理页视觉 —— 大部分已停用
    - 与超话2.0 共享色板 (玫瑰金/紫罗兰/琥珀) + 玻璃拟态
    - 顶部 hero 与 4 个统一骨架模块 (st3-card) + 底部 sheet
    - 全部 sans-serif 字母数字, 字重 800-900 维持编辑感
+
+   ⚠ 2026-09 直播设置改版后，本节的 st3 组件规则（hero / card / card-hd /
+     card-ic / body / sheet / range / input / char-cell / btn / cta / kicker /
+     pill / loading / note / sec-row / page）在 JS 里已零引用，新界面用的是
+     文件末尾的 .ls3-*。改 UI 前先看这条，别去调这里的 .st3-card 等——
+     调了不会有任何效果。
+
+   本节内【仍在生效、不要连带删除】的有三处：
+     1) 下面的 --st3-* token 块：被本节末尾「整页背景」以 var(--st3-canvas) 引用
+     2) 「整页背景」[id="communityLiveSettingsView"], [id="communityLiveMusicView"]：
+        给直播设置子页和音乐子页铺底色
+     3) 「浅色光晕背景 · 复用」.st3-glow-bg：community.js 的导览卡与
+        live.js 的野生主播卡在用，且全是字面色值、不依赖 token
+   清理这三者的依赖关系后再整节删除。
    ========================================================================= */
 
 /* ---------- 颜色 token (与超话一致) ---------- */
@@ -7117,4 +7131,541 @@ input:checked + .switch-slider:before {
 .lr-row { animation: lr-rise .26s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
   .lr-podium, .lr-row, .lr-crown { animation: none; }
+}
+
+/* =========================================================================
+   直播设置 · 主播控制台 (.ls3-*)
+   ---------------------------------------------------------------------------
+   紧凑标题条 + 三格图标网格 + 设置 sheet。tile 由 studio_settings.js 的
+   MODULES 注册表生成，grid 自动换行，加第四个模块不用动这里。
+   和排行榜同一套纪律：所有尺寸显式声明、头像一律 aspect-ratio + 50%，
+   不借 Tailwind 的 w-*/h-* 刻度承载几何（刻度写错时容器会静默失去宽高，
+   竖版图就被切成椭圆；断网拉不到 cdn.tailwindcss.com 时同样会裸奔）。
+   注意 .is-violet / .is-rose / .is-amber 在 st3-* 那套里已有同名用法，
+   这里一律带 .ls3-* 前缀限定，避免污染旧组件。
+   ========================================================================= */
+
+/* ---------- 标题条 ---------- */
+.ls3-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 2px 0;
+}
+.ls3-head h4 {
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: -.025em;
+  line-height: 1.1;
+  color: #0f172a;
+}
+.ls3-head p {
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+.ls3-head-k {
+  flex-shrink: 0;
+  padding-bottom: 3px;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: #cbd5e1;
+}
+
+/* ---------- 三格网格 ---------- */
+.ls3-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding-top: 14px;
+}
+.ls3-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 14px 6px 11px;
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, .95);
+  background: rgba(255, 255, 255, .78);
+  box-shadow: 0 10px 24px -18px rgba(15, 23, 42, .38);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.ls3-tile:active {
+  transform: scale(.965);
+  border-color: rgba(203, 213, 225, 1);
+}
+.ls3-tile-ic {
+  width: 40px;
+  aspect-ratio: 1 / 1;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+.ls3-tile-ic .ls3-i { width: 21px; height: 21px; display: block; }
+.ls3-tile-ic.is-violet {
+  background: linear-gradient(145deg, #a78bfa, #7c3aed);
+  box-shadow: 0 9px 20px -9px rgba(124, 58, 237, .65);
+}
+.ls3-tile-ic.is-rose {
+  background: linear-gradient(145deg, #fb7185, #e11d48);
+  box-shadow: 0 9px 20px -9px rgba(225, 29, 72, .6);
+}
+.ls3-tile-ic.is-amber {
+  background: linear-gradient(145deg, #fbbf24, #d97706);
+  box-shadow: 0 9px 20px -9px rgba(217, 119, 6, .6);
+}
+.ls3-tile-name {
+  margin-top: 9px;
+  font-size: 12.5px;
+  font-weight: 900;
+  letter-spacing: -.01em;
+  color: #0f172a;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ls3-tile-sub {
+  margin-top: 2px;
+  font-size: 8.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ls3-tile-badge {
+  margin-top: 8px;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 232, 240, .9);
+  background: rgba(241, 245, 249, .9);
+  font-size: 8.5px;
+  font-weight: 800;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+.ls3-tile-badge.is-on {
+  color: #475569;
+  background: rgba(248, 250, 252, .95);
+  border-color: rgba(203, 213, 225, .9);
+}
+
+/* ---------- sheet 骨架 ---------- */
+.ls3-sheet {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(15, 23, 42, .34);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity .24s ease;
+}
+.ls3-sheet.show { opacity: 1; }
+.ls3-sheet-panel {
+  width: 100%;
+  max-width: 480px;
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 26px 26px 0 0;
+  transform: translateY(100%);
+  transition: transform .3s cubic-bezier(.22, .61, .36, 1);
+}
+.ls3-sheet.show .ls3-sheet-panel { transform: translateY(0); }
+.ls3-sheet-grabber {
+  width: 38px;
+  height: 4px;
+  flex-shrink: 0;
+  margin: 10px auto 0;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+.ls3-sheet-hd {
+  flex-shrink: 0;
+  padding: 13px 18px 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.ls3-sheet-hd h4 {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -.02em;
+  color: #0f172a;
+}
+.ls3-sheet-hd p {
+  margin-top: 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+.ls3-sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 15px 16px calc(20px + var(--safe-bottom, 20px));
+}
+@keyframes ls3-flip {
+  from { opacity: 0; transform: translateX(14px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.ls3-sheet-body.is-flip { animation: ls3-flip .24s ease-out both; }
+
+/* 第二级头部：返回 + 主播身份 */
+.ls3-subhd { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ls3-back {
+  width: 32px;
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ls3-back:active { transform: scale(.9); }
+.ls3-back .ls3-i { width: 16px; height: 16px; }
+.ls3-subhd-av {
+  width: 38px;
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #f1f5f9;
+  box-shadow: 0 0 0 1px rgba(226, 232, 240, .95);
+}
+.ls3-subhd-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ls3-subhd-t { flex: 1; min-width: 0; }
+.ls3-subhd-t b {
+  display: block;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: -.02em;
+  color: #0f172a;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ls3-subhd-t span {
+  display: block;
+  margin-top: 2px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+/* ---------- 第一级：选主播 ---------- */
+.ls3-chargrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 13px 8px;
+}
+.ls3-charcell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .14s ease;
+}
+.ls3-charcell:active { transform: scale(.93); }
+.ls3-char-av {
+  position: relative;
+  width: 52px;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  padding: 2px;
+  background: linear-gradient(145deg, #e2e8f0, #cbd5e1);
+}
+.ls3-char-av img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  background: #f1f5f9;
+}
+.ls3-charcell.is-set .ls3-char-av {
+  background: linear-gradient(145deg, #c4b5fd, #7c3aed);
+  box-shadow: 0 7px 16px -9px rgba(124, 58, 237, .6);
+}
+.ls3-char-n {
+  position: absolute;
+  right: -4px;
+  bottom: -2px;
+  min-width: 21px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 232, 240, .95);
+  background: #fff;
+  color: #94a3b8;
+  font-size: 8.5px;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.ls3-charcell.is-set .ls3-char-n {
+  color: #7c3aed;
+  border-color: rgba(167, 139, 250, .55);
+}
+.ls3-char-name {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #334155;
+}
+
+/* ---------- 第二级：视频列表 ---------- */
+.ls3-videos { display: flex; flex-direction: column; gap: 10px; }
+.ls3-video {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  background: #0f172a;
+}
+.ls3-video-slot { width: 100%; aspect-ratio: 16 / 9; background: #0f172a; }
+.ls3-video-slot video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #0f172a;
+}
+.ls3-video-load {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+}
+.ls3-video-load.is-err { color: #f87171; }
+.ls3-video-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  background: #fff;
+  border-top: 1px solid #f1f5f9;
+}
+.ls3-video-meta {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 9px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+.ls3-vbtn {
+  flex-shrink: 0;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 232, 240, .95);
+  background: #fff;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 800;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.ls3-vbtn .ls3-i { width: 12px; height: 12px; }
+.ls3-vbtn.is-del { color: #dc2626; border-color: rgba(220, 38, 38, .25); }
+.ls3-vbtn.is-armed {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+.ls3-vempty {
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 16px;
+  padding: 26px 14px;
+  text-align: center;
+}
+.ls3-vempty .ls3-i { width: 26px; height: 26px; color: #cbd5e1; }
+.ls3-vempty b {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #64748b;
+}
+.ls3-vempty span {
+  display: block;
+  margin-top: 3px;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+/* ---------- 主按钮 ---------- */
+.ls3-cta {
+  width: 100%;
+  height: 46px;
+  margin-top: 14px;
+  border: none;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  color: #fff;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .14s ease, opacity .14s ease;
+}
+.ls3-cta .ls3-i { width: 17px; height: 17px; }
+.ls3-cta:active { transform: scale(.98); }
+.ls3-cta.is-violet {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  box-shadow: 0 12px 26px -12px rgba(109, 40, 217, .75);
+}
+.ls3-cta.is-amber {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow: 0 12px 26px -12px rgba(217, 119, 6, .75);
+}
+.ls3-cta[disabled] { opacity: .48; box-shadow: none; cursor: not-allowed; }
+
+/* ---------- 信息条 ---------- */
+.ls3-hint {
+  display: flex;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 10px 11px;
+  border-radius: 12px;
+  border: 1px solid #f1f5f9;
+  background: #f8fafc;
+  font-size: 9.5px;
+  line-height: 1.55;
+  font-weight: 600;
+  color: #64748b;
+}
+.ls3-hint .ls3-i { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; color: #94a3b8; }
+.ls3-hint b { color: #334155; font-weight: 800; }
+
+/* ---------- 粉丝体系 ---------- */
+.ls3-fans-sum {
+  margin-bottom: 14px;
+  padding: 14px 10px;
+  border-radius: 16px;
+  text-align: center;
+  border: 1px solid rgba(245, 158, 11, .22);
+  background: linear-gradient(135deg, rgba(245, 158, 11, .1), rgba(251, 191, 36, .04));
+}
+.ls3-fans-sum span {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: #94a3b8;
+}
+.ls3-fans-sum b {
+  display: block;
+  margin-top: 5px;
+  font-size: 21px;
+  font-weight: 900;
+  letter-spacing: -.02em;
+  color: #b45309;
+  font-variant-numeric: tabular-nums;
+}
+.ls3-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.ls3-field label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  color: #94a3b8;
+}
+.ls3-inputwrap {
+  display: flex;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0 10px;
+}
+.ls3-inputwrap:focus-within { border-color: #fbbf24; }
+.ls3-inputwrap input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  color: #0f172a;
+  padding: 11px 0;
+  font-variant-numeric: tabular-nums;
+}
+.ls3-inputwrap span {
+  flex-shrink: 0;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+/* ---------- 读取态 ---------- */
+.ls3-loading {
+  padding: 32px 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+.ls3-loading.is-err { color: #dc2626; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ls3-sheet-body.is-flip { animation: none; }
+  .ls3-tile, .ls3-charcell, .ls3-cta, .ls3-back { transition: none; }
 }
