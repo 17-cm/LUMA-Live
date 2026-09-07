@@ -4,6 +4,10 @@
 // 1. 三大排行榜：粉丝热度榜、至尊守护/贡献总榜、劳模工时榜
 // 2. 金/银/铜立体颁奖台与 4~10 详细排名
 // 3. 用户与全主播实时动态分数计算与打榜联动
+//
+// 视图几何（头像尺寸、领奖台高度、圆）全部由 style.css 的 .lr-* 负责，
+// 这里只出结构，不再用 Tailwind 的 w-*/h-* 刻度写死尺寸 —— 刻度写错时
+// 容器会静默拿不到宽高，竖版头像就会被 rounded-full 切成椭圆。
 // =========================================================================
 
 var api = window.api || {};
@@ -106,76 +110,102 @@ function renderCommunityRanking(tabType = 'fans') {
     rankedItems.sort((a, b) => b.score - a.score);
   }
 
-  const top1 = rankedItems[0] || null;
-  const top2 = rankedItems[1] || null;
-  const top3 = rankedItems[2] || null;
-  const rest = rankedItems.slice(3);
+  // 三条数据源的字段形状略有差异（fans / score，tag / badge），这里收敛成
+  // 视图唯一依赖的结构：score 保证可计算，avatar 保证有兜底。
+  // 数据层习惯把玩家那条写成「某某 (你)」，这里剥掉后缀、改由 .lr-you 徽标标记，
+  // 免得名字里挂着一段括号，将来又和徽标重复。
+  const items = rankedItems.map(it => {
+    const isUser = !!it.isUser;
+    const raw = String(it.name || '匿名');
+    const slim = raw.replace(/\s*[（(]\s*你\s*[)）]\s*$/, '');
+    return {
+      name: (isUser && slim) ? slim : raw,
+      avatar: it.avatar || getAvatar(it.name || null, 'first'),
+      badge: it.badge || it.tag || '',
+      score: Number(it.score) || 0,
+      scoreLabel: it.scoreLabel || '热度',
+      isUser: isUser
+    };
+  }).sort((a, b) => b.score - a.score);
+
+  if (!items.length) {
+    container.innerHTML = '<div class="lr-none">本榜暂时还没有人上榜</div>';
+    return;
+  }
+
+  // 头像 URL 与昵称都可能来自外部数据，进模板前统一转义
+  const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, ch => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+  ));
+  const num = (v) => (Number(v) || 0).toLocaleString();
+  const youTag = (item) => (item.isUser ? '<span class="lr-you">你</span>' : '');
+
+  // 领奖台三列。DOM 按名次 1→2→3 排，视觉上的 2·1·3 由 CSS order 负责。
+  const PODIUM = [
+    { rank: 1, cls: 'lr-pod-1', av: 'lr-av-1', mark: '<span class="lr-crown">👑</span>' },
+    { rank: 2, cls: 'lr-pod-2', av: 'lr-av-2', mark: '<span class="lr-medal">🥈</span>' },
+    { rank: 3, cls: 'lr-pod-3', av: 'lr-av-3', mark: '<span class="lr-medal">🥉</span>' }
+  ];
 
   const podiumHtml = `
-    <div class="grid grid-cols-3 gap-2 items-end pt-4 pb-2 text-center">
-      ${top2 ? `
-        <div class="flex flex-col items-center">
-          <div class="relative mb-2">
-            <div class="w-12 h-12 rounded-full p-0.5 bg-slate-300 shadow-md">
-              <img src="${top2.avatar}" class="w-full h-full rounded-full object-cover">
+    <div class="lr-podium">
+      ${PODIUM.map(cfg => {
+        const item = items[cfg.rank - 1];
+        if (!item) {
+          return `
+            <div class="lr-pod ${cfg.cls}">
+              <div class="lr-stage">
+                <div class="lr-vacant">虚位</div>
+                <span class="lr-name">等待上榜</span>
+              </div>
+              <div class="lr-base">${cfg.rank}</div>
             </div>
-            <span class="absolute -top-2 -right-1 text-xs">🥈</span>
-          </div>
-          <span class="text-xs font-black text-slate-800 truncate max-w-[85px]">${top2.name}</span>
-          <span class="text-[9px] text-slate-400 mt-0.5">${top2.score.toLocaleString()} ${top2.scoreLabel}</span>
-          <div class="podium-step-2 w-full mt-2 flex items-center justify-center font-black text-slate-400 text-sm">2</div>
-        </div>
-      ` : '<div></div>'}
-
-      ${top1 ? `
-        <div class="flex flex-col items-center">
-          <div class="relative mb-2">
-            <div class="w-15 h-15 rounded-full p-0.5 bg-gradient-to-tr from-amber-300 via-amber-400 to-amber-500 shadow-lg">
-              <img src="${top1.avatar}" class="w-full h-full rounded-full object-cover">
+          `;
+        }
+        return `
+          <div class="lr-pod ${cfg.cls}">
+            <div class="lr-stage">
+              <div class="lr-av ${cfg.av}">
+                <img src="${esc(item.avatar)}" alt="">
+                ${cfg.mark}
+              </div>
+              <div class="lr-idline">
+                <span class="lr-name">${esc(item.name)}</span>
+                ${youTag(item)}
+              </div>
+              <span class="lr-val">${num(item.score)} · ${esc(item.scoreLabel)}</span>
             </div>
-            <span class="absolute -top-3 -right-1 text-base animate-bounce">👑</span>
+            <div class="lr-base">${cfg.rank}</div>
           </div>
-          <span class="text-xs font-black text-amber-600 truncate max-w-[95px]">${top1.name}</span>
-          <span class="text-[9px] font-bold text-slate-500 mt-0.5">${top1.score.toLocaleString()} ${top1.scoreLabel}</span>
-          <div class="podium-step-1 w-full mt-2 flex items-center justify-center font-black text-amber-500 text-lg">1</div>
-        </div>
-      ` : '<div></div>'}
-
-      ${top3 ? `
-        <div class="flex flex-col items-center">
-          <div class="relative mb-2">
-            <div class="w-12 h-12 rounded-full p-0.5 bg-amber-700/40 shadow-md">
-              <img src="${top3.avatar}" class="w-full h-full rounded-full object-cover">
-            </div>
-            <span class="absolute -top-2 -right-1 text-xs">🥉</span>
-          </div>
-          <span class="text-xs font-black text-slate-800 truncate max-w-[85px]">${top3.name}</span>
-          <span class="text-[9px] text-slate-400 mt-0.5">${top3.score.toLocaleString()} ${top3.scoreLabel}</span>
-          <div class="podium-step-3 w-full mt-2 flex items-center justify-center font-black text-amber-700 text-sm">3</div>
-        </div>
-      ` : '<div></div>'}
+        `;
+      }).join('')}
     </div>
   `;
 
-  const listHtml = rest.map((item, idx) => `
-    <div class="luxe-card p-3 flex items-center justify-between bg-white ${item.isUser ? 'border-rose-300 bg-rose-50/50' : ''}">
-      <div class="flex items-center gap-3 min-w-0">
-        <span class="w-5 text-center text-xs font-black text-slate-400">${idx + 4}</span>
-        <img src="${item.avatar}" class="w-9 h-9 rounded-full object-cover border border-slate-200 flex-shrink-0">
-        <div class="min-w-0">
-          <div class="flex items-center gap-1.5">
-            <h5 class="text-xs font-black text-slate-900 truncate">${item.name}</h5>
-            <span class="text-[8px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.2 rounded">${item.badge}</span>
+  const rest = items.slice(3);
+  const listHtml = rest.length ? `
+    <div class="lr-divider">4 名之后</div>
+    <div class="lr-list">
+      ${rest.map((item, idx) => `
+        <div class="lr-row${item.isUser ? ' me' : ''}">
+          <span class="lr-idx">${idx + 4}</span>
+          <div class="lr-av lr-av-sm"><img src="${esc(item.avatar)}" alt=""></div>
+          <div class="lr-who">
+            <div class="lr-idline">
+              <span class="lr-name">${esc(item.name)}</span>
+              ${youTag(item)}
+            </div>
+            ${item.badge ? `<span class="lr-badge">${esc(item.badge)}</span>` : ''}
+          </div>
+          <div class="lr-score">
+            <b>${num(item.score)}</b>
+            <span>${esc(item.scoreLabel)}</span>
           </div>
         </div>
-      </div>
-      <div class="text-right flex-shrink-0">
-        <span class="text-xs font-black text-rose-600">${item.score.toLocaleString()}</span>
-        <p class="text-[8px] text-slate-400">${item.scoreLabel}</p>
-      </div>
+      `).join('')}
     </div>
-  `).join('');
+  ` : '';
 
-  container.innerHTML = podiumHtml + `<div class="space-y-2 pt-2">${listHtml}</div>`;
+  container.innerHTML = podiumHtml + listHtml;
 }
 window.renderCommunityRanking = renderCommunityRanking;

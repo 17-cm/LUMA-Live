@@ -1595,28 +1595,7 @@ input:checked + .switch-slider:before {
   pointer-events: none;
 }
 
-/* 颁奖台 3 阶梯 */
-.podium-step-1 {
-  background: linear-gradient(180deg, rgba(251, 191, 36, 0.18) 0%, rgba(251, 191, 36, 0.05) 100%);
-  border: 1px solid rgba(251, 191, 36, 0.4);
-  border-bottom: none;
-  border-radius: 16px 16px 0 0;
-  height: 90px;
-}
-.podium-step-2 {
-  background: linear-gradient(180deg, rgba(148, 163, 184, 0.18) 0%, rgba(148, 163, 184, 0.05) 100%);
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  border-bottom: none;
-  border-radius: 16px 16px 0 0;
-  height: 70px;
-}
-.podium-step-3 {
-  background: linear-gradient(180deg, rgba(217, 119, 6, 0.18) 0%, rgba(217, 119, 6, 0.05) 100%);
-  border: 1px solid rgba(217, 119, 6, 0.4);
-  border-bottom: none;
-  border-radius: 16px 16px 0 0;
-  height: 55px;
-}
+/* 颁奖台 3 阶梯已迁至 .lr-base（见文件末尾「社区排行榜」一节） */
 
 /* 微博热搜榜单角标 */
 .hot-badge-bao {
@@ -6829,3 +6808,313 @@ input:checked + .switch-slider:before {
 }
 .st2s-detail-send:hover { color: var(--st2s-ink); border-color: var(--st2s-ink-mute); }
 .st2s-detail-send:active { transform: scale(.95); }
+
+/* =========================================================================
+   社区排行榜 · 领奖台与榜单行 (.lr-*)
+   ---------------------------------------------------------------------------
+   为什么单独建一套类，而不是继续用 Tailwind 工具类：
+   头像容器原先写的是 `w-15 h-15`，而 Tailwind 默认 spacing 刻度只有
+   …12, 14, 16, 20…，**w-15 / h-15 不存在** → 容器拿不到宽高 → 内部
+   img 的 w-full/h-full 百分比无处解析 → 退化成按图片自身比例撑开。
+   角色头像是外部竖版人设图(约 3:4)，于是 rounded-full 把它切成了椭圆；
+   换成 canvas 生成的 200×200 正方头像时又是正圆 —— 切 tab 换第一名，
+   形状就跟着变。这里把尺寸收进 CSS 显式声明，并用
+   aspect-ratio:1/1 + border-radius:50% 双保险钉死为正圆：
+   即便将来又写错刻度、或真机断网导致 cdn.tailwindcss.com 拉不到，
+   这一屏的几何仍然成立。
+   ========================================================================= */
+
+.lr-podium {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: end;
+  gap: 8px;
+  padding: 20px 2px 0;
+}
+.lr-pod {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+/* DOM 顺序按名次 1→2→3，视觉顺序靠 order 摆成 2·1·3 */
+.lr-pod-1 { order: 2; }
+.lr-pod-2 { order: 1; }
+.lr-pod-3 { order: 3; }
+
+/* 舞台区定高：名字长短不再牵动头像位置，三列几何完全由 CSS 决定 */
+.lr-stage {
+  width: 100%;
+  height: 122px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+/* ---------- 头像：唯一尺寸来源 ---------- */
+.lr-av {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  padding: 2.5px;
+  background: rgba(226, 232, 240, .95);
+  flex-shrink: 0;
+}
+.lr-av > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #f1f5f9;
+}
+.lr-av-1 {
+  width: 68px;
+  padding: 3px;
+  background: linear-gradient(150deg, #fef3c7 0%, #fbbf24 45%, #d97706 100%);
+  box-shadow: 0 10px 26px -8px rgba(217, 119, 6, .55), inset 0 0 0 1px rgba(255, 255, 255, .65);
+}
+.lr-av-2 {
+  width: 54px;
+  background: linear-gradient(150deg, #f8fafc 0%, #cbd5e1 45%, #94a3b8 100%);
+  box-shadow: 0 8px 20px -10px rgba(100, 116, 139, .5);
+}
+.lr-av-3 {
+  width: 54px;
+  background: linear-gradient(150deg, #fed7aa 0%, #fb923c 45%, #c2410c 100%);
+  box-shadow: 0 8px 20px -10px rgba(194, 65, 12, .45);
+}
+.lr-av-sm {
+  width: 40px;
+  padding: 0;
+  background: transparent;
+  box-shadow: 0 0 0 1px rgba(226, 232, 240, .95);
+}
+
+/* ---------- 台顶标记 ---------- */
+.lr-crown {
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  font-size: 17px;
+  line-height: 1;
+  z-index: 2;
+  filter: drop-shadow(0 3px 6px rgba(217, 119, 6, .4));
+  animation: lr-float 2.8s ease-in-out infinite;
+}
+@keyframes lr-float {
+  0%, 100% { transform: translateX(-50%) translateY(0) rotate(-5deg); }
+  50%      { transform: translateX(-50%) translateY(-3px) rotate(5deg); }
+}
+.lr-medal {
+  position: absolute;
+  right: -3px;
+  top: -3px;
+  font-size: 13px;
+  line-height: 1;
+  z-index: 2;
+}
+
+/* ---------- 文字 ---------- */
+/* 领奖台上的名字行：名字 + 「你」标记，长名照样省略号截断 */
+.lr-idline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+}
+.lr-idline .lr-name { padding: 0; }
+.lr-you {
+  flex-shrink: 0;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  color: #fff;
+  background: linear-gradient(135deg, #ff2a6d, #7928ca);
+  border-radius: 999px;
+  padding: 1px 5px;
+}
+.lr-name {
+  max-width: 100%;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lr-pod-1 .lr-name { font-size: 12.5px; color: #b45309; }
+.lr-val {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+.lr-pod-1 .lr-val { color: #64748b; }
+
+/* ---------- 台阶 ---------- */
+.lr-base {
+  width: 100%;
+  height: 54px;
+  border-radius: 14px 14px 0 0;
+  border: 1px solid rgba(226, 232, 240, .95);
+  border-bottom: none;
+  background: rgba(248, 250, 252, .85);
+  color: #94a3b8;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 9px;
+  font-size: 15px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.lr-pod-1 .lr-base {
+  height: 92px;
+  padding-top: 12px;
+  font-size: 19px;
+  color: #d97706;
+  background: linear-gradient(180deg, rgba(251, 191, 36, .22) 0%, rgba(251, 191, 36, .04) 100%);
+  border-color: rgba(251, 191, 36, .45);
+}
+.lr-pod-2 .lr-base {
+  height: 68px;
+  background: linear-gradient(180deg, rgba(148, 163, 184, .2) 0%, rgba(148, 163, 184, .03) 100%);
+  border-color: rgba(148, 163, 184, .4);
+}
+.lr-pod-3 .lr-base {
+  background: linear-gradient(180deg, rgba(217, 119, 6, .16) 0%, rgba(217, 119, 6, .03) 100%);
+  border-color: rgba(217, 119, 6, .32);
+  color: #b45309;
+}
+
+/* ---------- 空位 ---------- */
+.lr-vacant {
+  width: 54px;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(148, 163, 184, .45);
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(148, 163, 184, .75);
+  letter-spacing: .04em;
+}
+
+/* ---------- 4 名之后的列表 ---------- */
+.lr-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 2px 0;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  color: #cbd5e1;
+  text-transform: uppercase;
+}
+.lr-divider::before,
+.lr-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(226, 232, 240, .85);
+}
+.lr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+}
+.lr-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, .95);
+  background: rgba(255, 255, 255, .72);
+}
+.lr-row.me {
+  border-color: rgba(255, 42, 109, .26);
+  background: linear-gradient(90deg, rgba(255, 42, 109, .07) 0%, rgba(255, 255, 255, .74) 46%);
+}
+.lr-idx {
+  width: 20px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 900;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+.lr-row.me .lr-idx { color: #ff2a6d; }
+.lr-who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.lr-who .lr-name { padding: 0; font-size: 11.5px; }
+.lr-badge {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 8.5px;
+  font-weight: 700;
+  color: #64748b;
+  background: rgba(241, 245, 249, .95);
+  border: 1px solid rgba(226, 232, 240, .95);
+  border-radius: 6px;
+  padding: 1.5px 6px;
+}
+.lr-score {
+  flex-shrink: 0;
+  text-align: right;
+}
+.lr-score b {
+  display: block;
+  font-size: 12px;
+  font-weight: 900;
+  color: #e11d48;
+  font-variant-numeric: tabular-nums;
+}
+.lr-score span {
+  display: block;
+  margin-top: 1px;
+  font-size: 8.5px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+/* ---------- 空榜 ---------- */
+.lr-none {
+  padding: 34px 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+/* ---------- 入场 ---------- */
+@keyframes lr-rise {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.lr-podium { animation: lr-rise .34s ease-out both; }
+.lr-row { animation: lr-rise .26s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .lr-podium, .lr-row, .lr-crown { animation: none; }
+}
