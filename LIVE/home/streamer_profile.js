@@ -190,7 +190,68 @@ function getOrGenerateStreamerProfile(characterId, characterObj) {
 }
 window.getOrGenerateStreamerProfile = getOrGenerateStreamerProfile;
 
+// 把真实直播结算数据接入主播主页：直播场次、当前粉丝、真实直播场次列表
+// 数据源为宿主持久化台账（LiveStatsManager），粉丝总数 = 各场次增粉累加，列表与总数完全对得上
+async function applyLiveStatsIntoProfile(profile) {
+  try {
+    if (!profile) return;
+    const baseTitles = [
+      '深夜治愈弹唱会 · 唱给每一个未眠的你',
+      '冲国服巅峰赛！带粉车队极速发车',
+      '聊天互动碎碎念 · 聊聊最近发生的好玩事',
+      '开箱测评与好物分享专场',
+      '粉丝专属连麦PK！输了有惩罚哦',
+      '早安元气电台 · 开启美好的一天'
+    ];
+
+    let ledger = [];
+    if (window.LiveStatsManager) {
+      const rec = await window.LiveStatsManager.getStats(profile.characterId);
+      if (rec) {
+        profile.totalShows = Math.floor(Number(rec.liveShowCount) || 0);
+        profile.baseFans = Math.floor(Number(rec.fans) || 0);
+      }
+      try { ledger = await window.LiveStatsManager.getLedger(profile.characterId); } catch (e) { ledger = (rec && Array.isArray(rec.shows)) ? rec.shows.slice() : []; }
+    }
+
+    // 用台账重建“直播场次”列表：条数 = 累计场次，增粉累加 = 粉丝总数
+    // 每场带真实开播/下播时间戳，展示"几月几日 几点开 ~ 几点收"，可透过时间戳验证是否真随机错落
+    const realShows = [];
+    let gainSum = 0;
+    ledger.slice(0, 15).forEach((h, idx) => {
+      const gained = Math.floor(Number(h.gain) || 0);
+      gainSum += gained;
+      const endTs = Number(h.end) || Number(h.ts) || Date.now();
+      const startTs = Number(h.start) || (endTs - 90 * 60000);
+      const durMin = Math.max(1, Math.round((endTs - startTs) / 60000));
+      const dh = Math.floor(durMin / 60);
+      const dm = durMin % 60;
+      realShows.push({
+        showNumber: profile.totalShows - idx,
+        title: h.title || (idx < baseTitles.length ? baseTitles[idx] : `第 ${profile.totalShows - idx} 场直播`),
+        duration: `${dh}小时${dm}分`,
+        heat: (35000 + idx * 4500).toLocaleString(),
+        newFans: `+${gained} 粉丝`,
+        createdAt: endTs,
+        startTs,
+        endTs
+      });
+    });
+    if (realShows.length) {
+      profile.showsHistory = realShows;
+      profile.avgFansPerShow = Math.max(1, Math.round(gainSum / realShows.length));
+    } else {
+      profile.showsHistory = [];
+      profile.avgFansPerShow = 0;
+    }
+  } catch (e) {}
+}
+
 function getHostBaseFans(characterId, room) {
+  // 统一以直播台账累加的真实粉丝为准（FansManager 已被 LiveStatsManager 回灌）
+  if (window.LumaFansManager && typeof window.LumaFansManager.getFans === 'function') {
+    return window.LumaFansManager.getFans(characterId, room);
+  }
   const prof = getOrGenerateStreamerProfile(characterId, room);
   return prof ? prof.baseFans : 12800;
 }
@@ -434,6 +495,9 @@ async function openStreamerProfilePage(id) {
     }
   } catch (e) {}
 
+  // 把真实直播结算数据（场次 + 粉丝 + 历史记录）接入主播主页“直播场次”
+  try { await applyLiveStatsIntoProfile(profile); } catch (e) {}
+
   window.currentViewingProfile = profile;
   renderStreamerProfileToUI(profile);
 
@@ -647,6 +711,19 @@ function renderSpPosts() {
   `;
 }
 
+function fmtPad(n) { return n < 10 ? '0' + n : '' + n; }
+function fmtShowRange(show) {
+  const end = Number(show.endTs) || Number(show.createdAt) || Date.now();
+  const start = Number(show.startTs) || (end - 90 * 60000);
+  const sD = new Date(start), eD = new Date(end);
+  const sStr = `${sD.getMonth() + 1}月${sD.getDate()}日 ${fmtPad(sD.getHours())}:${fmtPad(sD.getMinutes())}`;
+  const eStr = `${fmtPad(eD.getHours())}:${fmtPad(eD.getMinutes())}`;
+  const eFull = `${eD.getMonth() + 1}月${eD.getDate()}日 ${eStr}`;
+  // 统一展示：跨天补日期，同天省略日期，每场只有一行、开收播固定不跳动
+  return `${sStr} 开播 ~ ${sD.getMonth() === eD.getMonth() && sD.getDate() === eD.getDate() ? eStr : eFull} 收播`;
+}
+window.fmtShowRange = fmtShowRange;
+
 function renderSpShows() {
   const box = document.getElementById('spPanelShows');
   if (!box || !window.currentViewingProfile) return;
@@ -667,6 +744,7 @@ function renderSpShows() {
         <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs flex items-center justify-between">
           <div class="space-y-1">
             <h4 class="text-xs font-bold text-slate-900">${s.title}</h4>
+            <div class="text-[9px] text-rose-500 font-bold">${window.fmtShowRange ? window.fmtShowRange(s) : ''}</div>
             <div class="flex items-center gap-2 text-[10px] text-slate-400">
               <span>时长: ${s.duration}</span>
               <span>·</span>
@@ -675,7 +753,6 @@ function renderSpShows() {
               <span class="text-rose-500 font-bold">${s.newFans}</span>
             </div>
           </div>
-          <span class="text-[9px] text-slate-400 font-medium" ${s.createdAt ? `data-dynamic-time data-ts="${s.createdAt}"` : ''}>${s.createdAt ? (window.formatDynamicTime ? window.formatDynamicTime(s.createdAt) : '刚刚') : (s.timeAgo || '刚刚')}</span>
         </div>
       `).join('')}
     </div>

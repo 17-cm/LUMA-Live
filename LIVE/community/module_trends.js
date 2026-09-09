@@ -560,10 +560,10 @@ function getPostCardHtml(post) {
     : ((typeof window.getAvatar === 'function')
         ? window.getAvatar(post.author.name, 'emoji')
         : (post.author.avatar || ''));
-  // 手机型号：Float
-  const deviceTag = (typeof window.getFloatClientTag === 'function')
-    ? window.getFloatClientTag(true)
-    : 'Float 客户端';
+  // 手机型号：品牌固定 Float，后缀随机但一经确定就钉在 post 上
+  // （原来这里每次渲染都现抽，点赞/评论重渲染时机型会跳）
+  const deviceTag = (typeof window.postDeviceTag === 'function')
+    ? window.postDeviceTag(post) : 'Float 客户端';
 
   // 内联文本流
   const tagHtml = post.tag

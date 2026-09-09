@@ -209,51 +209,6 @@ window.handleSuperTopicCheckIn = function(targetKey, targetName = '该超话') {
   window.notifyCommunityDataChanged('checkin', { targetKey, storeData });
 };
 
-// =========================================================================
-// 【全局同步中心 2】：打榜与贡献值统一中心 (直播间消费、超话打榜、排行榜三方绝对同步)
-// =========================================================================
-window.getCharContributionScore = function(charId) {
-  try {
-    const raw = localStorage.getItem(`luma_char_contribution_${charId}`);
-    return raw ? parseInt(raw, 10) : 0;
-  } catch (e) {
-    return 0;
-  }
-};
-
-window.addCharContributionScore = function(charId, addAmount) {
-  const current = window.getCharContributionScore(charId);
-  const next = current + addAmount;
-  try {
-    localStorage.setItem(`luma_char_contribution_${charId}`, next.toString());
-  } catch (e) {}
-  
-  // 同步全网总贡献
-  const totalUserContrib = parseInt(localStorage.getItem('luma_total_user_contribution') || '12000', 10) + addAmount;
-  localStorage.setItem('luma_total_user_contribution', totalUserContrib.toString());
-
-  // 同步写入守护消费矩阵，保证「社区全服守护/贡献总榜」与「个人主页消费排行」实时联动
-  if (window.LumaGuardManager && typeof window.LumaGuardManager.recordSpending === 'function') {
-    try {
-      const chars = (typeof window.getAvailableCharsList === 'function') ? window.getAvailableCharsList() : [];
-      const char = chars.find(c => String(c.id) === String(charId));
-      window.LumaGuardManager.recordSpending({
-        fromId: 'user',
-        toId: charId,
-        toName: char ? char.name : '主播',
-        toAvatar: char ? char.avatar : '',
-        amount: addAmount,
-        type: 'support_gift',
-        itemName: '超话打榜'
-      });
-    } catch (e) {}
-  }
-
-  // 广播触发打榜与贡献更新
-  window.notifyCommunityDataChanged('support', { charId, addAmount, next });
-  return next;
-};
-
 // 全局监听器注册与广播
 const communityListeners = [];
 window.subscribeCommunityData = function(cb) {

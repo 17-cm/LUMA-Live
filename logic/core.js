@@ -397,7 +397,9 @@ window.appParams = window.appParams || {
   danmakuSpeed: 50,
   giftFrequency: 30,
   enterPlayerLiveRate: 60,
-  guestbookRate: 75
+  guestbookRate: 75,
+  fansGainMin: 1000,
+  fansGainMax: 5000
 };
 
 // 自定义 API 配置
@@ -504,13 +506,22 @@ function renderPresetTemplate(tpl, vars) {
   return tpl.replace(/\{\{(\w+)\}\}/g, (m, k) => (vars[k] !== undefined && vars[k] !== null ? vars[k] : ''));
 }
 
-function getEffectivePresetTemplate(tagKey, categoryKey = null) {
+function getEffectivePresetTemplate(tagKey, categoryKey = null, presetIds = null) {
   const p = window.appPresets || {};
   // 1. 如果指定了分类（例如 live 或 trends），且该分类下有预设条目：
   if (categoryKey && p[categoryKey]?.entries?.length > 0) {
     const entries = p[categoryKey].entries;
-    // 如果是 live 直播分类或 trends 热搜分类，将所有规则条目按编号顺序整合成完整的规范下发
-    if (categoryKey === 'live' || categoryKey === 'trends') {
+    // 显式点名时只下发被点到的那几条：两阶段生成需要分别取「帖子协议」和
+    // 「评论协议」，而 appTags 走 find(t => t !== 'live') 永远只会命中第一个
+    // 元素，选不出具体条目，所以另开这个口子。
+    if (Array.isArray(presetIds) && presetIds.length) {
+      const picked = presetIds.map(id => entries.find(e => e.id === id)).filter(Boolean);
+      if (picked.length) return picked.map(e => `${e.title}\n${e.content}`).join('\n\n---\n\n');
+    }
+    // 多条目分类必须整册下发：这些分类的规范是拆成 ①②③ 写的，
+    // 只取 entries[0] 会让模型只看到总纲、看不到文风与输出协议。
+    // 新增多条目分类时要在这里登记，否则后面的条目会被静默丢弃。
+    if (categoryKey === 'live' || categoryKey === 'trends' || categoryKey === 'supertopic') {
       return entries.map(e => `${e.title}\n${e.content}`).join('\n\n---\n\n');
     }
     // 否则按 id 查找
@@ -533,7 +544,7 @@ async function aiGenerate(params) {
   const isLive = appTags.includes('live');
   const catKey = isLive ? 'live' : (appTags[0] || 'live');
   const tagKey = appTags.find(t => t !== 'live') || 'reply';
-  const tpl = getEffectivePresetTemplate(tagKey, catKey);
+  const tpl = getEffectivePresetTemplate(tagKey, catKey, params.presetIds);
 
   let characterId = params.characterId;
   if (!characterId && window.allCharacters && window.allCharacters.length > 0) {
@@ -834,7 +845,14 @@ window.extractJsonFromText = extractJsonFromText;
 // 品牌固定为 Float，型号随机（17 Pro / 17 Pro Max / 17 Ultra / 17 mini / 17）
 // =========================================================================
 window.FLOAT_BRAND = 'Float';
-window.FLOAT_MODEL_POOL = ['17 Pro', '17 Pro Max', '17 Ultra', '17 mini', '17'];
+// 品牌固定 Float，只有后缀变化 —— 数字 / Pro / Plus / Max / Ultra / Air /
+// Note / SE / Mini / GT / Turbo 混着来，看起来像不同人在不同设备上发的
+window.FLOAT_MODEL_POOL = [
+  '12', '15', '16 Pro', '17 Pro Max', '20 Plus', '30 Pro', '40 Ultra',
+  '50 Pro+', '60', '60 Plus', '70 Max', '80 Pro', '90 Max', '90 Pro',
+  'Air', 'Air 5', 'Note 11', 'Note 12 Pro', 'X Ultra', 'Neo 9',
+  'Play 6', 'Magic 5', 'SE', 'Mini 4', 'GT 7', 'Turbo 9', '13 Pro'
+];
 function getFloatClientTag(useModel) {
   const brand = window.FLOAT_BRAND || 'Float';
   if (useModel) {
@@ -845,6 +863,18 @@ function getFloatClientTag(useModel) {
   return `${brand} 客户端`;
 }
 window.getFloatClientTag = getFloatClientTag;
+
+// 机型标签（稳定版）：getFloatClientTag(true) 每次调用都会重新随机，而列表 /
+// 详情在点赞、评论、展开回复时都会整块重渲染 → 机型跟着跳。
+// 用这个：首次抽一个并写回 post.device，之后只读不再抽。
+function postDeviceTag(post) {
+  if (post && !post.device) {
+    post.device = (typeof getFloatClientTag === 'function')
+      ? getFloatClientTag(true) : 'Float 客户端';
+  }
+  return (post && post.device) || 'Float 客户端';
+}
+window.postDeviceTag = postDeviceTag;
 
 // =========================================================================
 // 【统一头像资源站】getAvatar(name, style)

@@ -62,7 +62,8 @@
         streakDays: info.streakDays || 0,
         totalDays: info.totalDays || 0,
         totalExp: exp,
-        level: level
+        level: level,
+        totalCheckins: info.totalDays || 0
       };
     },
 

@@ -5,6 +5,17 @@
 
 (function initDataHubModule() {
   const STORAGE_PREFIX = 'luma_data_';
+  // 宿主持久化统一走 api.db（真机/沙盒均稳定落盘），localStorage 仅作浏览器兜底
+  const HOST_COLLECTIONS = {
+    fans: 'app_social_fans',
+    spendingMatrix: 'app_social_spending',
+    checkins: 'app_social_checkins',
+    entityFollows: 'app_social_follows',
+    userTitles: 'app_social_titles'
+  };
+  const HOST_DOC_ID = 'main';
+  let _persistBusy = false;
+  const _persistQueue = [];
 
   // 内存缓存
   const memoryStore = {
@@ -32,7 +43,46 @@
     } catch (e) {}
   }
 
-  // 初始化持久化数据
+  // 异步落盘到宿主 api.db（串行化，避免并发覆盖）
+  function persistNow() {
+    if (_persistBusy || _persistQueue.length === 0) return;
+    _persistBusy = true;
+    const task = _persistQueue.shift();
+    const { collection, data } = task;
+    Promise.resolve()
+      .then(() => {
+        if (window.api && window.api.db && typeof window.dbUpsert === 'function') {
+          return window.dbUpsert(collection, HOST_DOC_ID, { data: JSON.parse(JSON.stringify(data)) });
+        }
+        return null;
+      })
+      .catch(e => console.warn('[DataHub persist]', collection, e))
+      .finally(() => {
+        _persistBusy = false;
+        if (_persistQueue.length) setTimeout(persistNow, 0);
+      });
+  }
+
+  function queuePersist(key) {
+    const collection = HOST_COLLECTIONS[key];
+    if (!collection) return;
+    _persistQueue.push({ collection, data: memoryStore[key] });
+    if (_persistQueue.length > 80) _persistQueue.splice(0, _persistQueue.length - 80);
+    setTimeout(persistNow, 0);
+  }
+
+  // 从宿主 api.db 拉取一份 map（未命中回退浏览器存）
+  async function loadFromHost(key, defaultValue) {
+    const collection = HOST_COLLECTIONS[key];
+    if (!window.api || !window.api.db || !collection) return defaultValue;
+    try {
+      const doc = await window.api.db.get(collection, HOST_DOC_ID);
+      if (doc && doc.data && typeof doc.data === 'object') return doc.data;
+    } catch (e) {}
+    return defaultValue;
+  }
+
+  // 统一同步初始化：先本地兜底，再异步宿主覆盖（宿主为权威持久层）
   function initStorage() {
     memoryStore.fans = loadLocal('fans_map', {});
     memoryStore.spendingMatrix = loadLocal('spending_matrix', {});
@@ -42,6 +92,22 @@
   }
 
   initStorage();
+
+  // 异步以宿主数据为权威源回灌内存（关键：真机冷进不再被 localStorage 清空）
+  // 注：内存对象被各管理器引用，回灌后通过广播触发界面统一刷新
+  (function hydrateFromHost() {
+    const keys = ['fans', 'spendingMatrix', 'checkins', 'entityFollows', 'userTitles'];
+    const localKeys = { fans: 'fans_map', spendingMatrix: 'spending_matrix', checkins: 'checkin_map', entityFollows: 'entity_follows', userTitles: 'titles_map' };
+    keys.forEach(k => {
+      loadFromHost(k, {}).then(dbData => {
+        if (dbData && typeof dbData === 'object' && Object.keys(dbData).length) {
+          memoryStore[k] = dbData;
+          saveLocal(localKeys[k], dbData);
+          window.LumaDataHub.emit(k + '_synced', dbData);
+        }
+      }).catch(() => {});
+    });
+  })();
 
   const DataHub = {
     // 基础存储操作
@@ -53,6 +119,7 @@
       if (!id) return;
       memoryStore.fans[id] = Math.max(0, Math.floor(Number(count) || 0));
       saveLocal('fans_map', memoryStore.fans);
+      queuePersist('fans');
       this.emit('fans_changed', { id, count: memoryStore.fans[id] });
     },
     getAllFansMap() {
@@ -66,6 +133,7 @@
     saveSpendingMatrix(matrix) {
       memoryStore.spendingMatrix = matrix;
       saveLocal('spending_matrix', memoryStore.spendingMatrix);
+      queuePersist('spendingMatrix');
       this.emit('spending_changed', matrix);
     },
 
@@ -76,6 +144,7 @@
     saveCheckinsMap(map) {
       memoryStore.checkins = map;
       saveLocal('checkin_map', memoryStore.checkins);
+      queuePersist('checkins');
       this.emit('checkin_changed', map);
     },
     getEntityFollows() {
@@ -84,6 +153,7 @@
     saveEntityFollows(follows) {
       memoryStore.entityFollows = follows;
       saveLocal('entity_follows', memoryStore.entityFollows);
+      queuePersist('entityFollows');
       this.emit('follows_changed', follows);
     },
 
@@ -94,6 +164,7 @@
     saveTitlesMap(titles) {
       memoryStore.userTitles = titles;
       saveLocal('titles_map', memoryStore.userTitles);
+      queuePersist('userTitles');
       this.emit('titles_changed', titles);
     },
 

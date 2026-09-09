@@ -182,6 +182,40 @@
           </div>
         </div>
 
+        <!-- 抽屉 1.6: 后台轮询时长间隔 -->
+        <div class="accordion-item" id="accItemOpsPoll">
+          <div class="accordion-header" onclick="toggleAccordion('accItemOpsPoll')">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path></svg>
+              </div>
+              <h4 class="text-xs font-black text-slate-900">后台轮询时长间隔</h4>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-bold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded" id="tagOpsPollInterval">3 分钟</span>
+              <svg class="accordion-chevron w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+          </div>
+          <div class="accordion-body space-y-2">
+            <div class="h-[1px] bg-slate-100 mb-2"></div>
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-[11px] font-bold text-slate-700">官方运营组轮询间隔</span>
+              <span id="valOpsPollInterval" class="text-purple-600 font-bold">3 分钟</span>
+            </div>
+            <p class="text-[9px] text-slate-400 mb-1.5">官方运营组多久轮询一次，每轮评估全部角色的开播/下播倾向。修改后保存会重启轮询。</p>
+            <input type="range" id="paramOpsPollInterval" min="3" max="10" value="3" step="1" oninput="updateOpsPollIntervalDisplay(this.value)" class="jelly-slider">
+            <div class="flex justify-between text-[8px] text-slate-400 font-bold">
+              <span>3 分钟（活跃）</span>
+              <span>10 分钟（佛系）</span>
+            </div>
+            <div class="pt-2">
+              <button onclick="openOpsLogViewer()" class="btn-brand w-full py-2 justify-center text-xs font-bold shadow-sm">
+                <span>后台轮询日志</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- 抽屉 2: 自定义API -->
         <div class="accordion-item" id="accItem4">
           <div class="accordion-header" onclick="toggleAccordion('accItem4')">
