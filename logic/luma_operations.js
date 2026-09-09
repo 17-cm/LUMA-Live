@@ -1,20 +1,25 @@
 // =========================================================================
-// LUMA Live 直播运营核心 (v1.3.2 基底 + 离线补跑优化)
-// 决策机制完全对齐 76a5f13 原版：
-//   后台轮询 → 倾向值(开播/下播)/2 + 比例式增长(已持续/上限×50) → 掷骰判定
-//   判定命中 → 进【延迟1-10分钟执行队列】→ 到点才真正开播/下播
-//   每轮写入【后台轮询日志】(lumaOpsLog，保留最近50轮)
-// 相对原版仅做的增强（用户确认保留）：
-//   1. 关闭直播时走 closeAndArchive 结算（归档 streamer_history + 粉丝统计/排行）
-//   2. 下播后加强制休息锁（forcedRestUntil），杜绝"下播秒开"
-//   3. 每日场次上限 dailyLiveLimit
-//   4. 离线补跑去掉原版30步(90分钟)上限，按真实离线时长逐段推演(上限6000步防呆)，
-//      并在补跑后对仍超最大直播时长的场次做逾时硬收盘兜底
-// 已彻底移除：哈希时间艺术算法、seededHash、evaluateLivePoll、在线"节拍器"命名残留。
+// LUMA Live 直播运营核心 (v2.0 作息纸条版)
+//
+// 决策机制：抛弃后台轮询，改为「作息纸条 + 心跳核对 + 判定即执行」
+//   · 每个主播一条纸条：她在哪个状态、这个状态从哪一刻开始、上次何时判定
+//   · 心跳每 30 秒核对一次：只问"现在该不该为她掷一次骰"，不评估全员、不排队、不记账
+//   · 掷中了当场送房管审核并落地；没掷中只留一个时间戳，下一拍自然还有机会
+//   · 推演依据仍是【倾向值/2 + 比例式增长(已持续时长/上限×50)】——
+//     因为这个概率本身随真实时间 continuously 变化，命中落在哪一拍不可预测，
+//     所以推演出的"这一场播多久 / 这次歇多久"是活的，不是钉死的固定值
+//   · 已彻底移除：后台轮询、延迟1-10分钟执行队列、离线6000步重演、逾时硬收盘、
+//     forcedRestUntil 强制休息锁（改由"在播未满最短门槛不掷下播骰"这一道硬门槛承担）
+//   · 结算链保持不动：下播仍走 closeAndArchive（归档 streamer_history + 场次/粉丝）
+//   · 每日场次上限 dailyLiveLimit 保留，位置移到掷骰之前当闸门
+// 三条铁律：
+//   1. 纸条是决策的唯一真相；live_sessions 是"她在不在播"的唯一真相（心跳会校正纸条）
+//   2. 一次心跳只改被判定那一个人的那一条，绝不整块读改写
+//   3. 所有开播/下播（含 AI 工具、手动、心跳）必须过 lumaOpsGateway 房管审核
 // 依赖：core.js (dbUpsert/saveDbSetting/api) + live.js (renderLiveGrid/normalizeCategory)
 // =========================================================================
 
-// 轮询日志：文件加载即初始化，避免首次轮询前访问报错
+// 作息事件流：文件加载即初始化，避免首次心跳前访问报错
 if (!window.lumaOpsLog) window.lumaOpsLog = [];
 // =========================================================================
 // 【角色倾向值管理】
@@ -106,6 +111,20 @@ async function getCharTendency(characterId) {
 window.getCharTendency = getCharTendency;
 window.readCharTendency = readCharTendency;
 
+// 倾向值缓存：同一拍/相邻几拍反复用到同一个角色时，不必每次都打 readState + readHistory。
+// 心跳是 30 秒一下、判定间隔至少 3 分钟，90 秒的缓存既能吸收同一拍的重复读，
+// 又不至于让角色刚写进状态栏的数值迟迟不生效。
+const TENDENCY_CACHE_MS = 90 * 1000;
+const tendencyCache = {};
+async function getCachedTendency(characterId) {
+  const hit = tendencyCache[characterId];
+  if (hit && (Date.now() - hit.at) < TENDENCY_CACHE_MS) return hit.data;
+  const data = await readCharTendency(characterId);
+  tendencyCache[characterId] = { at: Date.now(), data: data || {} };
+  return data || { startTendency: null, stopTendency: null };
+}
+window.getCachedTendency = getCachedTendency;
+
 // =========================================================================
 // 【调试回调与运营组专用通知系统】(正式运行已静默调试弹层)
 // =========================================================================
@@ -189,12 +208,13 @@ const lumaOpsGateway = {
     }
 
     const minRestMs = (params.minRestDuration || 10) * 60 * 1000;
-    // 强制休息锁：锁期内（含刚下播/被劝退）一律驳回开播申请
-    const forcedRestUntil = sched && sched.forcedRestUntil;
-    const inForcedLock = (forcedRestUntil != null && now < forcedRestUntil) ||
-                         (sched && sched.lastEndTime && (now - sched.lastEndTime < minRestMs));
-    if (inForcedLock) {
-      const remainingMins = Math.max(1, Math.ceil((minRestMs - (sched.lastEndTime ? now - sched.lastEndTime : 0)) / 60000));
+    // 法定休息门槛：纸条上她这次"从哪一刻开始歇"距今不足 minRestDuration，一律驳回。
+    // 取代原先的 forcedRestUntil 双轨锁 —— 门槛只在这一处判定，判定只依据一个时刻。
+    const restAnchor = sched && (typeof sched.anchorAt === 'number'
+      ? (sched.state === 'rest' ? sched.anchorAt : null)
+      : (sched.lastEndTime || null));
+    if (restAnchor != null && (now - restAnchor < minRestMs)) {
+      const remainingMins = Math.max(1, Math.ceil((minRestMs - (now - restAnchor)) / 60000));
       lumaOpsNotify("开播驳回", `【${charName}】刚下播休息不足，需再休息 ${remainingMins} 分钟`, "reject");
       return {
         success: false,
@@ -255,21 +275,13 @@ const lumaOpsGateway = {
 
     const created = await api.db.create("live_sessions", newSession);
 
-    window.charSchedulesMap[characterId] = {
-      isLive: true,
-      currentSessionId: created.id,
-      lastStartTime: start,
-      plannedEndTime: end,
-      lastEndTime: null
-    };
-    await saveDbSetting("char_schedules", window.charSchedulesMap);
+    // 纸条翻面：进入"在播"，锚点=本场开播时刻，任期号+1（旧的心跳判定若还挂着会自动作废）
+    await bumpRhythm(characterId, 'live', start, created.id);
     await incrementDailyStartCount(characterId);
 
     lumaOpsNotify("开播批准", `【${charName}】通过审核已成功推流开播 (房号:${created.roomId})`, "approve");
 
-    if (typeof syncLiveSessions === 'function') {
-      await syncLiveSessions({ allowSpawn: false });
-    }
+    await refreshLiveList();
 
     return {
       success: true,
@@ -298,19 +310,11 @@ const lumaOpsGateway = {
     // 结算归档：直播场次 +1、按配置区间随机增粉、写 streamer_history、清空房号临存
     await closeAndArchive(character, session, now);
 
-    // 下播后强制进入休息期：加"强制休息锁"，锁期内轮询/改签/Tool 一律不得提前重开
-    const sparams = window.appParams || {};
-    const sMinRestMs = (sparams.minRestDuration || 10) * 60 * 1000;
-    if (!window.charSchedulesMap) window.charSchedulesMap = {};
-    let sched = window.charSchedulesMap[characterId] || (window.charSchedulesMap[characterId] = { initialized: true });
-    sched.isLive = false;
-    sched.currentSessionId = null;
-    sched.plannedEndTime = null;
-    sched.lastEndTime = now;
-    sched.forcedRestUntil = now + sMinRestMs; // 强制休息锁：锁期内禁止任何提前开播
-    try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch (e) {}
+    // 纸条翻面：进入"在歇"，锚点=本次下播时刻。
+    // 法定休息期不再另存一份锁，房管驳回只看这个锚点，避免两处真相。
+    await bumpRhythm(characterId, 'rest', now, null);
     lumaOpsNotify("下播完成", `【${session.name || '主播'}】${reason || '正常下播'}`, "approve");
-    if (typeof syncLiveSessions === 'function') await syncLiveSessions({ allowSpawn: false });
+    await refreshLiveList();
     return { success: true, message: `主播已下播（${reason || '正常下播'}）` };
   },
 
@@ -374,58 +378,227 @@ registerAiPhoneToolHandlers();
 window.registerAiPhoneToolHandlers = registerAiPhoneToolHandlers;
 
 // =========================================================================
-// 【延迟执行队列】判定为开播/下播后，延迟1-10分钟执行，避免同时开播下播
-// 决策只入队，真正落地由 executeDueActions 到点执行（在线与离线补跑都走这里）
+// 【作息纸条】每个主播一条，是"她下一步什么时候可能被推翻"的唯一真相
+//   state     : 'live' 在播 / 'rest' 在歇
+//   anchorAt  : 这个状态从哪一刻开始（在播=本场开播时刻；在歇=本次下播时刻）
+//   sessionId : 在播时对应的房间记录 id（仅记录，判重仍以 live_sessions 为准）
+//   lastRollAt: 上一次为她掷骰的时刻（判定间隔节流用）
+//   seq       : 任期号，每翻一次面 +1
+//   lastRoll  : 最后一掷的快照（{mins,base,p,dice,hit,note}），只给面板看，不参与决策
+// 存储沿用 app_settings.char_schedules；旧字段(lastStartTime/lastEndTime/
+// plannedEndTime/forcedRestUntil/isLive)一律作废，由 ensureRhythm 一次性迁移成纸条。
 // =========================================================================
-async function getPendingActions() {
-  try {
-    const saved = await api.db.get("app_settings", "luma_pending_actions").catch(() => null);
-    const unwrapped = window.readDbSettingValue ? window.readDbSettingValue(saved) : saved;
-    return Array.isArray(unwrapped) ? unwrapped : [];
-  } catch (e) { return []; }
+const RHYTHM_HEARTBEAT_MS = 30 * 1000;   // 心跳：30 秒核对一次，只核对不决策
+
+function rhythmMap() {
+  if (!window.charSchedulesMap) window.charSchedulesMap = {};
+  return window.charSchedulesMap;
 }
-async function addPendingAction(characterId, action, delayMins, reason, nowTime = null) {
-  const queue = await getPendingActions();
-  // 移除该角色已有的同类型待执行动作，避免重复入队
-  const filtered = queue.filter(a => !(a.characterId === characterId && a.action === action));
-  filtered.push({
-    characterId,
-    action, // 'start' or 'stop'
-    executeAt: (nowTime || Date.now()) + delayMins * 60 * 1000,
-    delayMins,
-    reason,
-    createdAt: nowTime || Date.now()
-  });
-  try { await saveDbSetting("luma_pending_actions", filtered); } catch (e) {}
-  return filtered;
+async function saveRhythmMap() {
+  try { await saveDbSetting("char_schedules", window.charSchedulesMap || {}); } catch (e) {}
 }
-async function executeDueActions(nowTime = null) {
-  const queue = await getPendingActions();
-  const now = nowTime || Date.now();
-  const due = queue.filter(a => a.executeAt <= now);
-  const remaining = queue.filter(a => a.executeAt > now);
-  try { await saveDbSetting("luma_pending_actions", remaining); } catch (e) {}
-  for (const action of due) {
-    try {
-      if (action.action === 'start') {
-        await window.lumaOpsGateway.requestStartLive({
-          characterId: action.characterId,
-          source: "delayed_start"
-        }, action.executeAt || now);
-      } else if (action.action === 'stop') {
-        await window.lumaOpsGateway.requestStopLive({
-          characterId: action.characterId,
-          reason: action.reason || "角色下播倾向决定下播休息",
-          source: "delayed_stop"
-        }, action.executeAt || now);
+
+// 判定间隔（分钟）：同一个主播隔多久才允许再掷一次骰 —— 这就是"45% 的分母"。
+// 字段语义已从"后台轮询间隔"换成"直播判定间隔"，兼容读旧存档里的 opsPollInterval。
+function getRollIntervalMins() {
+  const p = window.appParams || {};
+  const v = Number(p.liveRollInterval !== undefined ? p.liveRollInterval : p.opsPollInterval);
+  return (isFinite(v) && v > 0) ? v : 3;
+}
+
+// 在播门槛：本场已播不满这个时长，一次下播骰都不掷 —— 杜绝"开播下播开播"横跳
+function getMinLiveGateMins() {
+  const maxLive = Number((window.appParams || {}).maxLiveDuration) || 240;
+  return Math.max(15, Math.round(maxLive * 0.35));
+}
+
+// 房管翻纸条的唯一入口（AI 工具、手动、心跳三条路都汇聚到这里）
+async function bumpRhythm(characterId, nextState, atTime, sessionId) {
+  const map = rhythmMap();
+  const prev = map[characterId] || {};
+  map[characterId] = {
+    state: nextState,
+    anchorAt: Number(atTime) || Date.now(),
+    sessionId: sessionId || null,
+    lastRollAt: Number(prev.lastRollAt) || 0,
+    seq: (Number(prev.seq) || 0) + 1,
+    lastRoll: prev.lastRoll || null
+  };
+  await saveRhythmMap();
+  return map[characterId];
+}
+window.bumpRhythm = bumpRhythm;
+
+// 事件流（取代原先"每轮一份"的轮询日志）：只记真正发生了的事，保留最近 80 条
+function pushRhythmEvent(evt) {
+  if (!window.lumaOpsLog) window.lumaOpsLog = [];
+  window.lumaOpsLog.unshift(Object.assign({ time: new Date(evt.at).toLocaleTimeString() }, evt));
+  if (window.lumaOpsLog.length > 80) window.lumaOpsLog.length = 80;
+}
+
+// 校正 + 补齐纸条：以 live_sessions 为唯一真相。纸条和房间对不上，一律信房间。
+async function ensureRhythm(sessions, now) {
+  const map = rhythmMap();
+  const allChars = window.allCharacters || [];
+  const roomOf = {};
+  (sessions || []).forEach(s => { if (s && s.characterId) roomOf[s.characterId] = s; });
+  let dirty = false;
+
+  for (const c of allChars) {
+    if (!c || !c.id) continue;
+    const room = roomOf[c.id];
+    const e = map[c.id];
+
+    if (room) {
+      const anchor = Number(room.startTime) || now;
+      if (!e || e.state !== 'live' || typeof e.anchorAt !== 'number' || e.anchorAt !== anchor) {
+        map[c.id] = {
+          state: 'live', anchorAt: anchor, sessionId: room.id || null,
+          lastRollAt: (e && e.state === 'live' && Number(e.lastRollAt) > anchor) ? e.lastRollAt : anchor,
+          seq: (e && Number(e.seq)) || 0, lastRoll: (e && e.lastRoll) || null
+        };
+        dirty = true;
       }
-    } catch (e) {}
+      continue;
+    }
+
+    // 没有房间 = 她没在播。纸条说要播 → 房间被手动关了/结算失败，一律信房间。
+    if (!e || e.state !== 'rest' || typeof e.anchorAt !== 'number') {
+      // 新加入或旧字段作废的角色：给她一个"已经歇了一会儿"的随机锚点，
+      // 免得所有人心跳同拍对齐、挤在同一分钟一起开播。
+      const minRest = Number((window.appParams || {}).minRestDuration) || 10;
+      const anchor = (e && Number(e.lastEndTime)) || (now - (minRest + 5 + Math.floor(Math.random() * 90)) * 60000);
+      map[c.id] = {
+        state: 'rest', anchorAt: anchor, sessionId: null,
+        lastRollAt: anchor, seq: (e && Number(e.seq)) || 0, lastRoll: (e && e.lastRoll) || null
+      };
+      dirty = true;
+    }
   }
-  return due.length;
+
+  if (dirty) await saveRhythmMap();
+  return map;
 }
-window.getPendingActions = getPendingActions;
-window.addPendingAction = addPendingAction;
-window.executeDueActions = executeDueActions;
+
+// 为一个人掷一次骰。返回 null = 这一拍根本不掷（门槛没过）；返回对象 = 掷了。
+// 概率 p = 倾向值/2 + min(1, 该状态已持续分钟/对应上限) × 50   （区间 0~100）
+// 倾向值读不到 → 按中性 50 折算 25 分，不再按 0 分算死（0 分会把机制退化成纯倒计时）
+async function rollOneChar(char, entry, now) {
+  const params = window.appParams || {};
+  const heldMins = Math.max(0, (now - entry.anchorAt) / 60000);
+
+  if (entry.state === 'live') {
+    if (heldMins < getMinLiveGateMins()) return null;               // 时长没走完，一次都不掷
+    const cap = Number(params.maxLiveDuration) || 240;
+    const tend = await getCachedTendency(char.id);
+    const raw = (tend && tend.stopTendency != null) ? Number(tend.stopTendency) : null;
+    const base = (raw == null || !isFinite(raw)) ? 50 : Math.max(0, Math.min(100, raw));
+    // 概率 = 倾向/2 + 时间增长；到上限直接钉成 100 —— 这一行替代了旧版整段"逾时硬收盘"，
+    // 保证上限是真上限（不再有赖播的僵尸房间），上限以内的时刻仍然完全随机
+    const p = (heldMins >= cap) ? 100 : Math.min(100, Math.round(base / 2 + Math.min(1, heldMins / cap) * 50));
+    const dice = Math.floor(Math.random() * 100);
+    return { kind: 'stop', mins: Math.round(heldMins), base: (raw == null ? '暂未获取(按中性50)' : raw), p, dice, hit: dice < p };
+  }
+
+  const minRest = Number(params.minRestDuration) || 10;
+  if (heldMins < minRest) return null;                              // 法定休息期没过，不掷
+  const dailyLimit = (params.dailyLiveLimit !== undefined && params.dailyLiveLimit > 0) ? Number(params.dailyLiveLimit) : Infinity;
+  if (dailyLimit !== Infinity) {
+    const todayCount = await getDailyStartCount(char.id);
+    if (todayCount >= dailyLimit) {
+      return { kind: 'start', mins: Math.round(heldMins), base: '-', p: 0, dice: '-', hit: false, note: `今日已达${dailyLimit}场上限` };
+    }
+  }
+  const cap = Number(params.maxRestDuration) || 480;
+  const tend = await getCachedTendency(char.id);
+  const raw = (tend && tend.startTendency != null) ? Number(tend.startTendency) : null;
+  const base = (raw == null || !isFinite(raw)) ? 50 : Math.max(0, Math.min(100, raw));
+  // 同上：歇到休息上限必开播，上限以内看倾向和运气
+  const p = (heldMins >= cap) ? 100 : Math.min(100, Math.round(base / 2 + Math.min(1, heldMins / cap) * 50));
+  const dice = Math.floor(Math.random() * 100);
+  return { kind: 'start', mins: Math.round(heldMins), base: (raw == null ? '暂未获取(按中性50)' : raw), p, dice, hit: dice < p };
+}
+
+// =========================================================================
+// 【心跳】每 30 秒核对一次：谁到了该掷的时候，就只替她掷一次、办一件事。
+// 与旧轮询的本质区别：不遍历评估全员倾向、不写延迟队列、不整块读改写、带重入锁。
+// =========================================================================
+async function rhythmTick() {
+  if (window.__rhythmBusy) return { skipped: 'busy' };
+  window.__rhythmBusy = true;
+  try {
+    const now = Date.now();
+    const rollMs = getRollIntervalMins() * 60000;
+    let sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
+    const map = await ensureRhythm(sessions, now);
+    const allChars = window.allCharacters || [];
+    let changed = false, touched = false;
+
+    for (const c of allChars) {
+      if (!c || !c.id) continue;
+      const entry = map[c.id];
+      if (!entry) continue;
+      if (now - (Number(entry.lastRollAt) || 0) < rollMs) continue;   // 没到她的判定时刻
+      entry.lastRollAt = now;
+      touched = true;
+
+      const r = await rollOneChar(c, entry, now);
+      if (!r) continue;
+      entry.lastRoll = { mins: r.mins, base: r.base, p: r.p, dice: r.dice, hit: r.hit, note: r.note || '' };
+      if (!r.hit) continue;
+
+      const wasState = entry.state;
+      let res = null;
+      try {
+        if (wasState === 'live') {
+          const cap = Number((window.appParams || {}).maxLiveDuration) || 240;
+          res = await lumaOpsGateway.requestStopLive({
+            characterId: c.id,
+            reason: r.mins >= cap ? '已达直播时长上限' : '倾向与时长共同判定该下播',
+            source: 'rhythm'
+          });
+        } else {
+          res = await lumaOpsGateway.requestStartLive({ characterId: c.id, source: 'rhythm' });
+        }
+      } catch (e) { res = { success: false, reason: String(e) }; }
+
+      // 房管驳回同样记账：旧版通知是空函数，驳回原因用户永远看不到
+      pushRhythmEvent({
+        at: now, char: c.name || c.id, kind: r.kind, from: wasState,
+        to: (res && res.success) ? (wasState === 'live' ? 'rest' : 'live') : wasState,
+        mins: r.mins, base: r.base, p: r.p, dice: r.dice,
+        ok: !!(res && res.success),
+        note: (res && res.success) ? (r.note || '') : ((res && res.reason) || '房管驳回')
+      });
+      if (res && res.success) changed = true;
+    }
+
+    if (touched) await saveRhythmMap();
+    if (changed) {
+      sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
+      window.liveList = sessions;
+      if (typeof renderLiveGrid === 'function') { try { renderLiveGrid(); } catch (e) {} }
+      try { syncCharStatusToChat(now); } catch (e) {}
+    }
+    return { rolls: touched, changed };
+  } finally {
+    window.__rhythmBusy = false;
+  }
+}
+window.rhythmTick = rhythmTick;
+
+// 启停心跳（全局只允许存在一个心跳）
+function startLiveRhythm() {
+  stopLiveRhythm();
+  window.__lumaLiveSyncInterval = setInterval(() => {
+    try { rhythmTick(); } catch (e) {}
+  }, RHYTHM_HEARTBEAT_MS);
+}
+function stopLiveRhythm() {
+  if (window.__lumaLiveSyncInterval) { clearInterval(window.__lumaLiveSyncInterval); window.__lumaLiveSyncInterval = null; }
+}
+window.startLiveRhythm = startLiveRhythm;
+window.stopLiveRhythm = stopLiveRhythm;
 
 // 【每日开播场次统计】记录每个角色今天的开播次数
 async function getDailyStartCount(characterId) {
@@ -453,105 +626,60 @@ window.getDailyStartCount = getDailyStartCount;
 window.incrementDailyStartCount = incrementDailyStartCount;
 
 // =========================================================================
-// 【世界生态冷启动初始化】（仅在首次安装或无历史调度记录时执行一次）
-// 在 settings/main.js 中按 charSchedulesMap 为空才触发；后续不再调用，避免重复造场。
-// 一次性为全服分配自然分布（部分直播中、部分休息中、部分蓄势待发）
+// 【世界生态冷启动】只在首次安装（char_schedules 为空）时执行一次。
+// 只发纸条、造少量房间，之后一切交给心跳 —— 不在这里预排"她几点开几点下"。
+// 锚点刻意打散：在播的人已播时长都落在最短门槛之内，避免打开瞬间集体下播。
 // =========================================================================
 async function bootstrapWorldInitialState(allChars, params = {}) {
   const now = Date.now();
-  const maxLiveMins = params.maxLiveDuration || 240;
-  const maxRestMins = params.maxRestDuration || 480;
   const minRestMins = params.minRestDuration || 10;
+  const gateMins = Math.max(15, Math.round((params.maxLiveDuration || 240) * 0.35));
 
   if (!window.charSchedulesMap) window.charSchedulesMap = {};
+  const total = (allChars || []).length;
+  if (!total) return;
 
-  let currentSessions = await api.db.list("live_sessions", { limit: 500 }) || [];
-  const existingSessionCharIds = new Set(currentSessions.map(s => s.characterId));
+  const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
+  const roomOf = {};
+  sessions.forEach(s => { if (s && s.characterId) roomOf[s.characterId] = s; });
 
-  const total = allChars.length;
-  if (total === 0) return;
+  for (const c of allChars) {
+    if (!c || !c.id) continue;
 
-  const shuffled = [...allChars].sort(() => Math.random() - 0.5);
-  let targetLiveCount = Math.max(1, Math.round(total * 0.4));
-  if (total === 1) targetLiveCount = 1;
-
-  for (let i = 0; i < shuffled.length; i++) {
-    const c = shuffled[i];
-    if (existingSessionCharIds.has(c.id)) {
-      const sess = currentSessions.find(s => s.characterId === c.id);
-      window.charSchedulesMap[c.id] = {
-        initialized: true,
-        isLive: true,
-        currentSessionId: sess?.id,
-        lastStartTime: sess?.startTime || now,
-        plannedEndTime: sess?.endTime || (now + 60 * 60 * 1000),
-        lastEndTime: null
-      };
+    // 已经有房间的：以房间为真相，纸条照着房间写
+    if (roomOf[c.id]) {
+      const a = Number(roomOf[c.id].startTime) || now;
+      window.charSchedulesMap[c.id] = { state: 'live', anchorAt: a, sessionId: roomOf[c.id].id, lastRollAt: a, seq: 1, lastRoll: null };
       continue;
     }
 
-    if (i < targetLiveCount) {
-      // 初始直播中：分配 5 ~ 35 分钟的合理中盘已播时长
-      const initLiveMins = Math.floor(Math.random() * Math.min(35, Math.floor(maxLiveMins * 0.5))) + 5;
-      const startTime = now - initLiveMins * 60000;
-      const plannedDurationMins = Math.floor(Math.random() * 60 + 60);
-      const endTime = startTime + plannedDurationMins * 60000;
-
+    if (Math.random() < 0.4 || total === 1) {
+      // 发一张"在播"的纸条并造出这个房间：已播 2 分钟 ~ 门槛前一分钟，全员打散
+      const heldMins = 2 + Math.floor(Math.random() * Math.max(1, gateMins - 3));
+      const startTime = now - heldMins * 60000;
       const coverUrl = c.cover || c.avatar || '';
       const picked = (typeof pickRandomLiveCategory === 'function') ? pickRandomLiveCategory() : { mainCat: '随性杂谈', subCat: '日常唠嗑' };
-      const chosenCat = picked.mainCat;
-      const chosenSubTag = picked.subCat;
-
-      const newSession = {
-        characterId: c.id,
-        name: c.name || '主播',
-        avatar: c.avatar || coverUrl,
-        cover: coverUrl,
-        category: chosenCat,
-        subTag: chosenSubTag,
-        topic: `【${c.name || '主播'}】的精彩直播`,
-        heat: Math.floor(Math.random() * 80000 + 20000),
-        roomId: Math.floor(Math.random() * 899999 + 100000),
-        startTime: startTime,
-        endTime: endTime,
-        isNPC: false
-      };
-
       try {
-        const created = await api.db.create("live_sessions", newSession);
-        window.charSchedulesMap[c.id] = {
-          initialized: true,
-          isLive: true,
-          currentSessionId: created?.id,
-          lastStartTime: startTime,
-          plannedEndTime: endTime,
-          lastEndTime: null
-        };
+        const created = await api.db.create("live_sessions", {
+          characterId: c.id, name: c.name || '主播', avatar: c.avatar || coverUrl, cover: coverUrl,
+          category: picked.mainCat, subTag: picked.subCat,
+          topic: `【${c.name || '主播'}】的精彩直播`,
+          heat: Math.floor(Math.random() * 80000 + 20000),
+          roomId: Math.floor(Math.random() * 899999 + 100000),
+          startTime: startTime, endTime: startTime + gateMins * 60000, isNPC: false
+        });
+        window.charSchedulesMap[c.id] = { state: 'live', anchorAt: startTime, sessionId: (created && created.id) || null, lastRollAt: startTime, seq: 1, lastRoll: null };
       } catch (e) {
         console.warn("冷启动直播间创建失败:", e);
+        const fa = now - (minRestMins + 5 + Math.floor(Math.random() * 90)) * 60000;
+        window.charSchedulesMap[c.id] = { state: 'rest', anchorAt: fa, sessionId: null, lastRollAt: fa, seq: 0, lastRoll: null };
       }
-    } else if (i < targetLiveCount + Math.round(total * 0.35)) {
-      // 初始休息中：处于法定强制休息期内
-      const initRestMins = Math.floor(Math.random() * Math.min(60, Math.max(1, maxRestMins - minRestMins))) + minRestMins;
-      const lastEndTime = now - initRestMins * 60000;
-      window.charSchedulesMap[c.id] = {
-        initialized: true,
-        isLive: false,
-        lastStartTime: null,
-        plannedEndTime: null,
-        lastEndTime: lastEndTime
-      };
-    } else {
-      // 初始空闲/蓄势待发：已度过休息期，开播倾向较高，近期轮询可自然开播
-      const lastEndTime = now - (minRestMins + Math.floor(Math.random() * 40 + 10)) * 60000;
-      window.charSchedulesMap[c.id] = {
-        initialized: true,
-        isLive: false,
-        lastStartTime: null,
-        plannedEndTime: null,
-        lastEndTime: lastEndTime
-      };
+      continue;
     }
+
+    // 在歇：歇了多久随机散开 —— 有人马上就能开播，有人还要磨蹭半天
+    const ra = now - (minRestMins + Math.floor(Math.random() * 120)) * 60000;
+    window.charSchedulesMap[c.id] = { state: 'rest', anchorAt: ra, sessionId: null, lastRollAt: ra, seq: 0, lastRoll: null };
   }
 
   try {
@@ -562,334 +690,43 @@ async function bootstrapWorldInitialState(allChars, params = {}) {
 window.bootstrapWorldInitialState = bootstrapWorldInitialState;
 
 // =========================================================================
-// 【后台轮询·决策核心】(align 76a5f13)
-// 每轮：
-//   直播中角色 → 下播倾向分 = min(100, 下播倾向/2 + 已播分钟/上限×50)，掷骰命中进延迟下播队列
-//   休息中角色 → 开播倾向分 = min(100, 开播倾向/2 + 已休息分钟/上限×50)，掷骰命中进延迟开播队列
-//   达到时长上限（已播>上限 / 已休息>上限）→ 必然动作（100分）
-//   每日场次上限 / 强制休息期 / 已有待执行动作 → 跳过评估
-//   命中决策写入轮询日志 lumaOpsLog（保留最近50轮）
-// options.silent=true 用于离线补跑静默模式：跳过UI渲染 / 日历写入 / last_poll_time 更新
+// 【列表刷新】只做一件事：把 live_sessions 挂到 window.liveList 并重渲染。
+// 保留旧函数名 syncLiveSessions，是因为房管与启动流程多处调用它（旧 allowSpawn:false
+// 分支走的就是这里）。它不做任何决策 —— 决策只发生在 rhythmTick。
 // =========================================================================
-async function syncLiveSessions(options = {}, nowTime = null) {
-  let sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
-  const silent = !!(options && options.silent);
-
-  // 仅刷新模式：房管/工具操作后调用，不做新决策
-  if (options.refreshOnly || options.allowSpawn === false) {
-    window.liveList = sessions;
-    renderLiveGrid();
-    return;
-  }
-
-  const now = nowTime || Date.now();
-  const params = window.appParams || {};
-  const maxLiveMins = params.maxLiveDuration || 240;
-  const maxRestMins = params.maxRestDuration || 480;
-  const minRestMins = params.minRestDuration || 10;
-  const allChars = window.allCharacters || [];
-  if (!window.charSchedulesMap) window.charSchedulesMap = {};
-
-  // ── 轮次计数：持久化 + 每天0点重置 ──
-  const today = new Date().toDateString();
-  let cycleStore = {};
-  try {
-    const raw = await api.db.get("app_settings", "luma_ops_cycle").catch(() => null);
-    if (raw && typeof raw === 'object') cycleStore = raw;
-  } catch(e) {}
-  if (cycleStore.date !== today) {
-    cycleStore = { date: today, cycle: 0 };
-  }
-  const cycle = ++cycleStore.cycle;
-  try { await saveDbSetting("luma_ops_cycle", cycleStore); } catch(e) {}
-
-  // ── 新加入角色平滑注册（如果有新增角色，安全初始化为休息状态，绝不倒推开播时间） ──
-  let hasNewSched = false;
-  for (const c of allChars) {
-    if (!window.charSchedulesMap[c.id]) {
-      const existingSession = sessions.find(s => s.characterId === c.id);
-      if (existingSession) {
-        window.charSchedulesMap[c.id] = {
-          initialized: true,
-          isLive: true,
-          currentSessionId: existingSession.id,
-          lastStartTime: existingSession.startTime || now,
-          plannedEndTime: existingSession.endTime || (now + 60 * 60 * 1000),
-          lastEndTime: null
-        };
-      } else {
-        // 新角色平滑加入生态：设为已度过休息期的正常空闲状态，后续由轮询真实决策开播
-        window.charSchedulesMap[c.id] = {
-          initialized: true,
-          isLive: false,
-          lastStartTime: null,
-          plannedEndTime: null,
-          lastEndTime: now - (minRestMins + 5) * 60000
-        };
-      }
-      hasNewSched = true;
-    }
-  }
-  if (hasNewSched) {
-    try { await saveDbSetting("char_schedules", window.charSchedulesMap); } catch(e) {}
-  }
-
-  // 刷新会话列表（新角色初始化后可能新增了直播间）
-  sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
-  const streamingIds = new Set(sessions.map(s => s.characterId));
-
-  // ── 构建全部角色评估列表 ──
-  const dailyLimit = (params.dailyLiveLimit !== undefined && params.dailyLiveLimit > 0) ? params.dailyLiveLimit : Infinity;
-  const pendingActions = await getPendingActions();
-  const pendingCharIds = new Set(pendingActions.map(a => a.characterId));
-
-  const toEvaluate = [];
-  // 直播中角色：评估下播
-  for (const s of sessions) {
-    const liveMins = (now - (s.startTime || now)) / 60000;
-    toEvaluate.push({
-      type: 'stop',
-      charId: s.characterId,
-      charName: s.name || s.characterId,
-      liveMins: liveMins,
-      hasPending: pendingCharIds.has(s.characterId)
-    });
-  }
-  // 休息中角色：评估开播（排除强制休息期和已有待执行动作的）
-  for (const c of allChars) {
-    if (streamingIds.has(c.id)) continue;
-    const sched = window.charSchedulesMap[c.id];
-    const lastEndTime = sched?.lastEndTime;
-    const restMins = lastEndTime ? (now - lastEndTime) / 60000 : 9999;
-    const inMandatoryRest = restMins < minRestMins;
-    if (inMandatoryRest) continue;
-    if (pendingCharIds.has(c.id)) continue; // 已有待执行动作，跳过
-    toEvaluate.push({
-      type: 'start',
-      charId: c.id,
-      charName: c.name || c.id,
-      restMins: restMins
-    });
-  }
-
-  // ── 轮询日志初始化 ──
-  const cycleLog = {
-    time: new Date().toLocaleTimeString(),
-    cycle: cycle,
-    params: { maxLiveMins, maxRestMins, minRestMins, dailyLimit: dailyLimit === Infinity ? '不限制' : dailyLimit },
-    decisions: [],
-    summary: { totalChars: allChars.length, streaming: sessions.length, started: 0, stopped: 0, evaluated: toEvaluate.length, pending: pendingActions.length }
-  };
-
-  // ── 执行评估（全部角色）──
-  for (const item of toEvaluate) {
-    if (item.type === 'stop') {
-      if (item.hasPending) {
-        // 已有待执行下播动作，标注等待中
-        const pending = pendingActions.find(a => a.characterId === item.charId && a.action === 'stop');
-        const waitMins = Math.max(1, Math.round((pending.executeAt - now) / 60000));
-        cycleLog.decisions.push({
-          char: item.charName, state: '直播中',
-          liveMins: Math.round(item.liveMins),
-          result: `等待${waitMins}分后下播`
-        });
-        continue;
-      }
-      const liveMins = Math.round(item.liveMins);
-      const isUrgent = liveMins >= maxLiveMins;
-      const charTendency = await getCharTendency(item.charId);
-      const hasRealTendency = charTendency.stopTendency !== null && charTendency.stopTendency !== undefined;
-      const rawTendency = hasRealTendency ? Number(charTendency.stopTendency) : null;
-      // 下播倾向值取二分之一折算为0-50分；若暂未获取则基础得分计0
-      const tendencyScore = hasRealTendency ? Math.round(rawTendency / 2) : 0;
-      const timeScore = Math.round((liveMins / maxLiveMins) * 50);
-
-      let stopTendency, reason, baseTendencyText;
-      if (isUrgent) {
-        stopTendency = 100;
-        reason = '达到上限必然下播';
-        baseTendencyText = hasRealTendency ? `${rawTendency}` : '暂未获取';
-      } else {
-        stopTendency = Math.min(100, tendencyScore + timeScore);
-        reason = hasRealTendency ? '下播倾向(1/2)+时间增长' : '暂未获取下播倾向(仅时间增长)';
-        baseTendencyText = hasRealTendency ? `${rawTendency} (折算${tendencyScore})` : '暂未获取';
-      }
-
-      const dice = Math.round(Math.random() * 100);
-      const willStop = dice < stopTendency;
-
-      cycleLog.decisions.push({
-        char: item.charName, state: '直播中',
-        liveMins: liveMins,
-        baseTendency: baseTendencyText,
-        stopTendency: stopTendency,
-        dice: dice,
-        reason: reason,
-        result: willStop ? '准备下播' : '继续播'
-      });
-
-      if (willStop) {
-        cycleLog.summary.stopped++;
-        // 延迟1-10分钟执行下播（进队列，避免同时开播下播）
-        const delayMins = Math.floor(Math.random() * 10) + 1;
-        await addPendingAction(item.charId, 'stop', delayMins, isUrgent ? "达到直播时长上限" : "角色下播倾向决定下播休息", now);
-        cycleLog.decisions[cycleLog.decisions.length - 1].delayMins = delayMins;
-        cycleLog.decisions[cycleLog.decisions.length - 1].result = `${delayMins}分后下播`;
-      }
-    } else {
-      // 检查每日场次上限
-      const todayCount = await getDailyStartCount(item.charId);
-      if (todayCount >= dailyLimit) {
-        cycleLog.decisions.push({
-          char: item.charName, state: '休息中',
-          restMins: Math.round(item.restMins),
-          result: `今日已达${dailyLimit}场上限`
-        });
-        continue;
-      }
-      const restMins = Math.round(item.restMins);
-      const isUrgent = restMins >= maxRestMins;
-      const charTendency = await getCharTendency(item.charId);
-      const hasRealTendency = charTendency.startTendency !== null && charTendency.startTendency !== undefined;
-      const rawTendency = hasRealTendency ? Number(charTendency.startTendency) : null;
-      // 开播倾向值取二分之一折算为0-50分；若暂未获取则基础得分计0
-      const tendencyScore = hasRealTendency ? Math.round(rawTendency / 2) : 0;
-      const timeScore = Math.round((restMins / maxRestMins) * 50);
-
-      let spawnTendency, reason, baseTendencyText;
-      if (isUrgent) {
-        spawnTendency = 100;
-        reason = '达到上限必然开播';
-        baseTendencyText = hasRealTendency ? `${rawTendency}` : '暂未获取';
-      } else {
-        spawnTendency = Math.min(100, tendencyScore + timeScore);
-        reason = hasRealTendency ? '开播倾向(1/2)+时间增长' : '暂未获取开播倾向(仅时间增长)';
-        baseTendencyText = hasRealTendency ? `${rawTendency} (折算${tendencyScore})` : '暂未获取';
-      }
-
-      const dice = Math.round(Math.random() * 100);
-      const willSpawn = dice < spawnTendency;
-
-      cycleLog.decisions.push({
-        char: item.charName, state: '休息中',
-        restMins: restMins,
-        baseTendency: baseTendencyText,
-        spawnTendency: spawnTendency,
-        dice: dice,
-        reason: reason,
-        result: willSpawn ? '准备开播' : '不播'
-      });
-
-      if (willSpawn) {
-        cycleLog.summary.started++;
-        // 延迟1-10分钟执行开播（进队列）
-        const delayMins = Math.floor(Math.random() * 10) + 1;
-        await addPendingAction(item.charId, 'start', delayMins, "角色开播倾向决定开播", now);
-        cycleLog.decisions[cycleLog.decisions.length - 1].delayMins = delayMins;
-        cycleLog.decisions[cycleLog.decisions.length - 1].result = `${delayMins}分后开播`;
-      }
-    }
-  }
-
-  // 补跑静默模式不刷新UI（结算结束后统一刷新）；正常轮询刷新并渲染
-  if (!silent) {
-    sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
-    window.liveList = sessions;
-    renderLiveGrid();
-  }
-
-  // 更新上次轮询时间（正常轮询时，不是补跑时）
-  if (!nowTime) {
-    try { await saveDbSetting("last_poll_time", Date.now()); } catch (e) {}
-  }
-
-  // ── 写入轮询日志（保留最近50轮）──
-  cycleLog.summary.streaming = sessions.length;
-  if (!window.lumaOpsLog) window.lumaOpsLog = [];
-  window.lumaOpsLog.unshift(cycleLog);
-  if (window.lumaOpsLog.length > 50) window.lumaOpsLog.pop();
-
-  // 轮询完成后同步状态到聊天历史（补跑静默模式跳过）
-  if (!silent) {
-    try { syncCharStatusToChat(now); } catch (e) {}
-  }
+async function syncLiveSessions(options = {}) {
+  const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
+  window.liveList = sessions;
+  if (typeof renderLiveGrid === 'function') { try { renderLiveGrid(); } catch (e) {} }
+  return sessions;
 }
+async function refreshLiveList() { return await syncLiveSessions(); }
 window.syncLiveSessions = syncLiveSessions;
+window.refreshLiveList = refreshLiveList;
 
 // =========================================================================
-// 【离线补跑结算】APP打开时根据离开时间补跑轮询，模拟后台一直在跑
-// 原理：记录每次轮询时间 last_poll_time，APP打开时计算离开了多久，
-//       按轮询间隔逐段时间戳调 syncLiveSessions 推演历史决策，
-//       决策结果进延迟队列，再 executeDueActions(该历史时刻) 到点收盘/开播，
-//       保证开播/下播时间戳落在真实历史时刻、直播时长真实累计。
-// 相对原版优化：
-//   1. 去掉30步(90分钟)上限 → 按真实离线时长逐段推演，上限6000步仅作防呆
-//   2. 补跑后【逾时硬收盘兜底】：凡仍超最大直播时长的场次直接结算收盘，
-//      杜绝对应"离线7小时回来还挂着直播"的问题。
+// 【重开 APP 核对】取代旧版"离线 6000 步重演 + 逾时硬收盘"。
+// 新机制不需要重演：纸条上只有绝对时刻，概率按真实已持续时长计算，
+// 所以离开多久回来，第一拍心跳就能算出她此刻该不该切换，
+// 且切换时刻仍落在真实历史上（已播时长 = now - anchorAt，绝不为"打开瞬间"造时间）。
+//   · 离线期间"开了一场又下完"的整场不入账 —— 本机制的已知取舍，暂不改
+//   · 顺手清掉旧版遗留的延迟队列，避免历史数据继续干扰判断
 // =========================================================================
 async function settleAllLive() {
+  const now = Date.now();
   try {
-    const now = Date.now();
-    const lastPollRec = await api.db.get("app_settings", "last_poll_time").catch(() => null);
-    const lastSeen = window.readDbSettingValue ? Number(window.readDbSettingValue(lastPollRec)) : Number(lastPollRec);
-    if (!lastSeen || isNaN(lastSeen) || lastSeen <= 0) {
-      try { await saveDbSetting("last_poll_time", now); } catch (e) {}
-      return { settled: false, reason: "first_run" };
-    }
-    if (now - lastSeen < 60 * 1000) {
-      return { settled: false, reason: "too_short", elapsedMs: now - lastSeen };
-    }
-
-    const params = window.appParams || {};
-    const pollIntervalMs = ((params.opsPollInterval || 3) * 60 * 1000);
-    const maxLiveMins = params.maxLiveDuration || 240;
-
-    // ── 离线补跑：把 [lastSeen, now] 按轮询间隔切成若干历史时刻，逐段推演同一套轮询决策 ──
-    // 每段调 syncLiveSessions({silent:true}, 历史时刻) 让决策进延迟队列，
-    // 随后 executeDueActions(历史时刻) 把到点的开播/下播落实在该历史时刻。
-    // 步数上限 6000 仅作防呆（覆盖数天），远大于旧版30步导致的"离线超限不收盘"。
-    const elapsed = now - lastSeen;
-    const steps = Math.min(Math.max(1, Math.ceil(elapsed / pollIntervalMs)), 6000);
-    for (let i = 1; i <= steps; i++) {
-      const simulatedNow = lastSeen + i * pollIntervalMs;
-      if (simulatedNow > now) break;
-      try {
-        await syncLiveSessions({ silent: true, catchUp: true }, simulatedNow);
-        await executeDueActions(simulatedNow);
-      } catch (e) {}
-    }
-
-    // 补跑结束后，用真实时间再执行一次到期延迟动作（补跑时用的模拟时间，真实时间已超过）
-    try { await executeDueActions(now); } catch (e) {}
-
-    // ── 逾时硬收盘兜底：凡仍超最大直播时长的场次，一律走「直播机制」的正规下播 ──
-    //    由 requestStopLive 统一处理：结算归档(closeAndArchive) + 更新 sched.lastEndTime
-    //    + 强制休息锁(forcedRestUntil)，与在线下播/延迟下播走同一条路，
-    //    补跑不自行造一套收盘逻辑，避免角色状态机不一致（下播后休息时长算错、无休息锁）。
-    const sessions = await api.db.list("live_sessions", { limit: 500 }).catch(() => []) || [];
-    let forcedClosed = 0;
-    for (const s of sessions) {
-      const cid = s.characterId;
-      const liveMins = Math.max(0, (now - (Number(s.startTime) || now)) / 60000);
-      if (liveMins >= maxLiveMins) {
-        try {
-          const r = await lumaOpsGateway.requestStopLive({ characterId: cid, reason: "逾时硬收盘", source: "maint_shutdown" }, now);
-          if (r && r.success) forcedClosed++;
-        } catch (e) {}
-      }
-    }
-
-    // 补跑完成：真实时间同步状态与刷新列表
-    try { await syncCharStatusToChat(now); } catch (e) {}
-    try { await syncLiveSessions({ allowSpawn: false }); } catch (e) {}
-
-    try { await saveDbSetting("last_poll_time", now); } catch (e) {}
-
-    const liveNow = await (api.db.list("live_sessions", { limit: 500 }).catch(() => [])) || [];
-    return { settled: true, elapsedMs: elapsed, steps, forcedClosed, live: liveNow.length };
-  } catch (e) {
-    return { settled: false, reason: "error", error: String(e) };
-  }
+    const leftover = await api.db.get("app_settings", "luma_pending_actions").catch(() => null);
+    if (leftover) await saveDbSetting("luma_pending_actions", []);
+  } catch (e) {}
+  try {
+    const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
+    await ensureRhythm(sessions, now);
+    window.liveList = sessions;
+  } catch (e) {}
+  try { await rhythmTick(); } catch (e) {}
+  try { await saveDbSetting("last_poll_time", now); } catch (e) {}
+  const liveNow = await api.db.list("live_sessions", { limit: 500 }).catch(() => []) || [];
+  return { settled: true, live: liveNow.length };
 }
 window.settleAllLive = settleAllLive;
 
@@ -926,7 +763,7 @@ async function syncCharStatusToChat(nowTime = null) {
           title = `LUMA Live直播中，已播${liveMins}分钟`;
         } else {
           const sched = window.charSchedulesMap ? window.charSchedulesMap[c.id] : null;
-          const lastEndTime = sched?.lastEndTime;
+          const lastEndTime = (sched && sched.state === 'rest' && typeof sched.anchorAt === 'number') ? sched.anchorAt : null;
           const restMins = lastEndTime ? Math.round((now - lastEndTime) / 60000) : 0;
           title = `LUMA Live休息中，已休息${restMins}分钟`;
         }
@@ -964,5 +801,5 @@ async function syncCharStatusToChat(nowTime = null) {
 }
 window.syncCharStatusToChat = syncCharStatusToChat;
 
-// 兼容导出：lumaOpsPoll 仍指向轮询函数
-window.lumaOpsPoll = syncLiveSessions;
+// 兼容导出：lumaOpsPoll 名字保留给外部调用点，实际已指向心跳判定
+window.lumaOpsPoll = rhythmTick;
