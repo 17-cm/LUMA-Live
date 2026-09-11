@@ -179,15 +179,6 @@ function syncParamDisplays() {
   setVal('paramMaxLiveDuration', p.maxLiveDuration || 240, 'valMaxLiveDuration', '分钟');
   setVal('paramMaxRestDuration', p.maxRestDuration || 480, 'valMaxRestDuration', '分钟');
 
-  // 后台轮询间隔显示（抽屉1.6）
-  const pollVal = p.opsPollInterval || 3;
-  const pollInput = document.getElementById('paramOpsPollInterval');
-  const pollText = document.getElementById('valOpsPollInterval');
-  const pollTag = document.getElementById('tagOpsPollInterval');
-  if (pollInput) pollInput.value = pollVal;
-  if (pollText) pollText.textContent = `${pollVal} 分钟`;
-  if (pollTag) pollTag.textContent = `${pollVal} 分钟`;
-
   setVal('paramReplyRandomDanmakuRate', p.replyRandomDanmakuRate !== undefined ? p.replyRandomDanmakuRate : 25, 'valReplyRandomDanmakuRate', '%');
   setVal('paramMentionUserRate', p.mentionUserRate !== undefined ? p.mentionUserRate : 30, 'valMentionUserRate', '%');
   setVal('paramEnterOtherLiveRate', p.enterOtherLiveRate !== undefined ? p.enterOtherLiveRate : 35, 'valEnterOtherLiveRate', '%');
@@ -267,149 +258,21 @@ function getApiRequestIntervalMinutes() {
 window.getApiRequestIntervalMinutes = getApiRequestIntervalMinutes;
 
 // =========================================================================
-// 直播作息·心跳核对（取代原「后台轮询」）
-// 心跳每 30 秒核对一次纸条，只替"到点了"的那个主播掷一次骰，判定即执行；
-// 设置页「直播判定间隔」= opsPollInterval（旧名沿用）决定同一个主播多久允许掷一次，
-// 也就是倾向值那个概率的分母。查看器渲染 window.lumaOpsLog（现在是事件流）。
+// 直播作息·核算（机制核心在 logic/luma_operations.js）
+// 这里只负责"什么时候算一次"，全程没有任何定时器：
+//   · 开 APP —— lumaInitApp 里 settleAllLive() 算一次
+//   · 切回前台 / 窗口重新拿到焦点 —— 下面两个事件各算一次
+//   · 需要时手动 —— window.reconcileLive()（AI 工具、刷新按钮都能调）
+// 每次核算都把每个人的作息纸条顺到此刻：该翻面的那一步当场过房管、写的是那一步
+// 的真实历史时刻，并正常结算场次与涨粉。离线多久都一样，不需要补跑。
+// 原「后台轮询间隔」滑块与「后台轮询日志」面板已随定时器一起删除。
 // =========================================================================
-// 判定间隔显示更新
-function updateOpsPollIntervalDisplay(value) {
-  const minutes = Number(value) || 3;
-  const valEl = document.getElementById('valOpsPollInterval');
-  if (valEl) valEl.textContent = `${minutes} 分钟`;
-  const tagEl = document.getElementById('tagOpsPollInterval');
-  if (tagEl) tagEl.textContent = `${minutes} 分钟`;
-  if (!window.appParams) window.appParams = {};
-  window.appParams.opsPollInterval = minutes;
-}
-window.updateOpsPollIntervalDisplay = updateOpsPollIntervalDisplay;
-
-// 重启心跳（作息机制唯一驱动入口）。间隔固定 30 秒，判定间隔由 appParams 控制。
-function resetLumaOpsTimer() {
-  if (typeof startLiveRhythm === 'function') {
-    startLiveRhythm();
-  } else if (window.__lumaLiveSyncInterval) {
-    clearInterval(window.__lumaLiveSyncInterval);
-    window.__lumaLiveSyncInterval = null;
-  }
-}
-window.resetLumaOpsTimer = resetLumaOpsTimer;
-
-// 保存判定间隔：落盘 + 重播开屏 + 重启心跳
-async function saveOpsPollInterval() {
-  try {
-    if (!window.appParams) window.appParams = {};
-    await dbUpsert("app_settings", "global_params", window.appParams);
-    api.ui.toast("已保存，判定间隔已生效！");
-    if (typeof window.replaySplash === 'function') {
-      window.replaySplash();
-    }
-    resetLumaOpsTimer();
-  } catch (e) {
-    api.ui.toast("保存成功");
-    resetLumaOpsTimer();
-  }
-}
-window.saveOpsPollInterval = saveOpsPollInterval;
-
-// 轮询日志查看器
-function openOpsLogViewer() {
-  const modal = document.getElementById('opsLogModal');
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    renderOpsLog();
-  }
-}
-window.openOpsLogViewer = openOpsLogViewer;
-
-function closeOpsLogViewer() {
-  const modal = document.getElementById('opsLogModal');
-  if (modal) {
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-  }
-}
-window.closeOpsLogViewer = closeOpsLogViewer;
-
-function renderOpsLog() {
-  const container = document.getElementById('opsLogContent');
-  if (!container) return;
-  const map = window.charSchedulesMap || {};
-  const chars = window.allCharacters || [];
-  const p = window.appParams || {};
-  const rollMins = Number(p.liveRollInterval !== undefined ? p.liveRollInterval : p.opsPollInterval) || 3;
-  const gateMins = Math.max(15, Math.round((Number(p.maxLiveDuration) || 240) * 0.35));
-  const now = Date.now();
-  const fmt = (m) => (m >= 60 ? `${Math.floor(m / 60)}小时${m % 60}分` : `${m}分`);
-
-  const rows = chars.map(c => {
-    const e = map[c.id];
-    if (!e || typeof e.anchorAt !== 'number') {
-      return `<div class="flex justify-between items-center py-1 border-b border-slate-100">
-        <span class="text-slate-600">${c.name || c.id}</span>
-        <span class="text-[10px] text-slate-400">纸条待生成</span></div>`;
-    }
-    const held = Math.max(0, Math.round((now - e.anchorAt) / 60000));
-    const isLive = e.state === 'live';
-    const nextIn = Math.max(0, Math.round(((Number(e.lastRollAt) || 0) + rollMins * 60000 - now) / 1000));
-    const gateM = isLive ? gateMins : (Number(p.minRestDuration) || 10);
-    const gateText = held < gateM
-      ? `<span class="text-[9px] text-amber-500">门槛未满(需${fmt(gateM)})</span>`
-      : `<span class="text-[9px] text-slate-400">下次判定约${nextIn}秒后</span>`;
-    const r = e.lastRoll;
-    const rollText = !r ? '<span class="text-[10px] text-slate-300">尚未掷过</span>'
-      : r.dice === '-' ? `<span class="text-[10px] text-slate-400">${r.note || '不掷'}</span>`
-      : `<span class="text-[10px] text-slate-500">倾向${r.base} 概率${r.p}% 骰${r.dice} <b class="${r.hit ? 'text-rose-600' : 'text-slate-400'}">${r.hit ? '中' : '未中'}</b></span>`;
-    return `<div class="py-1 border-b border-slate-100">
-      <div class="flex justify-between items-center">
-        <span class="text-slate-700 font-bold">${c.name || c.id}</span>
-        <span class="text-[10px] ${isLive ? 'text-rose-600 font-bold' : 'text-slate-400'}">${isLive ? '直播中 ' : '休息中 '}${fmt(held)}</span>
-      </div>
-      <div class="flex justify-between items-center mt-0.5">${rollText}${gateText}</div>
-    </div>`;
-  }).join('');
-
-  const log = window.lumaOpsLog || [];
-  const events = log.map(ev => {
-    const act = ev.kind === 'stop' ? '下播' : '开播';
-    return `<div class="flex justify-between items-center py-0.5 border-b border-slate-50">
-      <span class="text-slate-600">${ev.time} ${ev.char}</span>
-      <span class="text-[10px] text-slate-400">持续${ev.mins}分 概率${ev.p}% 骰${ev.dice}</span>
-      <span class="${ev.ok ? 'text-rose-600' : 'text-slate-400'} text-[10px] font-bold">${ev.ok ? act + '✓' : '驳回'}${ev.note ? ' · ' + ev.note : ''}</span>
-    </div>`;
-  }).join('');
-
-  container.innerHTML = `
-    <div class="bg-slate-50 rounded-xl p-2.5 mb-2">
-      <div class="flex justify-between items-center mb-1.5">
-        <span class="font-bold text-slate-700">主播们现在</span>
-        <span class="text-[10px] text-slate-500">判定间隔${rollMins}分 · 心跳30秒</span>
-      </div>
-      ${rows || '<div class="text-center text-slate-400 py-4">还没有角色数据</div>'}
-    </div>
-    <div class="bg-slate-50 rounded-xl p-2.5">
-      <div class="font-bold text-slate-700 mb-1.5">开下播记录</div>
-      ${events || '<div class="text-center text-slate-400 py-4">还没有发生过切换，等她们掷到那一拍…</div>'}
-    </div>`;
-}
-window.renderOpsLog = renderOpsLog;
-
-function toggleOpsLogRaw() {
-  const content = document.getElementById('opsLogContent');
-  const raw = document.getElementById('opsLogRaw');
-  if (!content || !raw) return;
-  const showing = raw.style.display !== 'none';
-  if (showing) {
-    raw.style.display = 'none';
-    content.style.display = '';
-  } else {
-    raw.textContent = JSON.stringify(window.lumaOpsLog || [], null, 2);
-    raw.style.display = '';
-    content.style.display = 'none';
-  }
-}
-window.toggleOpsLogRaw = toggleOpsLogRaw;
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && typeof reconcileLive === 'function') { try { reconcileLive(); } catch (e) {} }
+});
+window.addEventListener('focus', () => {
+  if (typeof reconcileLive === 'function') { try { reconcileLive(); } catch (e) {} }
+});
 
 // =========================================================================
 // 直播间打包预设（代码只定义返回格式，具体生成数量和内容风格在预设里配置）
@@ -1362,6 +1225,17 @@ async function lumaInitApp() {
     console.warn("[LUMA Live] 直播数据回灌失败:", e);
   }
 
+  // 3. 重开核对：清掉旧版遗留队列，把每个人的纸条顺到此刻（该开的开、该下的下，
+  //    写的全是真实历史时刻，场次与涨粉正常入账）。没有"离线重演"这回事：
+  //    翻面时刻由定数算出，晚问一步不会得到另一个答案。
+  try {
+    if (typeof settleAllLive === 'function') {
+      await settleAllLive();
+    }
+  } catch (e) {
+    console.warn("[LUMA Live] 直播作息核算失败:", e);
+  }
+
   // 3. 重开核对：清掉旧版遗留队列、按真实房间校正纸条、立刻跑一拍心跳。
   //    不做任何"离线重演"——概率按真实已持续时长算，回来第一拍就该切就切，
   //    正在播的场次保持原 startTime，时长 = now - startTime 真实累计。
@@ -1371,16 +1245,6 @@ async function lumaInitApp() {
     }
   } catch (e) {
     console.warn("[LUMA Live] 时间差结算失败:", e);
-  }
-
-  // 2.5 启动直播作息心跳：每 30 秒核对一次纸条，谁到点就只替谁掷一次骰。
-  //     判定即执行，不再有"轮"、不再有延迟队列、不再有离线重演。
-  if (typeof startLiveRhythm === 'function') {
-    try {
-      startLiveRhythm();
-    } catch (e) {
-      console.warn("[LUMA Live] 作息心跳启动失败:", e);
-    }
   }
 
   // 3. 同步个人资料
