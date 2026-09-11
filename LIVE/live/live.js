@@ -4,6 +4,29 @@
   // 注入页面 HTML
   document.getElementById('pages-root').insertAdjacentHTML('beforeend', `
 <div id="tab-live" class="tab-page h-full overflow-y-auto no-scrollbar px-4 pb-28 space-y-3.5">
+      <!-- 【停机维护 · 官方公告】char后台自发开播概率 = 0% 且全平台无人直播时出现；
+           有一位主播自主开播（房管放行）就自动下掉。显隐见 updateMaintenanceBanner() -->
+      <div id="liveMaintBanner" class="maint-notice hidden">
+        <div class="flex items-center justify-between gap-2">
+          <span class="maint-seal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5.5v6c0 4.6 3.4 8.6 8 10 4.6-1.4 8-5.4 8-10v-6L12 2z"></path><path d="m9 12 2 2 4-4"></path></svg>
+            <span>LUMA LIVE 官方运营组</span>
+          </span>
+          <span class="text-[9px] font-bold tracking-wider text-white/30">公告 · 即时生效</span>
+        </div>
+        <h3 class="maint-title">平台正在维护中</h3>
+        <p class="maint-desc">
+          LUMA Live 正在进行系统维护升级，为确保推流质量，<b>APP 随机推流排班已暂停</b>。<br>
+          维护期间主播仍可自主开播，广场将实时更新。
+        </p>
+        <div class="maint-bar"><i></i></div>
+        <div class="maint-chips">
+          <span class="maint-chip on"><i class="maint-dot"></i>维护中</span>
+          <span class="maint-chip">随机推流 · 已暂停</span>
+          <span class="maint-chip ok"><i class="maint-dot"></i>自主开播 · 正常</span>
+        </div>
+        <p class="maint-foot">维护期间如有调整，以官方公告为准。</p>
+      </div>
       <div id="wildSummonCard" class="holo-wild-card st3-glow-bg p-3.5 flex items-center justify-between cursor-pointer active:scale-98 transition shadow-sm" style="position:relative;z-index:0;">
         <div class="flex items-center gap-3" style="position:relative;z-index:2;">
           <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-500 via-purple-600 to-cyan-400 p-0.5 shadow-md">
@@ -60,29 +83,6 @@
         <div id="subCategoryFilterBar" class="flex gap-2 overflow-x-auto no-scrollbar py-1"></div>
       </div>
 
-      <!-- 【停机维护 · 官方公告】char后台自发开播概率 = 0% 且全平台无人直播时出现；
-           有一位主播自主开播（房管放行）就自动下掉。显隐见 updateMaintenanceBanner() -->
-      <div id="liveMaintBanner" class="maint-notice hidden">
-        <div class="flex items-center justify-between gap-2">
-          <span class="maint-seal">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5.5v6c0 4.6 3.4 8.6 8 10 4.6-1.4 8-5.4 8-10v-6L12 2z"></path><path d="m9 12 2 2 4-4"></path></svg>
-            <span>LUMA LIVE 官方运营组</span>
-          </span>
-          <span class="text-[9px] font-bold tracking-wider text-white/30">公告 · 即时生效</span>
-        </div>
-        <h3 class="maint-title">平台正在维护中</h3>
-        <p class="maint-desc">
-          LUMA Live 正在进行系统维护升级，为确保推流质量，<b>APP 随机推流排班已暂停</b>。<br>
-          维护期间主播仍可自主开播，广场将实时更新。
-        </p>
-        <div class="maint-bar"><i></i></div>
-        <div class="maint-chips">
-          <span class="maint-chip on"><i class="maint-dot"></i>维护中</span>
-          <span class="maint-chip">随机推流 · 已暂停</span>
-          <span class="maint-chip ok"><i class="maint-dot"></i>自主开播 · 正常</span>
-        </div>
-        <p class="maint-foot">维护期间如有调整，以官方公告为准。</p>
-      </div>
 
       <div id="liveGrid" class="grid grid-cols-2 gap-3.5 pt-1"></div>
     </div>
