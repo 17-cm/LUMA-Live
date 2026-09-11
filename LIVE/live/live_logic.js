@@ -419,7 +419,7 @@ function renderLiveGrid() {
           </div>
           <div>
             <h4 class="text-xs font-black text-slate-800">${maint ? '当前频道暂无主播在线' : '当前暂无正在直播的主播'}</h4>
-            <p class="text-[10px] text-slate-400 mt-1">${maint ? '维护期间随机推流已暂停，可切换其他频道看看' : '可在小手机中添加角色，或召唤野生主播即刻开播！'}</p>
+            <p class="text-[10px] text-slate-400 mt-1">${maint ? '推荐排期服务暂停中，可切换其他频道看看' : '此刻暂无主播开播，也可以召唤一位野生主播即刻开播！'}</p>
           </div>
           ${maint ? '' : `
           <button onclick="handleGenerateWildNPC()" class="btn-brand text-xs !py-2 !px-4 shadow-md">
@@ -1978,8 +1978,8 @@ function maintenanceEmptyStateHTML() {
           <p class="maint-empty-eyebrow">LUMA LIVE 官方公告</p>
           <p class="maint-empty-title">维护期间暂无在线主播</p>
           <p class="maint-empty-desc">
-            平台正在系统维护升级，APP 随机推流排班已暂停。<br>
-            主播自主开播后，广场将自动刷新。
+            平台正在进行系统维护升级，推荐与开播排期服务暂停。<br>
+            有主播开播后，广场会自动刷新。
           </p>
           <div class="maint-empty-rule"></div>
         </div>

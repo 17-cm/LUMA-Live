@@ -333,12 +333,12 @@ const lumaOpsGateway = {
     // 【停机维护模式】只掐 APP 随机排班这一路：维护期不再有随机抓人开播；
     // 角色自主开播（chat_tool / 工具 / 人工）依旧放行，开播后广场横幅自动下掉。
     if (params.charSpawnRate === 0 && isAutoSpawnSource(source)) {
-      lumaOpsNotify("开播驳回", `【${charName}】的 APP 随机排班开播申请，全服正处于停机维护中`, "reject");
+      lumaOpsNotify("开播驳回", `【${charName}】的排期开播申请被驳回：平台正在维护中`, "reject");
       return {
         success: false,
         code: "maintenance",
         retryAfterMs: 10 * 60 * 1000,
-        reason: `【LUMA官方运营组通告】平台全服正在停机维护升级中，当前暂停 APP 随机推流排班（主播自主开播不受影响）。`
+        reason: `【LUMA官方运营组通告】平台正在进行系统维护升级，本次维护暂停推荐与开播排期服务；主播自主开播不受影响。`
       };
     }
 
@@ -542,6 +542,7 @@ const lumaOpsGateway = {
     }
 
     // 强制休息期：合法性下限 minRestDuration，同时尊重排班自带的随机休息长度
+    const isMaintCut = source === 'maint_shutdown';
     const params = window.appParams || {};
     const minRestMs = (params.minRestDuration || 10) * 60 * 1000;
     const planRestMins = Number(sched?.planRestMins) || 0;
@@ -553,7 +554,9 @@ const lumaOpsGateway = {
       isLive: false,
       currentSessionId: null,
       lastStartTime: matched[0]?.startTime || null,
-      lastEndTime: now,
+      // 运营维护切断不写 lastEndTime：她不是"播累了去休息"，只是被平台下线，
+      // 因此不占用强制休息期，随时可以自主开播回来。
+      lastEndTime: isMaintCut ? (sched?.lastEndTime || null) : now,
       plannedEndTime: null,
       // 下播即进入休息期：直接把排班的下一次开播点推到休息期之后
       nextLiveAt: now + restMs
@@ -644,33 +647,89 @@ if (typeof window !== 'undefined') {
 
 function registerAiPhoneToolHandlers() {
   const targetApi = window.api || window.AiPhone || window.AiPhoneApp;
-  if (targetApi && targetApi.tools && typeof targetApi.tools.handle === 'function') {
-    targetApi.tools.handle("handleRequestStartLive", async (args, context) => {
-      const charId = (context && (context.characterId || context.charId)) || 
-                     (args && (args.characterId || args.charId)) || 
-                     (window.allCharacters && window.allCharacters[0]?.id) || 
-                     "char_1";
-      return await lumaOpsGateway.requestStartLive({
+  if (!targetApi || !targetApi.tools || typeof targetApi.tools.handle !== 'function') return;
+
+  // 工具调用方（角色）的身份解析。宿主按契约把 context.characterId 交给我们，
+  // 兜底顺序：context → 参数 → 名字匹配 → 全应用只有一个主播时就用她。
+  // 最后才退化成"第一个主播"，并且记一条警告 —— 认错人会让别的直播间被顶掉。
+  function resolveToolCharId(args, context) {
+    const c = context || {}, a = args || {};
+    const direct = c.characterId || c.charId || c.id
+      || (c.character && (c.character.id || c.character.characterId))
+      || (c.char && (c.char.id || c.char.characterId))
+      || a.characterId || a.charId || a.id;
+    if (direct) return direct;
+
+    const nameHint = c.characterName || c.name || a.characterName || a.name || '';
+    const all = window.allCharacters || [];
+    if (nameHint) {
+      const hit = all.find(x => x && (x.name === nameHint || x.id === nameHint));
+      if (hit) return hit.id;
+    }
+    if (all.length === 1) return all[0].id;
+    if (all.length > 1) {
+      console.warn('[LUMA 房管] 工具调用未带角色身份，退化为第一个主播:', all[0].id);
+      return all[0].id;
+    }
+    return 'char_1';
+  }
+
+  // 工具结果的统一封装。
+  // 关键：宿主把 success:false 当成"工具执行失败"（见 app制造指南 的工具契约），
+  // 那样房管的驳回原因根本传不回角色，界面只剩一句"自定义 APP 工具执行失败"。
+  // 所以只要房管正常审完了（哪怕驳回），工具本身都算执行成功，结论放在 approved 里。
+  function toolResult(verdict, fallbackLabel) {
+    const v = verdict || {};
+    const approved = v.success === true;
+    return {
+      success: true,
+      approved,
+      code: approved ? 'approved' : (v.code || 'rejected'),
+      data: v.data || null,
+      userNotice: v.userNotice || (approved ? '' : `${fallbackLabel}未通过`),
+      message: v.message || v.reason || (approved ? '' : `${fallbackLabel}未通过`)
+    };
+  }
+
+  targetApi.tools.handle("handleRequestStartLive", async (args, context) => {
+    const charId = resolveToolCharId(args, context);
+    try {
+      const verdict = await lumaOpsGateway.requestStartLive({
         characterId: charId,
         category: args?.category,
         topic: args?.topic,
         durationMins: args?.durationMins,
         source: "chat_tool"
       });
-    });
+      return toolResult(verdict, '开播申请');
+    } catch (e) {
+      lumaOpsNotify('开播异常', `[${charId}] ${e && e.message || e}`, 'reject');
+      return toolResult({
+        success: false,
+        code: 'internal_error',
+        reason: `【LUMA官方运营组通告】推流通道暂时繁忙，开播申请未受理，请稍后再试。`
+      }, '开播申请');
+    }
+  });
 
-    targetApi.tools.handle("handleRequestStopLive", async (args, context) => {
-      const charId = (context && (context.characterId || context.charId)) || 
-                     (args && (args.characterId || args.charId)) || 
-                     (window.allCharacters && window.allCharacters[0]?.id) || 
-                     "char_1";
-      return await lumaOpsGateway.requestStopLive({
+  targetApi.tools.handle("handleRequestStopLive", async (args, context) => {
+    const charId = resolveToolCharId(args, context);
+    try {
+      const verdict = await lumaOpsGateway.requestStopLive({
         characterId: charId,
         reason: args?.reason || "正常下播",
         source: "chat_tool"
       });
-    });
-  }
+      return toolResult(verdict, '下播申请');
+    } catch (e) {
+      lumaOpsNotify('下播异常', `[${charId}] ${e && e.message || e}`, 'reject');
+      return toolResult({
+        success: false,
+        code: 'internal_error',
+        reason: `【LUMA官方运营组通告】推流通道暂时繁忙，下播申请未受理，请稍后再试。`
+      }, '下播申请');
+    }
+  });
 }
 registerAiPhoneToolHandlers();
 window.registerAiPhoneToolHandlers = registerAiPhoneToolHandlers;
