@@ -401,6 +401,16 @@ function renderLiveGrid() {
   });
 
   if (filtered.length === 0) {
+    const maint = isMaintenanceMode();
+    const anyLive = (window.liveList || liveList || []).length > 0;
+
+    // 维护中且全平台确实没人：整个空态换成官方公告（不含任何召唤入口）
+    if (maint && !anyLive) {
+      box.innerHTML = maintenanceEmptyStateHTML();
+      return;
+    }
+
+    // 其余空态：维护中不给"召唤野生主播"入口 —— 平台在维护，就不该引导用户去抓野生主播
     box.innerHTML = `
       <div class="col-span-2 py-12 px-4 text-center">
         <div class="luxe-card p-6 flex flex-col items-center justify-center space-y-3 bg-white/70">
@@ -408,12 +418,13 @@ function renderLiveGrid() {
             <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
           </div>
           <div>
-            <h4 class="text-xs font-black text-slate-800">当前暂无正在直播的主播</h4>
-            <p class="text-[10px] text-slate-400 mt-1">可在小手机中添加角色，或召唤野生主播即刻开播！</p>
+            <h4 class="text-xs font-black text-slate-800">${maint ? '当前频道暂无主播在线' : '当前暂无正在直播的主播'}</h4>
+            <p class="text-[10px] text-slate-400 mt-1">${maint ? '维护期间随机推流已暂停，可切换其他频道看看' : '可在小手机中添加角色，或召唤野生主播即刻开播！'}</p>
           </div>
+          ${maint ? '' : `
           <button onclick="handleGenerateWildNPC()" class="btn-brand text-xs !py-2 !px-4 shadow-md">
             <span>立即召唤野生主播</span>
-          </button>
+          </button>`}
         </div>
       </div>
     `;
@@ -1933,23 +1944,49 @@ function syncLiveSessions(options = {}) {
   return run;
 }
 
-// 【停机维护横幅】char后台自发开播概率 = 0% 且全平台无人直播 → 广场顶部拉横幅；
-// 只要有任意主播在线（角色自主开播照样过房管）就自动把横幅下掉。
+// 【停机维护横幅】char后台自发开播概率 = 0% 且全平台无人直播 → 广场顶部拉官方公告；
+// 只要有任意主播在线（角色自主开播照样过房管）就自动把公告下掉。
 function isMaintenanceMode() {
   return Number((window.appParams || {}).charSpawnRate) === 0;
 }
 function updateMaintenanceBanner(liveCount) {
-  const banner = document.getElementById('liveMaintBanner');
-  if (!banner) return;
   const online = Number.isFinite(Number(liveCount)) ? Number(liveCount) : (window.liveList || []).length;
   const show = isMaintenanceMode() && online === 0;
-  banner.classList.toggle('hidden', !show);
-  banner.classList.toggle('flex', show);
+  const banner = document.getElementById('liveMaintBanner');
+  if (banner) banner.classList.toggle('hidden', !show);
+  syncMaintenanceChrome();
 }
 window.isMaintenanceMode = isMaintenanceMode;
 window.updateMaintenanceBanner = updateMaintenanceBanner;
 
-// 设置面板把概率拖到 0% 时立即生效：切掉随机排班在播场次 + 更新横幅
+// 维护期的广场"门面"收拾：平台在维护，就不该再有任何"召唤野生主播"的入口。
+// 召唤入口 = 顶部偶遇野生主播卡（含召唤按钮）+ 广场空态里的召唤按钮。
+function syncMaintenanceChrome() {
+  const maint = isMaintenanceMode();
+  ['wildSummonCard', 'btnSummonWildBadge'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden', maint);
+  });
+}
+window.syncMaintenanceChrome = syncMaintenanceChrome;
+
+// 广场空态（维护中）：官方公告口吻，不含任何召唤/引导入口
+function maintenanceEmptyStateHTML() {
+  return `
+      <div class="col-span-2">
+        <div class="maint-empty">
+          <p class="maint-empty-eyebrow">LUMA LIVE 官方公告</p>
+          <p class="maint-empty-title">维护期间暂无在线主播</p>
+          <p class="maint-empty-desc">
+            平台正在系统维护升级，APP 随机推流排班已暂停。<br>
+            主播自主开播后，广场将自动刷新。
+          </p>
+          <div class="maint-empty-rule"></div>
+        </div>
+      </div>`;
+}
+
+// 设置面板把概率拖到 0% 时立即生效：切掉随机排班在播场次 + 更新广场门面
 function applyMaintenanceMode() {
   if (isMaintenanceMode() && typeof syncLiveSessions === 'function') {
     try { syncLiveSessions({ allowSpawn: false }); } catch (e) {}
@@ -2040,11 +2077,14 @@ async function _syncLiveSessionsInner(options = {}) {
       : (window.charSchedulesMap ? window.charSchedulesMap[c.id] : null);
     
     if (!sched || !sched.nextLiveAt) {
-      const initOffsetMins = Math.floor(Math.random() * 30 + 5);
       const planRest = Math.max(10, Math.round(maxRestMins - (maxRestMins - 10) * effectiveRate));
       const planDur = Math.floor(Math.random() * (maxLiveMins - 30) + 30);
-      
+      // 冷启动"她其实已经在播"的倒推量：散在 5 分钟以上，且必须给本场时长留得下余量，
+      // 否则 planEnd 落在过去，这条排班会被当成过期直接翻篇（表现为广场上没人）。
+      const maxOffsetMins = Math.max(1, Math.min(30, planDur - 10));
+
       const isOngoingMock = Math.random() < effectiveRate;
+      const initOffsetMins = 5 + Math.floor(Math.random() * maxOffsetMins);
       const startMock = isOngoingMock ? (now - initOffsetMins * 60 * 1000) : (now + initOffsetMins * 60 * 1000);
 
       sched = {
@@ -2100,7 +2140,11 @@ async function _syncLiveSessionsInner(options = {}) {
         category: cat,
         subTag: subTag,
         topic: `【${c.name}】的${subTag}直播`,
-        durationMins: remainMins,
+        durationMins: Number(sched.planDurationMins) || remainMins,
+        // 关键：把这条排班的真实开播时刻交给房管落库。
+        // 排班是"她其实几点开的"（可能是十几二十分钟前），不是"房管几点受理的"，
+        // 否则每次重开 APP，全平台主播的开播时间都会变成"刚刚"。
+        startAt: Number(sched.nextLiveAt) || now,
         source: "scheduler"
       });
 

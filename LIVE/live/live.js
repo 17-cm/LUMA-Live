@@ -4,7 +4,7 @@
   // 注入页面 HTML
   document.getElementById('pages-root').insertAdjacentHTML('beforeend', `
 <div id="tab-live" class="tab-page h-full overflow-y-auto no-scrollbar px-4 pb-28 space-y-3.5">
-      <div class="holo-wild-card st3-glow-bg p-3.5 flex items-center justify-between cursor-pointer active:scale-98 transition shadow-sm" style="position:relative;z-index:0;">
+      <div id="wildSummonCard" class="holo-wild-card st3-glow-bg p-3.5 flex items-center justify-between cursor-pointer active:scale-98 transition shadow-sm" style="position:relative;z-index:0;">
         <div class="flex items-center gap-3" style="position:relative;z-index:2;">
           <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-500 via-purple-600 to-cyan-400 p-0.5 shadow-md">
             <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-white text-base font-bold">
@@ -60,15 +60,28 @@
         <div id="subCategoryFilterBar" class="flex gap-2 overflow-x-auto no-scrollbar py-1"></div>
       </div>
 
-      <!-- 维护期横幅：char后台自发开播概率 = 0% 且全平台无人直播时出现；
-           角色自主开播（房管放行）后自动下掉。见 updateMaintenanceBanner() -->
-      <div id="liveMaintBanner" class="hidden items-center gap-3 rounded-2xl px-3.5 py-3 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg border border-white/10">
-        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0"></span>
-        <div class="flex-1 min-w-0">
-          <p class="text-[11px] font-black tracking-wide">LUMA Live 正在维护中…</p>
-          <p class="text-[9px] text-white/55 mt-0.5">APP 随机推流排班已暂停，主播自主开播不受影响</p>
+      <!-- 【停机维护 · 官方公告】char后台自发开播概率 = 0% 且全平台无人直播时出现；
+           有一位主播自主开播（房管放行）就自动下掉。显隐见 updateMaintenanceBanner() -->
+      <div id="liveMaintBanner" class="maint-notice hidden">
+        <div class="flex items-center justify-between gap-2">
+          <span class="maint-seal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5.5v6c0 4.6 3.4 8.6 8 10 4.6-1.4 8-5.4 8-10v-6L12 2z"></path><path d="m9 12 2 2 4-4"></path></svg>
+            <span>LUMA LIVE 官方运营组</span>
+          </span>
+          <span class="text-[9px] font-bold tracking-wider text-white/30">公告 · 即时生效</span>
         </div>
-        <svg class="w-4 h-4 text-white/35 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+        <h3 class="maint-title">平台正在维护中</h3>
+        <p class="maint-desc">
+          LUMA Live 正在进行系统维护升级，为确保推流质量，<b>APP 随机推流排班已暂停</b>。<br>
+          维护期间主播仍可自主开播，广场将实时更新。
+        </p>
+        <div class="maint-bar"><i></i></div>
+        <div class="maint-chips">
+          <span class="maint-chip on"><i class="maint-dot"></i>维护中</span>
+          <span class="maint-chip">随机推流 · 已暂停</span>
+          <span class="maint-chip ok"><i class="maint-dot"></i>自主开播 · 正常</span>
+        </div>
+        <p class="maint-foot">维护期间如有调整，以官方公告为准。</p>
       </div>
 
       <div id="liveGrid" class="grid grid-cols-2 gap-3.5 pt-1"></div>

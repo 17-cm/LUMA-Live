@@ -312,7 +312,7 @@ const lumaOpsGateway = {
     return withGatewayLock(() => lumaOpsGateway._auditStartLive(payload));
   },
 
-  async _auditStartLive({ characterId, category, topic, durationMins, subTag, source = 'system' } = {}) {
+  async _auditStartLive({ characterId, category, topic, durationMins, subTag, startAt, source = 'system' } = {}) {
     const charId = normLiveCharId(characterId);
     if (!charId) {
       lumaOpsNotify("开播驳回", "未指定有效的主播身份", "reject");
@@ -389,8 +389,19 @@ const lumaOpsGateway = {
     }
 
     const dur = Math.max(5, Math.round(Number(durationMins) || (Math.floor(Math.random() * (params.maxLiveDuration || 120) / 2 + 30))));
-    const start = now;
-    const end = start + dur * 60 * 1000;
+
+    // 开播时刻：受理方可以指定（排班心跳会把"其实早就开播了"的房间倒推回它真实的开播时刻），
+    // 否则一律按"此刻开播"。不倒推的后果就是每次重开 APP 全部主播都显示"刚刚开播"。
+    // 倒推上限 = 单次直播时长上限，且倒推后不能已经该下播了。
+    const maxBackMs = Math.max(1, Number(params.maxLiveDuration) || 120) * 60 * 1000;
+    const requestedStart = Number(startAt);
+    let start = now;
+    if (Number.isFinite(requestedStart) && requestedStart > 0 && requestedStart < now
+        && (now - requestedStart) <= maxBackMs) {
+      start = Math.round(requestedStart);
+    }
+    let end = start + dur * 60 * 1000;
+    if (end <= now) { start = now; end = start + dur * 60 * 1000; }
 
     let coverUrl = character?.cover || character?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800';
     let rawCat = category || (character?.tags ? character.tags[0] : '随性杂谈');
