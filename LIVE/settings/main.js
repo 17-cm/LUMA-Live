@@ -90,7 +90,18 @@ function updateParam(key, val) {
   if (!window.appParams) window.appParams = {};
   window.appParams[key] = num;
 
-  if (key === 'maxLiveDuration') {
+  if (key === 'charSpawnRate') {
+    const el = document.getElementById('valCharSpawnRate');
+    const tagEl = document.getElementById('tagCharRate');
+    if (el) el.textContent = `${num}%`;
+    if (tagEl) tagEl.textContent = `${num}% 概率开播`;
+    // 拖到 0% 就是进入停机维护：立刻拉横幅 / 撤横幅，并切掉 APP 随机排班的在播场次
+    if (typeof window.applyMaintenanceMode === 'function') {
+      try { window.applyMaintenanceMode(); } catch (e) {}
+    } else if (typeof window.updateMaintenanceBanner === 'function') {
+      window.updateMaintenanceBanner((window.liveList || []).length);
+    }
+  } else if (key === 'maxLiveDuration') {
     const el = document.getElementById('valMaxLiveDuration');
     if (el) el.textContent = `${num}分钟`;
   } else if (key === 'maxRestDuration') {
@@ -124,31 +135,6 @@ function updateParam(key, val) {
 }
 window.updateParam = updateParam;
 
-// 每日直播场次上限设置
-function setDailyLiveLimit(val) {
-  const num = Number(val);
-  if (!window.appParams) window.appParams = {};
-  window.appParams.dailyLiveLimit = num;
-  // 更新按钮选中状态
-  document.querySelectorAll('.daily-limit-btn').forEach(btn => {
-    const btnVal = Number(btn.dataset.value);
-    if (btnVal === num) {
-      btn.classList.add('bg-rose-500', 'text-white', 'border-rose-500');
-      btn.classList.remove('border-slate-200', 'text-slate-600');
-    } else {
-      btn.classList.remove('bg-rose-500', 'text-white', 'border-rose-500');
-      btn.classList.add('border-slate-200', 'text-slate-600');
-    }
-  });
-  // 更新小标签显示
-  const tagEl = document.getElementById('tagCharRate');
-  const valEl = document.getElementById('valDailyLiveLimit');
-  const label = num === 0 ? '不限制' : `${num}场`;
-  if (tagEl) tagEl.textContent = `直播场次：${label}`;
-  if (valEl) valEl.textContent = label;
-}
-window.setDailyLiveLimit = setDailyLiveLimit;
-
 function syncParamDisplays() {
   const p = window.appParams || {};
   const setVal = (id, val, textId, suffix = '') => {
@@ -158,26 +144,14 @@ function syncParamDisplays() {
     if (text && val !== undefined) text.textContent = `${val}${suffix}`;
   };
 
-  // 每日直播场次上限
-  const dailyLimit = p.dailyLiveLimit !== undefined ? p.dailyLiveLimit : 0;
-  const dailyLabel = dailyLimit === 0 ? '不限制' : `${dailyLimit}场`;
-  const dailyValEl = document.getElementById('valDailyLiveLimit');
-  const dailyTagEl = document.getElementById('tagCharRate');
-  if (dailyValEl) dailyValEl.textContent = dailyLabel;
-  if (dailyTagEl) dailyTagEl.textContent = `直播场次：${dailyLabel}`;
-  document.querySelectorAll('.daily-limit-btn').forEach(btn => {
-    const btnVal = Number(btn.dataset.value);
-    if (btnVal === dailyLimit) {
-      btn.classList.add('bg-rose-500', 'text-white', 'border-rose-500');
-      btn.classList.remove('border-slate-200', 'text-slate-600');
-    } else {
-      btn.classList.remove('bg-rose-500', 'text-white', 'border-rose-500');
-      btn.classList.add('border-slate-200', 'text-slate-600');
-    }
-  });
+  // char后台自发开播概率（test3 机制）
+  const spawnVal = p.charSpawnRate !== undefined ? p.charSpawnRate : 45;
+  setVal('paramCharSpawnRate', spawnVal, 'valCharSpawnRate', '%');
+  const tagEl = document.getElementById('tagCharRate');
+  if (tagEl) tagEl.textContent = `${spawnVal}% 概率开播`;
 
-  setVal('paramMaxLiveDuration', p.maxLiveDuration || 240, 'valMaxLiveDuration', '分钟');
-  setVal('paramMaxRestDuration', p.maxRestDuration || 480, 'valMaxRestDuration', '分钟');
+  setVal('paramMaxLiveDuration', p.maxLiveDuration || 120, 'valMaxLiveDuration', '分钟');
+  setVal('paramMaxRestDuration', p.maxRestDuration || 360, 'valMaxRestDuration', '分钟');
 
   setVal('paramReplyRandomDanmakuRate', p.replyRandomDanmakuRate !== undefined ? p.replyRandomDanmakuRate : 25, 'valReplyRandomDanmakuRate', '%');
   setVal('paramMentionUserRate', p.mentionUserRate !== undefined ? p.mentionUserRate : 30, 'valMentionUserRate', '%');
@@ -258,20 +232,20 @@ function getApiRequestIntervalMinutes() {
 window.getApiRequestIntervalMinutes = getApiRequestIntervalMinutes;
 
 // =========================================================================
-// 直播作息·核算（机制核心在 logic/luma_operations.js）
-// 这里只负责"什么时候算一次"，全程没有任何定时器：
-//   · 开 APP —— lumaInitApp 里 settleAllLive() 算一次
-//   · 切回前台 / 窗口重新拿到焦点 —— 下面两个事件各算一次
-//   · 需要时手动 —— window.reconcileLive()（AI 工具、刷新按钮都能调）
-// 每次核算都把每个人的作息纸条顺到此刻：该翻面的那一步当场过房管、写的是那一步
-// 的真实历史时刻，并正常结算场次与涨粉。离线多久都一样，不需要补跑。
-// 原「后台轮询间隔」滑块与「后台轮询日志」面板已随定时器一起删除。
+// 直播作息·排班调度（test3 机制版，核心在 LIVE/live/live_logic.js）
+//   · 开播概率由设置面板 charSpawnRate 控制（0-80%，0=全服停机维护）
+//   · syncLiveSessions() 每 30 秒轮询一次排班：到点自动建房、超时自动切断
+//   · 角色自主开播走 handleRequestStartLive 工具，与排班互不掺和
 // =========================================================================
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && typeof reconcileLive === 'function') { try { reconcileLive(); } catch (e) {} }
+  if (!document.hidden && typeof syncLiveSessions === 'function') {
+    try { syncLiveSessions({ allowSpawn: true }); } catch (e) {}
+  }
 });
 window.addEventListener('focus', () => {
-  if (typeof reconcileLive === 'function') { try { reconcileLive(); } catch (e) {} }
+  if (typeof syncLiveSessions === 'function') {
+    try { syncLiveSessions({ allowSpawn: true }); } catch (e) {}
+  }
 });
 
 // =========================================================================
@@ -1197,21 +1171,6 @@ async function lumaInitApp() {
     } catch (e) {
       window.charSchedulesMap = {};
     }
-
-    // 检查是否需要世界冷启动初始化（全新安装或首次运行）
-    const isBootstrapped = Object.keys(window.charSchedulesMap || {}).length > 0;
-    if (!isBootstrapped && window.allCharacters && window.allCharacters.length > 0) {
-      if (typeof bootstrapWorldInitialState === 'function') {
-        await bootstrapWorldInitialState(window.allCharacters, window.appParams);
-      }
-    }
-
-    // 启动时预读各角色状态栏倾向值，暖一次倾向缓存（readState SDK 调用）
-    if (window.allCharacters && Array.isArray(window.allCharacters) && typeof readCharTendency === 'function') {
-      try {
-        await Promise.all(window.allCharacters.map(c => c && c.id ? readCharTendency(c.id) : Promise.resolve()));
-      } catch (e) {}
-    }
   } catch (e) {
     console.warn("DB读取警告:", e);
   }
@@ -1225,36 +1184,14 @@ async function lumaInitApp() {
     console.warn("[LUMA Live] 直播数据回灌失败:", e);
   }
 
-  // 3. 重开核对：清掉旧版遗留队列，把每个人的纸条顺到此刻（该开的开、该下的下，
-  //    写的全是真实历史时刻，场次与涨粉正常入账）。没有"离线重演"这回事：
-  //    翻面时刻由定数算出，晚问一步不会得到另一个答案。
-  try {
-    if (typeof settleAllLive === 'function') {
-      await settleAllLive();
-    }
-  } catch (e) {
-    console.warn("[LUMA Live] 直播作息核算失败:", e);
-  }
-
-  // 3. 重开核对：清掉旧版遗留队列、按真实房间校正纸条、立刻跑一拍心跳。
-  //    不做任何"离线重演"——概率按真实已持续时长算，回来第一拍就该切就切，
-  //    正在播的场次保持原 startTime，时长 = now - startTime 真实累计。
-  try {
-    if (typeof settleAllLive === 'function') {
-      await settleAllLive();
-    }
-  } catch (e) {
-    console.warn("[LUMA Live] 时间差结算失败:", e);
-  }
-
   // 3. 同步个人资料
   await syncUserProfile();
 
   // 4. 加载社区动态
   await loadTrendsFromDb();
 
-  // 5. 同步直播列表并渲染赛道
-  await syncLiveSessions();
+  // 5. 同步直播列表并渲染赛道（test3：首次进排班，到点开播、超时切断）
+  await syncLiveSessions({ allowSpawn: true });
 
   // 5.5 后台结算与直播列表就绪 → 通知开屏退出，避免直播广场闪现"无人在播"
   if (typeof window.markAppInitReady === 'function') {
@@ -1277,6 +1214,13 @@ async function lumaInitApp() {
   if (window.TimeKeeper && typeof window.TimeKeeper.startDynamicTimeRefresher === 'function') {
     window.TimeKeeper.startDynamicTimeRefresher();
   }
+
+  // 9. 启动 test3 周期性作息推演定时器（每 30 秒轮询排班，APP随机开播机制核心心跳）
+  setInterval(() => {
+    if (typeof syncLiveSessions === 'function') {
+      syncLiveSessions({ allowSpawn: true });
+    }
+  }, 30000);
 
   console.log('[LUMA Live] ✅ 启动成功');
 }

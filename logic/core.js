@@ -385,12 +385,12 @@ window.allCharacters = window.allCharacters || [];
 window.liveList = window.liveList || [];
 window.charSchedulesMap = window.charSchedulesMap || {};
 
-// 9 大沙盒核心参数
+// 9 大沙盒核心参数（test3 版默认值：开播概率调度机制）
 window.appParams = window.appParams || {
-  maxLiveDuration: 240,
-  maxRestDuration: 480,
+  charSpawnRate: 45,
+  maxLiveDuration: 120,
+  maxRestDuration: 360,
   minRestDuration: 10,
-  dailyLiveLimit: 0,
   replyRandomDanmakuRate: 25,
   mentionUserRate: 30,
   enterOtherLiveRate: 35,

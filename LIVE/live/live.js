@@ -60,6 +60,17 @@
         <div id="subCategoryFilterBar" class="flex gap-2 overflow-x-auto no-scrollbar py-1"></div>
       </div>
 
+      <!-- 维护期横幅：char后台自发开播概率 = 0% 且全平台无人直播时出现；
+           角色自主开播（房管放行）后自动下掉。见 updateMaintenanceBanner() -->
+      <div id="liveMaintBanner" class="hidden items-center gap-3 rounded-2xl px-3.5 py-3 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg border border-white/10">
+        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0"></span>
+        <div class="flex-1 min-w-0">
+          <p class="text-[11px] font-black tracking-wide">LUMA Live 正在维护中…</p>
+          <p class="text-[9px] text-white/55 mt-0.5">APP 随机推流排班已暂停，主播自主开播不受影响</p>
+        </div>
+        <svg class="w-4 h-4 text-white/35 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+      </div>
+
       <div id="liveGrid" class="grid grid-cols-2 gap-3.5 pt-1"></div>
     </div>
 

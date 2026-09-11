@@ -5,6 +5,15 @@
 
 var api = window.api || {};
 
+// 主播身份归一化比较：宿主/历史数据里 char id 可能是数字，也可能被塞进 session.id，
+// 直接 === 会让"同一个人"被判成两个主播（防多开判定失效）。
+function isSameCharId(a, b) {
+  if (a === null || a === undefined || b === null || b === undefined) return false;
+  const x = String(a).trim();
+  return !!x && x === String(b).trim();
+}
+window.isSameCharId = isSameCharId;
+
 let liveList = [];
 let allCharacters = [];
 let currentRoom = null;
@@ -371,11 +380,25 @@ window.isSessionMatchingCategory = isSessionMatchingCategory;
 
 function renderLiveGrid() {
   const box = document.getElementById('liveGrid') || document.getElementById('livePlazaGrid');
+  // 维护横幅与广场内容联动：切换频道/刷新广场时一并更新
+  updateMaintenanceBanner((window.liveList || liveList || []).length);
   if (!box) return;
   
   const currentLives = window.liveList || liveList || [];
 
-  let filtered = currentLives.filter(s => isSessionMatchingCategory(s, activeMainCategory, activeSubCategory));
+  // 【兜底护栏】广场是给用户看的最终出口，这里再兜一次底：
+  //   1. 未过房管审核的场次不渲染（pending / rejected）
+  //   2. 同一 char 只渲染一个直播间（脏数据/分身房绝不出现在广场上）
+  const seenChar = new Set();
+  let filtered = currentLives.filter(s => {
+    if (!s || s.auditState === 'pending' || s.auditState === 'rejected') return false;
+    const key = String(s.characterId || s.id || '').trim();
+    if (key) {
+      if (seenChar.has(key)) return false;
+      seenChar.add(key);
+    }
+    return isSessionMatchingCategory(s, activeMainCategory, activeSubCategory);
+  });
 
   if (filtered.length === 0) {
     box.innerHTML = `
@@ -1875,3 +1898,228 @@ if (document.readyState === 'loading') {
     selectMainCategory('all');
   }
 }
+// =========================================================================
+
+// 【test3 直播机制·APP随机开播】头像兜底池（test3 LIVE/直播/live.js 原样搬运）
+
+// =========================================================================
+
+const NPC_AVATAR_POOL = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200',
+  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200',
+  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200',
+  'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=200'
+];
+
+
+
+// =========================================================================
+// 8. 周期性作息推演与同步服务
+// =========================================================================
+// 【单飞锁】syncLiveSessions 会被 30 秒心跳 / visibilitychange / focus / 启动初始化
+// 同时触发。没有这道锁时两趟会各自抓一份旧快照、各自给同一个 char 建房，最终同一个
+// 主播出现两个直播间。这里保证任意时刻只有一趟排班在跑，重复调用共享同一趟结果。
+let _syncLiveInFlight = null;
+function syncLiveSessions(options = {}) {
+  if (_syncLiveInFlight) return _syncLiveInFlight;
+  const run = _syncLiveSessionsInner(options)
+    .catch(e => { console.warn('[LUMA Live] 排班同步异常:', e); })
+    .then(() => { _syncLiveInFlight = null; });
+  _syncLiveInFlight = run;
+  return run;
+}
+
+// 【停机维护横幅】char后台自发开播概率 = 0% 且全平台无人直播 → 广场顶部拉横幅；
+// 只要有任意主播在线（角色自主开播照样过房管）就自动把横幅下掉。
+function isMaintenanceMode() {
+  return Number((window.appParams || {}).charSpawnRate) === 0;
+}
+function updateMaintenanceBanner(liveCount) {
+  const banner = document.getElementById('liveMaintBanner');
+  if (!banner) return;
+  const online = Number.isFinite(Number(liveCount)) ? Number(liveCount) : (window.liveList || []).length;
+  const show = isMaintenanceMode() && online === 0;
+  banner.classList.toggle('hidden', !show);
+  banner.classList.toggle('flex', show);
+}
+window.isMaintenanceMode = isMaintenanceMode;
+window.updateMaintenanceBanner = updateMaintenanceBanner;
+
+// 设置面板把概率拖到 0% 时立即生效：切掉随机排班在播场次 + 更新横幅
+function applyMaintenanceMode() {
+  if (isMaintenanceMode() && typeof syncLiveSessions === 'function') {
+    try { syncLiveSessions({ allowSpawn: false }); } catch (e) {}
+  }
+  updateMaintenanceBanner((window.liveList || []).length);
+}
+window.applyMaintenanceMode = applyMaintenanceMode;
+
+// 只刷新直播广场（重列在播表 → 同 char 去重 → 渲染），不排班、不建房、不加锁。
+// 房管审核通过/下播后调用它；绝不能再回调 syncLiveSessions —— 房管可能正被排班
+// 心跳在持锁上下文里调用，回调会形成环等死锁。
+async function refreshLivePlaza() {
+  const sessions = await api.db.list("live_sessions") || [];
+  const unique = (typeof window.dedupeLiveSessions === 'function')
+    ? window.dedupeLiveSessions(sessions)
+    : sessions;
+  // 未过房管审核的场次（pending / rejected）不渲染进直播广场
+  liveList = unique.filter(s => s && s.auditState !== 'pending' && s.auditState !== 'rejected');
+  window.liveList = liveList;
+  renderLiveGrid();
+  updateMaintenanceBanner(liveList.length);
+  return liveList;
+}
+window.refreshLivePlaza = refreshLivePlaza;
+
+async function _syncLiveSessionsInner(options = {}) {
+  let sessions = await api.db.list("live_sessions") || [];
+  const now = Date.now();
+  const params = window.appParams || {};
+  const spawnRate = params.charSpawnRate !== undefined ? params.charSpawnRate : 45;
+  const maxLiveMins = params.maxLiveDuration || 120;
+  const maxRestMins = params.maxRestDuration || 360;
+  const officialCategories = ['电竞竞技', '声动音律', '次元才艺', '随性杂谈', '探索开箱'];
+
+  // 超时下播强制切断检测：按主播去重，一次切断结束该主播名下全部场次（房管内部兜底）
+  const expiredCharIds = [];
+  for (const s of sessions) {
+    const endTs = Number(s.endTime) || ((Number(s.startTime) || now) + maxLiveMins * 60 * 1000);
+    if (now < endTs) continue;
+    const key = String(s.characterId || s.id || '');
+    if (key && !expiredCharIds.includes(key)) expiredCharIds.push(key);
+  }
+  for (const charId of expiredCharIds) {
+    if (window.lumaOpsGateway) {
+      await window.lumaOpsGateway.requestStopLive({
+        characterId: charId,
+        reason: "单次直播到达上限，官方强制切断",
+        source: "auto_timeout"
+      });
+    }
+  }
+
+  sessions = await api.db.list("live_sessions") || [];
+
+  const allChars = window.allCharacters || [];
+
+  if (spawnRate === 0) {
+    // 【停机维护模式】char后台自发开播概率 = 0%：
+    //   · APP 随机排班彻底停摆（不排班、不建房；房管侧也会驳回 scheduler 来源的申请）
+    //   · 已在播的随机排班场次强制切断，把广场清空交给维护横幅
+    //   · 角色自主开播不受影响：申请照样过房管，一旦开播，维护横幅自动下掉
+    const autoRooms = sessions.filter(s => s.auditSource === 'scheduler' || s.auditSource === 'egg_force');
+    for (const s of autoRooms) {
+      if (window.lumaOpsGateway) {
+        await window.lumaOpsGateway.requestStopLive({
+          characterId: s.characterId,
+          reason: "平台进入停机维护，APP 随机排班统一切断",
+          source: "maint_shutdown"
+        });
+      }
+    }
+
+    await refreshLivePlaza();
+    return;
+  }
+
+  if (options.allowSpawn === false || !allChars || allChars.length === 0) {
+    await refreshLivePlaza();
+    return;
+  }
+
+  const offlineChars = allChars.filter(c => !sessions.find(s => isSameCharId(s.characterId, c.id)));
+  const effectiveRate = Math.min(Math.max(spawnRate, 5), 80) / 100;
+
+  for (let c of offlineChars) {
+    let sched = (window.lumaOpsGateway && typeof window.lumaOpsGateway.getCharSchedule === 'function') 
+      ? await window.lumaOpsGateway.getCharSchedule(c.id) 
+      : (window.charSchedulesMap ? window.charSchedulesMap[c.id] : null);
+    
+    if (!sched || !sched.nextLiveAt) {
+      const initOffsetMins = Math.floor(Math.random() * 30 + 5);
+      const planRest = Math.max(10, Math.round(maxRestMins - (maxRestMins - 10) * effectiveRate));
+      const planDur = Math.floor(Math.random() * (maxLiveMins - 30) + 30);
+      
+      const isOngoingMock = Math.random() < effectiveRate;
+      const startMock = isOngoingMock ? (now - initOffsetMins * 60 * 1000) : (now + initOffsetMins * 60 * 1000);
+
+      sched = {
+        characterId: c.id,
+        lastOfflineAt: isOngoingMock ? (startMock - planRest * 60000) : now,
+        nextLiveAt: startMock,
+        planRestMins: planRest,
+        planDurationMins: planDur
+      };
+      if (window.lumaOpsGateway && typeof window.lumaOpsGateway.saveCharSchedule === 'function') {
+        await window.lumaOpsGateway.saveCharSchedule(c.id, sched);
+      }
+    }
+
+    const planDurationMs = (Number(sched.planDurationMins) || 60) * 60 * 1000;
+    const planEnd = (Number(sched.nextLiveAt) || now) + planDurationMs;
+
+    if (now >= planEnd) {
+      const nextPlanRestMins = Math.max(10, Math.round(maxRestMins - (maxRestMins - 10) * effectiveRate));
+      const nextPlanDurMins = Math.floor(Math.random() * (maxLiveMins - 30) + 30);
+      const newNextLive = now + nextPlanRestMins * 60 * 1000;
+
+      if (window.lumaOpsGateway && typeof window.lumaOpsGateway.saveCharSchedule === 'function') {
+        await window.lumaOpsGateway.saveCharSchedule(c.id, {
+          characterId: c.id,
+          lastOfflineAt: planEnd,
+          nextLiveAt: newNextLive,
+          planRestMins: nextPlanRestMins,
+          planDurationMins: nextPlanDurMins
+        });
+      }
+      continue;
+    }
+
+    if (now >= Number(sched.nextLiveAt) && now < planEnd) {
+      // 排班只负责"到点提交开播申请"，建房/落库/渲染全部由房管统一执行
+      if (!window.lumaOpsGateway || typeof window.lumaOpsGateway.requestStartLive !== 'function') continue;
+
+      // 防多开复核：上面的 sessions 是这趟循环开始时的快照，循环里全是 await，
+      // 期间角色可能已经自主开播。这里必须拿最新的在播表再确认一次。
+      const freshSessions = await api.db.list("live_sessions") || [];
+      if (sched.isLive === true) continue;   // 房管标记：该主播在线，禁止再次排班开播
+      const alreadyLive = freshSessions.some(s => isSameCharId(s.characterId, c.id) || isSameCharId(s.id, c.id));
+      if (alreadyLive) continue;
+
+      const cat = officialCategories[Math.floor(Math.random() * officialCategories.length)];
+      const subs = SUB_CATEGORIES[cat] || ['热门专场'];
+      const subTag = subs[Math.floor(Math.random() * subs.length)];
+      const remainMins = Math.max(5, Math.round((planEnd - now) / 60000));
+
+      const verdict = await window.lumaOpsGateway.requestStartLive({
+        characterId: c.id,
+        category: cat,
+        subTag: subTag,
+        topic: `【${c.name}】的${subTag}直播`,
+        durationMins: remainMins,
+        source: "scheduler"
+      });
+
+      if (!verdict || !verdict.success) {
+        // 房管驳回（重复开播/休息期/维护中）：不建房，并把排班顺延，避免每 30 秒空转重试
+        if (verdict && verdict.code === 'already_live') continue;
+        const backoffMs = Number(verdict && verdict.retryAfterMs) || 5 * 60 * 1000;
+        if (window.lumaOpsGateway && typeof window.lumaOpsGateway.saveCharSchedule === 'function') {
+          await window.lumaOpsGateway.saveCharSchedule(c.id, { nextLiveAt: now + backoffMs });
+        }
+        continue;
+      }
+
+      // 开播状态写入与时间线记账已由房管统一完成（含幂等 appEventId）
+      sessions = await api.db.list("live_sessions") || [];
+    }
+  }
+
+  await refreshLivePlaza();
+}
+window.syncLiveSessions = syncLiveSessions;
+
