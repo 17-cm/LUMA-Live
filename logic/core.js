@@ -740,24 +740,7 @@ async function aiGenerateImage(params) {
 window.aiGenerateImage = aiGenerateImage;
 
 async function robustNetworkRequest(options) {
-  // 需要走宿主代理的请求（如 GitHub API，沙盒 iframe 直连会被 CORS 拦截）
-  if (options.proxy === true && api.network?.fetch) {
-    try {
-      const res = await api.network.fetch({
-        url: options.url,
-        method: options.method || 'GET',
-        headers: options.headers || {},
-        body: options.body,
-        proxy: true,
-        timeoutMs: options.timeoutMs || 20000
-      });
-      if (res && (res.ok || res.status)) return res;
-    } catch (e) {
-      console.warn('[robustNetworkRequest] 宿主代理请求失败，降级为浏览器直连:', e?.message || e);
-    }
-  }
-
-  // 浏览器直连（自定义大模型 API 等，目标接口通常允许 CORS）
+  // 统一走浏览器直连：自定义大模型 / 生图 API 都允许 CORS，不需要宿主代发
   const rawRes = await fetch(options.url, {
     method: options.method || 'GET',
     headers: options.headers || {},
@@ -928,3 +911,120 @@ function getAvatar(name, style) {
   return dataUrl;
 }
 window.getAvatar = getAvatar;
+
+
+// =========================================================================
+// 【公共 · 等待态遮罩】
+// 宿主只提供 ui.toast / ui.confirm / ui.showNotification，没有 setLoading，
+// 长任务（生图、生成超话/动态）期间需要自己给一个"正在处理"的可见反馈，
+// 否则用户会以为按钮没点上。
+// =========================================================================
+function showBusyOverlay(text) {
+  try {
+    let el = document.getElementById('lumaBusyOverlay');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'lumaBusyOverlay';
+      el.style.cssText = 'position:fixed;inset:0;z-index:99998;display:flex;align-items:center;justify-content:center;background:rgba(8,12,20,.42);backdrop-filter:blur(3px);';
+      el.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:22px 26px;border-radius:20px;background:rgba(15,23,42,.94);box-shadow:0 18px 46px rgba(0,0,0,.38)">'
+        + '<div style="width:26px;height:26px;border-radius:999px;border:2.5px solid rgba(255,255,255,.22);border-top-color:#fb7185;animation:lumaBusySpin .8s linear infinite"></div>'
+        + '<div id="lumaBusyText" style="font-size:12px;font-weight:800;color:#fff;letter-spacing:.02em;max-width:210px;text-align:center;line-height:1.5"></div></div>';
+      document.body.appendChild(el);
+
+      if (!document.getElementById('lumaBusyStyle')) {
+        const st = document.createElement('style');
+        st.id = 'lumaBusyStyle';
+        st.textContent = '@keyframes lumaBusySpin{to{transform:rotate(360deg)}}';
+        document.head.appendChild(st);
+      }
+    }
+    const t = document.getElementById('lumaBusyText');
+    if (t) t.textContent = text || '正在处理…';
+    el.style.display = 'flex';
+  } catch (e) {}
+}
+window.showBusyOverlay = showBusyOverlay;
+
+function hideBusyOverlay() {
+  try {
+    const el = document.getElementById('lumaBusyOverlay');
+    if (el) el.style.display = 'none';
+  } catch (e) {}
+}
+window.hideBusyOverlay = hideBusyOverlay;
+
+// =========================================================================
+// 【公共 · 聊天室留痕】
+// 目的：APP 关着的时候也能知道"她和你在聊天室聊了什么"。
+// 宿主在 manifest 里声明 chat.message.created(background) 后，会用隐藏运行环境
+// 把新消息交给这里；只写本地 db，不产生任何聊天消息，所以不会刷屏。
+// =========================================================================
+const LUMA_CHAT_LOG_TABLE = 'luma_chat_log';
+
+async function recordChatEchoMessage(payload) {
+  try {
+    if (!payload || !api.db) return;
+    const msg = payload.message || {};
+    const charId = payload.characterId || msg.characterId || payload.sessionId;
+    const content = String(msg.content || msg.text || '').trim();
+    if (!charId || !content) return;
+
+    const list = await api.db.list(LUMA_CHAT_LOG_TABLE, { limit: 60 }).catch(() => []);
+    const mine = (Array.isArray(list) ? list : []).find(r => String(r && r.characterId) === String(charId));
+    const prev = Array.isArray(mine && mine.items) ? mine.items : [];
+    const items = prev.concat([{
+      role: msg.role || 'user',
+      content: content.slice(0, 600),
+      messageId: msg.id || null,
+      at: Date.now()
+    }]).slice(-40);
+
+    if (mine && mine.id) await api.db.update(LUMA_CHAT_LOG_TABLE, mine.id, { characterId: String(charId), items });
+    else await api.db.create(LUMA_CHAT_LOG_TABLE, { characterId: String(charId), items });
+  } catch (e) {}
+}
+
+async function readChatEchoLog(charId, limit = 24) {
+  try {
+    if (!api.db || !charId) return [];
+    const list = await api.db.list(LUMA_CHAT_LOG_TABLE, { limit: 60 });
+    const mine = (Array.isArray(list) ? list : []).find(r => String(r && r.characterId) === String(charId));
+    const items = Array.isArray(mine && mine.items) ? mine.items : [];
+    return items.slice(-limit);
+  } catch (e) { return []; }
+}
+window.readChatEchoLog = readChatEchoLog;
+
+// 取一段聊天室上下文（优先实时读取聊天历史，读不到就用本地留痕兜底）
+async function buildChatRoomContextText(charId, limit = 12) {
+  if (!charId) return '';
+  let rows = [];
+  try {
+    if (api.chat && typeof api.chat.readHistory === 'function') {
+      const res = await api.chat.readHistory({ characterId: charId, limit: limit * 2 }).catch(() => null);
+      const list = Array.isArray(res) ? res : (res && Array.isArray(res.messages) ? res.messages : []);
+      rows = list.map(m => ({ role: m && m.role, content: String((m && (m.content ?? m.text)) || '').trim() }));
+    }
+  } catch (e) {}
+  if (!rows.length) {
+    const log = await readChatEchoLog(charId, limit * 2);
+    rows = log.map(m => ({ role: m && m.role, content: String((m && m.content) || '').trim() }));
+  }
+  rows = rows.filter(m => m.content && m.content.length > 1);
+  if (!rows.length) return '';
+  return rows.slice(-limit).map(m => {
+    const isChar = (m.role === 'assistant' || m.role === 'char');
+    return `${isChar ? '她' : '观众'}: ${m.content}`;
+  }).join('\n');
+}
+window.buildChatRoomContextText = buildChatRoomContextText;
+
+// 注册后台聊天监听（manifest 需声明 chat.message.created + background）
+try {
+  if (api.on && typeof api.on === 'function') {
+    api.on('chat.message.created', function (payload) {
+      // 后台 handler 必须 await / 返回 Promise，否则隐藏运行环境可能提前销毁
+      return recordChatEchoMessage(payload);
+    });
+  }
+} catch (e) {}

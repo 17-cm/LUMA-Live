@@ -28,6 +28,7 @@ async function refreshTrendsWithAI(baseNow) {
   if (isRefreshingTrends) return;
   isRefreshingTrends = true;
   if (window.api && api.ui && api.ui.toast) api.ui.toast('正在生成热搜新动态…');
+  if (window.showBusyOverlay) window.showBusyOverlay('正在生成热搜新动态…');
   if (typeof window.toggleBtnLoading === 'function') {
     window.toggleBtnLoading(document.getElementById('btnRefreshTrends'), true);
   }
@@ -268,6 +269,7 @@ async function refreshTrendsWithAI(baseNow) {
     if (window.api && api.ui && api.ui.toast) api.ui.toast('生成失败：' + (e.message || '未知错误'));
   } finally {
     isRefreshingTrends = false;
+    if (window.hideBusyOverlay) window.hideBusyOverlay();
     if (typeof window.toggleBtnLoading === 'function') {
       window.toggleBtnLoading(document.getElementById('btnRefreshTrends'), false);
     }

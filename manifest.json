@@ -29,7 +29,6 @@
     "media.save",
     "ui.toast",
     "memory.write",
-    "network.fetch",
     "chat.read",
     "chat.read.background",
     "chat.tools",
@@ -53,7 +52,15 @@
         }
       ]
     },
-    "events": [],
+    "events": [
+      {
+        "event": "chat.message.created",
+        "entry": "chat_echo",
+        "background": true,
+        "timeoutMs": 300000,
+        "description": "记录聊天新消息，APP 未打开也能读到她在聊天室说过的话（用于防止进直播间后话语断层）"
+      }
+    ],
     "tools": [
       {
         "id": "luma-request-start-live",

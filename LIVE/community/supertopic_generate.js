@@ -346,7 +346,7 @@
     if (!anchor) return;
     if (busy.feed) { toast('正在生成中，稍等一下', 'warn'); return; }
     busy.feed = true;
-    try { if (window.api && api.ui) api.ui.setLoading(true); } catch (e) {}
+    try { if (window.showBusyOverlay) window.showBusyOverlay('正在生成超话新动态…'); } catch (e) {}
     toast('正在生成超话新动态…');
 
     try {
@@ -442,7 +442,7 @@
       toast('生成失败，请检查模型配置', 'warn');
     } finally {
       busy.feed = false;
-      try { if (window.api && api.ui) api.ui.setLoading(false); } catch (e) {}
+      try { if (window.hideBusyOverlay) window.hideBusyOverlay(); } catch (e) {}
     }
   }
 

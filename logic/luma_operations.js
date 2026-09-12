@@ -466,6 +466,20 @@ const lumaOpsGateway = {
       }
     } catch (e) {}
 
+    // 小手机通知（横幅 + 桌面红点）：只通知已关注她的用户
+    try {
+      const followed = Array.isArray(window.followedHosts) ? window.followedHosts : [];
+      const isFollowed = followed.some(id => String(id) === String(charId));
+      if (isFollowed && api.notifications && typeof api.notifications.create === 'function') {
+        await api.notifications.create({
+          title: `${charName} 开播了`,
+          body: `《${created.topic}》· ${created.category}　点开 LUMA Live 进直播间`,
+          badgeDelta: 1,
+          data: { characterId: charId, roomId: created.roomId, from: 'luma-live' }
+        });
+      }
+    } catch (e) {}
+
     lumaOpsNotify("开播批准", `【${charName}】通过审核已成功推流开播 (房号:${created.roomId})`, "approve");
 
     // 房管批准后才刷新直播广场（注意：这里不能回调 syncLiveSessions —— 排班心跳
@@ -554,6 +568,20 @@ const lumaOpsGateway = {
     await saveDbSetting("char_schedules", window.charSchedulesMap);
 
     // 不写角色状态值：同上，房管只记排班与事件流
+
+    // 下播事件流：不写这条，聊天室里的她就不知道自己已经下播了
+    try {
+      if (api.memory?.addTimeline) {
+        const endedTopic = matched[0]?.topic || '直播';
+        await api.memory.addTimeline({
+          characterId: charId,
+          appLabel: "LUMA Live",
+          detail: "live_stopped",
+          summary: `【${charName}】结束了《${endedTopic}》的网络直播，已经下播${isMaintCut ? '（被平台下线）' : ''}。`,
+          appEventId: `live_stop_${matched[0]?.id || charId}_${now}`
+        });
+      }
+    } catch (e) {}
     const isForced = source === 'maint_shutdown' || source === 'max_duration_reached' || source === 'auto_timeout';
     lumaOpsNotify(
       isForced ? "运营强制下播" : "主播已下播",

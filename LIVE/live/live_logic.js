@@ -533,6 +533,20 @@ function enterLiveRoomDirectly(sessionId) {
   // 重置单次进房请求锁
   lastPackageRequestTime = 0;
 
+  // 进直播间先去取一段聊天室上下文：开场白要承接你们刚才聊的话题，
+  // 不能像"上一秒还在聊天室，下一秒进直播间就成了陌生人"。
+  window.__liveChatContext = '';
+  try {
+    const chatCharId = currentRoom.characterId || currentRoom.id;
+    if (typeof window.buildChatRoomContextText === 'function') {
+      Promise.resolve(window.buildChatRoomContextText(chatCharId, 12)).then(text => {
+        if (text && currentRoom && String(currentRoom.characterId || currentRoom.id) === String(chatCharId)) {
+          window.__liveChatContext = text;
+        }
+      }).catch(() => {});
+    }
+  } catch (e) {}
+
   // 如果已经有打包好的内容，立即推首条台词并启动流
   if (hostSpeechPool.length > 0) {
     const first = hostSpeechPool.shift();
@@ -725,7 +739,12 @@ async function fetchBatchLivePackage(force = false) {
     }
 
     // 动态上下文：赛道频道、标题、最近送礼与待回应互动
-    const dynamicContext = `当前赛道：${currentRoom.category}（${currentRoom.subTag || '日常'}），标题：《${currentRoom.topic}》${giftHistoryText}${userReplyText}`;
+    // 开场这一次把聊天室上下文带上（用完即清，后续批次不重复）
+    const chatRoomCtx = window.__liveChatContext || '';
+    const chatRoomHint = chatRoomCtx
+      ? `\n\n【进直播间前，你和这位观众在聊天室刚聊过下面这些，开场白要自然承接、别像第一次见面】：\n${chatRoomCtx}`
+      : '';
+    const dynamicContext = `当前赛道：${currentRoom.category}（${currentRoom.subTag || '日常'}），标题：《${currentRoom.topic}》${giftHistoryText}${userReplyText}${chatRoomHint}`;
 
     // 注入直播间历史上下文（不可见层）：进房首次调用带全部历史，之后随新记录继续累积
     const liveHistory = await buildLiveHistoryPayload();
@@ -738,6 +757,7 @@ async function fetchBatchLivePackage(force = false) {
       historyText: liveHistory.historyText
     });
 
+    window.__liveChatContext = '';   // 开场上下文已用掉
     const parsed = window.extractJsonFromText ? window.extractJsonFromText(res.text) : null;
 
     if (parsed) {
