@@ -452,17 +452,7 @@ const lumaOpsGateway = {
     };
     await saveDbSetting("char_schedules", window.charSchedulesMap);
 
-    try {
-      if (api.characters?.writeState) {
-        await api.characters.writeState({
-          characterId: charId,
-          stateValues: [
-            { name: "状态", value: `${charName}直播中` }
-          ]
-        });
-      }
-    } catch (err) {}
-
+    // 不写角色状态值：状态栏归宿主/角色自己维护，房管只记排班（char_schedules）与事件流
     // 开播时间线由房管统一记账：无论自主开播还是随机开播都留痕，且 appEventId 幂等
     try {
       if (api.memory?.addTimeline) {
@@ -563,17 +553,7 @@ const lumaOpsGateway = {
     };
     await saveDbSetting("char_schedules", window.charSchedulesMap);
 
-    try {
-      if (api.characters?.writeState) {
-        await api.characters.writeState({
-          characterId: charId,
-          stateValues: [
-            { name: "状态", value: `${charName}已下播` }
-          ]
-        });
-      }
-    } catch (err) {}
-
+    // 不写角色状态值：同上，房管只记排班与事件流
     const isForced = source === 'maint_shutdown' || source === 'max_duration_reached' || source === 'auto_timeout';
     lumaOpsNotify(
       isForced ? "运营强制下播" : "主播已下播",
