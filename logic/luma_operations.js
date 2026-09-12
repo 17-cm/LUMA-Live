@@ -29,6 +29,90 @@
 // =========================================================================
 
 // =========================================================================
+// 【状态同步到角色日程】后台定时把每个角色的直播状态写入角色日程
+// 通过 {{当前日程}} 宏自动注入提示词，角色聊天时自动看到真实状态
+// 不依赖短期记忆、不依赖聊天历史、不依赖工具调用
+// —— 说明：这条链路曾于房管收口重构时被误删，此处按原设计恢复并增强：
+//    1) 状态/分钟数没变化就不重复写宿主（原来每 30 秒无脑写一次）
+//    2) 维护模式下写"维护中"，不再显示"休息中"
+//    3) 只替换标题以 "LUMA Live" 开头的条目，她自己原本的日程一条都不动
+// =========================================================================
+const _lumaCalendarState = {};
+
+async function syncCharStatusToChat(nowTime = null, onlyCharId = null) {
+  try {
+    // 离线唤醒（隐藏运行环境）冷启动时 window.allCharacters 可能还是空的，
+    // 所以开播/下播触发的即时同步会把 charId 直接带进来。
+    const allChars = onlyCharId ? [{ id: onlyCharId }] : (window.allCharacters || []);
+    if (allChars.length === 0) return;
+    const sessions = await api.db.list("live_sessions", { limit: 500 }) || [];
+    const now = nowTime || Date.now();
+    const today = new Date(now).toISOString().split('T')[0]; // YYYY-MM-DD
+    const calendarApi = (typeof AiPhone !== 'undefined' && AiPhone.calendar) ? AiPhone.calendar : (api.calendar || null);
+    if (!calendarApi || !calendarApi.write) return;
+
+    const maint = Number((window.appParams || {}).charSpawnRate) === 0;
+
+    for (const c of allChars) {
+      try {
+        const session = sessions.find(s => isSameLiveChar(liveSessionCharId(s), c.id) || isSameLiveChar(s.characterId, c.id));
+        let title;
+        if (session) {
+          const liveMins = Math.max(0, Math.round((now - (Number(session.startTime) || now)) / 60000));
+          title = `LUMA Live直播中，已播${liveMins}分钟`;
+        } else {
+          const sched = window.charSchedulesMap ? window.charSchedulesMap[c.id] : null;
+          const anchor = Number(sched && sched.lastEndTime) || null;
+          const restMins = anchor ? Math.max(0, Math.round((now - anchor) / 60000)) : 0;
+          title = anchor
+            ? `LUMA Live休息中，已休息${restMins}分钟`
+            : (maint ? 'LUMA Live维护中，暂时没有直播安排' : 'LUMA Live今日暂无直播安排');
+        }
+
+        const cached = _lumaCalendarState[c.id];
+        if (cached && cached.title === title && cached.day === today) continue;
+
+        // 先读取整周日程，过滤掉已有的 LUMA Live 条目，再写回今天的新状态
+        let existingItems = [];
+        try {
+          const weekData = await calendarApi.read({
+            ownerType: "character",
+            ownerId: c.id,
+            weekStart: today
+          }).catch(() => null);
+          if (weekData && weekData.plan && Array.isArray(weekData.plan.items)) {
+            existingItems = weekData.plan.items.filter(item => !String(item.title || '').startsWith('LUMA Live'));
+          }
+        } catch (e) {}
+
+        await calendarApi.write({
+          ownerType: "character",
+          ownerId: c.id,
+          operation: "replace",
+          items: existingItems.concat([{
+            date: today,
+            startTime: "00:00",
+            endTime: "23:59",
+            title: title,
+            location: "LUMA Live",
+            source: "luma_live"
+          }])
+        }).catch(() => {});
+        _lumaCalendarState[c.id] = { title: title, day: today };
+      } catch (e) {}
+    }
+  } catch (e) {}
+}
+window.syncCharStatusToChat = syncCharStatusToChat;
+// 历史名字带一个零宽字符，保留别名，避免旧调用点失效
+window['sync\u200bCharStatusToChat'] = syncCharStatusToChat;
+// 开播/下播后立刻同步一次（不等下一拍轮询）
+function syncCharStatusSoon(charId = null) {
+  try { Promise.resolve(syncCharStatusToChat(null, charId)).catch(() => {}); } catch (e) {}
+}
+window.syncCharStatusSoon = syncCharStatusSoon;
+
+// =========================================================================
 // 【角色倾向值管理】
 // 倾向值由角色自行判定状态后，通过富媒体指令注入到原生状态栏
 // 状态栏数值格式：[名称:数字]，例如 [开播倾向:75] / [下播倾向:20]
@@ -480,6 +564,7 @@ const lumaOpsGateway = {
       }
     } catch (e) {}
 
+    syncCharStatusSoon(charId);
     lumaOpsNotify("开播批准", `【${charName}】通过审核已成功推流开播 (房号:${created.roomId})`, "approve");
 
     // 房管批准后才刷新直播广场（注意：这里不能回调 syncLiveSessions —— 排班心跳
@@ -582,6 +667,7 @@ const lumaOpsGateway = {
         });
       }
     } catch (e) {}
+    syncCharStatusSoon(charId);
     const isForced = source === 'maint_shutdown' || source === 'max_duration_reached' || source === 'auto_timeout';
     lumaOpsNotify(
       isForced ? "运营强制下播" : "主播已下播",

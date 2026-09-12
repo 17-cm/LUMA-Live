@@ -2184,6 +2184,11 @@ async function _syncLiveSessionsInner(options = {}) {
   }
 
   await refreshLivePlaza();
+
+  // 排班跑完顺手把每个主播的直播状态写进她的日程（内部有节流，没变化不写）
+  if (typeof window.syncCharStatusToChat === 'function') {
+    Promise.resolve(window.syncCharStatusToChat()).catch(() => {});
+  }
 }
 window.syncLiveSessions = syncLiveSessions;
 
