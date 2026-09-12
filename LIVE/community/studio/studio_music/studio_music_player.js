@@ -278,14 +278,21 @@
   }
   window.LM.playPrevSong = playPrevSong;
 
+  // 随机播放取歌：在整个队列里随机挑，并避开刚播完的那首。
+  // 只挑一首不算随机 —— 要的是"队列里随机滚动"，所以每首播完都重新挑，且不原地重复。
+  function shufflePick(ids, excludeId) {
+    var pool = ids.filter(function (id) { return id !== excludeId; });
+    if (pool.length === 0) pool = ids.slice();
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
   function playNextSong() {
     var ids = _queueSongIds();
     if (ids.length === 0) return;
     var st = window.__liveMusicPlayback;
     var label = _modeLabel();
     if (label === '随机播放') {
-      var r = Math.floor(Math.random() * ids.length);
-      playLiveMusicSong(ids[r]);
+      playLiveMusicSong(shufflePick(ids, st.currentSongId));
       return;
     }
     var idx = ids.indexOf(st.currentSongId);
@@ -295,32 +302,77 @@
   }
   window.LM.playNextSong = playNextSong;
 
-  // ---- 进入直播间：自动播放该 char 的歌单 -------------------------------
-  // 有歌单 → 用歌单作为队列从第一首开始；没有歌单 → 回退歌曲列表随机播放
+  // ---- 直播间播放模式：固定随机播放 --------------------------------------
+  // 进场记下对方原本的播放模式，退出直播间时原样还回去，
+  // 这样直播间里一定是"歌单随机滚动"，而音乐设置里的偏好不会被悄悄改掉。
+  var _modeBeforeLiveRoom = null;
+
+  function _forceShuffleMode() {
+    if (_modeBeforeLiveRoom === null) {
+      _modeBeforeLiveRoom = (typeof window.__liveMusicPlayMode === 'number') ? window.__liveMusicPlayMode : 0;
+    }
+    var list = window.__liveMusicModeList || [];
+    var idx = -1;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].label === '随机播放') { idx = i; break; }
+    }
+    if (idx < 0) idx = Math.max(0, list.length - 1);
+    window.__liveMusicPlayMode = idx;
+    _emitState();
+  }
+
+  function _restorePlayMode() {
+    if (_modeBeforeLiveRoom === null) return;
+    window.__liveMusicPlayMode = _modeBeforeLiveRoom;
+    _modeBeforeLiveRoom = null;
+    _emitState();
+  }
+
+  // ---- 进入直播间：随机起播该主播的歌单 ---------------------------------
+  // 规则：
+  //   · 进场就是"随机换一首重新起播"，不是接着上次暂停的那首续播，
+  //     也不是永远从歌单第一首开始；
+  //   · 随机播放 = 就在这个歌单里随机滚动：一首播完再随机挑下一首，
+  //     而不是随机一首然后单曲循环到底（默认模式恰恰是单曲循环，所以必须显式改成随机）。
   window.LM.startCharPlaylist = function (charId) {
+    var st = window.__liveMusicPlayback;
+    // 只把"真的能播"的歌纳入队列：有播放链接，或已经是宿主 media-store 引用
+    var songs = (window.liveMusicSongs || []).filter(function (s) {
+      return s && (s.playUrl || (s.audioRef && String(s.audioRef).indexOf('media-store://') === 0));
+    });
+
     var playlists = window.liveMusicCharPlaylists || {};
     var pl = playlists[charId];
-    var ids = (pl && Array.isArray(pl.songIds)) ? pl.songIds.filter(Boolean) : [];
-    var st = window.__liveMusicPlayback;
-    if (ids.length > 0) {
-      st.queue = ids.slice();
-      playLiveMusicSong(ids[0]);
-    } else {
-      st.queue = null;
-      var songs = (window.liveMusicSongs || []).filter(function (s) { return s.playUrl; });
-      if (songs.length > 0) {
-        var r = Math.floor(Math.random() * songs.length);
-        playLiveMusicSong(songs[r].id);
-      } else {
-        playLiveMusicSong((window.liveMusicSongs && window.liveMusicSongs[0]) ? window.liveMusicSongs[0].id : null);
-      }
-    }
+    var rawIds = (pl && Array.isArray(pl.songIds)) ? pl.songIds.filter(Boolean) : [];
+    // 歌单里可能有已经被删掉的歌，先按歌曲库过一遍，避免抽到空歌
+    var ids = rawIds.filter(function (id) {
+      return songs.some(function (s) { return s.id === id; });
+    });
+    // 没有歌单（或歌单里的歌都没了）→ 退回自动列表，同样是整个列表里随机滚动
+    if (ids.length === 0) ids = songs.map(function (s) { return s.id; });
+
+    st.queue = ids.length > 0 ? ids.slice() : null;
+    if (ids.length === 0) return;
+
+    _forceShuffleMode();
+
+    // 断掉"同一首 → 恢复续播"的语义：进场是重新起播，不是从暂停处接着放
+    _hostStop();
+    _clearTick();
+    st.currentSongId = null;
+    st.inited = false;
+    st.audioRef = null;
+    st.pending = false;
+    _fakeElapsedMs = 0;
+
+    playLiveMusicSong(shufflePick(ids, null));
   };
 
-  // ---- 退出直播间：暂停当前播放，并清空歌单队列恢复默认歌曲列表 ----
+  // ---- 退出直播间：恢复对方原本的播放模式，暂停并清空歌单队列 ----------
   window.LM.stopCharPlaylist = function () {
     window.__liveMusicPlayback.queue = null;
     pauseLiveMusic();
+    _restorePlayMode();
   };
 
   // 模拟播完/宿主播完 → 按模式决定下一首
