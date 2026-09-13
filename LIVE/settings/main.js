@@ -232,10 +232,12 @@ function getApiRequestIntervalMinutes() {
 window.getApiRequestIntervalMinutes = getApiRequestIntervalMinutes;
 
 // =========================================================================
-// 直播作息·排班调度（test3 机制版，核心在 LIVE/live/live_logic.js）
-//   · 开播概率由设置面板 charSpawnRate 控制（0-80%，0=全服停机维护）
-//   · syncLiveSessions() 每 30 秒轮询一次排班：到点自动建房、超时自动切断
-//   · 角色自主开播走 handleRequestStartLive 工具，与排班互不掺和
+// 直播作息·推演调度（核心在 logic/live_engine.js + logic/live_rollout.js）
+//   · 面板三个参数就是全部：开播概率 charSpawnRate（0=停机维护）、直播时长上限、休息时长上限
+//   · syncLiveSessions() 只是"问一次"：谁在播、哪一场几点到几点，全部由
+//     「她是谁 + 参数 + 绝对时刻」算出来，定时器不负责触发任何东西（它推不动时间）
+//   · 离线补演：你不在的时候她播过的场次，回来时按真实起止时刻补进历史
+//   · 角色自主开播走工具/房管那条路，本机制只让位、不干预
 // =========================================================================
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && typeof syncLiveSessions === 'function') {
@@ -1215,7 +1217,8 @@ async function lumaInitApp() {
     window.TimeKeeper.startDynamicTimeRefresher();
   }
 
-  // 9. 启动 test3 周期性作息推演定时器（每 30 秒轮询排班，APP随机开播机制核心心跳）
+  // 9. 每 30 秒"问一次"（只检测、不触发）：APP 开着的时候，到下播点的场次能及时下场、
+  //    新到点的能及时上广场。就算这个定时器完全不跑，真实时间到了再打开 APP 也是同一个结果。
   setInterval(() => {
     if (typeof syncLiveSessions === 'function') {
       syncLiveSessions({ allowSpawn: true });

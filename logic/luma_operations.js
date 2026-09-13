@@ -396,7 +396,7 @@ const lumaOpsGateway = {
     return withGatewayLock(() => lumaOpsGateway._auditStartLive(payload));
   },
 
-  async _auditStartLive({ characterId, category, topic, durationMins, subTag, startAt, source = 'system' } = {}) {
+  async _auditStartLive({ characterId, category, topic, durationMins, subTag, startAt, source = 'system', silent = false } = {}) {
     const charId = normLiveCharId(characterId);
     if (!charId) {
       lumaOpsNotify("开播驳回", "未指定有效的主播身份", "reject");
@@ -477,15 +477,19 @@ const lumaOpsGateway = {
     // 开播时刻：受理方可以指定（排班心跳会把"其实早就开播了"的房间倒推回它真实的开播时刻），
     // 否则一律按"此刻开播"。不倒推的后果就是每次重开 APP 全部主播都显示"刚刚开播"。
     // 倒推上限 = 单次直播时长上限，且倒推后不能已经该下播了。
+    // 【机制补演】source='rollout' 是"把过去真实发生过的那一场如实落库"：它的开播/下播时刻
+    // 必须用真实时刻，所以不受"最多倒推一个时长上限""倒推后不能已经该下播"这两条限制。
+    // 角色自主开播 / 排班来源照旧受限，行为不变。
+    const isRollout = source === 'rollout';
     const maxBackMs = Math.max(1, Number(params.maxLiveDuration) || 120) * 60 * 1000;
     const requestedStart = Number(startAt);
     let start = now;
     if (Number.isFinite(requestedStart) && requestedStart > 0 && requestedStart < now
-        && (now - requestedStart) <= maxBackMs) {
+        && (isRollout || (now - requestedStart) <= maxBackMs)) {
       start = Math.round(requestedStart);
     }
     let end = start + dur * 60 * 1000;
-    if (end <= now) { start = now; end = start + dur * 60 * 1000; }
+    if (!isRollout && end <= now) { start = now; end = start + dur * 60 * 1000; }
 
     let coverUrl = character?.cover || character?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800';
     let rawCat = category || (character?.tags ? character.tags[0] : '随性杂谈');
@@ -554,7 +558,7 @@ const lumaOpsGateway = {
     try {
       const followed = Array.isArray(window.followedHosts) ? window.followedHosts : [];
       const isFollowed = followed.some(id => String(id) === String(charId));
-      if (isFollowed && api.notifications && typeof api.notifications.create === 'function') {
+      if (!silent && isFollowed && api.notifications && typeof api.notifications.create === 'function') {
         await api.notifications.create({
           title: `${charName} 开播了`,
           body: `《${created.topic}》· ${created.category}　点开 LUMA Live 进直播间`,
@@ -565,7 +569,7 @@ const lumaOpsGateway = {
     } catch (e) {}
 
     syncCharStatusSoon(charId);
-    lumaOpsNotify("开播批准", `【${charName}】通过审核已成功推流开播 (房号:${created.roomId})`, "approve");
+    if (!silent) lumaOpsNotify("开播批准", `【${charName}】通过审核已成功推流开播 (房号:${created.roomId})`, "approve");
 
     // 房管批准后才刷新直播广场（注意：这里不能回调 syncLiveSessions —— 排班心跳
     // 是在持锁状态下调用房管的，回调会形成环等死锁）
@@ -591,7 +595,7 @@ const lumaOpsGateway = {
     return withGatewayLock(() => lumaOpsGateway._auditStopLive(payload));
   },
 
-  async _auditStopLive({ characterId, reason = "正常下播", source = "system" } = {}) {
+  async _auditStopLive({ characterId, reason = "正常下播", source = "system", endedAt = null, silent = false } = {}) {
     const charId = normLiveCharId(characterId);
     if (!charId) return { success: false, code: "invalid_char", reason: "未指定有效主播身份" };
 
@@ -605,6 +609,9 @@ const lumaOpsGateway = {
     const character = allChars.find(c => isSameLiveChar(c.id, charId)) || await api.characters.get(charId).catch(() => null);
     const charName = matched[0]?.name || character?.name || "主播";
     const now = Date.now();
+    // 【机制补演】endedAt：把"她其实几点下播的"如实归档。不传 = 此刻 —— 与原来完全一致。
+    const _reqEnd = Number(endedAt);
+    const endedTs = (Number.isFinite(_reqEnd) && _reqEnd > 0 && _reqEnd <= now) ? Math.round(_reqEnd) : now;
 
     let sched = window.charSchedulesMap[charId];
     if (!sched) {
@@ -627,7 +634,7 @@ const lumaOpsGateway = {
 
     for (const session of matched) {
       // 结算归档（AAA 数据层原有能力，保持不动）：直播场次+1、区间增粉、写 streamer_history、清房
-      await closeAndArchive(character, session, now);
+      await closeAndArchive(character, session, endedTs);
     }
 
     // 强制休息期：合法性下限 minRestDuration，同时尊重排班自带的随机休息长度
@@ -645,10 +652,10 @@ const lumaOpsGateway = {
       lastStartTime: matched[0]?.startTime || null,
       // 运营维护切断不写 lastEndTime：她不是"播累了去休息"，只是被平台下线，
       // 因此不占用强制休息期，随时可以自主开播回来。
-      lastEndTime: isMaintCut ? (sched?.lastEndTime || null) : now,
+      lastEndTime: isMaintCut ? (sched?.lastEndTime || null) : endedTs,
       plannedEndTime: null,
       // 下播即进入休息期：直接把排班的下一次开播点推到休息期之后
-      nextLiveAt: now + restMs
+      nextLiveAt: endedTs + restMs
     };
     await saveDbSetting("char_schedules", window.charSchedulesMap);
 
@@ -663,13 +670,13 @@ const lumaOpsGateway = {
           appLabel: "LUMA Live",
           detail: "live_stopped",
           summary: `【${charName}】结束了《${endedTopic}》的网络直播，已经下播${isMaintCut ? '（被平台下线）' : ''}。`,
-          appEventId: `live_stop_${matched[0]?.id || charId}_${now}`
+          appEventId: `live_stop_${matched[0]?.id || charId}_${endedTs}`
         });
       }
     } catch (e) {}
     syncCharStatusSoon(charId);
     const isForced = source === 'maint_shutdown' || source === 'max_duration_reached' || source === 'auto_timeout';
-    lumaOpsNotify(
+    if (!silent) lumaOpsNotify(
       isForced ? "运营强制下播" : "主播已下播",
       `【${charName}】已结束推流（原因:${reason}，共结束 ${matched.length} 个直播间），进入强制休息期`,
       isForced ? "force" : "info"
