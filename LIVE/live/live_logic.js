@@ -625,7 +625,8 @@ window.closeLiveRoom = closeLiveRoom;
 
 // =========================================================================
 // 直播间：返回键旁边的「当前在播歌曲」状态栏 + 歌曲列表下拉抽屉
-//   · 没歌 → 整条状态不显示；有歌 → 显示「歌名 - 歌手」，点开是可播放的歌曲列表。
+//   · 没歌 → 整条状态不显示；有歌 → 显示「歌名 - 歌手」，点开是歌曲列表（**只展示，不能点播**：
+//     直播间放什么歌由主播/机制决定，玩家看得到、点不了）。
 //   · 列表规则：她有专属歌单 → 显示歌单里的歌；没有歌单 → 显示全部歌曲。
 //   · 立绘模式 / 视频背景模式共用同一个头像区，两种模式都能看到、都能点。
 //   · 不占用 LM 的状态钩子（那个槽位音乐页在用，抢了会弄坏别人的卡片），
@@ -698,21 +699,18 @@ function renderRoomSongList() {
   }
   const noteSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>';
   const eqSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="6" y1="10" x2="6" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line><line x1="18" y1="13" x2="18" y2="20"></line></svg>';
+  // 只展示：不做点击播放（直播间里的音乐由主播/机制决定，玩家只能看）
   box.innerHTML = info.songs.map(function (s) {
     const playing = cur && s.id === cur.id;
     return '' +
-      '<button type="button" class="room-song-item' + (playing ? ' playing' : '') + '" data-song-id="' + escapeHtml(String(s.id)) + '">' +
+      '<div class="room-song-item' + (playing ? ' playing' : '') + '">' +
         '<span class="room-song-item-ico">' + (playing ? eqSvg : noteSvg) + '</span>' +
         '<span class="room-song-item-main">' +
           '<span class="room-song-item-title">' + escapeHtml(s.title || '未知歌曲') + '</span>' +
           '<span class="room-song-item-artist">' + escapeHtml(s.artist || '未知歌手') + '</span>' +
         '</span>' +
-      '</button>';
+      '</div>';
   }).join('');
-  box.onclick = function (e) {
-    const btn = e.target && e.target.closest ? e.target.closest('.room-song-item') : null;
-    if (btn) playRoomSong(btn.getAttribute('data-song-id'));
-  };
 }
 window.renderRoomSongList = renderRoomSongList;
 
@@ -739,17 +737,6 @@ function closeRoomSongDrawer(ev) {
   if (mask && !mask.classList.contains('hidden')) mask.classList.add('hidden');
 }
 window.closeRoomSongDrawer = closeRoomSongDrawer;
-
-// 点列表里的歌 → 直接播这首（列表本身只放能播的歌）
-function playRoomSong(songId) {
-  if (!songId) return;
-  if (window.LM && typeof window.LM.playLiveMusicSong === 'function') {
-    window.LM.playLiveMusicSong(songId);
-  }
-  renderRoomSongBar();
-  renderRoomSongList();
-}
-window.playRoomSong = playRoomSong;
 
 
 // checkDeepLinkParams 增强版本定义在文件末尾，这里只保留 load 事件监听

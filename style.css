@@ -718,17 +718,16 @@ input:checked + .switch-slider:before {
 }
 .danmaku-stream-viewport::-webkit-scrollbar { display: none; }
 
-/* 沉浸式深色微透磨砂弹幕气泡 (头像 + 称号 + ID/名称 + 内容) */
+/* 公屏弹幕：已去掉圆角气泡底，普通弹幕就是纯文字（只有「我」和「主播」的气泡还带颜色）。
+   注意：这里保留 1px 透明边框，是为了让 .user-sent / .gift-sent 与 char 的随机色描边
+   照旧画得出来 —— 透明边框看不见，等于没有气泡底。 */
 .danmaku-bubble {
   align-self: flex-start;
   max-width: 92%;
   padding: 4px 10px 4px 4px;
   border-radius: 100px;
-  background: rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  border: 1px solid transparent;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
   font-size: 11.5px;
   line-height: 1.35;
   color: #ffffff;
@@ -7980,7 +7979,6 @@ input:checked + .switch-slider:before {
   font-family: inherit;
   transition: background 0.15s ease;
 }
-.room-song-item:active { background: rgba(255, 255, 255, 0.08); }
 .room-song-item.playing {
   background: rgba(244, 63, 94, 0.18);
   box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.35);
