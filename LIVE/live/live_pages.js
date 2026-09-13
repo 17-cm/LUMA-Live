@@ -13,6 +13,15 @@
         <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </button>
 
+      <!-- 顶部左侧：返回键旁边的「当前在播歌曲」状态栏（歌名 - 歌手）。没歌时整条隐藏，点开是歌曲列表抽屉 -->
+      <div id="roomSongBar" class="room-song-bar hidden">
+        <button type="button" class="room-song-pill" onclick="toggleRoomSongDrawer(event)" title="当前在播歌曲 · 点开看歌曲列表">
+          <svg class="room-song-note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+          <span id="roomSongBarText" class="room-song-text">— —</span>
+          <svg class="room-song-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+      </div>
+
       <!-- 顶部右侧：放大版动态拍摄红点 (模拟现场 REC 录制质感) 与 实时直播时长计时 -->
       <div class="stage-rec-indicator">
         <span class="stage-rec-dot"></span>
@@ -156,6 +165,21 @@
         </div>
 
 <div class="gift-scroll-grid" id="giftScrollGrid"></div>
+      </div>
+
+      <!-- 歌曲列表下拉抽屉（点返回键旁的状态栏弹出；两种模式共用） -->
+      <div id="roomSongDrawerMask" class="room-song-drawer-mask hidden" onclick="closeRoomSongDrawer(event)"></div>
+      <div id="roomSongDrawer" class="room-song-drawer hidden">
+        <div class="room-song-drawer-head">
+          <span class="room-song-drawer-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+          </span>
+          <span id="roomSongDrawerTitle" class="room-song-drawer-title">歌曲列表</span>
+          <button type="button" class="room-song-drawer-close" onclick="closeRoomSongDrawer(event)" title="收起">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div id="roomSongDrawerList" class="room-song-list"></div>
       </div>
   </div>
 

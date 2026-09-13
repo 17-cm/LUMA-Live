@@ -466,6 +466,8 @@ window.renderLiveGrid = renderLiveGrid;
 // =========================================================================
 function updateLiveRoomDuration() {
   if (!currentRoom) return;
+  // 每秒顺手把"当前在播歌曲"状态栏对一下表（只读 LM 的状态，不触发播放/切歌）
+  try { renderRoomSongBar(); } catch (e) {}
   const durationEl = document.getElementById('stageLiveDuration');
   if (!durationEl) return;
   const start = currentRoom.startTime || Date.now();
@@ -525,6 +527,8 @@ function enterLiveRoomDirectly(sessionId) {
   if (window.LM && typeof window.LM.startCharPlaylist === 'function') {
     try { window.LM.startCharPlaylist(currentRoom.characterId || currentRoom.id); } catch (e) {}
   }
+  // 返回键旁的"当前在播歌曲"状态栏：有歌才显示（起播是异步的，这里先刷一次，之后每秒跟一次）
+  try { closeRoomSongDrawer(); renderRoomSongBar(); } catch (e) {}
 
   clearInterval(liveDurationInterval);
   updateLiveRoomDuration();
@@ -618,6 +622,134 @@ function closeLiveRoom() {
   renderLiveGrid();
 }
 window.closeLiveRoom = closeLiveRoom;
+
+// =========================================================================
+// 直播间：返回键旁边的「当前在播歌曲」状态栏 + 歌曲列表下拉抽屉
+//   · 没歌 → 整条状态不显示；有歌 → 显示「歌名 - 歌手」，点开是可播放的歌曲列表。
+//   · 列表规则：她有专属歌单 → 显示歌单里的歌；没有歌单 → 显示全部歌曲。
+//   · 立绘模式 / 视频背景模式共用同一个头像区，两种模式都能看到、都能点。
+//   · 不占用 LM 的状态钩子（那个槽位音乐页在用，抢了会弄坏别人的卡片），
+//     这里靠"进房 + 点歌 + 每秒刷新"来同步，纯读取、不触发任何东西。
+// =========================================================================
+function roomPlayableSongs() {
+  return (window.liveMusicSongs || []).filter(function (s) {
+    return s && (s.playUrl || (s.audioRef && String(s.audioRef).indexOf('media-store://') === 0));
+  });
+}
+
+// char 歌单挂在 window['liveMusic​CharPlaylists']（键名里带一个不可见零宽字符），
+// 所以按"去掉不可见字符后同名"来找，不写死字面量。
+function roomCharPlaylistsStore() {
+  const keys = Object.keys(window);
+  for (let i = 0; i < keys.length; i++) {
+    if (String(keys[i]).replace(/[\u200b-\u200d\ufeff]/g, '') === 'liveMusicCharPlaylists') return window[keys[i]] || {};
+  }
+  return {};
+}
+
+function roomCurrentSong() {
+  const info = (window.LM && window.LM.getLiveMusicPlaybackInfo) ? window.LM.getLiveMusicPlaybackInfo() : null;
+  const id = info && info.songId;
+  if (!id) return null;
+  return roomPlayableSongs().find(function (s) { return s.id === id; }) || null;
+}
+
+// 该显示哪一份列表：有歌单用歌单，没歌单（或歌单里的歌都被删了）用全部歌曲
+function roomSongList() {
+  const all = roomPlayableSongs();
+  const charId = currentRoom && (currentRoom.characterId || currentRoom.id);
+  const playlists = roomCharPlaylistsStore();
+  const pl = charId ? playlists[charId] : null;
+  const ids = (pl && Array.isArray(pl.songIds)) ? pl.songIds.filter(Boolean) : [];
+  const own = ids.map(function (id) { return all.find(function (s) { return s.id === id; }); }).filter(Boolean);
+  const usingPlaylist = own.length > 0;
+  return { songs: usingPlaylist ? own : all, usingPlaylist: usingPlaylist, playlistName: (pl && pl.name) || '' };
+}
+window.roomSongList = roomSongList;
+
+function renderRoomSongBar() {
+  const bar = document.getElementById('roomSongBar');
+  if (!bar) return;
+  const song = roomCurrentSong();
+  if (!song) {                     // 没有歌（或还没起播）→ 这条状态就不出现
+    if (!bar.classList.contains('hidden')) bar.classList.add('hidden');
+    closeRoomSongDrawer();
+    return;
+  }
+  if (bar.classList.contains('hidden')) bar.classList.remove('hidden');
+  const textEl = document.getElementById('roomSongBarText');
+  const label = (song.title || '未知歌曲') + ' - ' + (song.artist || '未知歌手');
+  if (textEl && textEl.textContent !== label) textEl.textContent = label;
+  const drawer = document.getElementById('roomSongDrawer');
+  if (drawer && !drawer.classList.contains('hidden')) renderRoomSongList();   // 抽屉开着就同步高亮
+}
+window.renderRoomSongBar = renderRoomSongBar;
+
+function renderRoomSongList() {
+  const box = document.getElementById('roomSongDrawerList');
+  if (!box) return;
+  const info = roomSongList();
+  const cur = roomCurrentSong();
+  const titleEl = document.getElementById('roomSongDrawerTitle');
+  if (titleEl) {
+    titleEl.textContent = info.usingPlaylist
+      ? ('她的歌单' + (info.playlistName ? ' · ' + info.playlistName : '') + '（' + info.songs.length + ' 首）')
+      : ('全部歌曲（' + info.songs.length + ' 首）');
+  }
+  const noteSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>';
+  const eqSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="6" y1="10" x2="6" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line><line x1="18" y1="13" x2="18" y2="20"></line></svg>';
+  box.innerHTML = info.songs.map(function (s) {
+    const playing = cur && s.id === cur.id;
+    return '' +
+      '<button type="button" class="room-song-item' + (playing ? ' playing' : '') + '" data-song-id="' + escapeHtml(String(s.id)) + '">' +
+        '<span class="room-song-item-ico">' + (playing ? eqSvg : noteSvg) + '</span>' +
+        '<span class="room-song-item-main">' +
+          '<span class="room-song-item-title">' + escapeHtml(s.title || '未知歌曲') + '</span>' +
+          '<span class="room-song-item-artist">' + escapeHtml(s.artist || '未知歌手') + '</span>' +
+        '</span>' +
+      '</button>';
+  }).join('');
+  box.onclick = function (e) {
+    const btn = e.target && e.target.closest ? e.target.closest('.room-song-item') : null;
+    if (btn) playRoomSong(btn.getAttribute('data-song-id'));
+  };
+}
+window.renderRoomSongList = renderRoomSongList;
+
+function toggleRoomSongDrawer(ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  const drawer = document.getElementById('roomSongDrawer');
+  const mask = document.getElementById('roomSongDrawerMask');
+  if (!drawer) return;
+  if (drawer.classList.contains('hidden')) {
+    renderRoomSongList();
+    drawer.classList.remove('hidden');
+    if (mask) mask.classList.remove('hidden');
+  } else {
+    closeRoomSongDrawer();
+  }
+}
+window.toggleRoomSongDrawer = toggleRoomSongDrawer;
+
+function closeRoomSongDrawer(ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  const drawer = document.getElementById('roomSongDrawer');
+  const mask = document.getElementById('roomSongDrawerMask');
+  if (drawer && !drawer.classList.contains('hidden')) drawer.classList.add('hidden');
+  if (mask && !mask.classList.contains('hidden')) mask.classList.add('hidden');
+}
+window.closeRoomSongDrawer = closeRoomSongDrawer;
+
+// 点列表里的歌 → 直接播这首（列表本身只放能播的歌）
+function playRoomSong(songId) {
+  if (!songId) return;
+  if (window.LM && typeof window.LM.playLiveMusicSong === 'function') {
+    window.LM.playLiveMusicSong(songId);
+  }
+  renderRoomSongBar();
+  renderRoomSongList();
+}
+window.playRoomSong = playRoomSong;
 
 
 // checkDeepLinkParams 增强版本定义在文件末尾，这里只保留 load 事件监听
