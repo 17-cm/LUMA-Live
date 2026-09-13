@@ -252,7 +252,7 @@ window.isSameLiveChar = isSameLiveChar;
 // APP 随机排班来源判定：停机维护只掐这一类，角色自主开播不受任何影响
 function isAutoSpawnSource(source) {
   const s = String(source || '').toLowerCase();
-  return s === 'scheduler' || s === 'egg_force' || s.includes('sched') || s.includes('egg');
+  return s === 'scheduler' || s === 'egg_force' || s.includes('sched') || s.includes('egg') || s.includes('backfill');
 }
 window.isAutoSpawnSource = isAutoSpawnSource;
 
@@ -368,6 +368,10 @@ async function closeAndArchive(char, session, endTime) {
       totalLikes: session.likes || Math.floor(Math.random() * 5000 + 1000),
       totalGifts: Math.floor(Math.random() * 200 + 50),
       fansGained: fansGained,
+      // 多出来的那条数据：这一场是在线真实播的，还是离线补记出来的。
+      // 主页「直播场次」= 这张台账的条数，所以补记的场次会直接计进她的场次/粉丝。
+      origin: session.origin === 'offline_backfill' ? 'offline_backfill' : 'online',
+      backfilled: session.origin === 'offline_backfill',
       isOfflineSimulated: true
     };
     await api.db.create("streamer_history", historyRecord);
@@ -480,16 +484,16 @@ const lumaOpsGateway = {
     // 【机制补演】source='rollout' 是"把过去真实发生过的那一场如实落库"：它的开播/下播时刻
     // 必须用真实时刻，所以不受"最多倒推一个时长上限""倒推后不能已经该下播"这两条限制。
     // 角色自主开播 / 排班来源照旧受限，行为不变。
-    const isRollout = source === 'rollout';
+    const isBackfill = source === 'offline_backfill' || source === 'rollout';
     const maxBackMs = Math.max(1, Number(params.maxLiveDuration) || 120) * 60 * 1000;
     const requestedStart = Number(startAt);
     let start = now;
     if (Number.isFinite(requestedStart) && requestedStart > 0 && requestedStart < now
-        && (isRollout || (now - requestedStart) <= maxBackMs)) {
+        && (isBackfill || (now - requestedStart) <= maxBackMs)) {
       start = Math.round(requestedStart);
     }
     let end = start + dur * 60 * 1000;
-    if (!isRollout && end <= now) { start = now; end = start + dur * 60 * 1000; }
+    if (!isBackfill && end <= now) { start = now; end = start + dur * 60 * 1000; }
 
     let coverUrl = character?.cover || character?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800';
     let rawCat = category || (character?.tags ? character.tags[0] : '随性杂谈');
@@ -515,6 +519,9 @@ const lumaOpsGateway = {
       // 房管审核凭据：未带此凭据的场次不参与直播广场渲染
       auditState: 'approved',
       auditSource: source,
+      // 多出来的一条数据：这一场是在线真实播的（online），还是离线补记出来的（offline_backfill）。
+      // 会一路带到台账 streamer_history，主页「直播场次」按台账条数统计，所以补记的场次照样计进去。
+      origin: isBackfill ? 'offline_backfill' : 'online',
       approvedAt: now
     };
 
@@ -526,17 +533,18 @@ const lumaOpsGateway = {
     // 宿主 db.update 可能只回执不回记录，这里补全，保证后续字段一定拿得到
     const created = Object.assign({}, newSession, saved, { id: sessionId });
 
-    // 4) 排班表合并写入：只改直播状态，绝不抹掉排班的 nextLiveAt / planDurationMins，
-    //    否则排班心跳会把下播后的角色误判成"从没排过班"而立刻重新开播。
+    // 4) 排班表写成 hy2 祖先版的形状：**不带"下一次开播点"**。
+    //    她这场播完之后，下次被问到时当场重新掷一次 —— 这正是"离线回来广场不会全空"的来由。
+    //    只保留与这一场有关的字段；离线补记的进度（offlineBackfillToTs）不能丢。
     const prevSched = sched || {};
     window.charSchedulesMap[charId] = {
-      ...prevSched,
       characterId: charId,
       isLive: true,
       currentSessionId: created.id,
       lastStartTime: start,
       plannedEndTime: end,
-      lastEndTime: prevSched.lastEndTime || null
+      lastEndTime: prevSched.lastEndTime || null,
+      offlineBackfillToTs: prevSched.offlineBackfillToTs || null
     };
     await saveDbSetting("char_schedules", window.charSchedulesMap);
 
@@ -637,25 +645,21 @@ const lumaOpsGateway = {
       await closeAndArchive(character, session, endedTs);
     }
 
-    // 强制休息期：合法性下限 minRestDuration，同时尊重排班自带的随机休息长度
+    // 下播后不留"下一次开播点"（hy2 祖先版形状）：她下次被问到时当场重新掷一次。
+    // 法定最低休息期照旧生效 —— 开播审核读的是 lastEndTime，不是 nextLiveAt。
     const isMaintCut = source === 'maint_shutdown';
-    const params = window.appParams || {};
-    const minRestMs = (params.minRestDuration || 10) * 60 * 1000;
-    const planRestMins = Number(sched?.planRestMins) || 0;
-    const restMs = Math.max(minRestMs, planRestMins * 60 * 1000);
+    const prevSched2 = sched || {};
 
     window.charSchedulesMap[charId] = {
-      ...(sched || {}),
       characterId: charId,
       isLive: false,
       currentSessionId: null,
       lastStartTime: matched[0]?.startTime || null,
       // 运营维护切断不写 lastEndTime：她不是"播累了去休息"，只是被平台下线，
       // 因此不占用强制休息期，随时可以自主开播回来。
-      lastEndTime: isMaintCut ? (sched?.lastEndTime || null) : endedTs,
+      lastEndTime: isMaintCut ? (prevSched2.lastEndTime || null) : endedTs,
       plannedEndTime: null,
-      // 下播即进入休息期：直接把排班的下一次开播点推到休息期之后
-      nextLiveAt: endedTs + restMs
+      offlineBackfillToTs: prevSched2.offlineBackfillToTs || null
     };
     await saveDbSetting("char_schedules", window.charSchedulesMap);
 
