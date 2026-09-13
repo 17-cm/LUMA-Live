@@ -163,7 +163,8 @@ function postTime(post) {
 // -------------------------------------------------------------------------
 // 超话主视图：返回 / 切超话 / 9 个 sidebar tab + 拉高 hero + 内容面板
 // -------------------------------------------------------------------------
-const SUPERTOPIC_TAB_ORDER = ['posts', 'compose', 'rules', 'checkin', 'support', 'contribute', 'manage', 'report', 'refresh'];
+// 刷新不再是「一个界面/tab」：入口在侧栏底部那个刷新图标，点了就地转圈 + 后台生成
+const SUPERTOPIC_TAB_ORDER = ['posts', 'compose', 'rules', 'checkin', 'support', 'contribute', 'manage', 'report'];
 
 // -------------------------------------------------------------------------
 // 主视图渲染：Hero 封面 + 数据带 + 分段导航 + 内容面板
@@ -201,8 +202,7 @@ function renderSuperTopicView(charId = null) {
     support:    { label: '打榜',     sub: 'CHEER', ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"></path></svg>' },
     contribute: { label: '贡献榜',   sub: 'RANK',  ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"></circle><path d="M15.5 13 17 22l-5-3-5 3 1.5-9"></path></svg>' },
     manage:     { label: '管理',     sub: 'MGMT',  ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>' },
-    report:     { label: '举报',     sub: 'REPORT',ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>' },
-    refresh:    { label: '刷新',     sub: 'RELOAD',ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>' }
+    report:     { label: '举报',     sub: 'REPORT',ic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>' }
   };
   const tabOrder = SUPERTOPIC_TAB_ORDER;
 
@@ -227,6 +227,11 @@ function renderSuperTopicView(charId = null) {
             ${isLocked ? `<span class="st2s-side-tab-lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>` : ''}
           </button>`;
         }).join('')}
+        <div class="st2s-side-divider"></div>
+        <button id="st2sRefreshBtn" onclick="doRefreshSuperTopic('${char.id}')" class="st2s-side-tab st2s-side-act" title="刷新动态（按超话预设生成新帖）">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+          <span class="st2s-side-tab-lb">刷新</span>
+        </button>
       </aside>
 
       <!-- 右侧主区 -->
@@ -283,6 +288,7 @@ window.renderSuperTopicView = renderSuperTopicView;
 // 分段导航切换 (侧边栏 tab)
 // -------------------------------------------------------------------------
 function switchSuperTopicTab(tabKey) {
+  if (SUPERTOPIC_TAB_ORDER.indexOf(tabKey) < 0) tabKey = 'posts';   // 兜底：不认识的 tab 回动态
   st2sRulesEditing = false;      // 离开就退出守则编辑态
   st2sEditingPostId = null;
   // 锁住的 tab 不切换，只提示门槛
@@ -305,8 +311,7 @@ function switchSuperTopicTab(tabKey) {
       support: 'CHEER · 打榜',
       contribute: 'RANK · 贡献榜',
       manage: 'MGMT · 管理',
-      report: 'REPORT · 举报',
-      refresh: 'RELOAD · 刷新'
+      report: 'REPORT · 举报'
     }[tabKey];
     stripTab.textContent = stripCfg || '';
   }
@@ -326,6 +331,7 @@ window.switchSuperTopicSubTab = switchSuperTopicTab;
 function renderSuperTopicTab() {
   const char = getActiveChar();
   if (!char) return;
+  if (SUPERTOPIC_TAB_ORDER.indexOf(currentSuperTopicTab) < 0) currentSuperTopicTab = 'posts';
   if (superTopicDetailPostId) {
     const posts = topicPostsFor(char);
     const post = posts.find(p => String(p.id) === String(superTopicDetailPostId));
@@ -343,7 +349,6 @@ function renderSuperTopicTab() {
   else if (currentSuperTopicTab === 'contribute') renderSuperTopicContributeTab(char);
   else if (currentSuperTopicTab === 'manage') renderSuperTopicManageTab(char);
   else if (currentSuperTopicTab === 'report') renderSuperTopicReportTab(char);
-  else if (currentSuperTopicTab === 'refresh') renderSuperTopicRefreshTab(char);
 }
 
 // -------------------------------------------------------------------------
@@ -1437,38 +1442,16 @@ function st2sRestoreTrash() {
 window.st2sRestoreTrash = st2sRestoreTrash;
 
 // -------------------------------------------------------------------------
-// 刷新 Tab: 重新渲染当前超话动态
+// 刷新：不切页、不铺界面 —— 就地点一下侧栏那个刷新图标，图标自己转圈，
+// 后台按超话预设生成新动态，生成完各视图自己重绘（生成入口见 st2sGen.feed）
 // -------------------------------------------------------------------------
-function renderSuperTopicRefreshTab(char) {
-  const panel = document.getElementById('superTopicPanel');
-  if (!panel) return;
-  panel.innerHTML = `
-    <div class="st2s-refresh">
-      <div class="st2s-refresh-ic">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-      </div>
-      <div class="st2s-refresh-t">刷新「#${char.name}超话#」动态</div>
-      <div class="st2s-refresh-d">调用模型按超话预设生成 5~7 条新动态 —— 主 tag 由模型自己挑，会铺到<b>所有</b>超话而不只是这一个，再逐条铺开评论区。约需十几秒。</div>
-      <button onclick="doRefreshSuperTopic('${char.id}')" class="st2s-refresh-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-        立即刷新
-      </button>
-      <div id="spRefreshResult" class="st2s-refresh-result"></div>
-    </div>
-  `;
-}
-window.renderSuperTopicRefreshTab = renderSuperTopicRefreshTab;
-
 async function doRefreshSuperTopic(charId) {
-  const btn = document.querySelector('.st2s-refresh-btn');
+  const btn = document.getElementById('st2sRefreshBtn');
   if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
-  const out = document.getElementById('spRefreshResult');
-  if (out) out.innerHTML = '';   // 刷新期间只留按钮上的转圈圈，不写"正在调用模型…"这类文字
   try {
     await window.st2sGen.feed(charId);
-    setTimeout(() => switchSuperTopicTab('posts'), 700);
   } catch (e) {
-    if (out) out.innerHTML = '<div class="err">生成失败，请检查模型配置后重试</div>';
+    if (typeof showToast === 'function') showToast('生成失败，请检查模型配置', 'warn');
   } finally {
     if (btn) { btn.disabled = false; btn.classList.remove('is-loading'); }
   }

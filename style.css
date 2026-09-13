@@ -3180,6 +3180,9 @@ input:checked + .switch-slider:before {
 .st2s-side-tab-lb { line-height: 1; }
 .st2s-side-tab:hover { color: var(--st2s-ink-soft); }
 .st2s-side-tab:active { transform: scale(0.94); }
+/* 侧栏底部的刷新动作：不是 tab，点了就地转圈（图标自己转，不铺界面、不切页） */
+.st2s-side-act.is-loading { color: var(--st2s-rose); }
+.st2s-side-act.is-loading svg { animation: st2s-spin .85s linear infinite; }
 /* 选中态：不染色块，只把字提亮 + 在竖线上压出一小段记号 */
 .st2s-side-tab.on {
   color: var(--st2s-ink);
