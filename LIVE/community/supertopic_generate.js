@@ -108,7 +108,7 @@
 
   // ── 上下文：候选名单 + 世界书 + 各 char 人设 + 实时语境 ────
   async function st2sRosterText() {
-    const list = roster().slice(0, 10);
+    const list = roster().slice(0, 8);   // 提示词瘦身：一次生成 5~7 条长帖，名单人设别塞太多
     if (!list.length) return '';
     const rows = await Promise.all(list.map(async c => {
       let persona = '';
@@ -119,7 +119,7 @@
         }
       } catch (e) {}
       return { name: c.name, category: c.category || '', tag: c.tag || '',
-               isLive: !!c.isLive, persona: persona.slice(0, 260) };
+               isLive: !!c.isLive, persona: persona.slice(0, 140) };
     }));
     return '【本次候选名单】primaryTag 只能从这里挑，名字一字不差：\n'
       + rows.map(r => `- ${r.name}（${r.category}${r.tag ? ' / ' + r.tag : ''}${r.isLive ? ' / 正在直播' : ''}）`
@@ -439,12 +439,19 @@
       if (!saved) { toast('生成出来了但没能写进本地库，请再点一次刷新', 'warn'); return; }
 
       const spread = new Set(made.map(x => x.post.charId)).size;
-      if (typeof window.renderSuperTopicView === 'function' && window.currentActiveSuperTopicCharId) {
-        window.renderSuperTopicView(window.currentActiveSuperTopicCharId);
+      // 重绘单独兜底：它炸了不该被算成"生成失败"（帖子其实已经入库了）
+      try {
+        if (typeof window.renderSuperTopicView === 'function' && window.currentActiveSuperTopicCharId) {
+          window.renderSuperTopicView(window.currentActiveSuperTopicCharId);
+        }
+      } catch (e) {
+        console.warn('[st2s] 新帖已入库，但这次重绘失败（切一下页面就会显示）:', e);
       }
     } catch (e) {
       console.error('[st2s] 广场生成失败:', e);
-      toast('生成失败，请检查模型配置', 'warn');
+      // 兜底文案必须带真实原因：不然"请检查模型配置"会把所有问题都盖住（用户明明有模型）
+      const why = String((e && (e.message || e.error)) || e || '未知错误').replace(/\s+/g, ' ').trim();
+      toast('生成失败：' + why.slice(0, 120), 'warn');
     } finally {
       busy.feed = false;
     }

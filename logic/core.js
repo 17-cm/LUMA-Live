@@ -625,9 +625,17 @@ async function aiGenerate(params) {
       headers: { 'Authorization': key ? `Bearer ${key}` : '', 'Content-Type': 'application/json' },
       body: { model: model, messages: messages, temperature: 0.9 }
     });
-    const data = res.json || (res.text ? JSON.parse(res.text) : null);
+    // 注意：robustNetworkRequest 已经把 JSON 解析好了（解析不了就是 null）。
+    // 这里千万不要再 JSON.parse(res.text) —— 服务端返回纯文本/HTML 报错页时它会抛 SyntaxError，
+    // 把"上下文超长 / 鉴权失败 / 限流"这些真正的原因整个吞掉，用户只看到一句"请检查模型配置"。
+    const data = res.json || null;
     const text = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || data?.text || data?.response;
-    if (!res.ok || !text) throw new Error(`自定义API请求失败: ${data?.error?.message || res.status}`);
+    if (!res.ok || !text) {
+      const why = (data && data.error && (data.error.message || data.error))
+        || String(res.text || '').replace(/\s+/g, ' ').trim().slice(0, 160)
+        || `HTTP ${res.status}`;
+      throw new Error(`模型接口没给结果（HTTP ${res.status}）：${why}`);
+    }
     return { text };
   } catch (e) {
     throw e;
@@ -715,7 +723,7 @@ async function aiGenerateImage(params) {
       headers: { 'Authorization': key ? `Bearer ${key}` : '', 'Content-Type': 'application/json' },
       body: requestBody
     });
-    const data = res.json || (res.text ? JSON.parse(res.text) : null);
+    const data = res.json || null;   // 同上：解析不了就别再 JSON.parse，否则吞掉服务端原话
     
     // 兼容标准 OpenAI 格式: { data: [{ url: "..." }] } 或 { data: [{ b64_json: "..." }] }
     const item = data?.data?.[0];
