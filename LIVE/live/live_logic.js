@@ -1071,7 +1071,7 @@ function pushDanmakuToScreen(sender, text, type = 'normal', customInfo = null) {
   };
   const PALETTE_KEYS = Object.keys(BUBBLE_PALETTE);
 
-  // 选择调色板 key：char/user/普通观众都用 name 算 hash 取随机色
+  // 选择调色板 key：char/user/普通观众都用 name 算 hash 取随机色（这个 key 仍然用于昵称文字色）
   const pickKey = (salt) => {
     let h = 0;
     const s = String(info.name || '') + '|' + salt;
@@ -1086,9 +1086,13 @@ function pushDanmakuToScreen(sender, text, type = 'normal', customInfo = null) {
     return (m && BUBBLE_PALETTE[m[0]]) ? m[0] : PALETTE_KEYS[Math.abs((info.name||'').length * 7) % PALETTE_KEYS.length];
   })();
 
-  // 气泡背景/边框：char/user/gift 用对应 key；普通观众用 randomKey
+  // 气泡底色/描边：**只给 user（我）和 char（主播）**用随机色。
+  // 普通观众弹幕不设底色、回归样式表里的中性外观；送礼那条也不是随机色，
+  // 用样式表里定好的送礼专属外观（.gift-sent）。昵称文字色照旧由上面的 key 决定，没改。
   const choosePalette = isChar ? charKey : isUser ? userKey : isGift ? giftKey : randomKey;
-  const bubbleStyle = `background-color: ${BUBBLE_PALETTE[choosePalette].bg}; border-color: ${BUBBLE_PALETTE[choosePalette].border};`;
+  const bubbleStyle = (isUser || isChar)
+    ? `background-color: ${BUBBLE_PALETTE[choosePalette].bg}; border-color: ${BUBBLE_PALETTE[choosePalette].border};`
+    : '';
 
   // 昵称文字色
   const nameColorHex = {
