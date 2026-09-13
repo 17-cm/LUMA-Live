@@ -23,7 +23,12 @@ let superTopicVirtualScrollerInstance = null;
 // -------------------------------------------------------------------------
 function showToast(msg, type) {
   console.log(`[Toast ${type}]`, msg);
-  if (window.showMessage) window.showMessage(msg);
+  // 注意：原来这里只认 window.showMessage，而全项目没人定义它 → 超话所有提示都是隐形的
+  // （生成失败时用户只会看到"转圈停了、什么都没发生"）。改成优先用宿主 toast，和热搜那边一致。
+  try {
+    if (window.api && api.ui && typeof api.ui.toast === 'function') { api.ui.toast(String(msg)); return; }
+  } catch (e) {}
+  if (typeof window.showMessage === 'function') window.showMessage(msg);
 }
 // 玩家身份缓存：发帖/评论一律使用当前真实玩家(主页已同步或宿主 SDK)，不再出现“游客用户”占位
 let _hostUserCache = null;

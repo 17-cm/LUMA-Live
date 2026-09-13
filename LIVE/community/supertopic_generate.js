@@ -343,7 +343,7 @@
   async function st2sGenFeed(anchorCharId) {
     const list = roster();
     const anchor = list.find(c => String(c.id) === String(anchorCharId)) || list[0];
-    if (!anchor) return;
+    if (!anchor) { toast('没有可用的角色名单，生成不了新动态', 'warn'); return; }
     if (busy.feed) { toast('正在生成中，稍等一下', 'warn'); return; }
     busy.feed = true;
     // 刷新期间只留按钮上的转圈圈：不再弹整屏遮罩、不再弹"正在生成"播报
@@ -354,6 +354,7 @@
         `【本次任务】生成 5~7 条超话帖子（具体几条你定），primaryTag 从候选名单里自由分配，`
         + '不必都落在锚定超话上。约三成帖子由名单里的角色本人亲自发出'
         + '（author.isChar 标记）—— 是谁随机，他可以去别人超话发，也可以在自己超话发。'
+        + '其中至少 1 条要落在锚定超话里（用户就是在这个超话点的刷新）。'
         + 'comments 一律给空数组。'
       ].filter(Boolean).join('\n\n');
 
@@ -374,8 +375,10 @@
       const made = [];
       for (let i = 0; i < raw.length; i++) {
         const p = raw[i] || {};
-        if (!(p.content || '').trim()) continue;
-        const owner = st2sRouteByTag(p.primaryTag, anchor);
+        // 字段容错：预设是用户自己写的，正文/主 tag 的键名不一定是 content / primaryTag
+        const body = String(p.content || p.text || p.body || p.post || p.desc || '').trim();
+        if (!body) continue;
+        const owner = st2sRouteByTag(p.primaryTag || p.tag || p.topic, anchor);
         const ar = p.author || {};
 
         // 作者可以是 char 本人：他既能在自己超话发，也能去别人超话发
@@ -404,10 +407,10 @@
           author: { name: aName, avatar: aAvatar, badge: aBadge, verified: aVerified,
                     isChar: !!aCharId, charId: aCharId },
           createdAt: ts,
-          primaryTag: p.primaryTag || `#${owner.name}超话#`,
+          primaryTag: p.primaryTag || p.tag || p.topic || `#${owner.name}超话#`,
           subTags: Array.isArray(p.subTags) ? p.subTags.filter(Boolean).slice(0, 2) : [],
           mentions: Array.isArray(p.mentions) ? p.mentions.filter(Boolean).slice(0, 1) : [],
-          content: String(p.content).trim(),
+          content: body,
           image: '',
           imagePrompt: String(p.imagePrompt || '').slice(0, 400),
           imageDesc: String(p.imageDesc || '').slice(0, 120),
@@ -425,11 +428,15 @@
       }
       if (!made.length) { toast('没生成出有效内容', 'warn'); return; }
 
+      let saved = 0;
       for (let i = 0; i < made.length; i++) {
         try { await st2sGenCommentSet(made[i].owner, made[i].post, {}); }
         catch (e) { console.warn('[st2s] 评论区生成失败，帖子仍入库:', e); }
-        window.st2sStore.save(made[i].post);
+        // save() 在 id/charId 缺失时会静默丢弃 → 这里必须看返回值，否则就是"什么都没发生"
+        const r = await Promise.resolve(window.st2sStore.save(made[i].post)).catch(() => false);
+        if (r) saved++; else console.warn('[st2s] 这条没能入库:', made[i].post.id, made[i].post.charId);
       }
+      if (!saved) { toast('生成出来了但没能写进本地库，请再点一次刷新', 'warn'); return; }
 
       const spread = new Set(made.map(x => x.post.charId)).size;
       if (typeof window.renderSuperTopicView === 'function' && window.currentActiveSuperTopicCharId) {

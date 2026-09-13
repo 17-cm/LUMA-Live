@@ -817,6 +817,51 @@ function extractJsonFromText(text) {
       result = attempt(sanitized.replace(/\r?\n/g, '\\n'));
       if (result !== null) return result;
     }
+
+    // 7. 【截断抢救】模型一次写 5~7 条长帖时经常写到一半就被截断（尾部 JSON 不完整），
+    //    前半部分其实每条都是完整的。这时把完整的 {...} 逐个抠出来救，能救几条算几条 ——
+    //    总比整批丢掉、用户只看到一句"格式异常"要好。仅在前面全部解析失败时执行。
+    const salvage = (str) => {
+      const out = [];
+      let depth = 0, start = -1, inStr = false, esc = false;
+      for (let i = 0; i < str.length; i++) {
+        const ch = str[i];
+        if (inStr) {
+          if (esc) esc = false;
+          else if (ch === '\\') esc = true;
+          else if (ch === '"') inStr = false;
+          continue;
+        }
+        if (ch === '"') { inStr = true; continue; }
+        if (ch === '{') { if (depth === 0) start = i; depth++; }
+        else if (ch === '}' && depth > 0) {
+          depth--;
+          if (depth === 0 && start >= 0) {
+            const chunk = str.slice(start, i + 1);
+            let one = null;
+            try { one = JSON.parse(chunk); } catch (e) {
+              try { one = JSON.parse(chunk.replace(/,\s*([\}\]])/g, '$1')); } catch (e2) {}
+            }
+            if (one) out.push(one);
+            start = -1;
+          }
+        }
+      }
+      return out;
+    };
+    // 7a. 形如 {"posts":[ {...}, {...}   ← 被截断
+    const pm = cleaned.match(/"posts"\s*:\s*\[/);
+    if (pm) {
+      const from = cleaned.indexOf('[', pm.index);
+      const got = salvage(cleaned.slice(from + 1));
+      if (got.length) return { posts: got };
+    }
+    // 7b. 顶层就是数组
+    const arrFrom = cleaned.indexOf('[');
+    if (arrFrom !== -1) {
+      const got = salvage(cleaned.slice(arrFrom + 1));
+      if (got.length) return got;
+    }
   } catch (e) {}
 
   return null;
