@@ -2044,8 +2044,12 @@ function lumaPickCourse(charId, roundIndex, charName) {
   };
   const pick = (salt, arr) => arr[Math.min(arr.length - 1, Math.floor(h(salt) * arr.length))];
   const cat = pick('cat', cats);
-  const subs = (typeof SUB_CATEGORIES !== 'undefined' && SUB_CATEGORIES && SUB_CATEGORIES[cat]) || ['热门专场'];
-  const subTag = pick('sub', subs);
+  // 【务必过滤】「全部 / 全部推荐」是广场筛选栏的用词，不是二级频道 —— 落进房间里会变成
+  // 「【角色】的全部直播」这种怪标题、频道标签也会显示「全部」。项目原有的挑法
+  // （pickRandomLiveCategory / getCanonicalSubCategory）都做了这个过滤，这里必须一致。
+  const subs = ((typeof SUB_CATEGORIES !== 'undefined' && SUB_CATEGORIES && SUB_CATEGORIES[cat]) || [])
+    .filter(item => item !== '全部' && item !== '全部推荐');
+  const subTag = pick('sub', subs.length ? subs : ['热门专场']);
   return { category: cat, subTag: subTag, topic: `【${charName}】的${subTag}直播` };
 }
 window.lumaPickCourse = lumaPickCourse;
