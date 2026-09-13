@@ -22,12 +22,12 @@ let activeMainCategory = 'all';
 let activeSubCategory = 'all';
 
 let danmakuPool = [];
-let hostSpeechPool = [];
+let hostSpeechPool = [];   // 已退役：主播台词改为一句一次调用，保留变量只为兼容旧引用
 let danmakuDripTimer = null;
 let hostSpeechDripTimer = null;
 let liveDurationInterval = null;
 let plazaDurationInterval = null;
-let isFetchingBatchPackage = false;
+let isFetchingBatchPackage = false;   // 正在打包「弹幕」（弹幕链路专用；主播说话另有 isFetchingSpeechLine）
 let viewerCountInterval = null;
 let currentWalletBalance = 0;
 
@@ -508,9 +508,9 @@ function enterLiveRoomDirectly(sessionId) {
   if (!window.danmakuPool || window.danmakuPool.length === 0) {
     danmakuPool = [];
   }
-  if (!window.hostSpeechPool || window.hostSpeechPool.length === 0) {
-    hostSpeechPool = [];
-  }
+  // 主播台词不再走池子：她说一句就是一次调用（见 fetchHostSpeechLine）
+  hostSpeechPool = [];
+  window.hostSpeechPool = hostSpeechPool;
 
   // 恢复该房子上次退出前的公屏弹幕（可见层快照）
   restoreScreenDanmaku();
@@ -551,13 +551,10 @@ function enterLiveRoomDirectly(sessionId) {
     }
   } catch (e) {}
 
-  // 如果已经有打包好的内容，立即推首条台词并启动流
-  if (hostSpeechPool.length > 0) {
-    const first = hostSpeechPool.shift();
-    renderHostSpeech(first.speech, first.action);
-  } else {
-    fetchBatchLivePackage(true);
-  }
+  // 进房：先让她说一句（这次调用会带上你刚在聊天室聊的内容，承接得上），
+  // 同时补一批观众弹幕；之后弹幕照 4.5 秒滴入、她按说话节奏一句一调。
+  fetchHostSpeechLine(true);
+  fetchDanmakuPackage(true);
 
   startDanmakuDripFeed();
   startHostSpeechDripFeed();
@@ -800,11 +797,22 @@ async function toggleFollowRoomHost() {
 window.toggleFollowRoomHost = toggleFollowRoomHost;
 
 // =========================================================================
-// 3. 弹幕与主播台词流控系统
+// 3. 两条独立链路：观众弹幕（打包） / 主播说话（一次一句）
+//    · 弹幕：一次调用打包一批观众弹幕，每 4.5 秒滴一条，池子空了再补一批；
+//    · 主播说话：**她说一句就是一次独立调用** —— 所以每一句都能接住刚刚飘过的弹幕
+//      （包括你刚发的那条），而不是提前打包好的台词。她也可以不接弹幕、说自己想说的。
+//    节奏：她每 50 秒自己说一句；你发弹幕/送礼后，最快 15 秒能催她回一句。
 // =========================================================================
-// 上次打包请求时间（用于请求冷却）
+const DANMAKU_DRIP_MS = 4500;            // 弹幕滴入间隔
+const HOST_SPEECH_INTERVAL_MS = 50000;   // 她多久自己说一句（每次说话 = 一次调用）
+const HOST_SPEECH_MIN_GAP_MS = 15000;    // 你发弹幕/送礼后，最快多久能催她说一句
+
+// 上次"打包弹幕"的请求时间（用于请求冷却，沿用设置里的 API 请求间隔）
 let lastPackageRequestTime = 0;
-// 待主播回应的观众互动队列（user 发言 / 送礼），下次批量调用时统一回应，不插队
+// 上次"她说一句"的请求时间 + 是否正在请求
+let lastSpeechRequestTime = 0;
+let isFetchingSpeechLine = false;
+// 待主播回应的观众互动队列（user 发言 / 送礼）：交给下一次"她说话"那次调用统一回应
 let pendingUserReplies = [];
 
 function queueUserReply(text) {
@@ -812,62 +820,48 @@ function queueUserReply(text) {
   if (pendingUserReplies.length > 10) pendingUserReplies.shift();
 }
 
-// 冷却已过则立即触发一次批量调用；冷却未过则不插队，等待 drip 定时器自然触发
-function requestLivePackageIfCooled() {
+// 你刚发了弹幕 / 送了礼：够冷却就立刻催她说一句（不够就排队，等她下一句带上）
+function requestHostSpeechIfCooled() {
+  if (!currentRoom || isFetchingSpeechLine) return;
+  if (Date.now() - lastSpeechRequestTime < HOST_SPEECH_MIN_GAP_MS) return;
+  fetchHostSpeechLine(true);
+}
+window.requestHostSpeechIfCooled = requestHostSpeechIfCooled;
+
+// ---- 链路一：观众弹幕（一次调用打包一批） ------------------------------
+async function fetchDanmakuPackage(force = false) {
   if (!currentRoom || isFetchingBatchPackage) return;
+
+  // 请求冷却：两次打包至少间隔用户设置的时间（分钟转毫秒）
   const intervalMinutes = (typeof window.getApiRequestIntervalMinutes === 'function')
     ? window.getApiRequestIntervalMinutes()
     : 5;
   const minIntervalMs = intervalMinutes * 60 * 1000;
-  if (Date.now() - lastPackageRequestTime >= minIntervalMs) {
-    fetchBatchLivePackage(true);
-  }
-}
-
-async function fetchBatchLivePackage(force = false) {
-  if (!currentRoom || isFetchingBatchPackage) return;
-  
-  // 请求冷却：两次请求至少间隔用户设置的时间（分钟转毫秒）
-  const intervalMinutes = (typeof window.getApiRequestIntervalMinutes === 'function') 
-    ? window.getApiRequestIntervalMinutes() 
-    : 5;
-  const minIntervalMs = intervalMinutes * 60 * 1000;
   const now = Date.now();
-  
-  // 如果非强制且弹幕池与台词池均充足，且在冷却时间内，则不重复请求
-  if (!force && danmakuPool.length > 5 && hostSpeechPool.length > 2 && (now - lastPackageRequestTime < minIntervalMs)) {
-    return; // 冷却中，不请求
+  // 池子里还有存货且在冷却期内，就不重复请求
+  if (!force && danmakuPool.length > 5 && (now - lastPackageRequestTime < minIntervalMs)) {
+    return;
   }
   lastPackageRequestTime = now;
-  
   isFetchingBatchPackage = true;
 
   try {
-    // 从当前直播间读取最近的送礼记录（不写全局记忆，避免串台）
+    // 从当前直播间读取最近的送礼记录（不写全局记忆，避免串台）：观众会聊到送礼
     let giftHistoryText = '';
     if (currentRoom && currentRoom.giftHistory && currentRoom.giftHistory.length > 0) {
-      const recentGifts = currentRoom.giftHistory.slice(-5); // 最近5条
-      giftHistoryText = '\n最近观众送礼记录：' + recentGifts.map(g => `${g.giftName}x${g.count}`).join('、') + '，请在台词里自然地感谢这些送礼。';
+      const recentGifts = currentRoom.giftHistory.slice(-5);
+      giftHistoryText = '\n最近观众送礼记录：' + recentGifts.map(g => `${g.giftName}x${g.count}`).join('、') + '（观众弹幕里可以有人议论这事）';
     }
 
-    // 待回应的观众互动（user 发言 / 送礼）：统一在下一次批量调用里回应，不插队
-    let userReplyText = '';
-    if (pendingUserReplies.length > 0) {
-      userReplyText = '\n观众发来了互动消息，请在台词中自然地回应（可合并多条）：' + pendingUserReplies.join('；');
-      pendingUserReplies = [];
-    }
+    // 动态上下文：赛道频道、标题、最近送礼
+    const dynamicContext = `当前赛道：${currentRoom.category}（${currentRoom.subTag || '日常'}），标题：《${currentRoom.topic}》${giftHistoryText}`
+      + `\n【这一批只要观众弹幕：8～20 条。像真实直播间那样，观众互相聊、玩梗、复读、提问、`
+      + `对主播刚说的话和最近的送礼做出反应，可以有 1～2 条提到 user（观众"${(window.currentUser && window.currentUser.name) || 'user'}"）。`
+      + `不要写主播台词，不要写送礼记录。只输出 JSON：{"danmakus":[{"sender":"观众昵称","text":"弹幕内容","type":"normal"}]}】`;
 
-    // 动态上下文：赛道频道、标题、最近送礼与待回应互动
-    // 开场这一次把聊天室上下文带上（用完即清，后续批次不重复）
-    const chatRoomCtx = window.__liveChatContext || '';
-    const chatRoomHint = chatRoomCtx
-      ? `\n\n【进直播间前，你和这位观众在聊天室刚聊过下面这些，开场白要自然承接、别像第一次见面】：\n${chatRoomCtx}`
-      : '';
-    const dynamicContext = `当前赛道：${currentRoom.category}（${currentRoom.subTag || '日常'}），标题：《${currentRoom.topic}》${giftHistoryText}${userReplyText}${chatRoomHint}`;
-
-    // 注入直播间历史上下文（不可见层）：进房首次调用带全部历史，之后随新记录继续累积
+    // 注入直播间历史上下文（不可见层）
     const liveHistory = await buildLiveHistoryPayload();
-    
+
     const res = await window.aiGenerate({
       characterId: currentRoom.characterId,
       appTags: ['live', 'package'],
@@ -876,42 +870,102 @@ async function fetchBatchLivePackage(force = false) {
       historyText: liveHistory.historyText
     });
 
-    window.__liveChatContext = '';   // 开场上下文已用掉
     const parsed = window.extractJsonFromText ? window.extractJsonFromText(res.text) : null;
-
     if (parsed) {
-      // 灵活提取弹幕池 (兼容各种可能命名的字段)
       const rawDanmakus = parsed.danmakus || parsed.danmaku || parsed.barrages || parsed.comments || parsed.bullet_chats || [];
       if (Array.isArray(rawDanmakus) && rawDanmakus.length > 0) {
         danmakuPool.push(...rawDanmakus);
-      }
-
-      // 灵活提取台词流 (兼容各种可能命名的字段)
-      const rawSpeeches = parsed.hostSpeeches || parsed.host_speeches || parsed.hostSpeech || parsed.speeches || parsed.dialogues || [];
-      if (Array.isArray(rawSpeeches) && rawSpeeches.length > 0) {
-        hostSpeechPool.push(...rawSpeeches);
-        if (hostSpeechPool.length > 0) {
-          const first = hostSpeechPool.shift();
-          renderHostSpeech(first.speech, first.action);
-        }
       } else if (Array.isArray(parsed) && parsed.length > 0) {
+        // 兼容模型直接吐一个弹幕数组
         parsed.forEach(item => {
-          if (item && item.speech) hostSpeechPool.push(item);
-          else if (item && (item.text || item.sender)) danmakuPool.push(item);
+          if (item && (item.text || item.sender)) danmakuPool.push(item);
         });
-        if (hostSpeechPool.length > 0) {
-          const first = hostSpeechPool.shift();
-          renderHostSpeech(first.speech, first.action);
-        }
       }
     }
   } catch (e) {
-    console.warn('[fetchBatchLivePackage request error]:', e);
+    console.warn('[fetchDanmakuPackage request error]:', e);
   }
 
   isFetchingBatchPackage = false;
 }
-window.fetchBatchLivePackage = fetchBatchLivePackage;
+window.fetchDanmakuPackage = fetchDanmakuPackage;
+
+// ---- 链路二：主播说话（她说一句 = 一次调用） ---------------------------
+// 把模型返回的东西解析成"一句话 + 可选动作"：优先 JSON，其次把整段当一句话
+function parseHostSpeechLine(raw) {
+  const text = String(raw == null ? '' : raw).trim();
+  if (!text) return null;
+  const parsed = window.extractJsonFromText ? window.extractJsonFromText(text) : null;
+  if (parsed && typeof parsed === 'object') {
+    const one = Array.isArray(parsed) ? parsed.find(x => x && (x.speech || x.text)) : parsed;
+    if (one) {
+      const line = String(one.speech || one.text || '').trim();
+      if (line) return { speech: line, action: String(one.action || '').trim() };
+    }
+  } else if (typeof parsed === 'string' && parsed.trim()) {
+    return { speech: parsed.trim(), action: '' };
+  }
+  // 兜底：整段当一句话（去掉代码块围栏与首尾引号）
+  let line = text.replace(/```[a-zA-Z]*/g, '').replace(/^[\s"“”']+|[\s"“”']+$/g, '').trim();
+  if (!line) return null;
+  if (line.length > 200) line = line.slice(0, 200);
+  return { speech: line, action: '' };
+}
+
+async function fetchHostSpeechLine(force = false) {
+  if (!currentRoom || isFetchingSpeechLine) return;
+  const now = Date.now();
+  if (!force && now - lastSpeechRequestTime < HOST_SPEECH_MIN_GAP_MS) return;
+  lastSpeechRequestTime = now;
+  isFetchingSpeechLine = true;
+
+  try {
+    let giftHistoryText = '';
+    if (currentRoom && currentRoom.giftHistory && currentRoom.giftHistory.length > 0) {
+      const recentGifts = currentRoom.giftHistory.slice(-5);
+      giftHistoryText = '\n最近观众送礼记录（说的时候可以顺口谢谢）：' + recentGifts.map(g => `${g.giftName}x${g.count}`).join('、');
+    }
+
+    // 观众刚发来的互动（user 发言 / 送礼）：这一次说话统一回应，不排队等下一批
+    let userReplyText = '';
+    if (pendingUserReplies.length > 0) {
+      userReplyText = '\n观众刚发来了互动，请自然地回应（可合并多条）：' + pendingUserReplies.join('；');
+      pendingUserReplies = [];
+    }
+
+    // 进房第一次：承接你在聊天室刚聊过的话题
+    const chatRoomHint = window.__liveChatContext
+      ? `\n\n【进直播间前，你和这位观众在聊天室刚聊过下面这些，这一句开场要自然承接、别像第一次见面】：\n${window.__liveChatContext}`
+      : '';
+
+    const dynamicContext = `当前赛道：${currentRoom.category}（${currentRoom.subTag || '日常'}），标题：《${currentRoom.topic}》${giftHistoryText}${userReplyText}${chatRoomHint}`
+      + `\n【你现在正在直播。上面历史里最后几条就是刚刚飘过的弹幕（其中可能有 user 的发言），请接住它们说话。`
+      + `只写你接下来要说的这一句（1～2 句短句，口语，像直播里随口说出来的）：`
+      + `可以回应其中某一条弹幕或观众的互动；也可以不回应，说你自己想说的、做你自己的事（聊个话题、说想唱/想听某首歌都行）。`
+      + `不要写观众弹幕，不要一次写好几段。只输出 JSON：{"speech":"你要说的这一句","action":"可选的动作描写"}】`;
+
+    const liveHistory = await buildLiveHistoryPayload();
+
+    const res = await window.aiGenerate({
+      characterId: currentRoom.characterId,
+      appTags: ['live', 'speech'],
+      instruction: dynamicContext,
+      history: liveHistory.history,
+      historyText: liveHistory.historyText
+    });
+
+    window.__liveChatContext = '';   // 开场上下文已用掉
+
+    const line = parseHostSpeechLine(res && res.text);
+    if (line && line.speech) renderHostSpeech(line.speech, line.action);
+  } catch (e) {
+    console.warn('[fetchHostSpeechLine request error]:', e);
+  }
+
+  isFetchingSpeechLine = false;
+}
+window.fetchHostSpeechLine = fetchHostSpeechLine;
+window.parseHostSpeechLine = parseHostSpeechLine;
 
 // 校验/归一化礼物名：必须在 GIFT_LIST 中，否则从 GIFT_LIST 随机挑一个
 function normalizeGiftName(rawName) {
@@ -923,8 +977,8 @@ function normalizeGiftName(rawName) {
 
 function startDanmakuDripFeed() {
   clearInterval(danmakuDripTimer);
-  // 弹幕滴入间隔固定 4.5 秒，更接近真实直播节奏，减少消耗速度
-  const intervalMs = 4500;
+  // 弹幕滴入间隔固定 4.5 秒，更接近真实直播节奏；池子空了才去补一批弹幕
+  const intervalMs = DANMAKU_DRIP_MS;
 
   danmakuDripTimer = setInterval(() => {
     if (danmakuPool.length > 0) {
@@ -956,21 +1010,18 @@ function startDanmakuDripFeed() {
         pushDanmakuToScreen(sInfo, item.text, item.type);
       }
     } else {
-      fetchBatchLivePackage();
+      fetchDanmakuPackage();
     }
   }, intervalMs);
 }
 
 function startHostSpeechDripFeed() {
   clearInterval(hostSpeechDripTimer);
+  // 到点就让她说一句 —— 每一次都是现场调用，所以她接下来说的话
+  // 一定是"刚刚飘过的那些弹幕"的反应，而不是几分钟前打包好的台词。
   hostSpeechDripTimer = setInterval(() => {
-    if (hostSpeechPool.length > 0) {
-      const item = hostSpeechPool.shift();
-      renderHostSpeech(item.speech, item.action);
-    } else {
-      fetchBatchLivePackage();
-    }
-  }, 50000);
+    fetchHostSpeechLine();
+  }, HOST_SPEECH_INTERVAL_MS);
 }
 
 // 展示前清洗：剥离主播台词里残留的代码块、思考链、JSON 结构标记，
@@ -1275,9 +1326,10 @@ async function sendUserDanmaku() {
   pushDanmakuToScreen(uInfo, val, 'user');
   input.value = '';
 
-  // 写入历史由 pushDanmakuToScreen 统一完成；此处仅排队等待主播按间隔回应，不插队调用 API
+  // 写入历史由 pushDanmakuToScreen 统一完成；你发的这条会进下一次"她说话"的上下文，
+  // 并顺手催她一句（15 秒冷却内不重复催）——这就是你发弹幕的互动感来源。
   queueUserReply(`【${uInfo.tag}】${uInfo.name}发言：“${val}”`);
-  requestLivePackageIfCooled();
+  requestHostSpeechIfCooled();
 }
 window.sendUserDanmaku = sendUserDanmaku;
 
@@ -1803,9 +1855,9 @@ async function sendGift(name, cost) {
     showGrandGiftBanner(uInfo, name, qty);
     pushDanmakuToScreen(uInfo, `送了 ${qty} 个【${name}】给【${streamerName}】✨`, 'gift');
 
-    // 送礼历史由 pushDanmakuToScreen 统一写入；主播感谢统一排队等待按间隔回应，不插队调用 API
+    // 送礼历史由 pushDanmakuToScreen 统一写入；同样进下一次"她说话"的上下文并催一句（谢谢打赏）
     queueUserReply(`【${uInfo.tag}】${uInfo.name}送了 ${qty} 个【${name}】（总价值 ${totalCost} LUMA 币）给主播`);
-    requestLivePackageIfCooled();
+    requestHostSpeechIfCooled();
 
     // 启动连击倒计时圆圈
     startComboTimer();
