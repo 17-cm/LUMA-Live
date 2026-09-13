@@ -1463,10 +1463,9 @@ async function doRefreshSuperTopic(charId) {
   const btn = document.querySelector('.st2s-refresh-btn');
   if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
   const out = document.getElementById('spRefreshResult');
-  if (out) out.innerHTML = '<div class="run">正在调用模型生成新动态，约需十几秒…</div>';
+  if (out) out.innerHTML = '';   // 刷新期间只留按钮上的转圈圈，不写"正在调用模型…"这类文字
   try {
     await window.st2sGen.feed(charId);
-    if (out) out.innerHTML = `<div class="ok">已生成 · ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}</div>`;
     setTimeout(() => switchSuperTopicTab('posts'), 700);
   } catch (e) {
     if (out) out.innerHTML = '<div class="err">生成失败，请检查模型配置后重试</div>';

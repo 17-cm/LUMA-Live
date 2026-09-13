@@ -346,8 +346,7 @@
     if (!anchor) return;
     if (busy.feed) { toast('正在生成中，稍等一下', 'warn'); return; }
     busy.feed = true;
-    try { if (window.showBusyOverlay) window.showBusyOverlay('正在生成超话新动态…'); } catch (e) {}
-    toast('正在生成超话新动态…');
+    // 刷新期间只留按钮上的转圈圈：不再弹整屏遮罩、不再弹"正在生成"播报
 
     try {
       const extra = [
@@ -433,7 +432,6 @@
       }
 
       const spread = new Set(made.map(x => x.post.charId)).size;
-      toast(`已生成 ${made.length} 条新动态 · 分布在 ${spread} 个超话`, 'ok');
       if (typeof window.renderSuperTopicView === 'function' && window.currentActiveSuperTopicCharId) {
         window.renderSuperTopicView(window.currentActiveSuperTopicCharId);
       }
@@ -442,7 +440,6 @@
       toast('生成失败，请检查模型配置', 'warn');
     } finally {
       busy.feed = false;
-      try { if (window.hideBusyOverlay) window.hideBusyOverlay(); } catch (e) {}
     }
   }
 

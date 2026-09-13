@@ -27,8 +27,7 @@ let isRefreshingTrends = false;
 async function refreshTrendsWithAI(baseNow) {
   if (isRefreshingTrends) return;
   isRefreshingTrends = true;
-  if (window.api && api.ui && api.ui.toast) api.ui.toast('正在生成热搜新动态…');
-  if (window.showBusyOverlay) window.showBusyOverlay('正在生成热搜新动态…');
+  // 刷新期间只留按钮上的转圈圈（toggleBtnLoading），不再弹整屏遮罩、不再弹提示
   if (typeof window.toggleBtnLoading === 'function') {
     window.toggleBtnLoading(document.getElementById('btnRefreshTrends'), true);
   }
@@ -264,12 +263,10 @@ async function refreshTrendsWithAI(baseNow) {
 
     renderHotSearchRanking();
     renderTrends();
-    if (window.api && api.ui && api.ui.toast) api.ui.toast(`已成功生成 ${postList.length} 条热搜动态`);
   } catch (e) {
     if (window.api && api.ui && api.ui.toast) api.ui.toast('生成失败：' + (e.message || '未知错误'));
   } finally {
     isRefreshingTrends = false;
-    if (window.hideBusyOverlay) window.hideBusyOverlay();
     if (typeof window.toggleBtnLoading === 'function') {
       window.toggleBtnLoading(document.getElementById('btnRefreshTrends'), false);
     }
