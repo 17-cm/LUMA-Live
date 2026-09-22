@@ -331,6 +331,15 @@
     } catch (e) { console.warn('[st2s] 生图失败，帖子降级为无图:', e); }
   }
 
+  // 精简名单：只在"完整提示被服务端拒掉"时用 —— 只给名字和赛道，
+  // 不带人设、不逐条查宿主角色，整条请求能短一大截
+  function st2sRosterTextSlim() {
+    const list = roster().slice(0, 8);
+    if (!list.length) return '';
+    return '【本次候选名单】primaryTag 只能从这里挑，名字一字不差：\n'
+      + list.map(c => `- ${c.name}（${c.category || ''}）`).join('\n');
+  }
+
   // ── 按主 tag 投递 ───────────────────────────────────────
   function st2sRouteByTag(primaryTag, fallback) {
     const tag = String(primaryTag || '').replace(/#/g, '').trim();
@@ -358,13 +367,39 @@
         + 'comments 一律给空数组。'
       ].filter(Boolean).join('\n\n');
 
-      const res = await window.aiGenerate({
-        characterId: String(anchor.characterId || anchor.id),
-        appTags: ['supertopic'],
-        presetIds: ['luma_st_plaza_ecosystem', 'luma_st_persona_pool',
-                    'luma_st_voice_corpus', 'luma_st_posts_protocol'],
-        instruction: await st2sBuildContext(anchor, extra)
-      });
+      const fullInstruction = await st2sBuildContext(anchor, extra);
+      let res = null;
+      try {
+        res = await window.aiGenerate({
+          characterId: String(anchor.characterId || anchor.id),
+          appTags: ['supertopic'],
+          presetIds: ['luma_st_plaza_ecosystem', 'luma_st_persona_pool',
+                      'luma_st_voice_corpus', 'luma_st_posts_protocol'],
+          instruction: fullInstruction
+        });
+      } catch (e1) {
+        // 服务端可以整条拒掉请求（400 / 413 / 上下文超长）。别再让用户干瞪眼：
+        // 换成"精简提示 + 只带输出协议"自动再发一次，通常就过了。
+        console.warn('[st2s] 完整提示被服务端拒了，改用精简提示重试:', e1 && e1.message);
+        const slimInstruction = [
+          `【本次锚定超话】#${anchor.name}超话#`,
+          st2sRosterTextSlim(),
+          '【本次任务】生成 3~4 条超话帖子，primaryTag 只能从上面名单里挑；'
+            + '其中至少 1 条落在锚定超话里。约三成帖子由名单里的角色本人发出（author.isChar:true）。'
+            + 'comments 一律给空数组。'
+        ].filter(Boolean).join('\n\n');
+        try {
+          res = await window.aiGenerate({
+            // 不带 characterId：角色人设不再进系统提示，整条请求更短（本任务不需要人设）
+            appTags: ['supertopic'],
+            presetIds: ['luma_st_voice_corpus', 'luma_st_posts_protocol'],
+            instruction: slimInstruction
+          });
+        } catch (e2) {
+          console.warn('[st2s] 精简重试也失败:', e2 && e2.message);
+          throw e1;   // 报第一次的真实原因，不要报重试造成的次生错误
+        }
+      }
       const parsed = window.extractJsonFromText && res && res.text
         ? window.extractJsonFromText(res.text) : null;
       let raw = parsed && Array.isArray(parsed.posts) ? parsed.posts
