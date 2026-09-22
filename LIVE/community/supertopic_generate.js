@@ -127,22 +127,26 @@
         .join('\n');
   }
 
-  async function st2sBuildContext(anchor, extra) {
+  async function st2sBuildContext(anchor, extra, opts) {
+    // opts.lean：不带"宿主里的长文本"（角色人设、世界书），用来绕开服务端风控/体量限制
+    const lean = !!(opts && opts.lean);
     const parts = [];
     parts.push(`【本次锚定超话】#${anchor.name}超话#（用户是在这个超话点的刷新，`
       + `但这一批帖子不必都归它，primaryTag 由你按每条在写谁来定）`);
-    const r = await st2sRosterText();
+    const r = lean ? st2sRosterTextSlim() : await st2sRosterText();
     if (r) parts.push(r);
 
-    try {
-      if (window.api && api.world && typeof api.world.list === 'function') {
-        const ws = (await api.world.list()) || [];
-        const wt = ws.slice(0, 4)
-          .map(en => `${(en && en.title) || ''}：${(en && (en.content || en.text)) || ''}`)
-          .join('\n').slice(0, 700);
-        if (wt.trim()) parts.push(`【世界书摘要】\n${wt}`);
-      }
-    } catch (e) {}
+    if (!lean) {
+      try {
+        if (window.api && api.world && typeof api.world.list === 'function') {
+          const ws = (await api.world.list()) || [];
+          const wt = ws.slice(0, 4)
+            .map(en => `${(en && en.title) || ''}：${(en && (en.content || en.text)) || ''}`)
+            .join('\n').slice(0, 700);
+          if (wt.trim()) parts.push(`【世界书摘要】\n${wt}`);
+        }
+      } catch (e) {}
+    }
 
     const d = new Date();
     const hh = d.getHours();
@@ -358,45 +362,48 @@
     // 刷新期间只留按钮上的转圈圈：不再弹整屏遮罩、不再弹"正在生成"播报
 
     try {
-      const extra = [
-        st2sAvoidEcho(),
-        `【本次任务】生成 5~7 条超话帖子（具体几条你定），primaryTag 从候选名单里自由分配，`
-        + '不必都落在锚定超话上。约三成帖子由名单里的角色本人亲自发出'
-        + '（author.isChar 标记）—— 是谁随机，他可以去别人超话发，也可以在自己超话发。'
-        + '其中至少 1 条要落在锚定超话里（用户就是在这个超话点的刷新）。'
-        + 'comments 一律给空数组。'
-      ].filter(Boolean).join('\n\n');
-
-      const fullInstruction = await st2sBuildContext(anchor, extra);
+      // 两发请求的差别被压到一个变量上，出问题好定位：
+      //   第 1 发 = 4 条预设 + 精简上下文（不带角色人设/名单人设/世界书）
+      //   第 2 发 = 2 条预设 + 同一个精简上下文（只少了 plaza_ecosystem 与 persona_pool）
+      // 这样——第 1 发就过 ⇒ 触发点是"宿主里的长文本"；只有第 2 发过 ⇒ 触发点在那 2 条预设里。
+      const extras = {
+        full: [st2sAvoidEcho(),
+               '【本次任务】生成 5~7 条超话帖子（具体几条你定），primaryTag 从候选名单里自由分配，'
+               + '不必都落在锚定超话上。约三成帖子由名单里的角色本人亲自发出（author.isChar 标记）—— '
+               + '是谁随机，他可以去别人超话发，也可以在自己超话发。'
+               + '其中至少 1 条要落在锚定超话里（用户就是在这个超话点的刷新）。comments 一律给空数组。'
+              ].filter(Boolean).join('\n\n'),
+        slim: [st2sAvoidEcho(),
+               '【本次任务】生成 3~4 条超话帖子，primaryTag 只能从上面名单里挑；'
+               + '其中至少 1 条落在锚定超话里。约三成帖子由名单里的角色本人发出（author.isChar:true）。'
+               + 'comments 一律给空数组。'
+              ].filter(Boolean).join('\n\n')
+      };
+      const leanInstruction = async (which) => {
+        const t = await st2sBuildContext(anchor, extras[which], { lean: true });
+        console.log(`[st2s] 本次请求(${which}) 提示长度=${t.length} 字`);
+        return t;
+      };
       let res = null;
       try {
         res = await window.aiGenerate({
-          characterId: String(anchor.characterId || anchor.id),
+          // 不带 characterId：角色人设不进系统提示（这一发专门用来试探"长文本触发的风控"）
           appTags: ['supertopic'],
           presetIds: ['luma_st_plaza_ecosystem', 'luma_st_persona_pool',
                       'luma_st_voice_corpus', 'luma_st_posts_protocol'],
-          instruction: fullInstruction
+          instruction: await leanInstruction('full')
         });
       } catch (e1) {
-        // 服务端可以整条拒掉请求（400 / 413 / 上下文超长）。别再让用户干瞪眼：
-        // 换成"精简提示 + 只带输出协议"自动再发一次，通常就过了。
-        console.warn('[st2s] 完整提示被服务端拒了，改用精简提示重试:', e1 && e1.message);
-        const slimInstruction = [
-          `【本次锚定超话】#${anchor.name}超话#`,
-          st2sRosterTextSlim(),
-          '【本次任务】生成 3~4 条超话帖子，primaryTag 只能从上面名单里挑；'
-            + '其中至少 1 条落在锚定超话里。约三成帖子由名单里的角色本人发出（author.isChar:true）。'
-            + 'comments 一律给空数组。'
-        ].filter(Boolean).join('\n\n');
+        // 服务端整条拒掉请求（400/413/风控/超长）时自动降一级再发一次，别让用户干瞪眼
+        console.warn('[st2s] 第 1 发（4 条预设）被服务端拒了，改用 2 条预设重试:', e1 && e1.message);
         try {
           res = await window.aiGenerate({
-            // 不带 characterId：角色人设不再进系统提示，整条请求更短（本任务不需要人设）
             appTags: ['supertopic'],
             presetIds: ['luma_st_voice_corpus', 'luma_st_posts_protocol'],
-            instruction: slimInstruction
+            instruction: await leanInstruction('slim')
           });
         } catch (e2) {
-          console.warn('[st2s] 精简重试也失败:', e2 && e2.message);
+          console.warn('[st2s] 第 2 发也失败:', e2 && e2.message);
           throw e1;   // 报第一次的真实原因，不要报重试造成的次生错误
         }
       }
